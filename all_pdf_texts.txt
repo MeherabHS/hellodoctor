@@ -1,0 +1,884 @@
+================ Hello Doctor [B] (1).pdf (1 pages) ================
+
+
+================ Hello Doctor [B] (10).pdf (5 pages) ================
+--- Page 1 ---
+Ask History
+12:30
+Start New Chat
+--- Page 2 ---
+12:30
+Ask History
+Dr. Sabrina Akter 10:32 PM
+Doctor kothay dekhaben? 99+
+Dr. Anik Sarkar  
+u nl li is real hai 
+Dr. Shahidul Alam
+u nl li is real hai 
+Dr. Sauda Rahman
+u nl li is real hai 
+Dr. T arequl Islam
+u nl li is real hai 
+Dr. Anik Sarkar
+u nl li is real hai 
+Dr. Shahidul Alam
+u nl li is real hai 
+Start New Chat
+--- Page 3 ---
+12:30
+Dr. Sabrina Akter
+Lorem ipsum dolor sit amet, adipiscida 
+quis ornare accumsan, blandit sed 
+diam. bah khub valo toh. bala hoise
+Lorem ipsum dolor sit amet, adipiscida 
+quis ornare accumsan, blandit sed 
+diam. bah khub valo toh. bala hoise
+Type a message
+--- Page 4 ---
+Ask A Free Question
+Enter Patient Details Below
+12:30
+Select Speciality
+Save
+--- Page 5 ---
+Explain Y our Problem
+Enter Patient Details Below
+12:30
+Select Doctor’s Speciality
+হৃদরোগ বিশেষজ্ঞ 
+মেডিসিন বিশেষজ্ঞ  রর  ন ন  র  
+হৃদরোগ বিশেষজ্ঞ 
+Select Speciality
+কিডনি বিশেষজ্ঞ 
+হৃদরোগ বিশেষজ্ঞ 
+নাক কান ও গলা  বিশেষজ্ঞ Continue
+গাইণী  বিশেষজ্ঞ 
+হৃদরোগ বিশেষজ্ঞ 
+ফিজিক্যাল মেডিসিন বিশেষজ্ঞ 
+নাক কান ও গলা  বিশেষজ্ঞ
+
+
+================ Hello Doctor [B] (11).pdf (6 pages) ================
+--- Page 1 ---
+Packages History
+12:30
+Add New Record
+--- Page 2 ---
+Consultation At Home
+Enter Patient Details Below
+12:30
+Which Country & Which Hospital Do Y ou 
+Want to T reatment?
+Patient’s Basic Information
+Patient’s Present Address
+Save & Next
+--- Page 3 ---
+Add Medical Records
+Type of Records
+Documents
+Upload Records
+12:30
+Prescription
+ptottc
+Add Record
+--- Page 4 ---
+Add Medical Records
+Type of Records
+Report
+Upload Records
+12:30
+Documents
+ttcore
+Add Record
+--- Page 5 ---
+12:30
+Packages History
+There are many variations of passages of 
+Lorem Ipsum available, but the....
+Imtiaz Hossain (56yrs)  2 Feb at 08:15 PM
+There are many variations of passages of 
+Lorem Ipsum available, but the....
+Imtiaz Hossain (56yrs)  2 Feb at 08:15 PM
+There are many variations of passages of 
+Lorem Ipsum available, but the....
+Imtiaz Hossain (56yrs)  2 Feb at 08:15 PM
+There are many variations of passages of 
+Lorem Ipsum available, but the....
+Imtiaz Hossain (56yrs)  2 Feb at 08:15 PM
+There are many variations of passages of 
+Lorem Ipsum available, but the....
+Imtiaz Hossain (56yrs)  2 Feb at 08:15 PM
+Add New Record
+--- Page 6 ---
+12:30
+Patient’s Profile
+ame Imtiaz Hossain
+etails Lorem Ipsum is simply dummy text 
+of the printing and typesetting 
+industry. Lorem Ipsum has been 
+the industry's standard dummy 
+text ever since the 1500s
+ge 24
+ex Male
+elation Husband
+Mobile o +88016 554 889
+ddress Lorem Ipsum is simply dummy text 
+of the printing and typesetting 
+industry. Lorem Ipsum has
+Bangladeshountry
+Medical Records
+Prescription
+2 Feb 2018 at 08:30PM
+Document
+2 Feb 2018 at 08:30PM
+Prescription
+2 Feb 2018 at 08:30PM
+Document
+2 Feb 2018 at 08:30PM
+
+
+================ Hello Doctor [B] (12).pdf (6 pages) ================
+--- Page 3 ---
+#D45500 #FD8636 #1BC1A0 #15967C #262626
+#79CA01 #FE2B73 #4CABFF #B14AFD #FD4AD6
+#4A5CFD
+
+
+================ Hello Doctor [B] (13).pdf (1 pages) ================
+--- Page 1 ---
+Typography
+Font-famil y Font-size Line-height Font-weight Weight Variants
+Title 1
+Title 2
+Title 3
+Lato
+Lato
+Lato
+24px
+20px
+18px
+36px
+30px
+30px
+Regular
+Medium
+Medium
+Title 4
+Body T ext 1
+Lato
+Lato
+16px
+16px
+24px
+24px
+Semi-Bold
+Regular
+Body T ext 2 Lato 14px 20px Regular Medium
+Body T ext 3 Lato 12px 18px Regular Medium
+Caption Lato 10px 14px Regular Medium
+Download font 
+https://fonts.google.com/specimen/Lato
+
+
+================ Hello Doctor [B] (14).pdf (2 pages) ================
+--- Page 1 ---
+Buttons & Links
+States
+Primary
+Button
+Button
+Button
+Button
+Normal
+Hover
+Disabled
+Loading
+Outline
+Button
+Button
+Button
+Button
+Link Button
+Link
+Forms
+States
+Enter your emailNormal
+Enter your emailActive
+emailname@emInput
+emailname@email.comFilled
+emailname@email.comInput Success
+emailname@email
+Error description
+Enter your email
+Input Error
+Disabled
+Form Without Icon
+Some tet goes here
+Some tet goes here
+emailname@em
+emailname@email.com
+emailname@em
+emailname@em
+Error description
+Some tet goes here
+Dropdown
+Dropdown option
+Item 1 goes here
+Item 2 goes here
+Item 3 goes here
+--- Page 2 ---
+Radio Button
+Normal
+Radio Button
+Selected
+Radio Button
+T oggle 
+T oggle Off T oggle On
+Orderlist & Unorderlist
+Bullet Point 1 1- Orderlist goes here
+Bullet Point 2 2- Orderlist goes here
+
+
+================ Hello Doctor [B] (15).pdf (2 pages) ================
+--- Page 1 ---
+12:30
+Welcome John Doe
+Video 
+Consultation
+Chat With a 
+Doctor
+Consultation 
+at Home
+Order 
+Medicines
+Ask A Free 
+Questions
+Get Special 
+Health Package
+Add Medical 
+Record
+Dr. Gorgia Meek
+Medicine Specialist
+08:30 PM
+Dr. Gorgia Meek
+Medicine Specialist
+08:30 PM
+Y ou don’t have any 
+medicine today
+Home
+
+
+================ Hello Doctor [B] (2).pdf (4 pages) ================
+--- Page 1 ---
+12:30
+Welcome to Hello Doctor
+SIGN IN
+oret or aord
+Get Started
+--- Page 2 ---
+12:30
+Create an account
+ner or ll deils elo
+rae
+aiaddre
+Mie
+aeir
+le emle er
+Single Married
+ard
+T erms & 
+SIGN UP
+lred  memer Sign In
+ signing  o gree o or 
+Conditions
+--- Page 3 ---
+12:30
+Registration has been successfuly 
+completed.
+LOGIN
+--- Page 4 ---
+12:30
+Create an account
+ner or ll deails elo
+ne
+ile
+ilen
+ei
+Male Female er
+Single Married
+T erms & 
+SIGN UP
+lread a memer Sign In
+ sinin  o aree o or 
+Conditions
+
+
+================ Hello Doctor [B] (3).pdf (1 pages) ================
+--- Page 1 ---
+12:30
+Welcome John Doe
+       
+  
+Video 
+Consultation
+Chat With a 
+Doctor
+Consultation 
+at Home
+Order 
+Medicines
+Ask A Free 
+Questions
+Get Special 
+Health Package
+Add Medical 
+Record
+Partners
+Offer
+  
+Dr. Gorgia Meek
+Medicine Specialist
+08:30 PM
+Health
+Products
+Dr. Gorgia Meek
+Medicine Specialist
+08:30 PM
+Y ou don’t have any 
+medicine today
+Home
+
+
+================ Hello Doctor [B] (4).pdf (2 pages) ================
+--- Page 1 ---
+12:30
+Notification
+ 2 Feb 2018
+Hello Doctor daktar er kach theke sheba nile 
+sms advice peye jaben apnar mobile e. T onic 
+daktar er poramorsho nite dial karun 789 
+jekono problem e 24 hour proti din
+ 2 Feb 2018
+Hello Doctor daktar er kach theke sheba nile 
+sms advice peye jaben apnar mobile e. T onic 
+daktar er poramorsho nite dial karun 789 
+jekono problem e 24 hour proti din
+ 2 Feb 2018
+Hello Doctor daktar er kach theke sheba nile 
+sms advice peye jaben apnar mobile e. T onic 
+daktar er poramorsho nite dial karun 789 
+jekono problem e 24 hour proti din
+Home rticles
+9+
+Notification role
+--- Page 2 ---
+Notification
+12:30
+Notification
+
+
+================ Hello Doctor [B] (5).pdf (6 pages) ================
+--- Page 1 ---
+Articles
+12:30
+ক্যান্সার কেয়ার শিশু স্বাস্থ্য পরাম 
+ফিজিওথেরাপি রুপচ া
+লিভার পরিচা
+Articles
+ দ ঁতের যত্নের যত কথা
+9+
+--- Page 2 ---
+ক্যান্সার কেয়ার 
+ভিটামিন ডি-র ঘাটতি ডেকে আনে 
+নানা সমস্যা 
+হ্যালো ডাক্তার ব্লগ টিম, ২৭ শে আগস্ট, ২০১৮
+12:30
+ভিটামিন ডি-র ঘাটতি ডেকে আনে 
+নানা সমস্যা 
+হ্যালো ডাক্তার ব্লগ টিম, ২৭ শে আগস্ট, ২০১৮
+ভিটামিন ডি-র ঘাটতি ডেকে আনে 
+নানা সমস্যা 
+হ্যালো ডাক্তার ব্লগ টিম, ২৭ শে আগস্ট, ২০১৮
+ভিটামিন ডি-র ঘাটতি ডেকে আনে 
+নানা সমস্যা 
+হ্যালো ডাক্তার ব্লগ টিম, ২৭ শে আগস্ট, ২০১৮
+ভিটামিন ডি-র ঘাটতি ডেকে আনে 
+নানা সমস্যা 
+হ্যালো ডাক্তার ব্লগ টিম, ২৭ শে আগস্ট, ২০১৮
+--- Page 3 ---
+12:30
+1
+q
+2
+w
+3
+e
+4
+r
+5
+t
+6
+y
+7
+u
+8
+i
+9
+o
+0
+p
+a s
+z
+d
+x
+f
+c
+g
+v
+h
+b
+j
+n
+k
+m
+l
+--- Page 4 ---
+Fitness
+12:30
+1
+q
+2
+w
+3
+e
+4
+r
+5
+t
+6
+y
+7
+u
+8
+i
+9
+o
+0
+p
+a s
+z
+d
+x
+f
+c
+g
+v
+h
+b
+j
+n
+k
+m
+l
+--- Page 5 ---
+Fitness
+The Healthiest People in the 
+World Don’t Go to the Gym
+12:30
+Hello Doctor Blog Team, 27 Aug 2018
+The Healthiest People in the 
+World Don’t Go to the Gym
+Hello Doctor Blog Team, 27 Aug 2018
+The Healthiest People in the 
+World Don’t Go to the Gym
+Hello Doctor Blog Team, 27 Aug 2018
+The Healthiest People in the 
+World Don’t Go to the Gym
+Hello Doctor Blog Team, 27 Aug 2018
+The Healthiest People in the 
+World Don’t Go to the Gym
+Hello Doctor Blog Team, 27 Aug 2018
+--- Page 6 ---
+Article Details
+ভিটামিন ডি-র ঘাটতি ডেকে 
+আনে নানা সমস্যা 
+হ্যালো ডাক্তার ব্লগ টিম, ২৭ শে আগস্ট, ২০১৮
+12:30
+কত জটিলতা সংশয় সন্দেহের পর পদ্মার বকে মাথা 
+ত লতে শুরু করেছে পদ্মা সেত । পাশাপাশি ঢাকা 
+থেকে ফরিদপরের ভাঙ্গা পন্ত চলছে এশিয়ান 
+হাইওয়ের কাজ।
+স্বপ্নের পদ্মাসেত
+কত জটিলতা সংশয় সন্দেহের পর পদ্মার বকে মাথা 
+ত লতে শুরু করেছে পদ্মা সেত । পাশাপাশি ঢাকা 
+থেকে ফরিদপরের ভাঙ্গা পন্ত চলছে এশিয়ান 
+হাইওয়ের কাজ। দই দিকের রাস্তা প্রশস্তকরন, ছোট 
+বড় অনেকগুলি সেত  ও ফ্লাইওভারের নিাণকাজ 
+দেখে সত্যি মনটা ভরে যায়। আমার কাছে এখনও 
+অবিশ্বাস্য মনে হচ্ছে ঢাকা মাত্র ৪৫ মিনিটে যাওয়া 
+যাবে ফরিদপরের ভাঙ্গায়!
+কত জটিলতা সংশয় সন্দেহের পর পদ্মার বকে মাথা 
+ত লতে শুরু করেছে পদ্মা সেত । পাশাপাশি ঢাকা 
+থেকে ফরিদপরের ভাঙ্গা পন্ত চলছে এশিয়ান 
+হাইওয়ের কাজ।
+Bullet Point 1
+Bullet Point 2
+Bullet Point 3
+Only it's not just a joke. According to a new 
+study from the University of T exas in Austin, 
+using a teen's rebellious tendencies.
+কত জটিলতা সংশয় সন্দেহের পর পদ্মার বকে মাথা 
+ত লতে শুরু করেছে পদ্মা সেত । পাশাপাশি ঢাকা 
+থেকে ফরিদপরের ভাঙ্গা পন্ত চলছে এশিয়ান 
+হাইওয়ের কাজ।
+
+
+================ Hello Doctor [B] (6).pdf (5 pages) ================
+--- Page 1 ---
+Order Medicine 
+12:30
+Order New Medicine
+--- Page 2 ---
+Order New Medicine
+12:30
+প্রয়োজনীয় তথ্য ও প্রেসক্রিপশন সাবমিটকরার পর 
+হ্যালোডাক্তার আপনাকে একটিইনভয়েস পাঠাবে। আপনি 
+অ ার কনফাকরলে আপনাকে মেডিসিন পাঠানো হবে।
+Enter Y our Details Below
+Attach Prescription
+Order Medicine Now
+--- Page 3 ---
+Order New Medicine
+12:30
+প্রয়োজনীয় তথ্য ও প্রেসক্রিপশন সাবমিটকরার পর 
+হ্যালোডাক্তার আপনাকে একটিইনভয়েস পাঠাবে। আপনি 
+অ ার কনফাকরলে আপনাকে মেডিসিন পাঠানো হবে।
+Enter Y our Details Below
+Attach Prescription
+Order Medicine Now
+--- Page 4 ---
+12:30
+Order Medicine 
+Medicine order 1 Pending
+   
+VIEW ORDER
+Medicine order 2 Delivered
+   
+VIEW ORDER
+Medicine order 3
+   
+VIEW ORDER
+Medicine order 3
+   
+Canceled
+Prending
+VIEW ORDER
+Order New Medicine
+--- Page 5 ---
+12:30
+Order Medicine 
+Medicine order 1 Pending
+   
+VIEW ORDER
+Medicine order 2 Delivered
+   
+VIEW ORDER
+Medicine order 3
+   
+VIEW ORDER
+Medicine order 3
+   
+VIEW ORDER
+Canceled
+Prending
+
+
+================ Hello Doctor [B] (7).pdf (6 pages) ================
+--- Page 1 ---
+Chat With a Doctor
+12:30
+Start New Chat
+--- Page 2 ---
+12:30
+Chat Request
+Dr. Sabrina Akter 10:32 PM
+Doctor kothay dekhaben? 99+
+Dr. Anik Sarkar  
+u nl li is real hai 
+Dr. Shahidul Alam
+u nl li is real hai 
+Dr. Sauda Rahman
+u nl li is real hai 
+Dr. T arequl Islam
+u nl li is real hai 
+Dr. Anik Sarkar
+u nl li is real hai 
+Dr. Shahidul Alam
+u nl li is real hai 
+Start New Chat
+--- Page 3 ---
+12:30
+Dr. Sabrina Akter
+Lorem ipsum dolor sit amet, adipiscida 
+quis ornare accumsan, blandit sed 
+diam. bah khub valo toh. bala hoise
+Lorem ipsum dolor sit amet, adipiscida 
+quis ornare accumsan, blandit sed 
+diam. bah khub valo toh. bala hoise
+Type a message
+--- Page 4 ---
+Explain Y our Problem
+Enter Patient Details Below
+12:30
+Select Speciality
+Continue
+--- Page 5 ---
+Explain Y our Problem
+Enter Patient Details Below
+12:30
+Select Doctor’s Speciality
+হৃদরোগ বিশেষজ্ঞ 
+মেডিসিন বিশেষজ্ঞ  রর  ন ন  র  
+হৃদরোগ বিশেষজ্ঞ 
+Select Speciality
+কিডনি বিশেষজ্ঞ 
+হৃদরোগ বিশেষজ্ঞ 
+নাক কান ও গলা  বিশেষজ্ঞ Continue
+গাইণী  বিশেষজ্ঞ 
+হৃদরোগ বিশেষজ্ঞ 
+ফিজিক্যাল মেডিসিন বিশেষজ্ঞ 
+নাক কান ও গলা  বিশেষজ্ঞ
+--- Page 6 ---
+Confirm And Pay
+12:30
+কনসাল্টেসন ফি ৬৩০ টাকা 
+আপনার  নিত ওয়ার ৩০ নির 
+ ন ভেফা  চ্যাট  
+যোগ দিন
+৩ দিন ফ্রি ফলোআপ
+১০০% নিরাপদ ও প্রায়ভেট চ্যাট 
+দ্রত যোগাযোগ 
+Confirm Payment
+
+
+================ Hello Doctor [B] (8).pdf (6 pages) ================
+--- Page 1 ---
+Call History
+12:30
+Start New Call
+--- Page 2 ---
+12:30
+Call History
+There are many variations of passages of 
+Lorem Ipsum available, but the....
+Imtiaz Hossain  2 Feb at 08:15 PM
+Lorem Ipsum is simply dummy text of the 
+printing and typesetting industry....
+Imtiaz Hossain  2 Feb at 08:15 PM
+There are many variations of passages of 
+Lorem Ipsum available, but the....
+Imtiaz Hossain  2 Feb at 08:15 PM
+Lorem Ipsum is simply dummy text of the 
+printing and typesetting industry......
+Imtiaz Hossain  2 Feb at 08:15 PM
+There are many variations of passages of 
+Lorem Ipsum available, but the....
+Imtiaz Hossain  2 Feb at 08:15 PM
+Start New Call
+--- Page 3 ---
+12:30
+Patient’s Profile
+ame Imtiaz Hossain
+etails Lorem Ipsum is simply dummy text 
+of the printing and typesetting 
+industry. Lorem Ipsum has been 
+the industry's standard dummy 
+text ever since the 1500s
+ge 24
+ex Male
+elation Husband
+Mobile o +88016 554 889
+ddress Lorem Ipsum is simply dummy text 
+of the printing and typesetting 
+industry. Lorem Ipsum has
+Confirm
+--- Page 4 ---
+Consultation At Home
+Enter Patient Details Below
+12:30
+Select Speciality
+Patient’s Basic Information
+Patient’s Present Address
+Continue
+--- Page 5 ---
+C on firm A nd P a y
+12:30
+কনসাল্টেসন ফি ৬৩০ টাকা 
+পনার  ত হয়ার  র মধ্যে 
+একজন রিা সকল কেয়ার 
+প্রনাল বাসায় প যান।
+সেবা প্রপ্তির সময় কাসন  পরিো করুন।
+জরুরী স্বাস্থ্য পরাম র জন্য এ সেবা প্রযোজ্য নয়। 
+সকাল ৭ টা থেকে রাত ৯ টার মধ্যে সেবা প্রদান করা 
+হয়। অন্য সময় সেবা প্রাপ্তি দেরি হতে পারে 
+C on firm
+--- Page 6 ---
+Thank Y ou
+12:30
+We have received your appointment 
+request. Our agent will get to you 
+between the time 8 am to 10 pm to 
+reconfirm your appointment
+Go T o Home
+Call History
+
+
+================ Hello Doctor [B] (9).pdf (4 pages) ================
+--- Page 1 ---
+Medical Record
+12:30
+Add New Record
+--- Page 2 ---
+12:30
+Medical Record
+Prescription
+2 Feb 2018 at 08:30PM
+Documents
+2 Feb 2018 at 08:30PM
+Prescription
+2 Feb 2018 at 08:30PM
+Documents
+2 Feb 2018 at 08:30PM
+Prescription
+2 Feb 2018 at 08:30PM
+Documents
+2 Feb 2018 at 08:30PM
+Add New Rocord
+--- Page 3 ---
+Add Medical Records
+Type of Records
+Report
+Upload Records
+12:30
+Documents
+ptottc
+Order Medicine Now
+--- Page 4 ---
+Add Medical Records
+Type of Records
+Report
+Upload Records
+12:30
+Documents
+ttcore
+Order Medicine Now
+
+
+================ Hello Doctor [B].pdf (9 pages) ================
+--- Page 1 ---
+My Profile
+12:30
+Georgia Meek
+   
+Profile Settings
+Change Password
+Language Preferance
+Notification
+Log Out
+Profile
+--- Page 2 ---
+My Profile
+12:30
+Georgia Meek
+   
+Profile Settings
+Change Password
+Language Preferance
+Notification
+Log Out
+Profile
+--- Page 3 ---
+12:30
+Profile Settings
+Full Name Georia Mee
+Gender Female
+Date of Birth  May 
+Mobile No   
+Address ouse  oad  
+Country Banladesh
+--- Page 4 ---
+12:30
+Profile Settings
+Full Name Georia Mee
+Gender Female
+Date of Birth  May 
+Mobile No   
+Address ouse  oad  
+Country Banladesh
+Y our Full Name
+Cancel OK
+--- Page 5 ---
+12:30
+Profile Settings
+Full Name Georia Mee
+Gender Female
+Date of Birth  May 
+Mobile No   
+Address ouse  oad  
+Country Banladesh
+Change Y our Mobile No.
+Cancel OK
+--- Page 6 ---
+12:30
+Profile Settings
+Full Name Georia Mee
+Gender Female
+Date of Birth  May 
+Mobile No   
+Address ouse  oad  
+Country Banladesh
+Select Gender
+Male
+Female
+--- Page 7 ---
+Profile Settings
+Full Name Georia Mee
+Gender Female
+Date of Birth  May 
+Mobile No 0  
+Address
+12:30
+Choose Date of Birth ouse  oad  
+eCountry 1
+1
+Banladesh 201
+201
+Nov 18 2018
+e
+a
+1
+20
+201
+2020
+Thursday, 18 November 2018
+Cancel OK
+--- Page 8 ---
+Address
+12:30
+--- Page 9 ---
+Country
+12:30
+Afghanistan
+Albania
+Australia
+Argentina
+Bahrain
+Bangladesh
+Barbados
+Belgium
+Brazil
+Canada
+Cameroon
+Cape Verde
+
+

@@ -1,0 +1,1073 @@
+const fs = require('fs');
+
+const adminHtml = `  <div id="adminPortalShell" class="admin-portal-shell" style="display:none;">
+    <!-- Left Sidebar (Full Height, Pure White, matching reference) -->
+    <aside class="admin-sidebar">
+      <div class="admin-sidebar-header">
+        <div class="admin-brand-icon">H</div>
+        <div style="display:flex; flex-direction:column;">
+          <span class="admin-brand-name">HelloDoctor</span>
+          <span style="font-size:9.5px; color:#64748B; font-weight:700; letter-spacing:0.5px; text-transform:uppercase;">Central Admin</span>
+        </div>
+      </div>
+
+      <nav class="admin-sidebar-nav">
+        <div class="admin-nav-item active" id="adminNav-doctors" onclick="switchAdminPage('doctors')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
+          <span>Settlements &amp; Payouts</span>
+          <span class="admin-nav-badge amber">4 Pending</span>
+        </div>
+
+        <div class="admin-nav-item" id="adminNav-command" onclick="switchAdminPage('command')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Command Center</span>
+          <span style="width:7px; height:7px; border-radius:50%; background:#10B981; margin-left:auto;"></span>
+        </div>
+
+        <div class="admin-nav-item" id="adminNav-slots" onclick="switchAdminPage('slots')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span>Slot Matrix &amp; Locks</span>
+        </div>
+
+        <div class="admin-nav-item" id="adminNav-patients" onclick="switchAdminPage('patients')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Patients Directory</span>
+        </div>
+
+        <div class="admin-nav-item" id="adminNav-bmdc" onclick="switchAdminPage('bmdc')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
+          <span>BMDC Credentialing</span>
+          <span class="admin-nav-badge blue">3</span>
+        </div>
+
+        <div class="admin-nav-item" id="adminNav-compliance" onclick="switchAdminPage('compliance')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Rx &amp; Q&amp;A Audit</span>
+        </div>
+      </nav>
+
+      <div class="admin-sidebar-footer">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="width:7px; height:7px; border-radius:50%; background:#10B981;"></span>
+          <span style="font-weight:700; color:#475569;">Core Gateway v2.4</span>
+        </div>
+        <span style="color:#94A3B8;">DGHS Uplink</span>
+      </div>
+    </aside>
+
+    <!-- Main Wrapper (Topbar + Content Area) -->
+    <div class="admin-main-wrapper">
+      <!-- Clean White Topbar matching user reference -->
+      <header class="admin-topbar">
+        <div class="admin-topbar-left">
+          <h1 class="admin-page-title" id="adminPageHeaderTitle">Telehealth Financial Settlement</h1>
+          <span class="admin-breadcrumb" id="adminBreadcrumb">Central Operations • Multi-Channel Doctor Wallet Disbursement</span>
+        </div>
+
+        <div class="admin-topbar-right">
+          <div class="admin-search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="adminGlobalSearchInput" placeholder="Search doctor, BMDC #, patient ID, TxID..." oninput="handleAdminGlobalSearch(this.value)">
+          </div>
+
+          <button class="admin-16263-btn" onclick="trigger16263BridgeModal()">
+            <span style="width:7px; height:7px; border-radius:50%; background:#DC2626; animation:pulse 1.5s infinite;"></span>
+            <span>🚨 16263 Helpline Bridge</span>
+          </button>
+
+          <div class="admin-top-icon-btn" title="Pending Notifications" onclick="showAppToast('Central Notifications', '3 BMDC physician applications pending review.', 'info', '🔔')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <span class="badge-dot"></span>
+          </div>
+
+          <div class="admin-user-pill">
+            <div class="admin-avatar">AR</div>
+            <div style="display:flex; flex-direction:column;">
+              <span class="admin-user-name">Amina Rashid</span>
+              <span class="admin-user-role">Clinical Ops Director</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Scrollable Canvas Area -->
+      <main class="admin-content-area">
+
+        <!-- ═════════════════════════════════════════════════════════
+             PAGE 1: SETTLEMENTS & DOCTOR WALLET PAYOUTS (REFERENCE MATCH)
+             ═════════════════════════════════════════════════════════ -->
+        <div class="admin-page-view active" id="adminPage_doctors">
+          <!-- Page Header Row -->
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h2 style="font-size:20px; font-weight:850; color:#0F172A; margin:0; letter-spacing:-0.4px;">Doctor Wallet Payout Dashboard</h2>
+              <div style="font-size:12px; color:#64748B; margin-top:2px;">Automated 20% platform commission reconciliation and multi-channel payouts</div>
+            </div>
+
+            <button class="admin-batch-payout-btn" onclick="executeAdminBatchPayout()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>Process Batch Payout</span>
+              <span style="background:rgba(255,255,255,0.2); padding:2px 6px; border-radius:6px; font-size:10.5px; margin-left:4px;">bKash + Nagad</span>
+            </button>
+          </div>
+
+          <!-- 4 Metric Cards (Matching User Reference Image) -->
+          <div class="admin-kpi-grid">
+            <!-- Card 1: Gross Telehealth Revenue -->
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Gross Telehealth Revenue</span>
+                <div class="admin-kpi-val">৳ 2,450,000</div>
+                <div style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:750; color:#059669; background:#ECFDF5; padding:2px 7px; border-radius:6px;">
+                  <span>↗ +8.5% this month</span>
+                </div>
+              </div>
+              <div class="admin-kpi-icon-circle green">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              </div>
+            </div>
+
+            <!-- Card 2: 24h Chat Revenue -->
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">24h Chat Revenue (৳ 300 tier)</span>
+                <div class="admin-kpi-val">৳ 380,000</div>
+                <div style="font-size:11px; color:#2563EB; font-weight:700;">1,267 paid sessions</div>
+              </div>
+              <div class="admin-kpi-icon-circle blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+            </div>
+
+            <!-- Card 3: Platform Fee -->
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Platform Fee (20%)</span>
+                <div class="admin-kpi-val">৳ 490,000</div>
+                <div style="font-size:11px; color:#0D9488; font-weight:700;">calculated automated cut</div>
+              </div>
+              <div class="admin-kpi-icon-circle teal">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              </div>
+            </div>
+
+            <!-- Card 4: Pending Doctor Escrow -->
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Pending Doctor Wallet Escrow</span>
+                <div class="admin-kpi-val" id="adminEscrowDisplay">৳ 890,000</div>
+                <div style="font-size:11px; color:#D97706; font-weight:700;">Awaiting disbursement</div>
+              </div>
+              <div class="admin-kpi-icon-circle amber">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pending Doctor Payout Disbursements Table (Exact match to user's uploaded image) -->
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-title">Pending Doctor Payout Disbursements</div>
+                <div class="admin-card-subtitle">Click on any doctor row to view their complete consultation &amp; payout history</div>
+              </div>
+
+              <div style="display:flex; gap:8px;">
+                <button class="admin-filter-pill active">All Active (6)</button>
+                <button class="admin-filter-pill">Pending (4)</button>
+                <button class="admin-filter-pill">Settled (2)</button>
+              </div>
+            </div>
+
+            <div style="overflow-x:auto;">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Doctor Name</th>
+                    <th>BMDC Reg</th>
+                    <th>Completed Visits</th>
+                    <th>24h Chat Sessions</th>
+                    <th>Gross Earnings</th>
+                    <th>Platform Cut</th>
+                    <th>Net Payout (৳)</th>
+                    <th>Payout Method</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminDoctorsTableBody">
+                  <tr class="admin-clickable-row" onclick="openAdminDoctorHistoryModal('anika')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:34px; height:34px; border-radius:50%; background:#ECFDF5; color:#059669; display:grid; place-items:center; font-weight:800; font-size:12px;">AR</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Dr. Anika Rahman</strong>
+                          <div style="font-size:10.5px; color:#64748B;">Pediatric Specialist</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">BMDC 87452</span></td>
+                    <td><b>142</b></td>
+                    <td>108</td>
+                    <td>৳ 78,600</td>
+                    <td style="color:#64748B;">৳ 15,720</td>
+                    <td><b style="color:#0F172A; font-size:13.5px;">৳ 62,880</b></td>
+                    <td>
+                      <span class="payout-method-badge bkash">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                        <span>bKash Merchant</span>
+                      </span>
+                    </td>
+                    <td><span class="badge badge-amber doc-payout-status">Pending Settlement</span></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminDoctorHistoryModal('anika');">View History ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" onclick="openAdminDoctorHistoryModal('sadik')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:34px; height:34px; border-radius:50%; background:#EFF6FF; color:#2563EB; display:grid; place-items:center; font-weight:800; font-size:12px;">SA</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Dr. Sadik Al-Amin</strong>
+                          <div style="font-size:10.5px; color:#64748B;">General Medicine &amp; Diabetology</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">BMDC 71203</span></td>
+                    <td><b>115</b></td>
+                    <td>94</td>
+                    <td>৳ 61,250</td>
+                    <td style="color:#64748B;">৳ 12,250</td>
+                    <td><b style="color:#0F172A; font-size:13.5px;">৳ 49,000</b></td>
+                    <td>
+                      <span class="payout-method-badge nagad">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1.5 3 4 5 4 8a4 4 0 0 1-8 0c0-3 2.5-5 4-8z"/></svg>
+                        <span>Nagad</span>
+                      </span>
+                    </td>
+                    <td><span class="badge badge-amber doc-payout-status">Pending Settlement</span></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminDoctorHistoryModal('sadik');">View History ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" onclick="openAdminDoctorHistoryModal('farhana')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:34px; height:34px; border-radius:50%; background:#FAF5FF; color:#7E22CE; display:grid; place-items:center; font-weight:800; font-size:12px;">FY</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Dr. Farhana Yesmin</strong>
+                          <div style="font-size:10.5px; color:#64748B;">Gynaecology &amp; Obstetrics</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">BMDC 90150</span></td>
+                    <td><b>160</b></td>
+                    <td>122</td>
+                    <td>৳ 87,400</td>
+                    <td style="color:#64748B;">৳ 17,480</td>
+                    <td><b style="color:#0F172A; font-size:13.5px;">৳ 69,920</b></td>
+                    <td>
+                      <span class="payout-method-badge beftn">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M4 10h16v11H4zm2-7h12l3 5H3z"/></svg>
+                        <span>BEFTN Bank</span>
+                      </span>
+                    </td>
+                    <td><span class="badge badge-green doc-payout-status">Settled ✓</span></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminDoctorHistoryModal('farhana');">View History ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" onclick="openAdminDoctorHistoryModal('sabrina')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:34px; height:34px; border-radius:50%; background:#FEF3C7; color:#B45309; display:grid; place-items:center; font-weight:800; font-size:12px;">SA</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Dr. Sabrina Akter</strong>
+                          <div style="font-size:10.5px; color:#64748B;">Internal Medicine Consultant</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">BMDC 45821</span></td>
+                    <td><b>142</b></td>
+                    <td>94</td>
+                    <td>৳ 78,600</td>
+                    <td style="color:#64748B;">৳ 15,720</td>
+                    <td><b style="color:#0F172A; font-size:13.5px;">৳ 62,880</b></td>
+                    <td>
+                      <span class="payout-method-badge bkash">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                        <span>bKash Merchant</span>
+                      </span>
+                    </td>
+                    <td><span class="badge badge-amber doc-payout-status">Pending Settlement</span></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminDoctorHistoryModal('sabrina');">View History ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" onclick="openAdminDoctorHistoryModal('anika')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:34px; height:34px; border-radius:50%; background:#EFF6FF; color:#1D4ED8; display:grid; place-items:center; font-weight:800; font-size:12px;">KH</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Dr. Karim Hossain</strong>
+                          <div style="font-size:10.5px; color:#64748B;">Cardiology • National Heart Fdn</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">BMDC 81551</span></td>
+                    <td><b>128</b></td>
+                    <td>86</td>
+                    <td>৳ 72,000</td>
+                    <td style="color:#64748B;">৳ 14,400</td>
+                    <td><b style="color:#0F172A; font-size:13.5px;">৳ 57,600</b></td>
+                    <td>
+                      <span class="payout-method-badge nagad">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1.5 3 4 5 4 8a4 4 0 0 1-8 0c0-3 2.5-5 4-8z"/></svg>
+                        <span>Nagad</span>
+                      </span>
+                    </td>
+                    <td><span class="badge badge-amber doc-payout-status">Pending Settlement</span></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminDoctorHistoryModal('anika');">View History ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" onclick="openAdminDoctorHistoryModal('sadik')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:10px;">
+                        <div style="width:34px; height:34px; border-radius:50%; background:#ECFDF5; color:#047857; display:grid; place-items:center; font-weight:800; font-size:12px;">TI</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Dr. Tariqul Islam</strong>
+                          <div style="font-size:10.5px; color:#64748B;">Gastroenterology Consultant</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">BMDC 63402</span></td>
+                    <td><b>154</b></td>
+                    <td>110</td>
+                    <td>৳ 84,200</td>
+                    <td style="color:#64748B;">৳ 16,840</td>
+                    <td><b style="color:#0F172A; font-size:13.5px;">৳ 67,360</b></td>
+                    <td>
+                      <span class="payout-method-badge beftn">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M4 10h16v11H4zm2-7h12l3 5H3z"/></svg>
+                        <span>BEFTN Bank</span>
+                      </span>
+                    </td>
+                    <td><span class="badge badge-green doc-payout-status">Settled ✓</span></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminDoctorHistoryModal('sadik');">View History ↗</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div><!-- /#adminPage_doctors -->
+
+        <!-- ═════════════════════════════════════════════════════════
+             PAGE 2: EXECUTIVE COMMAND CENTER
+             ═════════════════════════════════════════════════════════ -->
+        <div class="admin-page-view" id="adminPage_command">
+          <!-- 4 KPIs -->
+          <div class="admin-kpi-grid">
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Total Consultations Today</span>
+                <div class="admin-kpi-val">1,480</div>
+                <div style="font-size:11px; color:#059669; font-weight:750;">↗ +12.5% vs yesterday</div>
+              </div>
+              <div class="admin-kpi-icon-circle green">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              </div>
+            </div>
+
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Active Specialists Online</span>
+                <div class="admin-kpi-val">142</div>
+                <div style="font-size:11px; color:#2563EB; font-weight:700;">22 on break • 94% on-duty</div>
+              </div>
+              <div class="admin-kpi-icon-circle blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/></svg>
+              </div>
+            </div>
+
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">24h Paid Chats Active</span>
+                <div class="admin-kpi-val">380</div>
+                <div style="font-size:11px; color:#7E22CE; font-weight:700;">1,500 live messages</div>
+              </div>
+              <div class="admin-kpi-icon-circle purple">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+            </div>
+
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Emergency 16263 Escalations</span>
+                <div class="admin-kpi-val" style="color:#DC2626;">16,263</div>
+                <div style="font-size:11px; color:#DC2626; font-weight:750;">Action Required • Red-flag signs</div>
+              </div>
+              <div class="admin-kpi-icon-circle red">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2-Column Command Layout -->
+          <div class="command-dashboard-grid">
+            <!-- Left: Hourly Volume Chart -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <div>
+                  <div class="admin-card-title">Hourly Consultation Volume &amp; Load</div>
+                  <div class="admin-card-subtitle">Peak shifts: Morning 08:00–12:00 AM &amp; Evening 05:00–10:00 PM</div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <button class="admin-filter-pill active" style="padding:4px 10px; font-size:11px;">Today</button>
+                  <button class="admin-filter-pill" style="padding:4px 10px; font-size:11px;">7 Days</button>
+                </div>
+              </div>
+
+              <!-- SVG Area Chart -->
+              <div style="background:#F8FAFC; border-radius:12px; padding:16px 12px; border:1px solid #E2E8F0;">
+                <svg viewBox="0 0 540 180" style="width:100%; height:160px; overflow:visible;">
+                  <defs>
+                    <linearGradient id="chartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                      <stop offset="0%" stop-color="#059669" stop-opacity="0.3"/>
+                      <stop offset="100%" stop-color="#059669" stop-opacity="0.0"/>
+                    </linearGradient>
+                  </defs>
+                  <!-- Horizontal Gridlines -->
+                  <line x1="30" y1="30" x2="520" y2="30" stroke="#E2E8F0" stroke-dasharray="3,3"/>
+                  <line x1="30" y1="75" x2="520" y2="75" stroke="#E2E8F0" stroke-dasharray="3,3"/>
+                  <line x1="30" y1="120" x2="520" y2="120" stroke="#E2E8F0" stroke-dasharray="3,3"/>
+                  <!-- Area -->
+                  <path d="M 40 150 C 90 145, 120 70, 160 85 C 200 100, 240 135, 280 115 C 320 95, 360 40, 400 50 C 440 60, 480 130, 510 150 L 510 150 L 40 150 Z" fill="url(#chartGrad)"/>
+                  <!-- Stroke -->
+                  <path d="M 40 150 C 90 145, 120 70, 160 85 C 200 100, 240 135, 280 115 C 320 95, 360 40, 400 50 C 440 60, 480 130, 510 150" fill="none" stroke="#059669" stroke-width="3"/>
+                  <!-- Peak 1 Dot -->
+                  <circle cx="160" cy="85" r="4.5" fill="#059669" stroke="#fff" stroke-width="2"/>
+                  <!-- Peak 2 Dot -->
+                  <circle cx="400" cy="50" r="5" fill="#2563EB" stroke="#fff" stroke-width="2"/>
+                  <!-- Labels -->
+                  <text x="40" y="170" font-size="10" fill="#64748B">08:00 AM</text>
+                  <text x="140" y="170" font-size="10" fill="#059669" font-weight="bold">10:00 AM (Peak 1)</text>
+                  <text x="260" y="170" font-size="10" fill="#64748B">02:00 PM</text>
+                  <text x="380" y="170" font-size="10" fill="#2563EB" font-weight="bold">07:00 PM (Peak 2)</text>
+                  <text x="480" y="170" font-size="10" fill="#64748B">10:00 PM</text>
+                </svg>
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:14px; text-align:center;">
+                <div style="padding:10px; background:#F8FAFC; border-radius:10px; border:1px solid #E2E8F0;">
+                  <div style="font-size:10.5px; color:#64748B;">Morning Shift Volume</div>
+                  <div style="font-size:15px; font-weight:800; color:#0F172A; margin-top:2px;">620 Encounters</div>
+                </div>
+                <div style="padding:10px; background:#F8FAFC; border-radius:10px; border:1px solid #E2E8F0;">
+                  <div style="font-size:10.5px; color:#64748B;">Evening Shift Volume</div>
+                  <div style="font-size:15px; font-weight:800; color:#2563EB; margin-top:2px;">860 Encounters</div>
+                </div>
+                <div style="padding:10px; background:#F8FAFC; border-radius:10px; border:1px solid #E2E8F0;">
+                  <div style="font-size:10.5px; color:#64748B;">Avg Video Duration</div>
+                  <div style="font-size:15px; font-weight:800; color:#059669; margin-top:2px;">9m 24s / 10m</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: WebRTC Stream Telemetry -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <div>
+                  <div class="admin-card-title">Live WebRTC Encrypted Telemetry</div>
+                  <div class="admin-card-subtitle">Real-time QoS packet telemetry across active nodes</div>
+                </div>
+                <span class="badge badge-green" style="font-size:10.5px; font-weight:800;">4 Active Calls</span>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                <!-- Call 1 -->
+                <div class="webrtc-stream-card">
+                  <div>
+                    <strong style="font-size:12px; color:#0F172A;">Call #897103 • Dr. Anisul Haque (BMDC 74902)</strong>
+                    <div style="font-size:10.5px; color:#64748B; margin-top:2px;">Patient: P-ANON-A03 (Dhaka) • Elapsed: <b>08:45 / 10:00</b></div>
+                  </div>
+                  <span class="webrtc-ping-badge good">34ms • HD Audio/Video</span>
+                </div>
+
+                <!-- Call 2 -->
+                <div class="webrtc-stream-card">
+                  <div>
+                    <strong style="font-size:12px; color:#0F172A;">Call #897104 • Dr. Sabrina Akter (BMDC 45821)</strong>
+                    <div style="font-size:10.5px; color:#64748B; margin-top:2px;">Patient: P-ANON-D91 (Dhanmondi) • Elapsed: <b>05:12 / 10:00</b></div>
+                  </div>
+                  <span class="webrtc-ping-badge good">42ms • HD Audio/Video</span>
+                </div>
+
+                <!-- Call 3 -->
+                <div class="webrtc-stream-card">
+                  <div>
+                    <strong style="font-size:12px; color:#0F172A;">Call #897105 • Dr. Karim Hossain (BMDC 81551)</strong>
+                    <div style="font-size:10.5px; color:#64748B; margin-top:2px;">Patient: P-ANON-K12 (Sylhet) • Elapsed: <b>09:03 / 10:00</b></div>
+                  </div>
+                  <span class="webrtc-ping-badge moderate">86ms (3G Adaptive)</span>
+                </div>
+
+                <!-- Call 4 -->
+                <div class="webrtc-stream-card">
+                  <div>
+                    <strong style="font-size:12px; color:#0F172A;">Call #897106 • Dr. Sadik Al-Amin (BMDC 68192)</strong>
+                    <div style="font-size:10.5px; color:#64748B; margin-top:2px;">Patient: P-ANON-M22 (Chittagong) • Elapsed: <b>02:18 / 10:00</b></div>
+                  </div>
+                  <span class="webrtc-ping-badge good">29ms • HD Audio/Video</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div><!-- /#adminPage_command -->
+
+        <!-- ═════════════════════════════════════════════════════════
+             PAGE 3: SLOT MATRIX & 1-HOUR LOCK GOVERNANCE (REDESIGNED)
+             ═════════════════════════════════════════════════════════ -->
+        <div class="admin-page-view" id="adminPage_slots">
+          <div class="admin-card">
+            <!-- Header Toolbar -->
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-title">Timetable 10-Minute Micro-Slot Grid &amp; 1-Hour Lock Governance</div>
+                <div class="admin-card-subtitle">Slots within &lt;60 minutes of start are strictly locked to prevent patient abandonment</div>
+              </div>
+
+              <!-- Legend Pills -->
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="slot-chip available" style="padding:4px 8px; font-size:10px;">Available</span>
+                <span class="slot-chip booked" style="padding:4px 8px; font-size:10px;">Booked (10m)</span>
+                <span class="slot-chip locked" style="padding:4px 8px; font-size:10px;">🔒 &lt;1h Locked</span>
+                <span class="slot-chip chat-only" style="padding:4px 8px; font-size:10px;">💬 24h Chat</span>
+              </div>
+            </div>
+
+            <!-- Multi-Doctor Micro-Slot Matrix Table -->
+            <div style="overflow-x:auto;">
+              <table class="admin-slot-grid-table">
+                <thead>
+                  <tr>
+                    <th style="width:200px;">Specialist</th>
+                    <th>10:30 AM</th>
+                    <th>10:40 AM</th>
+                    <th>10:50 AM</th>
+                    <th>11:00 AM</th>
+                    <th>11:10 AM</th>
+                    <th>11:20 AM</th>
+                    <th>11:30 AM</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Row 1: Dr. Sabrina Akter -->
+                  <tr>
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#FEF3C7; color:#B45309; display:grid; place-items:center; font-weight:800; font-size:10.5px;">SA</div>
+                        <div>
+                          <strong style="font-size:12px; color:#0F172A;">Dr. Sabrina Akter</strong>
+                          <div style="font-size:10px; color:#64748B;">Internal Medicine</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><div class="slot-chip locked" onclick="showAppToast('Slot Locked 🔒', 'Rafiq Ahmed (10:30 AM) consultation cannot be cancelled within 1 hour.', 'warning', '🔒')"><span>10:30 • Rafiq A.</span><span style="font-size:9.5px; opacity:0.85;">🔒 Locked (0m left)</span></div></td>
+                    <td><div class="slot-chip locked" onclick="showAppToast('Slot Locked 🔒', 'Nusrat Jahan (10:40 AM) locked under 1h policy.', 'warning', '🔒')"><span>10:40 • Nusrat J.</span><span style="font-size:9.5px; opacity:0.85;">🔒 Locked (8m left)</span></div></td>
+                    <td><div class="slot-chip chat-only" onclick="showAppToast('Chat Consultation', 'Kamal Uddin subscribed for 24h dedicated chat only.', 'info', '💬')"><span>10:50 • Kamal U.</span><span style="font-size:9.5px;">💬 24h Chat Only</span></div></td>
+                    <td><div class="slot-chip available" onclick="showAppToast('Open Slot', '11:00 AM available for patient booking.', 'success', '✓')"><span>11:00 • Available</span></div></td>
+                    <td><div class="slot-chip available" onclick="showAppToast('Open Slot', '11:10 AM available for patient booking.', 'success', '✓')"><span>11:10 • Available</span></div></td>
+                    <td><div class="slot-chip booked"><span>11:20 • Tanvir C.</span><span style="font-size:9.5px;">Booked (10m)</span></div></td>
+                    <td><div class="slot-chip available"><span>11:30 • Available</span></div></td>
+                  </tr>
+
+                  <!-- Row 2: Dr. Karim Hossain -->
+                  <tr>
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#EFF6FF; color:#1D4ED8; display:grid; place-items:center; font-weight:800; font-size:10.5px;">KH</div>
+                        <div>
+                          <strong style="font-size:12px; color:#0F172A;">Dr. Karim Hossain</strong>
+                          <div style="font-size:10px; color:#64748B;">Cardiology</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><div class="slot-chip available"><span>10:30 • Available</span></div></td>
+                    <td><div class="slot-chip locked"><span>10:40 • T. Hasan</span><span style="font-size:9.5px; opacity:0.85;">🔒 Locked (8m left)</span></div></td>
+                    <td><div class="slot-chip available"><span>10:50 • Available</span></div></td>
+                    <td><div class="slot-chip available"><span>11:00 • Available</span></div></td>
+                    <td><div class="slot-chip booked"><span>11:10 • Farzana H.</span><span style="font-size:9.5px;">Booked (10m)</span></div></td>
+                    <td><div class="slot-chip available"><span>11:20 • Available</span></div></td>
+                    <td><div class="slot-chip available"><span>11:30 • Available</span></div></td>
+                  </tr>
+
+                  <!-- Row 3: Dr. Sadik Al-Amin -->
+                  <tr>
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#EFF6FF; color:#2563EB; display:grid; place-items:center; font-weight:800; font-size:10.5px;">SA</div>
+                        <div>
+                          <strong style="font-size:12px; color:#0F172A;">Dr. Sadik Al-Amin</strong>
+                          <div style="font-size:10px; color:#64748B;">General Medicine</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><div class="slot-chip locked"><span>10:30 • Z. Hossain</span><span style="font-size:9.5px; opacity:0.85;">🔒 Locked (0m left)</span></div></td>
+                    <td><div class="slot-chip available"><span>10:40 • Available</span></div></td>
+                    <td><div class="slot-chip available"><span>10:50 • Available</span></div></td>
+                    <td><div class="slot-chip booked"><span>11:00 • B. Alam</span><span style="font-size:9.5px;">Booked (10m)</span></div></td>
+                    <td><div class="slot-chip available"><span>11:10 • Available</span></div></td>
+                    <td><div class="slot-chip available"><span>11:20 • Available</span></div></td>
+                    <td><div class="slot-chip chat-only"><span>11:30 • Refill</span><span style="font-size:9.5px;">💬 Chat Refill</span></div></td>
+                  </tr>
+
+                  <!-- Row 4: Dr. Anika Rahman -->
+                  <tr>
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#ECFDF5; color:#059669; display:grid; place-items:center; font-weight:800; font-size:10.5px;">AR</div>
+                        <div>
+                          <strong style="font-size:12px; color:#0F172A;">Dr. Anika Rahman</strong>
+                          <div style="font-size:10px; color:#64748B;">Pediatrics</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><div class="slot-chip available"><span>10:30 • Available</span></div></td>
+                    <td><div class="slot-chip available"><span>10:40 • Available</span></div></td>
+                    <td><div class="slot-chip locked"><span>10:50 • A. Kabir</span><span style="font-size:9.5px; opacity:0.85;">🔒 Locked (18m left)</span></div></td>
+                    <td><div class="slot-chip booked"><span>11:00 • S. Ahmed</span><span style="font-size:9.5px;">Booked (10m)</span></div></td>
+                    <td><div class="slot-chip available"><span>11:10 • Available</span></div></td>
+                    <td><div class="slot-chip available"><span>11:20 • Available</span></div></td>
+                    <td><div class="slot-chip available"><span>11:30 • Available</span></div></td>
+                  </tr>
+
+                  <!-- Row 5: Dr. Farhana Yesmin -->
+                  <tr>
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:28px; height:28px; border-radius:50%; background:#FAF5FF; color:#7E22CE; display:grid; place-items:center; font-weight:800; font-size:10.5px;">FY</div>
+                        <div>
+                          <strong style="font-size:12px; color:#0F172A;">Dr. Farhana Yesmin</strong>
+                          <div style="font-size:10px; color:#64748B;">Gynaecology</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><div class="slot-chip locked"><span>10:30 • M. Begum</span><span style="font-size:9.5px; opacity:0.85;">🔒 Locked (0m left)</span></div></td>
+                    <td><div class="slot-chip available"><span>10:40 • Available</span></div></td>
+                    <td><div class="slot-chip available"><span>10:50 • Available</span></div></td>
+                    <td><div class="slot-chip available"><span>11:00 • Available</span></div></td>
+                    <td><div class="slot-chip chat-only"><span>11:10 • Antenatal</span><span style="font-size:9.5px;">💬 24h Chat Only</span></div></td>
+                    <td><div class="slot-chip booked"><span>11:20 • R. Parveen</span><span style="font-size:9.5px;">Booked (10m)</span></div></td>
+                    <td><div class="slot-chip available"><span>11:30 • Available</span></div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Emergency Re-assignment Dispatch (Clean & Balanced Banner) -->
+            <div class="emergency-dispatch-card">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="font-size:24px;">🚨</div>
+                <div>
+                  <strong style="font-size:13px; color:#991B1B;">Emergency Patient Re-assignment Dispatch</strong>
+                  <div style="font-size:11.5px; color:#B91C1C; margin-top:2px;">Override 1-hour cancellation lock for verified doctor emergency and re-route waiting patients to alternate on-duty specialists without re-billing.</div>
+                </div>
+              </div>
+
+              <button class="emergency-dispatch-btn" onclick="showAppToast('Emergency Re-assignment Dispatched', 'Patient Rafiq Ahmed re-routed to Dr. Tanvir Hossain without re-billing.', 'urgent', '⚡')">
+                <span>Execute Emergency Override ⚡</span>
+              </button>
+            </div>
+          </div>
+        </div><!-- /#adminPage_slots -->
+
+        <!-- ═════════════════════════════════════════════════════════
+             PAGE 4: PATIENTS DIRECTORY (MATCHING DOCTORS TABLE)
+             ═════════════════════════════════════════════════════════ -->
+        <div class="admin-page-view" id="adminPage_patients">
+          <!-- 4 KPIs -->
+          <div class="admin-kpi-grid">
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Total Registered Patients</span>
+                <div class="admin-kpi-val">28,450</div>
+                <div style="font-size:11px; color:#059669; font-weight:750;">+14.2% YoY growth</div>
+              </div>
+              <div class="admin-kpi-icon-circle green">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              </div>
+            </div>
+
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Active 24h Chat Subscribers</span>
+                <div class="admin-kpi-val">1,267</div>
+                <div style="font-size:11px; color:#2563EB; font-weight:700;">+8.5% growth</div>
+              </div>
+              <div class="admin-kpi-icon-circle blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              </div>
+            </div>
+
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Chronic Care Cohort</span>
+                <div class="admin-kpi-val">6,820</div>
+                <div style="font-size:11px; color:#D97706; font-weight:700;">Hypertension &amp; T2DM</div>
+              </div>
+              <div class="admin-kpi-icon-circle amber">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+            </div>
+
+            <div class="admin-kpi-card">
+              <div>
+                <span class="admin-kpi-sub">Total Patient Health Spend</span>
+                <div class="admin-kpi-val">৳ 4,890,000</div>
+                <div style="font-size:11px; color:#059669; font-weight:750;">+18.1% turnover</div>
+              </div>
+              <div class="admin-kpi-icon-circle teal">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Patients Table Card -->
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-title">Patients Directory &amp; Longitudinal Archive</div>
+                <div class="admin-card-subtitle">Click any patient row to open their clinical dossier &amp; Health Vault</div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button class="admin-filter-pill active" onclick="filterAdminPatients('all', this)">All (28,450)</button>
+                <button class="admin-filter-pill" onclick="filterAdminPatients('chronic', this)">Chronic Care</button>
+                <button class="admin-filter-pill" onclick="filterAdminPatients('chat', this)">Active 24h Chat</button>
+                <button class="admin-filter-pill" onclick="filterAdminPatients('pediatric', this)">Pediatric</button>
+              </div>
+            </div>
+
+            <div style="overflow-x:auto;">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Patient Name</th>
+                    <th>Patient ID</th>
+                    <th>Demographics</th>
+                    <th>Completed Video Visits</th>
+                    <th>24h Chat Sessions</th>
+                    <th>Total Spend (৳)</th>
+                    <th>Chronic Condition</th>
+                    <th>Last Consultation</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="adminPatientsTableBody">
+                  <tr class="admin-clickable-row" data-cat="chronic" onclick="openAdminPatientDossierModal('sarah')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:#FCE7F3; color:#BE185D; display:grid; place-items:center; font-weight:800; font-size:11px;">SA</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Sarah Ahmed</strong>
+                          <div style="font-size:10px; color:#64748B;">Dhaka Central</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">#PT-6521</span></td>
+                    <td>34 F • Dhanmondi</td>
+                    <td><b>12</b></td>
+                    <td>45</td>
+                    <td><b style="color:#0F172A; font-size:13px;">৳ 75,000</b></td>
+                    <td>
+                      <span class="badge" style="background:#FEE2E2; color:#DC2626; font-size:9.5px; font-weight:750;">Hypertension</span>
+                      <span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size:9.5px; font-weight:750;">T2DM</span>
+                    </td>
+                    <td>15 Oct 2026<div style="font-size:10px; color:#64748B;">by Dr. Kamal</div></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminPatientDossierModal('sarah');">View Dossier ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" data-cat="chronic" onclick="openAdminPatientDossierModal('rafiq')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:#DBEAFE; color:#1D4ED8; display:grid; place-items:center; font-weight:800; font-size:11px;">RA</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Rafiq Ahmed</strong>
+                          <div style="font-size:10px; color:#64748B;">Dhanmondi Rd 4</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">#PT-6522</span></td>
+                    <td>34 M • Dhanmondi</td>
+                    <td><b>8</b></td>
+                    <td>22</td>
+                    <td><b style="color:#0F172A; font-size:13px;">৳ 42,000</b></td>
+                    <td>
+                      <span class="badge" style="background:#ECFDF5; color:#065F46; font-size:9.5px; font-weight:750;">Acute URTI</span>
+                      <span class="badge" style="background:#FEE2E2; color:#DC2626; font-size:9.5px; font-weight:750;">Hypertension</span>
+                    </td>
+                    <td>Today, 10:30 AM<div style="font-size:10px; color:#059669; font-weight:700;">by Dr. Sabrina</div></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminPatientDossierModal('rafiq');">View Dossier ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" data-cat="chronic" onclick="openAdminPatientDossierModal('nusrat')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:#F3E8FF; color:#7E22CE; display:grid; place-items:center; font-weight:800; font-size:11px;">NJ</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Nusrat Jahan</strong>
+                          <div style="font-size:10px; color:#64748B;">Banani Block C</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">#PT-6523</span></td>
+                    <td>28 F • Banani</td>
+                    <td><b>8</b></td>
+                    <td>22</td>
+                    <td><b style="color:#0F172A; font-size:13px;">৳ 42,000</b></td>
+                    <td>
+                      <span class="badge" style="background:#FDF2F8; color:#BE185D; font-size:9.5px; font-weight:750;">Hypothyroidism</span>
+                    </td>
+                    <td>Today, 10:40 AM<div style="font-size:10px; color:#059669; font-weight:700;">by Dr. Sabrina</div></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminPatientDossierModal('nusrat');">View Dossier ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" data-cat="chat chronic" onclick="openAdminPatientDossierModal('kamal')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:#FEF3C7; color:#B45309; display:grid; place-items:center; font-weight:800; font-size:11px;">KU</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Kamal Uddin</strong>
+                          <div style="font-size:10px; color:#1D4ED8; font-weight:750;">💬 24h Chat Subscribed</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">#PT-6524</span></td>
+                    <td>52 M • Uttara</td>
+                    <td><b>15</b></td>
+                    <td>38</td>
+                    <td><b style="color:#0F172A; font-size:13px;">৳ 92,000</b></td>
+                    <td>
+                      <span class="badge" style="background:#FEE2E2; color:#DC2626; font-size:9.5px; font-weight:750;">Hypertension</span>
+                      <span class="badge" style="background:#EFF6FF; color:#1D4ED8; font-size:9.5px; font-weight:750;">T2DM</span>
+                    </td>
+                    <td>Today, 10:50 AM<div style="font-size:10px; color:#059669; font-weight:700;">by Dr. Sabrina</div></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminPatientDossierModal('kamal');">View Dossier ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" data-cat="chronic" onclick="openAdminPatientDossierModal('farzana')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:#E0F2FE; color:#0369A1; display:grid; place-items:center; font-weight:800; font-size:11px;">FH</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Farzana Haque</strong>
+                          <div style="font-size:10px; color:#64748B;">Gulshan 2</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">#PT-6525</span></td>
+                    <td>41 F • Gulshan</td>
+                    <td><b>6</b></td>
+                    <td>18</td>
+                    <td><b style="color:#0F172A; font-size:13px;">৳ 38,000</b></td>
+                    <td>
+                      <span class="badge" style="background:#FEF3C7; color:#B45309; font-size:9.5px; font-weight:750;">Bronchial Asthma</span>
+                    </td>
+                    <td>Yesterday<div style="font-size:10px; color:#64748B;">by Dr. Karim</div></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminPatientDossierModal('farzana');">View Dossier ↗</button></td>
+                  </tr>
+
+                  <tr class="admin-clickable-row" data-cat="pediatric" onclick="openAdminPatientDossierModal('tanvir')">
+                    <td>
+                      <div style="display:flex; align-items:center; gap:8px;">
+                        <div style="width:32px; height:32px; border-radius:50%; background:#DCFCE7; color:#15803D; display:grid; place-items:center; font-weight:800; font-size:11px;">TC</div>
+                        <div>
+                          <strong style="color:#0F172A; font-size:13px;">Tanvir Chowdhury</strong>
+                          <div style="font-size:10px; color:#64748B;">Baridhara Diplomatic Zone</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td><span class="badge badge-slate" style="font-weight:750;">#PT-6526</span></td>
+                    <td>7 M (Child) • Baridhara</td>
+                    <td><b>5</b></td>
+                    <td>14</td>
+                    <td><b style="color:#0F172A; font-size:13px;">৳ 21,500</b></td>
+                    <td>
+                      <span class="badge" style="background:#DCFCE7; color:#166534; font-size:9.5px; font-weight:750;">Pediatric Atopic Dermatitis</span>
+                    </td>
+                    <td>Today, 11:15 AM<div style="font-size:10px; color:#059669; font-weight:700;">by Dr. Anika</div></td>
+                    <td><button class="admin-btn-sec" onclick="event.stopPropagation(); openAdminPatientDossierModal('tanvir');">View Dossier ↗</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div><!-- /#adminPage_patients -->
+
+        <!-- ═════════════════════════════════════════════════════════
+             PAGE 5: BMDC CREDENTIALING HUB
+             ═════════════════════════════════════════════════════════ -->
+        <div class="admin-page-view" id="adminPage_bmdc">
+          <div style="display:grid; grid-template-columns:320px 1fr; gap:18px;">
+            <!-- Left Queue -->
+            <div class="admin-card" style="padding:16px;">
+              <div style="font-size:14px; font-weight:800; color:#0F172A; margin-bottom:12px;">Doctor Vetting Queue (3 Pending)</div>
+              <div style="display:flex; flex-direction:column; gap:10px;">
+                <div style="padding:12px; background:#ECFDF5; border:1px solid #10B981; border-radius:12px; cursor:pointer;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong style="font-size:12.5px; color:#065F46;">Dr. Sarah Rahman</strong>
+                    <span class="badge badge-green">98% Match</span>
+                  </div>
+                  <div style="font-size:11px; color:#047857; margin-top:2px;">BMDC #A-48291 • Internal Medicine</div>
+                  <div style="font-size:10px; color:#64748B; margin-top:4px;">Applied 2 hrs ago • NID Verified</div>
+                </div>
+
+                <div style="padding:12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; cursor:pointer;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong style="font-size:12.5px; color:#0F172A;">Dr. Ahmed Khan</strong>
+                    <span class="badge badge-blue">95% Match</span>
+                  </div>
+                  <div style="font-size:11px; color:#475569; margin-top:2px;">BMDC #A-55102 • Cardiology</div>
+                  <div style="font-size:10px; color:#64748B; margin-top:4px;">Applied 5 hrs ago • Renewal Check</div>
+                </div>
+
+                <div style="padding:12px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; cursor:pointer;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong style="font-size:12.5px; color:#0F172A;">Dr. Priya Sharma</strong>
+                    <span class="badge badge-amber">92% Match</span>
+                  </div>
+                  <div style="font-size:11px; color:#475569; margin-top:2px;">BMDC #A-61984 • General Medicine</div>
+                  <div style="font-size:10px; color:#64748B; margin-top:4px;">Applied Yesterday • Certificate Check</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Inspection Pane -->
+            <div class="admin-card">
+              <div class="admin-card-header">
+                <div>
+                  <div class="admin-card-title">In Review: Dr. Sarah Rahman (A-48291)</div>
+                  <div style="font-size:12px; color:#059669; font-weight:750; margin-top:2px;">Govt BMDC Directory Match: 99.1% High Confidence</div>
+                </div>
+                <span class="badge badge-amber">Pending Final Approval</span>
+              </div>
+
+              <!-- Side-by-Side Document & OCR Grid -->
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:18px;">
+                <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:14px;">
+                  <div style="font-size:11.5px; font-weight:750; color:#475569; margin-bottom:10px;">ORIGINAL UPLOADED SCANS</div>
+                  <div style="background:#fff; border:1px dashed #CBD5E1; padding:14px; border-radius:10px; text-align:center;">
+                    <div style="font-size:26px; margin-bottom:4px;">📜</div>
+                    <strong style="font-size:12px; color:#0F172A;">BMDC Registration Certificate (A-48291)</strong>
+                    <div style="font-size:10px; color:#64748B;">Issued: 15 Oct 2022 • Bangladesh Medical &amp; Dental Council</div>
+                  </div>
+                  <div style="background:#fff; border:1px dashed #CBD5E1; padding:14px; border-radius:10px; text-align:center; margin-top:10px;">
+                    <div style="font-size:26px; margin-bottom:4px;">🪪</div>
+                    <strong style="font-size:12px; color:#0F172A;">National ID (NID #7849120356)</strong>
+                    <div style="font-size:10px; color:#64748B;">Match Verified with Election Commission Registry</div>
+                  </div>
+                </div>
+
+                <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:14px;">
+                  <div style="font-size:11.5px; font-weight:750; color:#475569; margin-bottom:10px;">VERIFIED OCR DIGITAL DATA</div>
+                  <div style="font-size:12px; display:flex; flex-direction:column; gap:8px;">
+                    <div><b>Full Name:</b> SARAH RAHMAN</div>
+                    <div><b>BMDC Reg Number:</b> A-48291 <span class="badge badge-green" style="font-size:9.5px;">Active</span></div>
+                    <div><b>NID Number:</b> 7849120356 (Matched 100%)</div>
+                    <div><b>Degrees:</b> MBBS (Dhaka Med. Col., 2013), FCPS (BCPS, 2019)</div>
+                    <div><b>Affiliated Hospital:</b> Apollo Hospitals Dhaka</div>
+                    <div><b>Specialty:</b> Internal Medicine Consultant</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Bar -->
+              <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid #E2E8F0; padding-top:16px;">
+                <button class="slot-subtle-btn" style="background:#FEE2E2; color:#DC2626; border:none; padding:8px 16px; border-radius:8px; font-size:12px; font-weight:750; cursor:pointer;" onclick="approveDoctorBmdc('reject')">
+                  ✕ Reject Application
+                </button>
+                <button class="slot-subtle-btn" style="background:#FEF3C7; color:#B45309; border:none; padding:8px 16px; border-radius:8px; font-size:12px; font-weight:750; cursor:pointer;" onclick="approveDoctorBmdc('clarify')">
+                  ⚠️ Request Clarification
+                </button>
+                <button class="admin-btn-pri" style="padding:8px 16px; font-size:12px;" onclick="approveDoctorBmdc('approve')">
+                  ✓ Approve &amp; Activate Doctor
+                </button>
+              </div>
+            </div>
+          </div>
+        </div><!-- /#adminPage_bmdc -->
+
+        <!-- ═════════════════════════════════════════════════════════
+             PAGE 6: CLINICAL PRESCRIPTION & Q&A AUDIT HUB
+             ═════════════════════════════════════════════════════════ -->
+        <div class="admin-page-view" id="adminPage_compliance">
+          <div class="admin-card">
+            <div class="admin-card-header">
+              <div>
+                <div class="admin-card-title">Clinical e-Prescription Audit &amp; DGDA Compliance</div>
+                <div class="admin-card-subtitle">AI-assisted antimicrobial stewardship &amp; narcotic Schedule H compliance surveillance</div>
+              </div>
+              <span class="badge badge-amber" style="font-weight:800;">1 Flagged for Review</span>
+            </div>
+
+            <!-- Flagged Rx Item -->
+            <div style="background:#FEF2F2; border:1px solid #FECACA; border-radius:14px; padding:18px; margin-bottom:18px;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="font-size:20px;">⚠️</span>
+                  <div>
+                    <strong style="color:#991B1B; font-size:13.5px;">Schedule H Controlled Substance Alert — Rx #HD-891042</strong>
+                    <div style="font-size:11px; color:#B91C1C; margin-top:2px;">Issued today by Dr. Sabrina Akter (BMDC #45821) • Patient: Sarah Khan (29F)</div>
+                  </div>
+                </div>
+                <span class="badge" style="background:#FEE2E2; color:#991B1B; font-weight:800;">High Risk</span>
+              </div>
+
+              <!-- Prescription Details Strip -->
+              <div style="margin-top:14px; background:#fff; border-radius:10px; padding:14px; border:1px solid #FCA5A5; display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                <div>
+                  <div style="font-size:11px; color:#64748B; font-weight:700;">PRESCRIBED MEDICATIONS</div>
+                  <div style="font-size:12px; color:#0F172A; margin-top:4px;">
+                    1. <b>Tab. Azithromycin 500mg</b> — 1 daily x 3 days (Broad spectrum)<br>
+                    2. <b style="color:#DC2626;">Inj. Morphine Sulphate 10mg/mL</b> — SOS for severe trauma pain (Schedule H)
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:11px; color:#64748B; font-weight:700;">COMPLIANCE AUDIT RATIONALE</div>
+                  <div style="font-size:11.5px; color:#7F1D1D; margin-top:4px;">
+                    Narcotic Schedule H analgesics require physical triage verification under DGDA Telemedicine circular 2024. Audit flag requires clinical ops counter-signature.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:14px;">
+                <button class="slot-subtle-btn" style="background:#FEE2E2; color:#DC2626; border:none; padding:7px 14px; border-radius:8px; font-size:11.5px; font-weight:750; cursor:pointer;" onclick="showAppToast('Prescription Flagged', 'Doctor notified to revise Schedule H dosage.', 'warning', '⚠️')">
+                  Request Revision from Doctor
+                </button>
+                <button class="admin-btn-pri" onclick="showAppToast('Prescription Approved ✓', 'Archived into Sarah Khan Health Vault with audit signature.', 'success', '✓')">
+                  Counter-Sign &amp; Release Rx ✓
+                </button>
+              </div>
+            </div>
+
+            <!-- Safety Checks Verified -->
+            <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:16px;">
+              <div style="font-size:12px; font-weight:800; color:#0F172A; margin-bottom:10px;">Automated DGDA Safety Checks (Passing)</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+                <div style="padding:10px; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; font-size:11px; color:#065F46;">
+                  <b>DDI Drug-Drug Interactions:</b> Passed ✓ No severe interactions detected.
+                </div>
+                <div style="padding:10px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:8px; font-size:11px; color:#1D4ED8;">
+                  <b>Antibiotic Stewardship:</b> Standard 3-day course validated.
+                </div>
+                <div style="padding:10px; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:8px; font-size:11px; color:#065F46;">
+                  <b>BMDC Digital Signature:</b> SHA-256 authenticated against physician key.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div><!-- /#adminPage_compliance -->
+
+      </main>
+    </div>
+  </div><!-- /#adminPortalShell -->`;
+
+console.log('Admin HTML chunk generated with character length:', adminHtml.length);
+fs.writeFileSync('scratch/generated_admin_shell.html', adminHtml);
+console.log('Saved to scratch/generated_admin_shell.html');

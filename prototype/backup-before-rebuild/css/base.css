@@ -1,0 +1,314 @@
+/**
+ * Base styles, layout primitives, and simulator shell
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-family-body);
+  background-color: #121817; /* Dark slate studio backdrop for prototype preview */
+  color: var(--color-text-main);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================================================
+   SIMULATOR WORKBENCH (Desktop Tooling & Quick Switcher)
+   ========================================================================== */
+
+.workbench {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.workbench-bar {
+  background: #1B2423;
+  border-bottom: 1px solid #283634;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.workbench-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+  box-shadow: 0 0 10px var(--color-primary-light);
+}
+
+.workbench-title {
+  color: #FFFFFF;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.workbench-subtitle {
+  color: #8C9E9B;
+  font-size: 12px;
+  margin-left: 6px;
+  font-weight: 500;
+}
+
+.screen-switcher-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0;
+  max-width: 60%;
+}
+
+.screen-switcher-pills::-webkit-scrollbar {
+  height: 4px;
+}
+.screen-switcher-pills::-webkit-scrollbar-thumb {
+  background: #3A4C48;
+  border-radius: 4px;
+}
+
+.pill-btn {
+  background: #232F2D;
+  color: #B2C4C0;
+  border: 1px solid #334441;
+  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--duration-fast) var(--ease-smooth);
+}
+
+.pill-btn:hover {
+  background: #2D3D3A;
+  color: #FFFFFF;
+}
+
+.pill-btn.active {
+  background: var(--color-primary);
+  color: #FFFFFF;
+  border-color: var(--color-primary-light);
+  box-shadow: 0 2px 8px rgba(20, 184, 166, 0.3);
+}
+
+.workbench-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Discreet Privacy Shield Button */
+.discreet-shield-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #2B1D19;
+  border: 1px solid #78350F;
+  color: #FCD34D;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-spring);
+}
+
+.discreet-shield-btn:hover {
+  background: #3F2618;
+  transform: translateY(-1px);
+}
+
+.discreet-shield-btn.active {
+  background: #1E3A8A;
+  border-color: #38BDF8;
+  color: #BAE6FD;
+}
+
+/* Main Canvas Area */
+.workbench-canvas {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+  background: radial-gradient(circle at center, #1B2423 0%, #0F1413 100%);
+}
+
+/* ==========================================================================
+   MOBILE DEVICE FRAME (Phone Shell)
+   ========================================================================== */
+
+.phone-shell {
+  width: 390px;
+  height: 820px;
+  max-height: calc(100vh - 80px);
+  background: #000000;
+  border-radius: 46px;
+  padding: 12px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7),
+              0 0 0 1px rgba(255, 255, 255, 0.12),
+              inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Phone Speaker & Dynamic Island / Notch */
+.phone-notch {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 28px;
+  background: #000000;
+  border-radius: 20px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+}
+
+.camera-lens {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #111A24;
+  border: 1px solid #1E293B;
+}
+
+.speaker-grill {
+  width: 44px;
+  height: 4px;
+  background: #1E293B;
+  border-radius: 4px;
+}
+
+/* Screen Display Viewport */
+.phone-screen {
+  flex: 1;
+  background: var(--color-bg-app);
+  border-radius: 36px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Native Android/iOS Status Bar */
+.status-bar {
+  height: 44px;
+  padding: 12px 24px 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-main);
+  z-index: 99;
+  flex-shrink: 0;
+}
+
+.status-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-icon-svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+/* App Content Area (Holds all scrollable screens) */
+.app-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.screen-view {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 84px; /* Space for bottom nav */
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px) scale(0.99);
+  transition: opacity 220ms ease, transform 220ms ease;
+  background: var(--color-bg-app);
+}
+
+.screen-view.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.screen-view::-webkit-scrollbar {
+  display: none;
+}
+
+/* Fullscreen on Mobile Viewport Breakpoint */
+@media (max-width: 600px) {
+  .workbench {
+    height: 100%;
+  }
+  .workbench-bar {
+    padding: 8px 12px;
+  }
+  .workbench-title, .workbench-subtitle {
+    display: none;
+  }
+  .workbench-canvas {
+    padding: 0;
+    align-items: flex-start;
+  }
+  .phone-shell {
+    width: 100vw;
+    height: calc(100vh - 54px);
+    max-height: none;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    border: none;
+  }
+  .phone-screen {
+    border-radius: 0;
+  }
+  .phone-notch {
+    display: none;
+  }
+}

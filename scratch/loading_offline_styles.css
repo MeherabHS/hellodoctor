@@ -1,0 +1,157 @@
+/* ═════════════════════════════════════════════════════════════
+   SKELETON LOADING STATE & OFFLINE RESILIENCE STYLES
+   ═════════════════════════════════════════════════════════════ */
+@keyframes skShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.sk-shimmer {
+  background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+  background-size: 200% 100%;
+  animation: skShimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.sk-shimmer-dark {
+  background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%);
+  background-size: 200% 100%;
+  animation: skShimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Offline Banner and Indicators */
+.offline-banner {
+  background: linear-gradient(90deg, #FFFBEB 0%, #FEF3C7 100%);
+  border-bottom: 1px solid #FCD34D;
+  color: #92400E;
+  padding: 6px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(180, 83, 9, 0.08);
+  position: relative;
+  z-index: 50;
+  animation: slideDown .25s ease-out;
+}
+
+body.is-offline .offline-banner {
+  display: flex !important;
+}
+
+.offline-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #FDE68A;
+  color: #78350F;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Offline state on interactive buttons */
+body.is-offline .doc-act-btn,
+body.is-offline #bookingProceedBtn,
+body.is-offline #profileVideoCta,
+body.is-offline #profileChatCta,
+body.is-offline #paidChatCtaBtn,
+body.is-offline .admin-batch-payout-btn {
+  opacity: 0.65;
+  filter: grayscale(0.2);
+  cursor: pointer;
+  position: relative;
+}
+
+body.is-offline .doc-act-btn::after,
+body.is-offline #bookingProceedBtn::after,
+body.is-offline .admin-batch-payout-btn::after {
+  content: " (Offline)";
+  font-size: 9px;
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+/* Global Loading Transition Overlay */
+.global-loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 9999999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+
+.global-loading-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.global-loading-card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 28px 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 340px;
+  width: 90%;
+  border: 1px solid #E2E8F0;
+  animation: adminModalZoom .2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.loading-spinner-ring {
+  width: 44px;
+  height: 44px;
+  border: 3.5px solid #E2E8F0;
+  border-top-color: #059669;
+  border-radius: 50%;
+  animation: spinRing 0.8s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spinRing {
+  to { transform: rotate(360deg); }
+}
+
+/* Online Recovery Toast */
+.online-recovery-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #064E3B;
+  color: #ECFDF5;
+  border: 1px solid #059669;
+  border-radius: 14px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.4);
+  z-index: 9999999;
+  transition: transform .35s cubic-bezier(0.16, 1, 0.3, 1), opacity .3s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.online-recovery-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
