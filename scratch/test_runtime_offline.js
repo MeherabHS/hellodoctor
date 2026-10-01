@@ -59,7 +59,8 @@ const context = {
 
 vm.createContext(context);
 
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 const script1 = html.match(/<script[\s\S]*?<\/script>/gi)[0].replace(/<\/?script[^>]*>/gi, '');
 
 vm.runInContext(script1, context);

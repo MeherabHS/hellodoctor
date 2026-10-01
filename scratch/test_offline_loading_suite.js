@@ -2,7 +2,8 @@ const fs = require('fs');
 const assert = require('assert');
 
 console.log('>>> [1/4] Checking file reading and HTML tag balance...');
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 
 // Basic tag check
 const openDivs = (html.match(/<div(\s|>)/gi) || []).length;

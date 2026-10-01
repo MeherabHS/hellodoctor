@@ -8,7 +8,8 @@ const vm = require('vm');
 
 console.log('🧪 Starting HeloDoc Star Rating Removal & Grievance Suite...\n');
 
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 
 // ─────────────────────────────────────────────────────────────
 // 1. Zero Customer Star Ratings & Review System Check

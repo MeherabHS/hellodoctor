@@ -3,7 +3,8 @@ const assert = require('assert');
 
 console.log("=== RUNNING DOCTOR DIRECTORY & DOSSIER MODAL TEST SUITE ===");
 
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 
 // 1. Verify DOM Elements in modal
 assert(html.includes('id="adhDocPhone"'), "Missing #adhDocPhone in modal");

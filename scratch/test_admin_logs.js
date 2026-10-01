@@ -3,7 +3,8 @@ const assert = require('assert');
 const vm = require('vm');
 
 console.log('>>> [1/4] Checking HTML Tag Balance...');
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 
 const checkTags = ['main', 'script', 'body', 'html'];
 checkTags.forEach(tag => {

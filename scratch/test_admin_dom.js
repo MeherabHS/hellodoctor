@@ -1,7 +1,8 @@
 const fs = require('fs');
 
 // Simple DOM Mock testing
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 
 // Verify key element IDs exist in HTML
 const requiredElementIds = [

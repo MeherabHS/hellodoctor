@@ -3,7 +3,8 @@ const vm = require('vm');
 
 console.log('🧪 Starting HeloDoc Multi-Image Prescription Upload (Max 5) Test Suite...\n');
 
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 
 // 1. Tag balance check
 console.log('>>> [1/4] Checking HTML Tag Balance...');

@@ -1,7 +1,8 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 
 console.log('1. Checking HTML Tag Balance for key containers...');
 const checkTags = ['main', 'script', 'body', 'html'];

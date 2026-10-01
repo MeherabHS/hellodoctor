@@ -1,12 +1,12 @@
 const fs = require('fs');
 const assert = require('assert');
 
-console.log("=== RUNNING LANGUAGE & HOME LAYOUT TEST SUITE ===");
+console.log("=== RUNNING SWAHILI LANGUAGE & EMERGENCY CONTACT TEST SUITE ===");
 
 const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
 const html = fs.readFileSync(htmlFile, 'utf8');
 
-// 1. Verify Emergency Helpline position relative to Core Services and Upcoming Consultation inside #view-0
+// 1. Verify Emergency Contact position relative to Core Services and Upcoming Consultation inside #view-0
 const view0Start = html.indexOf('id="view-0"');
 const view0End = html.indexOf('id="view-1"', view0Start);
 const view0Content = html.substring(view0Start, view0End);
@@ -19,9 +19,13 @@ assert(coreServicesIdx !== -1, "Core Services grid not found in view-0");
 assert(helplineIdx !== -1, "Helpline strip #patientEmergencyHelplineStrip not found in view-0");
 assert(upcomingIdx !== -1, "Upcoming Consultation section not found in view-0");
 
-assert(helplineIdx > coreServicesIdx, "Emergency call button must be placed AFTER Core Services in view-0");
-assert(helplineIdx < upcomingIdx, "Emergency call button must be placed BEFORE (above) Upcoming Consultation section in view-0");
-console.log("✓ Layout order verified: Core Services -> Emergency Helpline (Call 16263) -> Upcoming Consultation");
+assert(helplineIdx > coreServicesIdx, "Emergency contact button must be placed AFTER Core Services in view-0");
+assert(helplineIdx < upcomingIdx, "Emergency contact button must be placed BEFORE (above) Upcoming Consultation section in view-0");
+
+// Verify Emergency Contact wording (MUST NOT be labelled 24/7)
+assert(view0Content.includes('Emergency Contact'), "Helpline strip must be labelled 'Emergency Contact'");
+assert(!view0Content.includes('24/7 Emergency Medical Helpline'), "Helpline strip must NOT be labelled '24/7'");
+console.log("✓ Layout order & title verified: Core Services -> Emergency Contact (Call 16263) -> Upcoming Consultation");
 
 // 2. Verify Medication Reminder card is REMOVED from Home View Upcoming Consultation
 assert(!view0Content.includes('Azithromycin 500mg'), "Medication reminder card must be removed from home screen");
@@ -29,16 +33,16 @@ assert(!view0Content.includes('Scheduled 5:00 PM • Day 3 of 5'), "Medication r
 assert(view0Content.includes('Dr. Sabrina Akter'), "Upcoming consultation with Dr. Sabrina Akter must remain intact");
 console.log("✓ Verified: Medication Reminder card is 100% removed from Upcoming Consultation section");
 
-// 3. Verify Language Menu & Modal Elements
+// 3. Verify Language Menu & Modal Elements for Swahili
 const requiredElements = [
   'patientLangMenuItem',
   'patientLangMenuText',
   'patientActiveLangBadge',
   'languageModal',
   'langOptEnglish',
-  'langOptKenyan',
+  'langOptSwahili',
   'langCheckEnglish',
-  'langCheckKenyan'
+  'langCheckSwahili'
 ];
 
 requiredElements.forEach(id => {
@@ -46,10 +50,10 @@ requiredElements.forEach(id => {
   console.log(`✓ DOM element verified: #${id}`);
 });
 
-assert(html.includes('Language (English / Kenyan)'), "Account menu must display Language (English / Kenyan)");
-assert(html.includes('Kenyan (Kiswahili / English)'), "Language modal must have Kenyan option");
+assert(html.includes('Language (English / Swahili)'), "Account menu must display Language (English / Swahili)");
+assert(html.includes('Swahili (Kiswahili)'), "Language modal must have Swahili (Kiswahili) option");
 assert(!html.includes('Language (English / বাংলা)'), "Old বাংলা language text must be removed from menu");
-console.log("✓ Verified: Language menu updated to English & Kenyan");
+console.log("✓ Verified: Language menu & modal updated to English & Swahili");
 
 // 4. Runtime Simulation of Language Switcher in Script 1
 class MockClassList {
@@ -111,28 +115,28 @@ global.openLanguageModal();
 assert.strictEqual(getOrCreate('languageModal').style.display, 'flex', "languageModal should open with display flex");
 console.log("✓ openLanguageModal() opened modal successfully");
 
-// Test selecting Kenyan language
-global.selectAppLanguage('ke');
-assert.strictEqual(global.currentAppLanguage, 'ke', "Language state should be 'ke'");
-assert.strictEqual(getOrCreate('langCheckKenyan').style.display, 'block', "Kenyan checkmark should be visible");
+// Test selecting Swahili language ('sw')
+global.selectAppLanguage('sw');
+assert.strictEqual(global.currentAppLanguage, 'sw', "Language state should be 'sw'");
+assert.strictEqual(getOrCreate('langCheckSwahili').style.display, 'block', "Swahili checkmark should be visible");
 assert.strictEqual(getOrCreate('langCheckEnglish').style.display, 'none', "English checkmark should be hidden");
-console.log("✓ selectAppLanguage('ke') selected Kenyan language");
+console.log("✓ selectAppLanguage('sw') selected Swahili language");
 
-// Test confirming Kenyan language
+// Test confirming Swahili language
 global.confirmAppLanguage();
 assert.strictEqual(getOrCreate('languageModal').style.display, 'none', "Modal should close on confirm");
-assert.strictEqual(getOrCreate('patientActiveLangBadge').textContent, 'Kenyan (Kiswahili)', "Active badge should update to Kenyan");
-assert.strictEqual(getOrCreate('patientLangMenuText').textContent, 'Language (Kenyan / Kiswahili)', "Menu text should update");
-console.log("✓ confirmAppLanguage() successfully applied Kenyan language & updated badge");
+assert.strictEqual(getOrCreate('patientActiveLangBadge').textContent, 'Swahili (Kiswahili)', "Active badge should update to Swahili");
+assert.strictEqual(getOrCreate('patientLangMenuText').textContent, 'Language (English / Swahili)', "Menu text should update");
+console.log("✓ confirmAppLanguage() successfully applied Swahili language & updated badge");
 
 // Test switching back to English
 global.openLanguageModal();
 global.selectAppLanguage('en');
 global.confirmAppLanguage();
 assert.strictEqual(getOrCreate('patientActiveLangBadge').textContent, 'English', "Active badge should revert to English");
-assert.strictEqual(getOrCreate('patientLangMenuText').textContent, 'Language (English / Kenyan)', "Menu text should revert");
+assert.strictEqual(getOrCreate('patientLangMenuText').textContent, 'Language (English / Swahili)', "Menu text should revert to English / Swahili");
 console.log("✓ Switched back to English successfully");
 
 console.log("\n============================================================");
-console.log("🎉 ALL LANGUAGE & LAYOUT CHECKS PASSED 100%!");
+console.log("🎉 ALL SWAHILI LANGUAGE & EMERGENCY CONTACT CHECKS PASSED 100%!");
 console.log("============================================================");

@@ -70,7 +70,8 @@ global.window = global;
 global.showAppToast = (title, msg) => console.log(`[TOAST]: ${title} -> ${msg}`);
 
 // Load the script and extract function definitions
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 const scripts = [...html.matchAll(/<script[\s\S]*?>([\s\S]*?)<\/script>/gi)].map(m => m[1]);
 const script2 = scripts[1]; // second script block containing admin controllers
 

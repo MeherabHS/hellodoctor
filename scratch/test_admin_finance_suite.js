@@ -3,7 +3,8 @@ const vm = require('vm');
 
 console.log('🧪 Starting HeloDoc Admin Payment & Escrow Master Ledger Test Suite...\n');
 
-const html = fs.readFileSync('prototype/index.html', 'utf8');
+const htmlFile = fs.existsSync('index.html') ? 'index.html' : 'prototype/index.html';
+const html = fs.readFileSync(htmlFile, 'utf8');
 
 // 1. Tag balance check (excluding HTML void tags like input, br, hr, img, meta, link)
 console.log('>>> [1/4] Checking HTML Tag Balance...');
