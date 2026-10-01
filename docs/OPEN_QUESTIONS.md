@@ -18,7 +18,8 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Q:** *Where is the emergency call button placed?*  
   **A:** **Directly above Upcoming Consultation** on `view-0`, labeled "Emergency Contact" (no "24/7" prefix), dialing `16263`.
 - **Q:** *What languages are supported?*  
-  **A:** **English (`en`)** and **Swahili (`sw`)**.
+- **Q:** *What video infrastructure will be used for live teleconsultation?*  
+  **A:** **Agora RTC SDK** (`agora_rtc_engine` in Flutter + dynamic token generation in Rust). No custom WebRTC server will be built.
 
 ---
 
@@ -30,15 +31,6 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Affected Components:** `services/backend/src/services/payment_service.rs`, `adminPage_finance`.
 - **Safe Default:** Implement an abstract `PaymentGateway` trait in Rust with a direct bKash/M-Pesa simulator for development and pluggable drivers for aggregators.
 - **Blocks Implementation?** **NON-BLOCKER.** Implementation can proceed using the simulator driver.
-
----
-
-### Q-002: LiveKit SFU vs. Self-Hosted Coturn for WebRTC Relays
-- **Question:** Does the production deployment have dedicated compute infrastructure to host a LiveKit SFU cluster, or should 1-on-1 consultations use standard P2P with a managed STUN/TURN traversal relay?
-- **Why It Matters:** Dictates whether the backend embeds the LiveKit server-side token generation SDK or simple STUN/TURN credential issuance.
-- **Affected Components:** `services/backend/src/api/v1/telehealth_handlers.rs`, `apps/mobile/lib/features/consultation/`.
-- **Safe Default:** Implement standard WebRTC P2P with STUN/TURN credentials (compatible with `coturn` and Twilio Network Traversal).
-- **Blocks Implementation?** **NON-BLOCKER.**
 
 ---
 

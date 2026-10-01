@@ -196,11 +196,34 @@
 
 ---
 
-## 5. Telehealth Video & Telemetry Capture
+## 5. Telehealth Video (Agora RTC) & Telemetry Capture
+
+### `POST /api/v1/telehealth/agora-token`
+- **Purpose:** Mints an authorized, short-lived Agora Dynamic RTC Token for entering a video consultation room.
+- **Auth:** `PATIENT` or `DOCTOR` (Caller must be participant in the appointment).
+- **Request Body:**
+  ```json
+  {
+    "appointment_id": "apt-94812"
+  }
+  ```
+- **Response:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "data": {
+      "channel_name": "apt-94812",
+      "token": "007eJxTYGCoM2y+5tW2Z1n380vP4...",
+      "uid": 94812,
+      "app_id": "a1b2c3d4e5f6...",
+      "expires_in": 3600
+    }
+  }
+  ```
 
 ### `POST /api/v1/consultations/{appointment_id}/telemetry`
-- **Purpose:** Submits auto-captured technical telemetry upon consultation termination.
-- **Auth:** System / Doctor Client.
+- **Purpose:** Submits auto-captured technical telemetry upon consultation termination (derived from Agora's `onRtcStats`).
+- **Auth:** System / Doctor Client / Patient Client.
 - **Request Body:**
   ```json
   {

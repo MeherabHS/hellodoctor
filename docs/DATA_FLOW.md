@@ -77,24 +77,28 @@ sequenceDiagram
 
 ---
 
-## 3. Flow 3: Telehealth Session & Telemetry Capture
+## 3. Flow 3: Telehealth Session & Telemetry Capture (Agora RTC)
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor Doctor as Doctor Workstation
     actor Patient as Patient Mobile App
-    participant Signaling as WebSocket Signaling Hub
+    participant Axum as Rust Backend API
+    participant Agora as Agora SD-RTN Global Network
     participant TelemetrySvc as TelemetryService
     participant DB as PostgreSQL
 
-    Patient->>Signaling: Join Room (WebSocket)
-    Doctor->>Signaling: Join Room (WebSocket)
-    Signaling->>Patient: Peer Joined -> Initiate WebRTC Offer
-    Patient->>Doctor: P2P Audio / Video Stream via STUN/TURN
-    Note over Patient,Doctor: Consultation Duration Timer Runs
-    Doctor->>Signaling: Disconnect & Sign Prescription
-    Patient->>TelemetrySvc: POST /consultations/{id}/telemetry
+    Patient->>Axum: POST /api/v1/telehealth/agora-token (appointment_id)
+    Doctor->>Axum: POST /api/v1/telehealth/agora-token (appointment_id)
+    Axum-->>Patient: 200 OK (Agora Token, Channel: apt-94812, UID: 94812)
+    Axum-->>Doctor: 200 OK (Agora Token, Channel: apt-94812, UID: 10421)
+    Patient->>Agora: joinChannel(token, "apt-94812", 94812)
+    Doctor->>Agora: joinChannel(token, "apt-94812", 10421)
+    Note over Patient,Doctor,Agora: Adaptive 720p/1080p Video via Agora SD-RTN
+    Note over Patient: Agora RtcStats tracks callSeconds, packetLoss, RTT
+    Doctor->>Agora: leaveChannel() & Sign Prescription
+    Patient->>TelemetrySvc: POST /consultations/{id}/telemetry (from onRtcStats)
     Note over TelemetrySvc: Payload: call_duration = 642s, packet_loss = 0.4%, premature_end = false
     TelemetrySvc->>DB: INSERT INTO consultation_telemetry (...)
     TelemetrySvc->>DB: UPDATE transactions SET escrow_status = 'SETTLED_TO_DOCTOR'

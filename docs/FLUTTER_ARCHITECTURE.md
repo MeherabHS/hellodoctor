@@ -50,7 +50,7 @@ lib/
 | `flutter_secure_storage` | ^9.2.2 | Encrypted storage for JWTs (Keychain on iOS, Keystore on Android). |
 | `drift` | ^2.20.0 | Type-safe local SQLite database for offline caching and health records. |
 | `connectivity_plus` | ^6.0.5 | Observes cellular/WiFi network states to trigger offline action guards. |
-| `flutter_webrtc` | ^0.11.7 | Native WebRTC bindings for 720p/1080p teleconsultation audio/video. |
+| `agora_rtc_engine` | ^6.3.0 | Agora RTC SDK for low-latency adaptive video/audio teleconsultation via SD-RTN. |
 | `cached_network_image` | ^3.4.0 | Efficient bitmap caching for doctor portraits and medical photos. |
 | `shimmer` | ^3.0.0 | Hardware-accelerated skeleton shimmer animations matching `view-14`. |
 | `easy_localization` | ^3.0.7 | Runtime localization toggling for English and Swahili without app reboots. |

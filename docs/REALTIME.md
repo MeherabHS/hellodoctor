@@ -1,18 +1,18 @@
 # Phase 11 — Real-Time Communications & Teleconsultation Architecture
 
-> **Document Version:** 1.0.0  
-> **Protocols:** WebRTC (P2P / SFU Media Transport), WebSocket (Signaling & 24h Chat), FCM/APNS (Push Notifications)  
+> **Document Version:** 1.1.0  
+> **Protocols:** Agora RTC SDK (Managed Video/Audio SD-RTN), WebSocket (24h Clinical Chat), FCM/APNS (Push Notifications)  
 > **Target Audience:** Claude Code Autonomous Implementation Agent
 
 ---
 
 ## 1. Real-Time Requirement Analysis & Protocol Selection
 
-To maintain optimal battery life and network efficiency on 2G/3G/4G connections, protocols are selected based on actual clinical interaction requirements:
+To maintain optimal battery life, rapid time-to-market, and network resilience on 2G/3G/4G connections, protocols are selected based on actual clinical interaction requirements:
 
 | Clinical Feature | Real-Time Requirement | Selected Protocol | Architectural Justification |
 |---|---|---|---|
-| **Live Telehealth Consultation** | Sub-300ms bidirectional video & audio | **WebRTC** (Media) + **WebSocket** (Signaling) | Essential for real-time diagnostic examination; REST is incapable of streaming media. |
+| **Live Telehealth Consultation** | Sub-300ms bidirectional video & audio | **Agora RTC SDK** (`agora_rtc_engine`) | Managed SD-RTN automatically traverses carrier NATs and handles packet loss up to 80% without custom TURN/SFU infrastructure. |
 | **24-Hour Follow-up Chat** | Instant message delivery, typing indicators | **WebSocket** (with REST history fallback) | Low-overhead bidirectional messaging during active clinical consultation sessions. |
 | **Waiting Room Queue Countdown** | Periodic position & status updates | **Server-Sent Events (SSE)** or **Polling** (10s) | Unidirectional server-to-client updates; full duplex WebSockets are unnecessary. |
 | **Upcoming Consultation Alerts** | Time-sensitive reminders (30m before) | **Push Notifications (FCM / APNS)** | Must reach user even when application is terminated or phone is locked. |
@@ -21,58 +21,134 @@ To maintain optimal battery life and network efficiency on 2G/3G/4G connections,
 
 ---
 
-## 2. WebRTC Video Teleconsultation Architecture
+## 2. Agora Video Telehealth Architecture
 
-WebRTC is structured into five distinct subsystems to avoid conflating signaling with media transport:
+Live video and audio teleconsultation is powered by **Agora RTC SDK** instead of a custom-built WebRTC server. Media transport, jitter buffering, and mobile telco firewall traversal are handled by Agora's global Software-Defined Real-time Network (SD-RTN).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                             TELEHEALTH SESSION                              │
+│                       AGORA TELEHEALTH SESSION LIFECYCLE                    │
 ├──────────────────────────────────────┬──────────────────────────────────────┤
-│ 1. SIGNALING (Rust WebSocket Server)  │ 2. MEDIA TRANSPORT (WebRTC / SFU)    │
-│    • SDP Offer / Answer Exchange      │    • Direct P2P via STUN/TURN (P2P)  │
-│    • ICE Candidate Routing            │    • Adaptive Bitrate (128kbps-2Mbps)│
-│    • Connection Heartbeats            │    • VP8 / H.264 Video, Opus Audio   │
+│ 1. CHANNEL SECURITY & TOKEN MINTING  │ 2. MEDIA STREAMING (Agora SD-RTN)    │
+│    • Rust backend mints Dynamic Token│    • 720p/1080p Adaptive Video       │
+│    • Bound to appointment_id + UID   │    • Hardware Echo Cancellation      │
+│    • Short TTL (1 hour expiration)   │    • 80% Packet Loss Tolerance       │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ 3. SESSION MANAGEMENT (Rust Backend) │ 4. DEVICE HARDWARE (Flutter Client)  │
-│    • Room Creation & Authorization    │    • Camera / Microphone Access      │
-│    • Call Duration Clock              │    • Pre-Flight Permission Checks    │
-│    • Escrow State Locking             │    • Hardware Echo Cancellation      │
+│ 3. FLUTTER INTEGRATION               │ 4. WEB WORKSTATION INTEGRATION       │
+│    • agora_rtc_engine Plugin         │    • Agora Web SDK (v4.x)            │
+│    • AgoraVideoView (Local & Remote) │    • Dual-Pane Telehealth Console    │
+│    • Camera / Microphone Pre-Flight  │    • Screen Sharing & Diagnostics    │
 ├──────────────────────────────────────┴──────────────────────────────────────┤
-│ 5. TELEMETRY CAPTURE & CONNECTION RECOVERY                                  │
-│    • Packet Loss & RTT Sampling                                             │
-│    • Premature Call Termination Flagging (<30s)                             │
-│    • Silent Evidence Binding for Medical Grievance Board                     │
+│ 5. TELEMETRY CAPTURE & DISPUTE EVIDENCE                                     │
+│    • Agora RtcEngineEventHandler.onRtcStats Listener                         │
+│    • Ingestion of duration, bitrate, packet loss, and RTT                    │
+│    • Premature Call Termination Flagging (<30s) -> consultation_telemetry   │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.1 Signaling Protocol (Rust WebSocket Endpoint)
-- **Endpoint:** `GET /api/v1/telehealth/signal/{room_id}` (Upgraded to WebSocket).
-- **Authentication:** Query param `?token=<JWT_ACCESS_TOKEN>`.
-- **Signaling Message Types:**
-  - `join_room`: Client enters signaling channel.
-  - `sdp_offer`: Peer sends Session Description Protocol offer.
-  - `sdp_answer`: Peer responds with SDP answer.
-  - `ice_candidate`: Peer exchanges network routing candidates.
-  - `leave_room`: Peer intentionally disconnects.
+### 2.1 Backend Dynamic Token Minting (Rust Axum)
+- **Endpoint:** `POST /api/v1/telehealth/agora-token`
+- **Authentication:** Bearer JWT (Patient or Doctor).
+- **Request Body:**
+  ```json
+  { "appointment_id": "apt-94812" }
+  ```
+- **Business Logic:**
+  1. Verifies that the authenticated caller is either the assigned patient or doctor for `appointment_id`.
+  2. Verifies that the appointment is in `CONFIRMED` or `IN_CONSULTATION` status.
+  3. Mints an Agora RTC Token using:
+     - `AGORA_APP_ID` (from environment)
+     - `AGORA_APP_CERTIFICATE` (from environment)
+     - Channel Name: `apt-94812` (or `room_id`)
+     - UID: Numeric user ID hash or string user ID
+     - Role: `RtcRole::Publisher`
+     - Privilege Expiration: 3600 seconds (1 hour)
+- **Response:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "data": {
+      "channel_name": "apt-94812",
+      "token": "007eJxTYGCoM2y+5tW2Z1n380vP4...",
+      "uid": 94812,
+      "app_id": "a1b2c3d4e5f6..."
+    }
+  }
+  ```
 
-### 2.2 External Media Infrastructure Recommendation
-- **STUN/TURN Servers:** Production requires a dedicated TURN server (e.g., open-source `coturn` deployed in-region or managed Twilio Network Traversal) to traverse symmetric NATs and mobile telco firewalls.
-- **Selective Forwarding Unit (SFU):** For 1-on-1 calls, direct P2P with TURN relay is recommended. If multi-party consultations (e.g., patient, family member, and specialist) are introduced, **LiveKit** (open-source Go/Rust SFU) is recommended.
+### 2.2 Flutter Mobile Implementation (`agora_rtc_engine`)
+```dart
+import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 
-### 2.3 Forensic Telemetry Recording
-During the call, the Flutter client samples `PeerConnection.getStats()` every 5 seconds. Upon call termination, the client submits the final telemetry record:
+class TelehealthCallController {
+  late RtcEngine _engine;
+  int _callSeconds = 0;
+  double _packetLoss = 0.0;
+  int _rtt = 0;
+
+  Future<void> initializeAgora({
+    required String appId,
+    required String channelName,
+    required String token,
+    required int uid,
+  }) async {
+    _engine = createAgoraRtcEngine();
+    await _engine.initialize(RtcEngineContext(
+      appId: appId,
+      channelProfile: ChannelProfileType.channelProfileCommunication,
+    ));
+
+    _engine.registerEventHandler(RtcEngineEventHandler(
+      onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
+        // Start duration timer
+      },
+      onRtcStats: (RtcConnection connection, RtcStats stats) {
+        _callSeconds = stats.duration ?? 0;
+        _packetLoss = (stats.rxPacketLossRate ?? 0).toDouble();
+        _rtt = stats.lastmileDelay ?? 0;
+      },
+      onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
+        // Remote doctor or patient disconnected
+      },
+      onLeaveChannel: (RtcConnection connection, RtcStats stats) {
+        _submitSessionTelemetry();
+      },
+    ));
+
+    await _engine.enableVideo();
+    await _engine.startPreview();
+    await _engine.joinChannel(
+      token: token,
+      channelId: channelName,
+      uid: uid,
+      options: const ChannelMediaOptions(
+        clientRoleType: ClientRoleType.clientRoleBroadcaster,
+        autoSubscribeAudio: true,
+        autoSubscribeVideo: true,
+      ),
+    );
+  }
+
+  Future<void> _submitSessionTelemetry() async {
+    final premature = _callSeconds < 30;
+    // Dispatches telemetry to POST /api/v1/consultations/{id}/telemetry
+  }
+}
+```
+
+### 2.3 Forensic Telemetry Ingestion for Medical Grievance Board
+Upon call termination, the client submits the final telemetry record derived from Agora's `RtcStats`:
 ```json
 {
   "call_duration_seconds": 642,
-  "ice_connection_state": "COMPLETED",
+  "ice_connection_state": "AGORA_SD_RTN_CONNECTED",
   "packet_loss_percent": 0.42,
   "round_trip_time_ms": 38,
   "premature_end": false,
   "prescription_issued": true
 }
 ```
-If `call_duration_seconds < 30`, the backend automatically flags `premature_end: true`, retaining the escrow hold pending grievance review or patient reconnection.
+If `call_duration_seconds < 30`, the backend automatically marks `premature_end: true`, retaining the escrow hold pending grievance review or patient reconnection.
 
 ---
 

@@ -127,12 +127,12 @@ M18-M19: Localization (Swahili/English), Offline Guards & Production Sign-off
 
 ---
 
-### Milestone M10: WebRTC Telehealth & Telemetry Auto-Capture
+### Milestone M10: Agora RTC Telehealth Video & Telemetry Auto-Capture
 - **Prerequisites:** M9.
 - **Expected Artifacts:**
-  - `features/consultation/`, WebSocket signaling endpoint `GET /api/v1/telehealth/signal/{room_id}`.
-- **Deliverables:** 1080p WebRTC video feed, automatic call duration timer, premature end detection (<30s), telemetry upload.
-- **Tests:** WebRTC signaling mock exchange, premature termination flag verification.
+  - `features/consultation/` (`agora_rtc_engine` integration in Flutter), Agora token endpoint `POST /api/v1/telehealth/agora-token` in Rust.
+- **Deliverables:** Adaptive 720p/1080p video feed via Agora SD-RTN, automatic call duration tracking from `onRtcStats`, premature end detection (<30s), telemetry upload to `POST /api/v1/consultations/{id}/telemetry`.
+- **Tests:** Agora token generation unit test, channel join mock test, premature termination flag verification.
 
 ---
 

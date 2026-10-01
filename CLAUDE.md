@@ -5,8 +5,7 @@
 > - **Mobile Application:** Flutter (Dart) — Cross-platform iOS, Android, and responsive tablet  
 > - **Backend Core Service:** Rust (Axum, Tokio, SQLx, Tower) — High-performance, memory-safe REST & WebSocket server  
 > - **Persistent Database:** PostgreSQL 16+ (Normalized schema, connection pooling, ACID transactions)  
-> - **Web Workstations / Admin Portal:** Next.js (TypeScript) or Flutter Web connecting to the central Rust API  
-> - **Real-Time Signaling:** WebRTC for live teleconsultation, WebSockets for 24-hour clinical chats  
+> - **Real-Time Video & Chat:** Agora RTC SDK (`agora_rtc_engine` in Flutter + dynamic token minting in Rust) for live teleconsultation; WebSockets for 24-hour clinical chats  
 > - **Reference Baseline:** HTML/CSS/JavaScript prototype located at `index.html` (and `prototype/index.html`)
 
 ---

@@ -39,6 +39,8 @@
    - Verified position: positioned directly above Upcoming Appointments on `view-0`. Strict omission of "24/7" prefix.
 5. **Bilingual Regional Localization:**  
    - Verified instant toggle between English (`en`) and Swahili (`sw`) with dynamic badge `#patientActiveLangBadge`.
+6. **Agora RTC Video Infrastructure:**  
+   - Verified across `ADR-008`, `REALTIME.md`, `FLUTTER_ARCHITECTURE.md`, `API_SPEC.md`, `DATA_FLOW.md`, and `IMPLEMENTATION_ROADMAP.md`. Live teleconsultation utilizes the managed Agora RTC SDK (`agora_rtc_engine` in Flutter + dynamic token generation in Rust Axum), eliminating custom WebRTC TURN/SFU server maintenance.
 
 ---
 
