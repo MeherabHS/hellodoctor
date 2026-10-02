@@ -7,7 +7,7 @@
 ---
 
 ## 1. Context
-HelloDoctor mobile applications feature complex asynchronous state transitions: multi-prescription image uploads with live preview capping, real-time waiting room countdown timers, WebRTC call state changes, and live 20% platform charge wallet arithmetic. An unprincipled state management choice risks race conditions and UI desynchronization.
+HelloDoctor mobile applications feature complex asynchronous state transitions: multi-prescription image uploads with live preview capping, real-time waiting room countdown timers, Agora RTC call-state changes, and live 20% platform charge wallet arithmetic. An unprincipled state management choice risks race conditions and UI desynchronization.
 
 ## 2. Decision
 We choose **`flutter_bloc`** (Bloc & Cubit) as the standard state management pattern across the Flutter mobile application.

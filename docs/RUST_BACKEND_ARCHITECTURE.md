@@ -37,12 +37,12 @@ services/backend/
     │       └── realtime_ws.rs
     │
     ├── domain/                         # Domain models, validation & business rules
-    │   ├── models/                     # Patient, Doctor, Appointment, Escrow, etc.
+    │   ├── models/                     # Patient, Doctor, Appointment, PaymentHold, etc.
     │   └── validation/                 # Custom phone, Internal Platform Compliance Warning, slot validator rules
     │
     ├── services/                       # Business logic orchestration
     │   ├── auth_service.rs             # JWTs and auth_sessions management
-    │   ├── appointment_service.rs      # Atomic slot locking & escrow hold
+    │   ├── appointment_service.rs      # Atomic slot locking & payment attempt creation
     │   ├── prescription_service.rs     # Doctor prescription photo upload, patient intake document management & integrity verification
     │   ├── grievance_service.rs        # Telemetry binding & board adjudication (Internal Platform Compliance Warning)
     │   ├── settlement_service.rs       # 20% platform charge debarment calculations, two-stage payment flow & monthly batch disbursement orchestration
@@ -107,7 +107,7 @@ dotenvy = "0.15"
 
 ---
 
-## 3. Atomic Slot Reservation & Escrow Engine
+## 3. Atomic Slot Reservation & Payment Attempt Engine
 
 To prevent concurrent double-booking and ensure financial integrity, slot reservation runs within an **ACID database transaction** with row-level locks (`SELECT ... FOR UPDATE`):
 
@@ -128,7 +128,7 @@ pub async fn book_appointment(
         SELECT id, status as "status: SlotStatus"
         FROM doctor_schedule_slots
         WHERE id = $1 AND doctor_id = $2
-        FOR UPDATE
+        FOR UPDATE SKIP LOCKED
         "#,
         slot_id,
         doctor_id
@@ -141,9 +141,9 @@ pub async fn book_appointment(
         return Err(AppError::Conflict("Selected slot is no longer available.".into()));
     }
 
-    // 2. Mark slot as booked
+    // 2. Lock slot while the payment attempt is being created
     sqlx::query!(
-        "UPDATE doctor_schedule_slots SET status = 'BOOKED' WHERE id = $1",
+        "UPDATE doctor_schedule_slots SET status = 'LOCKED_IN_PAYMENT' WHERE id = $1",
         slot_id
     )
     .execute(&mut *tx)
@@ -160,7 +160,7 @@ pub async fn book_appointment(
     sqlx::query!(
         r#"
         INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, status, consultation_fee)
-        VALUES ($1, $2, $3, $4, $5, 'CONFIRMED', $6)
+        VALUES ($1, $2, $3, $4, $5, 'PENDING_PAYMENT', $6)
         "#,
         apt_id,
         apt_num,
@@ -172,15 +172,17 @@ pub async fn book_appointment(
     .execute(&mut *tx)
     .await?;
 
-    // 5. Deposit into Escrow Ledger
+    // 5. Persist the payment attempt before redirecting to the provider
     let txn_num = format!("TXN-{}", Uuid::new_v4().to_string()[0..8].to_uppercase());
+    let payment_session_id = Uuid::new_v4();
     sqlx::query!(
         r#"
-        INSERT INTO transactions (transaction_number, appointment_id, gateway, gross_amount, platform_fee_amount, net_amount, escrow_status)
-        VALUES ($1, $2, $3, $4, $5, $6, 'ESCROW_HELD')
+        INSERT INTO transactions (transaction_number, appointment_id, payment_session_id, gateway, gross_amount, platform_fee_amount, net_amount, payment_status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, 'INITIATED')
         "#,
         txn_num,
         apt_id,
+        payment_session_id,
         gateway as _,
         fee,
         platform_fee,
@@ -194,10 +196,13 @@ pub async fn book_appointment(
     Ok(AppointmentBookingResult {
         appointment_id: apt_id,
         appointment_number: apt_num,
-        escrow_held: fee,
+        payment_session_id: payment_session_id,
+        payment_status: PaymentStatus::Initiated,
     })
 }
 ```
+
+After commit, the service creates the provider session using `txn_num` as merchant reference, stores the returned `gateway_reference`, and only then returns the redirect URL. The webhook locks this existing transaction and transitions `INITIATED -> PAYMENT_HELD`; it also changes the appointment to `CONFIRMED` and the slot to `BOOKED`. Provider timeouts remain `PAYMENT_STATUS_UNKNOWN` until reconciliation.
 
 ---
 

@@ -9,7 +9,7 @@
 ## 1. Authentication Lifecycle
 
 ### 1.1 Mobile OTP Authentication Flow (Patients)
-HelloDoctor uses **Phone Number + OTP** as primary authentication for patients. For physicians, it uses **BMDC Credentials + Password + OTP** (which constitutes a true Multi-Factor Authentication flow).
+HelloDoctor uses **Phone Number + OTP** as primary authentication for patients. For physicians, it uses **Medical license credentials (BMDC in Bangladesh) + Password + OTP** (which constitutes a true Multi-Factor Authentication flow).
 
 ```mermaid
 sequenceDiagram
@@ -73,6 +73,21 @@ sequenceDiagram
 - **Parameters:** Memory: 64 MB (`65536`), Iterations: 3, Parallelism: 4.
 - **Enforcement:** Minimum 12 characters, uppercase, lowercase, numbers, and symbols. Plaintext passwords must never be logged or transmitted in unencrypted protocols.
 
+### 2.4 Administrator TOTP Enrollment & Recovery
+- **Enrollment:** During admin account creation, the server generates a TOTP secret,
+  encrypts it with envelope encryption (KMS), and presents a QR code / otpauth:// URI
+  to the admin's authenticator app. Enrollment is confirmed by submitting a valid code.
+- **Persistence:** TOTP secrets are stored encrypted (NOT hashed) in the
+  `mfa_credentials` table, because the server must verify time-based codes against
+  the underlying secret.
+- **Recovery Codes:** Eight one-time recovery codes are generated at enrollment.
+  Each is hashed with Argon2id and stored. Used codes are permanently removed.
+- **Lost Device:** If all recovery codes are exhausted, a PLATFORM_ADMIN must
+  manually reset the admin's MFA, which requires re-enrollment and generates new codes.
+- **Re-authentication:** Administrative actions on sensitive resources (e.g., initiating
+  disbursement, resetting another admin's MFA) require TOTP re-verification within
+  the current session, even if the session is still valid.
+
 ---
 
 ## 3. Attribute-Based Access Control (ABAC) Matrix
@@ -84,7 +99,7 @@ Authorization relies on Attribute-Based Access Control (ABAC). Beyond standard r
 | View Doctor Directory | READ | READ | READ (All Admin Roles) |
 | Book Appointment Slot | WRITE (Own) | DENIED | WRITE (`SUPPORT`, `PLATFORM_ADMIN`) |
 | Upload Intake Prescriptions | WRITE (Own context) | READ (Assigned context) | READ (`COMPLIANCE`, `CLINICAL_ADMIN`) |
-| Author & Sign Prescription | DENIED | WRITE (Assigned context) | READ (`COMPLIANCE`, `CLINICAL_ADMIN`) |
+| Upload Doctor Prescription Photo | DENIED | WRITE (Assigned context) | READ (`COMPLIANCE`, `CLINICAL_ADMIN`) |
 | Inspect Doctor Wallet | DENIED | READ (Own) | READ (`FINANCE_ADMIN`), DISBURSE (`FINANCE_ADMIN`) |
 | View Physician Dossier | DENIED | DENIED | READ (`COMPLIANCE`, `PLATFORM_ADMIN`) |
 | Submit Clinical Grievance | WRITE (Own) | DENIED | READ (`SUPPORT`, `CLINICAL_ADMIN`) |
@@ -106,8 +121,16 @@ Authorization relies on Attribute-Based Access Control (ABAC). Beyond standard r
    - Medical images (like prescriptions or lab reports) must **NOT** be cached by generic disk caching libraries (e.g., `cached_network_image`).
    - Use encrypted, lifecycle-controlled storage with immediate session cleanup upon logout or expiration.
 4. **Transport Layer Security**:
-   - All REST and WebSocket connections enforce TLS 1.3 with HSTS (`Strict-Transport-Security`).
-   - Certificate pinning is enforced on Flutter release builds using `dio` security certificates.
+   - TLS 1.3 is preferred; the supported Android/iOS matrix is validated before production rollout, with HSTS (`Strict-Transport-Security`) enabled.
+   - Flutter release builds use certificate pinning with a primary and backup SPKI pin. Rotation requires overlap, an emergency certificate-rotation path, and a remotely deliverable app/config update strategy so a legitimate renewal cannot brick installed clients.
+- **Certificate Pinning Rotation Strategy:**
+  - Pin against SPKI (Subject Public Key Info) hashes, not leaf certificates.
+  - Always include a primary pin and at least one backup pin from a different CA.
+  - Maintain a 30-day overlap period during certificate rotation.
+  - Emergency certificate rotation: The app should include a remote configuration
+    endpoint that can update pins without requiring an app store release.
+  - The production pin configuration must be validated against every supported
+    Android (API 26+) and iOS (14+) version before deployment.
 
 ---
 
@@ -136,9 +159,9 @@ Video consultation channels must be strictly secured to prevent unauthorized acc
 
 ---
 
-## 7. Anti-Injection Architecture (Zero-Tolerance Policy)
+## 7. Anti-Injection Defense-in-Depth Architecture
 
-HelloDoctor eliminates code and data injection vectors by design across all system layers:
+HelloDoctor implements defense-in-depth controls to minimize injection risks across all system layers:
 
 ### 7.1 SQL Injection Elimination
 - **Compile-Time Verification:** All SQL queries in Rust Axum services must be authored using `sqlx::query!` or `sqlx::query_as!`. String concatenation or runtime string formatting (`format!`) for SQL construction is strictly rejected by CI lint rules (`clippy::disallowed_methods`).
@@ -146,7 +169,7 @@ HelloDoctor eliminates code and data injection vectors by design across all syst
 - **PostgreSQL Cast Enforcement:** Database inputs are cast at query boundaries, ensuring malformed literals trigger database parse rejections rather than execution.
 
 ### 7.2 Cross-Site Scripting (XSS) Prevention
-- **Mobile Layer:** Flutter natively renders UI via Skia/Impeller canvas and text spans without an HTML/DOM document tree, immunizing the mobile app against script injection.
+- **Mobile Layer:** Flutter's native rendering avoids DOM-based XSS in standard native screens; however, WebViews, deep links, external content rendering, and any embedded HTML still require explicit validation and sandboxing.
 - **Admin Web Shell (Next.js):**
   - Strict Content Security Policy (CSP): `default-src 'self'; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none';`.
   - Zero `dangerouslySetInnerHTML` usage.
@@ -266,6 +289,7 @@ To ensure defense-in-depth even if an application-level query omits an ownership
    Because `SET LOCAL` is scoped strictly to the current transaction, connection reuse in `sqlx::PgPool` cannot leak credentials to subsequent requests.
 2. **Forced Security:**
    All PHI tables execute `ALTER TABLE <table> FORCE ROW LEVEL SECURITY;`, ensuring table owners and administrative database roles are also bound by RLS rules.
-3. **Defense-in-Depth Principle:**
+3. **Service-write separation:**
+   The schema defines separate, non-login capability roles for API reads/ordinary inserts, payment state transitions, timed system transitions, and finance/disbursements. They have no `BYPASSRLS`; application workers use the narrowest role and transaction-local identity context required for the operation. The ordinary API role cannot update payment, appointment, wallet, grievance, or chat lifecycle state.
+4. **Defense-in-Depth Principle:**
    Application ABAC is authoritative; database RLS ensures that any accidental query flaw or compromised route handler physically cannot select, update, or delete rows outside the caller's tenancy.
-

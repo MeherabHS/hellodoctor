@@ -33,7 +33,7 @@ Is this an internal technical error?
 | `FORBIDDEN` | `403 Forbidden` | "You do not have permission to perform this clinical action." | Display access denied dialog. |
 | `CHAT_SESSION_EXPIRED` | `403 Forbidden` | "This 24-hour consultation chat has concluded." / "Mazungumzo haya ya saa 24 yamemalizika." | Lock chat box into read-only state. |
 | `RESOURCE_NOT_FOUND` | `404 Not Found` | "Requested doctor or record could not be found." | Render empty state illustration. |
-| `GATEWAY_TIMEOUT` | `504 Gateway Timeout` | "We could not confirm the payment status. Please do not pay again while we verify the transaction." | Allow retry after 30 seconds. |
+| `GATEWAY_TIMEOUT` | `504 Gateway Timeout` | "We could not confirm the payment status. Please do not pay again while we verify the transaction." | Payment Timeout Recovery Protocol:<br>1. Backend sets transaction to PAYMENT_STATUS_UNKNOWN<br>2. Backend immediately initiates provider status poll/reconciliation<br>3. Possible outcomes:<br>   a. Provider confirms SUCCESS → transition to PAYMENT_HELD, confirm appointment<br>   b. Provider confirms FAILED → transition to FAILED, release slot, allow new payment attempt<br>   c. Provider returns PENDING → continue polling at 15-second intervals (max 5 attempts)<br>   d. Provider unreachable → hold PAYMENT_STATUS_UNKNOWN, alert on-call engineer<br>4. Patient UI shows: 'Verifying your payment status... Please do not close the app.'<br>5. DO NOT re-enable the payment button until provider status is definitively resolved. |
 | `INTERNAL_ERROR` | `500 Server Error` | "A temporary server issue occurred. Reference: {trace_id}" | Provide "Contact Support" button with pre-filled trace ID. |
 
 ---

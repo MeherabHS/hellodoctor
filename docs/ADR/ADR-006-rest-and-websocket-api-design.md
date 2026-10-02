@@ -7,7 +7,7 @@
 ---
 
 ## 1. Context
-HelloDoctor includes transactional operations (appointment booking, payment escrow authorization, prescription signing) as well as continuous bi-directional streams (24-hour asynchronous clinical messaging). Selecting a single transport protocol for all interactions would be suboptimal.
+HelloDoctor includes transactional operations (appointment booking, payment-hold authorization, secure prescription-photo submission) as well as continuous bi-directional streams (24-hour asynchronous clinical messaging). Selecting a single transport protocol for all interactions would be suboptimal.
 
 ## 2. Decision
 We adopt a **Hybrid Protocol Strategy**:
@@ -20,7 +20,7 @@ We adopt a **Hybrid Protocol Strategy**:
 2. **gRPC:** High performance, but requires specialized mobile HTTP/2 proxies and complicates web browser support for the Admin Portal and Doctor Workstation.
 
 ## 4. Rationale
-- **REST for Determinism:** Financial transactions, slot reservations, and prescription signing require standard HTTP semantics (`Idempotency-Key`, cache-control headers, status codes `201`, `409`, `422`).
+- **REST for Determinism:** Financial transactions, slot reservations, and prescription-photo submission require standard HTTP semantics (`Idempotency-Key`, cache-control headers, status codes `201`, `409`, `422`).
 - **WebSockets Where Justified:** Live chat benefits from persistent socket framing without HTTP polling overhead. Video/audio RTC is handled entirely by Agora SDK — WebSockets are NOT used for RTC signaling.
 
 ## 5. Consequences

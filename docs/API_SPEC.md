@@ -15,7 +15,7 @@
   - `Content-Type: application/json` (or `multipart/form-data` for file uploads)
   - `Authorization: Bearer <JWT_ACCESS_TOKEN>` (for authenticated routes)
   - `X-Request-Id: <UUIDv4>` (Traceability header auto-injected by proxy or client)
-  - `Idempotency-Key: <UUIDv4>` (Required for financial and booking mutations)
+  - `Idempotency-Key: <UUIDv4>` (Required for financial mutations, booking mutations, AND file upload mutations.)
 
 ### 1.2 Authorization & ABAC Note
 All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addition to Role-Based Access Control (RBAC). Beyond checking the user's role, the system verifies:
@@ -94,7 +94,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
   ```
 
 ### `POST /api/v1/auth/doctor/login`
-- **Purpose:** Initiates doctor login using Medical license credentials + password (Step 1 of MFA). Note: Keep UI labels as "BMDC Registration Number" for Bangladesh deployment. The /bmdc/ path is kept as a V1 Bangladesh-specific path.
+- **Purpose:** Initiates doctor login. Medical license credentials (BMDC in Bangladesh, Kenya Medical Board in Kenya) + password. (Step 1 of MFA).
 - **Auth:** Public.
 - **Request Body:**
   ```json
@@ -142,6 +142,8 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
     }
   }
   ```
+
+Admin TOTP is backed by the encrypted `mfa_credentials` model in `DATABASE_SCHEMA.md`. Enrollment, recovery, reset, and sensitive admin actions follow the lifecycle in `AUTH_SECURITY.md`.
 
 ### `POST /api/v1/auth/refresh`
 - **Purpose:** Exchanges a valid opaque refresh token for a new access/refresh token pair. Employs token rotation and reuse detection.
@@ -232,8 +234,8 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
       "appointment_id": "apt-94812",
       "appointment_number": "APT-20261001-9481",
       "status": "PENDING_PAYMENT",
-      "payment_session_id": "sess_bkash_9123",
-      "payment_redirect_url": "https://gateway.bkash.com/pay/sess_bkash_9123",
+      "payment_session_id": "7baf3072-96bd-4fae-a735-e8d2c1f94b3a",
+      "payment_redirect_url": "https://gateway.bkash.com/pay/provider-session-token",
       "amount": 800.00
     }
   }
@@ -247,6 +249,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
 ### `POST /api/v1/appointments/{id}/prescriptions`
 - **Purpose:** Uploads 1 to 5 physical prescription or lab report images for pre-consultation intake.
 - **Auth:** `PATIENT`.
+- **Headers:** `Idempotency-Key: <UUID>` (Required to prevent duplicate uploads on mobile network retries.)
 - **Content-Type:** `multipart/form-data`
 - **Form Fields:**
   - `files[]`: Up to 5 binary image or PDF attachments (max 10 MB per file).
@@ -326,6 +329,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
 ### `POST /api/v1/consultations/{appointment_id}/prescription`
 - **Purpose:** Uploads a photo of the handwritten prescription after consultation.
 - **Auth:** `DOCTOR` (must be the assigned doctor for this appointment).
+- **Headers:** `Idempotency-Key: <UUID>` (Required to prevent duplicate uploads on mobile network retries.)
 - **Content-Type:** `multipart/form-data`
 - **Form Fields:**
   - `rx_image`: Single photo of handwritten prescription (JPEG/PNG, max 10MB)

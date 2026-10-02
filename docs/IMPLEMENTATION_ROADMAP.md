@@ -21,7 +21,7 @@ M5-M6: Specialist Discovery (Zero Stars) & Emergency Banner
   │
 M7-M9: Atomic Booking, 1-5 Rx Upload Engine & Virtual Waiting Room
   │
-M10-M12: Agora Telehealth, Telemetry, 24h Chat & E-Prescriptions
+M10-M12: Agora Telehealth, Telemetry, 24h Chat & Prescription Photos
   │
 M13: Doctor Wallet & Transparent 20% Fee Debarment Settlement
   │
@@ -81,11 +81,11 @@ M18: Production Sign-off
 - **Deliverables:** Emergency Contact banner positioned directly above Upcoming Appointments with one-tap dialing (configurable per country, e.g. `16263` for BD).
 - **Tests:** Widget test asserting DOM position and native dialer trigger.
 
-### Milestone M7: Atomic Slot Booking & Escrow Hold
+### Milestone M7: Atomic Slot Booking & Payment Hold
 - **Prerequisites:** M5.
 - **Expected Artifacts:**
   - `services/backend/src/services/appointment_service.rs`.
-- **Deliverables:** Row-locked slot booking with automatic 20% platform charge debarment and deposit into `ESCROW_HELD`.
+- **Deliverables:** Row-locked slot booking with `LOCKED_IN_PAYMENT`, persisted `INITIATED` payment attempt, verified `PAYMENT_HELD` webhook transition, automatic 20% platform charge, and reconciliation.
 - **Tests:** Concurrency test proving prevented double-booking under parallel requests.
 
 ***SECURITY GATE: BOLA/IDOR testing verified on Appointment APIs.***
@@ -94,7 +94,7 @@ M18: Production Sign-off
 - **Prerequisites:** M7.
 - **Expected Artifacts:**
   - `features/appointment_booking/presentation/widgets/prescription_dropzone.dart`.
-  - Endpoint: `POST /api/v1/appointments/{id}/prescriptions/upload`.
+  - Endpoint: `POST /api/v1/appointments/{id}/prescriptions`.
 - **Deliverables:** Multi-file picker with 5-image hard limit, delete triggers, and full-screen multi-page viewer modal.
 - **Tests:** Unit test asserting 6th photo rejection with warning toast.
 
@@ -107,7 +107,7 @@ M18: Production Sign-off
 ### Milestone M10: Agora RTC Telehealth Video & Telemetry Auto-Capture
 - **Prerequisites:** M9.
 - **Expected Artifacts:**
-  - `features/consultation/` (`agora_rtc_engine` integration in Flutter), Agora token endpoint `POST /api/v1/telehealth/agora-token` in Rust.
+  - `features/consultation/` (`agora_rtc_engine` integration in Flutter), Agora token endpoint `POST /api/v1/consultations/{appointment_id}/rtc-token` in Rust.
 - **Deliverables:** Adaptive 720p/1080p video feed via Agora SD-RTN, automatic call duration tracking from `onRtcStats`, premature end detection (<30s), telemetry upload.
 - **Tests:** Agora token generation unit test, channel join mock test, premature termination flag verification.
 
@@ -115,22 +115,22 @@ M18: Production Sign-off
 - **Prerequisites:** M10.
 - **Deliverables:** Bi-directional chat with canned clinical pills and automatic 24-hour expiration lock.
 
-### Milestone M12: DGDA E-Prescriptions & Health Vault EMR
+### Milestone M12: Handwritten Prescription Photos & Health Vault
 - **Prerequisites:** M10.
 - **Expected Artifacts:**
-  - `features/health_vault/`, Rust digital signature service.
-- **Deliverables:** Digital prescription authoring, HMAC-SHA256 integrity verification, PDF generation, vault archive.
-- **Tests:** PDF generation test, cryptographic integrity verification.
+  - `features/health_vault/`, secure prescription-photo upload and integrity-verification service.
+- **Deliverables:** Secure handwritten-prescription photo upload, HMAC-SHA256 integrity verification, private vault archive, and explicit no-prescription outcome.
+- **Tests:** Upload-pipeline and cryptographic-integrity verification tests; no generated-PDF test.
 
 ### Milestone M13: Doctor Wallet & 20% Debarred Settlement
 - **Prerequisites:** M10.
-- **Deliverables:** 3-tier earnings calculation ($G \to C \to N$), mandatory basis note, itemized ledger rows, MFS payout trigger.
+- **Deliverables:** 3-tier earnings calculation ($G \to C \to N$), mandatory basis note, itemized ledger rows, and Finance-admin monthly MFS disbursement batches.
 
 ### Milestone M14: Clinical Grievance Redressal & Board Arbitration
 - **Prerequisites:** M10, M13.
 - **Expected Artifacts:**
   - `features/grievance_redressal/`, Admin Grievance Docket.
-- **Deliverables:** Patient grievance modal with silent telemetry binding, admin adjudication desk with one-click escrow refund and Internal Platform Compliance Warning tools.
+- **Deliverables:** Patient grievance modal with silent telemetry binding, admin adjudication desk with one-click payment refund and Internal Platform Compliance Warning tools.
 
 ### Milestone M15: Central Admin Consoles & Doctor Dossiers
 - **Prerequisites:** M14.

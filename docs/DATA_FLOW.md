@@ -39,19 +39,30 @@ sequenceDiagram
     Repo->>DB: UPDATE doctor_schedule_slots SET status = 'LOCKED_IN_PAYMENT'
     Svc->>Repo: create_appointment(status='PENDING_PAYMENT')
     Repo->>DB: INSERT INTO appointments ... RETURNING id
+    Svc->>Repo: create_clinical_intake(chief_complaint)
+    Repo->>DB: INSERT INTO appointment_clinical_intake (appointment_id, patient_id, chief_complaint)
+    Svc->>Repo: create_payment_attempt(status='INITIATED')
+    Repo->>DB: INSERT INTO transactions (appointment_id, payment_session_id, gateway, amounts, payment_status='INITIATED')
     Svc->>DB: COMMIT TRANSACTION
-    Svc-->>Axum: Return payment URL
-    Axum-->>Dio: 201 Created { payment_url }
+    Svc->>MFS: Create provider payment session (merchant reference = transaction_number)
+    MFS-->>Svc: gateway_reference + payment_redirect_url
+    Svc->>DB: UPDATE transactions SET gateway_reference = $1 WHERE payment_session_id = $2
+    Svc-->>Axum: Return persisted payment_session_id + payment_redirect_url
+    Axum-->>Dio: 201 Created { payment_session_id, payment_redirect_url }
     Dio-->>Patient: Navigate to MFS Gateway
     Patient->>MFS: Complete Payment
     MFS->>Axum: POST Webhook (Payment Success)
     Axum->>DB: BEGIN TRANSACTION
+    Axum->>DB: INSERT payment_events (gateway, provider_event_id, provider_event_type) ON CONFLICT DO NOTHING
+    Axum->>DB: SELECT transaction FOR UPDATE by gateway_reference
+    Axum->>DB: UPDATE transactions SET payment_status = 'PAYMENT_HELD'
     Axum->>DB: UPDATE appointments SET status='CONFIRMED'
     Axum->>DB: UPDATE doctor_schedule_slots SET status = 'BOOKED'
-    Axum->>DB: INSERT INTO transactions (..., payment_status = 'PAYMENT_HELD')
     Axum->>DB: COMMIT TRANSACTION
     Axum-->>MFS: 200 OK
 ```
+
+The HelloDoctor `payment_session_id` is generated and persisted with the `INITIATED` transaction before any redirect is returned. Provider-session creation happens after the slot transaction commits, so no database lock is held during a network call. If provider-session creation fails, the attempt is marked `FAILED` and the appointment/slot are released by the payment-recovery worker. Signed duplicate webhooks lock and update the existing transaction idempotently; they never create a second transaction.
 
 ---
 

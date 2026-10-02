@@ -27,5 +27,5 @@ We choose **Agora RTC SDK** as the managed real-time video and audio infrastruct
 - **Direct QoS Telemetry:** Agora's `RtcStats` (duration, tx/rx audio/video bitrate, packet loss rate, round-trip time) directly populates HelloDoctor's clinical governance and grievance audit trail.
 
 ## 5. Consequences
-- **Positive:** Zero custom TURN server maintenance, near-100% connection reliability on mobile networks, fast implementation timeline, built-in echo cancellation.
+- **Positive:** No custom TURN-server maintenance, vendor-managed network traversal and built-in echo cancellation, with reliability measured through Agora telemetry and tested across supported mobile networks.
 - **Trade-off:** External vendor dependency; requires provisioning Agora App ID and App Certificate in environment configuration (`AGORA_APP_ID`, `AGORA_APP_CERTIFICATE`).

@@ -47,8 +47,8 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Question:** How long must clinical data be stored legally based on jurisdiction?
 - **Blocks Implementation?** **NON-BLOCKER.**
 
-### Q-NEW-2: Does the MFS payment hold arrangement constitute legal escrow or is it a payment hold?
-- **Question:** Does the MFS payment hold arrangement constitute legal escrow or is it a payment hold? Affects terminology.
+### Q-NEW-2: Payment-hold terminology
+- **Decision:** Use `PAYMENT_HELD` and payment-hold terminology throughout product, API, database, and financial operations documents. Do not describe the arrangement as legal escrow unless counsel and the payment provider explicitly approve that classification.
 - **Blocks Implementation?** **NON-BLOCKER.**
 
 ### Q-NEW-3: What Bangla localization timeline is appropriate for Bangladesh market launch?

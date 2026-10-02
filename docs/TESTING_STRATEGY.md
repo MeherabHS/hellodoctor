@@ -56,9 +56,9 @@
 - **Concurrent Slot Double-Booking Prevention:**
   - Launch 10 concurrent async tasks attempting to book the identical slot ID.
   - Assert that exactly **1 task succeeds (`201 Created`)** and **9 tasks fail with `409 Conflict` (`SLOT_NOT_AVAILABLE`)**.
-  - Verify that database row remains in `BOOKED` state without corrupting the escrow ledger.
-- **Grievance Refund Escrow Disbursal:**
-  - Seed transaction in `ESCROW_HELD`.
+  - Verify that database row remains in `BOOKED` state without corrupting the payment ledger.
+- **Grievance Refund Payment Disbursal:**
+  - Seed transaction in `PAYMENT_HELD`.
   - Execute `POST /api/v1/admin/grievances/{id}/refund`.
   - Assert transaction updates to `REFUNDED` and patient wallet is credited.
 - **Payment Adversarial Tests:**
@@ -82,7 +82,7 @@
 
 ## 4. Coverage Targets & Continuous Integration
 
-- **Financial & Escrow Engine:** 100% statement and branch coverage required.
+- **Financial & Payment-Hold Engine:** 100% statement and branch coverage required.
 - **Grievance & Telemetry Capture:** 95%+ coverage required.
-- **Clinical Services & Prescription Signing:** 90%+ coverage required.
+- **Clinical Services & Prescription-Photo Integrity Pipeline:** 90%+ coverage required.
 - **Client Presentation & UI Blocs:** 85%+ coverage required.

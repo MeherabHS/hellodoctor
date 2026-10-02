@@ -22,7 +22,7 @@ User (1) ──────┬────── (1) PatientProfile (1) ──�
 │                                                                                                    │
 ├────── (N) PrescriptionIntakeDocument (Max 5 photos per appointment)                                │
 ├────── (1) ConsultationSession (1) ────── (1) ConsultationTelemetry                                │
-├────── (1) Prescription (1) ────── (N) PrescriptionItem                                             │
+├────── (1) Prescription (secure handwritten-Rx photo)                                               │
 ├────── (N) ChatMessage                                                                              │
 ├────── (N) GrievanceReport (1) ────── (1) GrievanceAdjudication                                      │
 └────── (1) Transaction (Payment holding ledger)                                                     │
@@ -79,6 +79,43 @@ CREATE TABLE auth_sessions (
 CREATE INDEX idx_auth_sessions_user ON auth_sessions(user_id) WHERE revoked_at IS NULL;
 CREATE INDEX idx_auth_sessions_family ON auth_sessions(token_family_id);
 CREATE UNIQUE INDEX idx_auth_sessions_token ON auth_sessions(refresh_token_hash) WHERE revoked_at IS NULL;
+
+-- ============================================================================
+-- 1b. MFA CREDENTIALS (TOTP / Recovery for Doctors & Admins)
+-- ============================================================================
+CREATE TYPE mfa_method_enum AS ENUM ('TOTP', 'PASSKEY');
+
+CREATE TABLE mfa_credentials (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    method mfa_method_enum NOT NULL DEFAULT 'TOTP',
+    totp_secret_encrypted BYTEA NOT NULL, -- Encrypted via KMS/envelope encryption, NOT hashed
+    recovery_codes_hash TEXT[], -- Array of Argon2id hashed one-time recovery codes
+    is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    enabled_at TIMESTAMPTZ,
+    last_verified_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX idx_mfa_user_method ON mfa_credentials(user_id, method) WHERE revoked_at IS NULL;
+
+-- Notes:
+-- The TOTP secret must be stored ENCRYPTED (not hashed) because the server
+-- needs the plaintext secret to verify time-based codes.
+-- Use envelope encryption: encrypt with a data encryption key (DEK),
+-- which is itself encrypted by a KMS master key.
+--
+-- MFA Enrollment Flow:
+--   1. Server generates TOTP secret, encrypts with DEK, stores in DB
+--   2. Server returns QR code / otpauth:// URI to admin's authenticator app
+--   3. Admin enters verification code to confirm enrollment
+--   4. is_enabled = TRUE, enabled_at = now()
+--
+-- MFA Reset / Lost Device:
+--   1. Admin uses one of 8 pre-generated recovery codes (one-time use)
+--   2. After recovery code used, hash is removed from array
+--   3. If all codes exhausted, PLATFORM_ADMIN must reset MFA manually
+--   4. Reset requires re-enrollment and generates new codes
 
 -- ============================================================================
 -- 2. PATIENT PROFILES
@@ -169,17 +206,46 @@ CREATE TABLE appointments (
     modality modality_enum NOT NULL DEFAULT 'VIDEO',
     status appointment_status_enum NOT NULL DEFAULT 'PENDING_PAYMENT',
     consultation_fee NUMERIC(10, 2) NOT NULL CHECK (consultation_fee >= 0),
-    chief_complaint TEXT,
     clinical_outcome VARCHAR(50) CHECK (
         clinical_outcome IS NULL
         OR clinical_outcome IN ('COMPLETED_WITH_RX', 'COMPLETED_NO_RX', 'REFERRED', 'ESCALATED')
     ),
+    completed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_appointments_patient ON appointments(patient_id, status);
 CREATE INDEX idx_appointments_doctor ON appointments(doctor_id, status);
+
+-- ============================================================================
+-- 5b. APPOINTMENT CLINICAL INTAKE (PHI-separated from operational data)
+-- ============================================================================
+CREATE TABLE appointment_clinical_intake (
+    appointment_id UUID PRIMARY KEY REFERENCES appointments(id) ON DELETE RESTRICT,
+    chief_complaint TEXT,
+    clinical_notes TEXT, -- Doctor's internal notes during consultation
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE appointment_clinical_intake ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointment_clinical_intake FORCE ROW LEVEL SECURITY;
+
+-- Only patient, assigned doctor, and clinical/compliance admins can see PHI
+CREATE POLICY clinical_intake_select ON appointment_clinical_intake
+    FOR SELECT USING (
+        appointment_id IN (
+            SELECT id FROM appointments WHERE
+                patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+                OR doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        )
+        OR current_setting('app.current_role', true) IN ('CLINICAL_ADMIN', 'COMPLIANCE')
+    );
+
+-- Note: FINANCE_ADMIN, SUPPORT, SECURITY_ADMIN cannot see this table.
+-- They access the operational appointments table which has fee, status, slot
+-- but no clinical text.
 
 -- ============================================================================
 -- 6. MULTI-PRESCRIPTION INTAKE DOCUMENTS (MAX 5 IMAGES PER APPOINTMENT)
@@ -228,7 +294,7 @@ CREATE TABLE consultation_telemetry (
 );
 
 -- ============================================================================
--- 8. E-PRESCRIPTIONS & ITEMS
+-- 8. HANDWRITTEN PRESCRIPTION PHOTOS
 -- ============================================================================
 CREATE TABLE prescriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -309,12 +375,13 @@ CREATE TABLE grievance_adjudications (
 -- 11. TRANSACTIONS & 20% DEBARRED WALLET LEDGER
 -- ============================================================================
 CREATE TYPE gateway_enum AS ENUM ('BKASH', 'NAGAD', 'CARD', 'MPESA');
-CREATE TYPE payment_status_enum AS ENUM ('INITIATED', 'ESCROW_HELD', 'SETTLED_TO_DOCTOR', 'DISBURSED', 'REFUNDED_TO_PATIENT', 'FAILED');
+CREATE TYPE payment_status_enum AS ENUM ('INITIATED', 'PAYMENT_HELD', 'SETTLED_TO_DOCTOR', 'DISBURSED', 'REFUNDED_TO_PATIENT', 'FAILED');
 
 CREATE TABLE transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     transaction_number VARCHAR(50) NOT NULL UNIQUE,
     appointment_id UUID NOT NULL REFERENCES appointments(id) ON DELETE RESTRICT,
+    payment_session_id UUID NOT NULL DEFAULT gen_random_uuid() UNIQUE,
     gateway gateway_enum NOT NULL,
     gateway_reference VARCHAR(100),
     gross_amount NUMERIC(10, 2) NOT NULL CHECK (gross_amount >= 0),
@@ -325,16 +392,21 @@ CREATE TABLE transactions (
     settled_at TIMESTAMPTZ,
     CONSTRAINT chk_fee_math CHECK (gross_amount = platform_fee_amount + net_amount)
 );
+CREATE UNIQUE INDEX uq_transactions_gateway_reference
+ON transactions(gateway, gateway_reference)
+WHERE gateway_reference IS NOT NULL;
 
 CREATE TABLE doctor_wallets (
     doctor_id UUID PRIMARY KEY REFERENCES doctor_profiles(id) ON DELETE RESTRICT,
     lifetime_gross NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     lifetime_fee_withheld NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     lifetime_net NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    pending_disbursement NUMERIC(12, 2) NOT NULL DEFAULT 0.00 CHECK (pending_disbursement >= 0),
     last_disbursement_at TIMESTAMPTZ,
     last_disbursement_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Doctors view earnings only; they cannot withdraw. Finance Admin disburses monthly.
 
 CREATE TABLE disbursement_batches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -370,7 +442,10 @@ CREATE INDEX idx_disbursement_items_doctor ON disbursement_items(doctor_id);
 CREATE TABLE payment_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE RESTRICT,
-    event_type VARCHAR(50) NOT NULL,
+    gateway gateway_enum NOT NULL,
+    provider_event_id VARCHAR(150) NOT NULL,
+    provider_event_type VARCHAR(50) NOT NULL,
+    event_type VARCHAR(50) NOT NULL, -- normalized internal event name
     gateway_reference VARCHAR(100),
     gateway_response_code VARCHAR(20),
     amount NUMERIC(10,2),
@@ -378,6 +453,8 @@ CREATE TABLE payment_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX idx_payment_events_txn ON payment_events(transaction_id, created_at);
+CREATE UNIQUE INDEX uq_payment_events_provider_id
+ON payment_events(gateway, provider_event_id);
 
 -- ============================================================================
 -- 12. AUDIT LOGS & SUBSYSTEM INCIDENTS
@@ -451,6 +528,8 @@ ON idempotency_records(user_id, route, key_hash);
 -- IMPORTANT: Application must use SET LOCAL within transactions:
 --   SET LOCAL app.current_user_id = '<uuid>';
 --   SET LOCAL app.current_role = '<role>';
+--   SET LOCAL app.current_patient_id = '<patient-profile-uuid-or-empty>';
+--   SET LOCAL app.current_doctor_id = '<doctor-profile-uuid-or-empty>';
 -- SET LOCAL automatically resets when the transaction ends,
 -- preventing identity leakage across pooled connections.
 --
@@ -459,12 +538,46 @@ ON idempotency_records(user_id, route, key_hash);
 -- RLS policies do not encode the entire ABAC engine but must
 -- never contradict it.
 
+-- Capability roles are NOLOGIN roles assumed only by separate, authenticated
+-- service processes/connections. End-user JWT claims can never select a DB role.
+-- None of these roles receives BYPASSRLS or table ownership.
+CREATE ROLE hellodoctor_api NOLOGIN;
+CREATE ROLE hellodoctor_auth_worker NOLOGIN;
+CREATE ROLE hellodoctor_payment_worker NOLOGIN;
+CREATE ROLE hellodoctor_system_worker NOLOGIN;
+CREATE ROLE hellodoctor_finance_worker NOLOGIN;
+
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC;
+GRANT SELECT ON users, patient_profiles, doctor_profiles, doctor_schedule_slots,
+    appointments, appointment_clinical_intake, prescriptions,
+    prescription_intake_documents, consultation_sessions,
+    chat_conversations, chat_messages, grievance_reports, transactions,
+    doctor_wallets, disbursement_items TO hellodoctor_api;
+GRANT UPDATE ON patient_profiles TO hellodoctor_api;
+GRANT INSERT ON appointments, appointment_clinical_intake,
+    prescriptions, prescription_intake_documents, chat_conversations,
+    chat_messages, grievance_reports TO hellodoctor_api;
+GRANT SELECT, INSERT, UPDATE ON users, auth_sessions, mfa_credentials
+    TO hellodoctor_auth_worker;
+GRANT SELECT, UPDATE ON appointments, doctor_schedule_slots, transactions
+    TO hellodoctor_payment_worker;
+GRANT INSERT ON appointments, appointment_clinical_intake, transactions, payment_events TO hellodoctor_payment_worker;
+GRANT SELECT, UPDATE ON appointments, chat_conversations, chat_messages
+    TO hellodoctor_system_worker;
+GRANT SELECT, UPDATE ON grievance_reports, transactions, doctor_wallets,
+    disbursement_batches, disbursement_items TO hellodoctor_finance_worker;
+GRANT INSERT ON grievance_adjudications, disbursement_batches,
+    disbursement_items, payment_events TO hellodoctor_finance_worker;
+
 -- Enable and FORCE RLS across all sensitive PHI, clinical, and financial tables
 ALTER TABLE patient_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE patient_profiles FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE appointments FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE appointment_clinical_intake ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointment_clinical_intake FORCE ROW LEVEL SECURITY;
 
 ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE prescriptions FORCE ROW LEVEL SECURITY;
@@ -494,7 +607,7 @@ ALTER TABLE disbursement_items FORCE ROW LEVEL SECURITY;
 CREATE POLICY patient_profiles_select ON patient_profiles
     FOR SELECT USING (
         user_id = current_setting('app.current_user_id', true)::UUID
-        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE', 'SECURITY_ADMIN')
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE')
         OR (
             current_setting('app.current_role', true) = 'DOCTOR'
             AND id IN (
@@ -503,7 +616,10 @@ CREATE POLICY patient_profiles_select ON patient_profiles
                     SELECT id FROM doctor_profiles
                     WHERE user_id = current_setting('app.current_user_id', true)::UUID
                 )
-                AND status IN ('CONFIRMED', 'WAITING', 'IN_CONSULTATION', 'COMPLETED')
+                AND (
+                    status IN ('CONFIRMED', 'WAITING', 'IN_CONSULTATION')
+                    OR (status = 'COMPLETED' AND updated_at > CURRENT_TIMESTAMP - INTERVAL '24 hours')
+                )
             )
         )
     );
@@ -511,28 +627,60 @@ CREATE POLICY patient_profiles_select ON patient_profiles
 CREATE POLICY patient_profiles_update ON patient_profiles
     FOR UPDATE USING (
         user_id = current_setting('app.current_user_id', true)::UUID
-        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'SUPPORT')
+    ) WITH CHECK (
+        user_id = current_setting('app.current_user_id', true)::UUID
     );
+
+-- Support has no direct UPDATE permission on clinical/demographic profiles.
+-- Approved corrections use audited, field-specific service operations.
 
 -- 2. appointments Policies
 CREATE POLICY appointments_select ON appointments
     FOR SELECT USING (
-        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
-        OR doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
-        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'FINANCE_ADMIN', 'SUPPORT', 'COMPLIANCE', 'SECURITY_ADMIN')
+        patient_id = NULLIF(current_setting('app.current_patient_id', true), '')::UUID
+        OR doctor_id = NULLIF(current_setting('app.current_doctor_id', true), '')::UUID
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'FINANCE_ADMIN', 'SUPPORT', 'COMPLIANCE')
     );
 
 CREATE POLICY appointments_insert ON appointments
     FOR INSERT WITH CHECK (
-        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
-        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'SUPPORT')
+        patient_id = NULLIF(current_setting('app.current_patient_id', true), '')::UUID
+        OR current_setting('app.current_role', true) = 'PLATFORM_ADMIN'
+    );
+
+-- Operational appointment rows contain no free-text clinical intake. Finance
+-- and Support may read them through ABAC-filtered endpoints; SECURITY_ADMIN may not.
+CREATE POLICY appointment_clinical_intake_select ON appointment_clinical_intake
+    FOR SELECT USING (
+        patient_id = NULLIF(current_setting('app.current_patient_id', true), '')::UUID
+        OR appointment_id IN (
+            SELECT id FROM appointments
+            WHERE doctor_id = NULLIF(current_setting('app.current_doctor_id', true), '')::UUID
+              AND (
+                  status IN ('CONFIRMED', 'WAITING', 'IN_CONSULTATION')
+                  OR (status = 'COMPLETED' AND updated_at > CURRENT_TIMESTAMP - INTERVAL '24 hours')
+              )
+        )
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE')
+    );
+
+CREATE POLICY appointment_clinical_intake_insert ON appointment_clinical_intake
+    FOR INSERT WITH CHECK (
+        patient_id = NULLIF(current_setting('app.current_patient_id', true), '')::UUID
     );
 
 -- 3. prescriptions Policies
 CREATE POLICY prescriptions_select ON prescriptions
     FOR SELECT USING (
         patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
-        OR doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR appointment_id IN (
+            SELECT id FROM appointments
+            WHERE doctor_id = NULLIF(current_setting('app.current_doctor_id', true), '')::UUID
+              AND (
+                  status IN ('CONFIRMED', 'WAITING', 'IN_CONSULTATION')
+                  OR (status = 'COMPLETED' AND updated_at > CURRENT_TIMESTAMP - INTERVAL '24 hours')
+              )
+        )
         OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE')
     );
 
@@ -547,9 +695,12 @@ CREATE POLICY prescription_intake_docs_select ON prescription_intake_documents
     FOR SELECT USING (
         patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
         OR appointment_id IN (
-            SELECT id FROM appointments WHERE doctor_id IN (
-                SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID
-            )
+            SELECT id FROM appointments
+            WHERE doctor_id = NULLIF(current_setting('app.current_doctor_id', true), '')::UUID
+              AND (
+                  status IN ('CONFIRMED', 'WAITING', 'IN_CONSULTATION')
+                  OR (status = 'COMPLETED' AND updated_at > CURRENT_TIMESTAMP - INTERVAL '24 hours')
+              )
         )
         OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE')
     );
@@ -626,4 +777,176 @@ CREATE POLICY disbursement_items_select ON disbursement_items
         doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
         OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'FINANCE_ADMIN')
     );
+
+-- ============================================================================
+-- 13b. SERVICE-ROLE WRITE POLICIES
+-- ============================================================================
+-- The application uses multiple logical service contexts via SET LOCAL:
+--   app.current_role = 'SERVICE_API'          -- Normal API request handler
+--   app.current_role = 'SERVICE_PAYMENT'      -- Payment webhook processor
+--   app.current_role = 'SERVICE_SETTLEMENT'   -- Consultation completion & settlement
+--   app.current_role = 'SERVICE_SYSTEM'       -- Background jobs (chat lock, slot expiry)
+--   app.current_role = 'SERVICE_FINANCE'      -- Monthly disbursement batch
+--
+-- These are NOT user-facing roles. They are internal service contexts
+-- set by the Axum middleware when processing internal/system operations.
+-- They are added to user_role_enum is NOT needed; they are checked only
+-- in RLS policies via current_setting('app.current_role').
+
+-- Appointments: API and payment worker can update status
+CREATE POLICY appointments_service_update ON appointments
+    FOR UPDATE USING (
+        current_setting('app.current_role', true) IN (
+            'SERVICE_API', 'SERVICE_PAYMENT', 'SERVICE_SETTLEMENT', 'SERVICE_SYSTEM',
+            'PLATFORM_ADMIN', 'SUPPORT'
+        )
+    );
+
+-- Slots: API and payment worker can update status
+CREATE POLICY slots_service_update ON doctor_schedule_slots
+    FOR UPDATE USING (
+        current_setting('app.current_role', true) IN (
+            'SERVICE_API', 'SERVICE_PAYMENT', 'SERVICE_SYSTEM',
+            'PLATFORM_ADMIN'
+        )
+    );
+ALTER TABLE doctor_schedule_slots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctor_schedule_slots FORCE ROW LEVEL SECURITY;
+
+CREATE POLICY slots_select ON doctor_schedule_slots
+    FOR SELECT USING (true); -- Slot availability is public information
+
+CREATE POLICY slots_insert ON doctor_schedule_slots
+    FOR INSERT WITH CHECK (
+        doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'SERVICE_SYSTEM')
+    );
+
+-- Transactions: Payment and settlement workers update payment_status
+CREATE POLICY transactions_service_update ON transactions
+    FOR UPDATE USING (
+        current_setting('app.current_role', true) IN (
+            'SERVICE_PAYMENT', 'SERVICE_SETTLEMENT', 'SERVICE_FINANCE',
+            'FINANCE_ADMIN', 'PLATFORM_ADMIN'
+        )
+    );
+
+CREATE POLICY transactions_service_insert ON transactions
+    FOR INSERT WITH CHECK (
+        current_setting('app.current_role', true) IN (
+            'SERVICE_API', 'SERVICE_PAYMENT',
+            'PLATFORM_ADMIN'
+        )
+    );
+
+-- Grievances: Clinical admin and compliance can update status
+CREATE POLICY grievance_reports_service_update ON grievance_reports
+    FOR UPDATE USING (
+        current_setting('app.current_role', true) IN (
+            'CLINICAL_ADMIN', 'COMPLIANCE', 'PLATFORM_ADMIN'
+        )
+    );
+
+-- Chat: System worker locks expired conversations
+CREATE POLICY chat_conversations_service_update ON chat_conversations
+    FOR UPDATE USING (
+        current_setting('app.current_role', true) IN (
+            'SERVICE_SYSTEM', 'PLATFORM_ADMIN'
+        )
+    );
+
+CREATE POLICY chat_conversations_insert ON chat_conversations
+    FOR INSERT WITH CHECK (
+        current_setting('app.current_role', true) IN (
+            'SERVICE_API', 'SERVICE_SETTLEMENT', 'PLATFORM_ADMIN'
+        )
+    );
+
+-- Doctor wallets: Settlement and finance workers update balances
+CREATE POLICY doctor_wallets_service_update ON doctor_wallets
+    FOR UPDATE USING (
+        current_setting('app.current_role', true) IN (
+            'SERVICE_SETTLEMENT', 'SERVICE_FINANCE',
+            'FINANCE_ADMIN', 'PLATFORM_ADMIN'
+        )
+    );
+
+-- Disbursement items: Finance worker updates
+CREATE POLICY disbursement_items_service_update ON disbursement_items
+    FOR UPDATE USING (
+        current_setting('app.current_role', true) IN (
+            'SERVICE_FINANCE', 'FINANCE_ADMIN', 'PLATFORM_ADMIN'
+        )
+    );
+
+CREATE POLICY disbursement_items_insert ON disbursement_items
+    FOR INSERT WITH CHECK (
+        current_setting('app.current_role', true) IN (
+            'SERVICE_FINANCE', 'FINANCE_ADMIN', 'PLATFORM_ADMIN'
+        )
+    );
+
+-- Prescriptions: Doctor inserts via service context
+CREATE POLICY prescriptions_service_insert ON prescriptions
+    FOR INSERT WITH CHECK (
+        current_setting('app.current_role', true) IN ('SERVICE_API', 'DOCTOR')
+    );
+
+-- Clinical intake: Doctor and API service can insert and update
+CREATE POLICY clinical_intake_insert ON appointment_clinical_intake
+    FOR INSERT WITH CHECK (
+        current_setting('app.current_role', true) IN ('SERVICE_API', 'DOCTOR', 'PATIENT')
+    );
+
+CREATE POLICY clinical_intake_update ON appointment_clinical_intake
+    FOR UPDATE USING (
+        current_setting('app.current_role', true) IN ('SERVICE_API', 'DOCTOR', 'CLINICAL_ADMIN')
+    );
+CREATE POLICY appointments_payment_worker_insert ON appointments
+    FOR INSERT TO hellodoctor_payment_worker WITH CHECK (TRUE);
+CREATE POLICY appointment_clinical_intake_payment_worker_insert ON appointment_clinical_intake
+    FOR INSERT TO hellodoctor_payment_worker WITH CHECK (TRUE);
+CREATE POLICY appointments_payment_worker_update ON appointments
+    FOR UPDATE TO hellodoctor_payment_worker USING (TRUE) WITH CHECK (TRUE);
+CREATE POLICY appointments_system_worker_select ON appointments
+    FOR SELECT TO hellodoctor_system_worker USING (TRUE);
+CREATE POLICY appointments_system_worker_update ON appointments
+    FOR UPDATE TO hellodoctor_system_worker USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY transactions_payment_worker_select ON transactions
+    FOR SELECT TO hellodoctor_payment_worker USING (TRUE);
+CREATE POLICY transactions_payment_worker_insert ON transactions
+    FOR INSERT TO hellodoctor_payment_worker WITH CHECK (TRUE);
+CREATE POLICY transactions_payment_worker_update ON transactions
+    FOR UPDATE TO hellodoctor_payment_worker USING (TRUE) WITH CHECK (TRUE);
+CREATE POLICY transactions_finance_worker_select ON transactions
+    FOR SELECT TO hellodoctor_finance_worker USING (TRUE);
+CREATE POLICY transactions_finance_worker_update ON transactions
+    FOR UPDATE TO hellodoctor_finance_worker USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY chat_conversations_system_worker_select ON chat_conversations
+    FOR SELECT TO hellodoctor_system_worker USING (TRUE);
+CREATE POLICY chat_conversations_system_worker_update ON chat_conversations
+    FOR UPDATE TO hellodoctor_system_worker USING (TRUE) WITH CHECK (TRUE);
+CREATE POLICY chat_messages_system_worker_select ON chat_messages
+    FOR SELECT TO hellodoctor_system_worker USING (TRUE);
+CREATE POLICY chat_messages_system_worker_update ON chat_messages
+    FOR UPDATE TO hellodoctor_system_worker USING (TRUE) WITH CHECK (TRUE);
+
+CREATE POLICY grievance_reports_finance_worker_select ON grievance_reports
+    FOR SELECT TO hellodoctor_finance_worker USING (TRUE);
+CREATE POLICY grievance_reports_finance_worker_update ON grievance_reports
+    FOR UPDATE TO hellodoctor_finance_worker USING (TRUE) WITH CHECK (TRUE);
+CREATE POLICY doctor_wallets_finance_worker_select ON doctor_wallets
+    FOR SELECT TO hellodoctor_finance_worker USING (TRUE);
+CREATE POLICY doctor_wallets_finance_worker_update ON doctor_wallets
+    FOR UPDATE TO hellodoctor_finance_worker USING (TRUE) WITH CHECK (TRUE);
+CREATE POLICY disbursement_items_finance_worker_select ON disbursement_items
+    FOR SELECT TO hellodoctor_finance_worker USING (TRUE);
+CREATE POLICY disbursement_items_finance_worker_insert ON disbursement_items
+    FOR INSERT TO hellodoctor_finance_worker WITH CHECK (TRUE);
+CREATE POLICY disbursement_items_finance_worker_update ON disbursement_items
+    FOR UPDATE TO hellodoctor_finance_worker USING (TRUE) WITH CHECK (TRUE);
 ```
+
+The API role cannot perform workflow state transitions. Booking/payment code uses the payment-worker connection, timed lifecycle jobs use the system-worker connection, and adjudication/disbursement code uses the finance-worker connection. No ordinary API or administrator session receives `BYPASSRLS`; admin JWT roles remain subject to the same ABAC and RLS rules.

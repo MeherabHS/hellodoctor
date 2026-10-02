@@ -16,7 +16,7 @@ lib/
 ├── app.dart                            # MaterialApp setup, themes, global blocs
 ├── core/                               # Cross-cutting infrastructure
 │   ├── network/                        # Dio client, interceptors, auth token refresh
-│   ├── persistence/                    # Secure storage, local database (Drift)
+│   ├── persistence/                    # Secure storage; Drift only for non-PHI local data
 │   ├── theme/                          # Colors, typography (tokens.css translation)
 │   ├── localization/                   # EasyLocalization (en, sw)
 │   ├── errors/                         # Failures, exceptions, user-facing mappers
@@ -30,7 +30,7 @@ lib/
     ├── waiting_room/                   # Countdown, pre-flight checks, Rx viewer
     ├── consultation/                   # Agora RTC video feed, doctor prescription photo upload, telemetry capture
     ├── clinical_chat/                  # 24h follow-up chat, canned pills
-    ├── health_vault/                   # Stores prescription photos uploaded by doctors, CBC reports
+    ├── health_vault/                   # Securely accesses prescription photos and CBC reports
     ├── grievance_redressal/            # Star-rating-free dispute filing
     ├── doctor_queue/                   # Physician duty toggle, incoming triage
     └── doctor_wallet/                  # 3-tier 20% debarred earnings breakdown, view-only with monthly disbursement display
@@ -48,7 +48,7 @@ lib/
 | `dio` | ^5.6.0 | Robust HTTP client supporting interceptors (JWT refresh, trace IDs, network retry). |
 | `freezed` & `freezed_annotation` | ^2.5.7 | Immutable domain models, union types for states, and pattern matching. |
 | `flutter_secure_storage` | ^9.2.2 | Encrypted storage for JWTs (Keychain on iOS, Keystore on Android). |
-| `drift` | ^2.20.0 | Type-safe local SQLite database for offline caching and health records. |
+| `drift` | ^2.20.0 | Type-safe local SQLite database for non-PHI offline data such as doctor-directory metadata; never use it for unencrypted clinical or health-vault records. |
 | `connectivity_plus` | ^6.0.5 | Observes cellular/WiFi network states to trigger offline action guards. |
 | `agora_rtc_engine` | ^6.3.0 | Agora RTC SDK for low-latency adaptive video/audio teleconsultation via SD-RTN. |
 | `cached_network_image` | ^3.4.0 | Efficient bitmap caching for doctor portraits. **PHI Rule:** Medical images and prescriptions must use encrypted storage, NOT `cached_network_image`. |
@@ -73,7 +73,7 @@ lib/
 - **DTOs / Models:** Data transfer objects with `@freezed` and `fromJson`/`toJson`.
 - **Data Sources:** 
   - `RemoteDataSource`: Direct HTTP calls via `Dio`.
-  - `LocalDataSource`: Cache reads and offline writes via `Drift` / `SharedPreferences`.
+  - `LocalDataSource`: Cache non-PHI reads via `Drift` / `SharedPreferences`; clinical records and prescription photos require encrypted lifecycle-controlled storage or network-only access.
 - **Repository Implementations:** Implements domain contracts, handles caching policies, and maps raw exceptions into domain `Failure` instances.
 
 ---

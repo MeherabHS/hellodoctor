@@ -17,7 +17,7 @@ To maintain optimal battery life, rapid time-to-market, and network resilience o
 | **Waiting Room Queue Countdown** | Periodic position & status updates | **Server-Sent Events (SSE)** or **Polling** (10s) | Unidirectional server-to-client updates; full duplex WebSockets are unnecessary. |
 | **Upcoming Consultation Alerts** | Time-sensitive reminders (30m before) | **Push Notifications (FCM / APNS)** | Must reach user even when application is terminated or phone is locked. |
 | **Doctor On-Duty Presence** | Online/offline availability status | **REST Polling** or **SSE** | Status changes infrequently; persistent socket holding drains doctor battery. |
-| **Escrow & Ledger Updates** | Financial status transitions | **REST API + Webhook** | High-integrity ACID operations; real-time push not strictly required. |
+| **Payment-Hold & Ledger Updates** | Financial status transitions | **REST API + Webhook** | High-integrity ACID operations; real-time push not strictly required. |
 
 ---
 
@@ -47,7 +47,7 @@ Live video and audio teleconsultation is powered by **Agora RTC SDK** instead of
 ```
 
 ### 2.1 Backend Dynamic Token Minting (Rust Axum)
-- **Endpoint:** `POST /api/v1/telehealth/agora-token`
+- **Endpoint:** `POST /api/v1/consultations/{appointment_id}/rtc-token`
 - **Authentication:** Bearer JWT (Patient or Doctor).
 - **Request Body:**
   ```json
@@ -148,7 +148,7 @@ Upon call termination, the client submits the final telemetry record derived fro
   "prescription_issued": true
 }
 ```
-If `call_duration_seconds < 30`, the backend automatically marks `premature_end: true`, retaining the escrow hold pending grievance review or patient reconnection.
+If `call_duration_seconds < 30`, the backend automatically marks `premature_end: true`, retaining `PAYMENT_HELD` pending grievance review or patient reconnection.
 
 ---
 

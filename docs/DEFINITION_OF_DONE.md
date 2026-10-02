@@ -41,7 +41,7 @@ Every feature implemented by Claude Code must satisfy all criteria before being 
   - No hardcoded API keys, tokens, or private secrets in repository.
   - Role-based (RBAC) and Attribute-based (ABAC) authorization enforced on all endpoints.
 - [ ] **9. Idempotency & Concurrency:**
-  - Booking and payment endpoints support `Idempotency-Key` headers.
+  - Booking, payment, and upload mutation endpoints require and enforce `Idempotency-Key` headers.
   - Slot bookings execute within serializable or row-locked transactions (`FOR UPDATE`).
 - [ ] **10. Responsive & Offline Behavior:**
   - Renders properly on mobile (`390px` width) and tablet viewports.
@@ -54,7 +54,7 @@ Every feature implemented by Claude Code must satisfy all criteria before being 
 - [ ] **13. BOLA/IDOR Protection:**
   - Every endpoint that accesses user-specific resources verifies ownership + relationship + appointment context beyond role check.
 - [ ] **14. File Upload Security:**
-  - All file uploads pass magic-byte validation, malware scanning, and image re-encoding before storage.
+  - All file uploads pass magic-byte validation and malware scanning; images are safely decoded/re-encoded with metadata (EXIF/GPS) removed, while PDFs undergo structural validation and active-content (JavaScript/macros) sanitization.
 - [ ] **15. Agora Token Security:**
   - Agora App Certificate exists only on server. RTC tokens are short-lived and bound to specific appointments.
 - [ ] **16. Audit Trail:**

@@ -152,7 +152,7 @@ Labels used:
 ### HD-PATIENT-BOOK-SLOT (`view-4`)
 - **Screen Name:** Appointment Scheduling & Multi-Rx Intake
 - **User Role:** `patient`
-- **Purpose:** Selects consultation date, 15-minute slot, uploads 1 to 5 previous prescription/lab photos, and initiates MFS escrow payment.
+- **Purpose:** Selects consultation date, 15-minute slot, uploads 1 to 5 previous prescription/lab photos, and initiates an MFS payment hold.
 - **Entry Points:** Doctor profile or directory booking button.
 - **Exit Points:**
   - `confirmAppointment()`: Moves to Waiting Room (`view-10`) upon payment.
@@ -180,14 +180,14 @@ Labels used:
     - Triggers warning toast if user selects > 5 files.
     - Appends valid files to `patientPrescriptionImages` array and updates preview gallery.
   - Tapping thumbnail trash icon invokes `removePatientPrescriptionImage(index)`.
-  - Tapping "Confirm & Pay" locks slot, deposits funds into escrow (`adminTransactionStore`), and transitions to Waiting Room.
+  - Tapping "Confirm & Pay" locks the slot, creates an `INITIATED` payment attempt, and transitions to the Waiting Room only after verified payment confirmation.
 - **State Variations:**
   - `slot unselected`: Confirm button disabled (`opacity: 0.5`).
   - `uploading`: Renders progress indicator on thumbnail.
   - `max upload reached`: Dropzone visually disables add button.
   - `offline`: Intercepted by `#offlineActionGuardModal`.
 - **Data Requirements:** Doctor schedule slots, uploaded image blobs/data URLs, selected gateway, patient identifier.
-- **Backend Requirements (Rust):** `GET /api/v1/doctors/{id}/slots?date=YYYY-MM-DD`, `POST /api/v1/appointments/book` (atomic slot reservation with escrow payment authorization).
+- **Backend Requirements (Rust):** `GET /api/v1/doctors/{id}/slots?date=YYYY-MM-DD`, `POST /api/v1/appointments/book` (atomic slot reservation with payment-hold authorization).
 - **Prototype Reference:** `index.html` lines containing `id="view-4"`.
 
 ---
@@ -232,10 +232,10 @@ Labels used:
 ### HD-PATIENT-POST-CONSULT (`view-11`)
 - **Screen Name:** Post-Consultation Summary & Telemetry Record
 - **User Role:** `patient`
-- **Purpose:** Displays consultation completion details, download link for the signed digital prescription, follow-up advice, and provides access to the Clinical Grievance Redressal modal.
+- **Purpose:** Displays consultation completion details, a secure download link for the doctor's handwritten prescription photo (or no-prescription outcome), follow-up advice, and access to the Clinical Grievance Redressal modal.
 - **Entry Points:** Termination of video consultation or end of 24h chat window.
 - **Exit Points:**
-  - `switchScreen(5)`: Open Health Vault to inspect prescription PDF.
+  - `switchScreen(5)`: Open Health Vault to inspect the prescription photo.
   - `openPatientGrievanceModal(...)`: File a clinical or system grievance.
   - `switchScreen(0)`: Return to Home Dashboard.
 - **UI Hierarchy:**
@@ -244,18 +244,17 @@ Labels used:
   └── Completion Hero Icon (Emerald Checkmark)
   └── Title "Consultation Completed Successfully"
   └── Doctor Summary (Dr. Sabrina Akter, Internal Medicine)
-  └── Digital Prescription Card:
-      ├── Prescription Reference ID ("RX-20260930-841")
-      ├── Medication Count ("3 Medicines Prescribed")
-      └── CTA "Download Official Prescription PDF"
+   └── Handwritten Prescription Photo Card:
+       ├── Prescription Reference ID ("RX-20260930-841")
+       └── CTA "View Secure Prescription Photo"
   └── Hidden Forensic Telemetry Card (#v11TelemetryCard aria-hidden="true" style="display:none;")
-      └── Background Session Record (Call Duration, Agora RTC RTT, Escrow ID)
+      └── Background Session Record (Call Duration, Agora RTC RTT, Payment ID)
   └── Grievance Trigger Button ("Having an issue with this consultation? Report to Medical Administration")
   └── Home Navigation CTA
   ```
-- **Components:** Success header, digital Rx preview card, action buttons, hidden telemetry container.
+- **Components:** Success header, secure prescription-photo card, action buttons, hidden telemetry container.
 - **Interactions:**
-  - Tapping "Download Prescription" fetches official PDF from vault.
+  - Tapping "View Prescription" fetches a short-lived authorized URL for the private prescription photo.
   - Tapping "Report Grievance" opens `#patientGrievanceModal` with pre-filled metadata.
 - **Privacy & Security Rule:** Raw telemetry is strictly hidden from patient UI (`display: none; aria-hidden="true"`) to prevent confusion and maintain clinical trust, while remaining bound to background reporting payloads.
 - **Backend Requirements (Rust):** `GET /api/v1/consultations/{id}/summary`, `GET /api/v1/prescriptions/{id}/pdf`.
@@ -342,12 +341,12 @@ Labels used:
 ### HD-DOC-WALLET-EARNINGS (`doc-view-3`)
 - **Screen Name:** Doctor Wallet & Transparent 20% Fee Debarment
 - **User Role:** `doctor`
-- **Purpose:** Displays total earnings strictly debarred of the 20% HeloDoc platform fee before showing net income, with itemized consultation breakdowns and withdrawal triggers.
+- **Purpose:** Displays total earnings strictly debarred of the 20% HeloDoc platform fee before showing net income, with itemized consultation breakdowns and Finance-admin disbursement status.
 - **Entry Points:** Doctor bottom nav "Wallet" tab.
 - **Exit Points:**
   - `openDoctorStatementModal()`: Opens full monthly statement modal.
   - `openConsultationFeeDetailModal(...)`: Opens individual consultation fee breakdown.
-  - Withdrawal Action: Dispatches net earnings to verified bKash merchant account.
+  - Disbursement status: Shows accrued net earnings and the last Finance-admin monthly disbursement; doctors cannot initiate withdrawals.
 - **UI Hierarchy:**
   ```
   HD-DOC-WALLET-EARNINGS
@@ -359,7 +358,7 @@ Labels used:
       ├── Row 3: "Final Earning (Net Take-Home)" (#docFinalEarningsVal "৳ 28,450.00")
       └── Mandatory Calculation Basis Note (#docEarningsCalcNote):
           "Total calculation is based including the platform charge 20%."
-  └── Quick Withdrawal CTA Bar ("Withdraw ৳ 28,450.00 to bKash 01713-445566")
+  └── Disbursement Status Bar ("Accrued net ৳ 28,450.00; awaiting Finance disbursement")
   └── Statement Modal Trigger ("View Full Monthly Statement")
   └── Itemized Consultation Ledger (#docConsultationsLedgerContainer):
       └── Rows for each consultation showing:
@@ -368,7 +367,7 @@ Labels used:
 - **Mathematical Enforcement:**
   $$\text{Withheld Fee} = \text{Total Gross} \times 0.20$$
   $$\text{Final Net Take-Home} = \text{Total Gross} - \text{Withheld Fee} = \text{Total Gross} \times 0.80$$
-- **Backend Requirements (Rust):** `GET /api/v1/doctor/wallet/summary`, `POST /api/v1/doctor/wallet/withdraw`.
+- **Backend Requirements (Rust):** `GET /api/v1/doctor/wallet/summary`; Finance uses `POST /api/v1/admin/disbursements/initiate`.
 - **Prototype Reference:** `index.html` lines containing `id="doc-view-3"`.
 
 ---
@@ -386,7 +385,7 @@ Labels used:
 ### HD-DOCWEB-WORKSTATION (`#doctorWebShell`)
 - **Screen Name:** Desktop Clinical Workstation & Telehealth Console
 - **User Role:** `doctor`
-- **Purpose:** Full-screen desktop workstation for hospital and clinic environments featuring dual-pane teleconsultation, live EMR record inspection, DGDA-compliant prescription authoring, and revenue KPI widgets.
+- **Purpose:** Full-screen desktop workstation for hospital and clinic environments featuring dual-pane teleconsultation, live clinical-record inspection, secure handwritten-prescription photo capture/upload, and revenue KPI widgets.
 - **Entry Points:** Workbench shell switcher `'doctor-web'`, web desktop login.
 - **UI Hierarchy:**
   ```
@@ -405,13 +404,14 @@ Labels used:
           ├── Tab 1: Patient Clinical History (#docWebPatientHistory)
           │   ├── Past Consultations & Chronic Conditions
           │   └── Attached Multi-Prescription Photos (1 to 5 thumbnails)
-          └── Tab 2: Cloud Rx Composer (#docWebRxComposer)
-              ├── DGDA Drug Search & Auto-complete
-              ├── Dosage, Frequency & Duration Matrix
-              ├── Diagnostic Investigation Checklist
-              └── Digital Signature & Dispatch Button
+          └── Tab 2: Prescription Capture (#docWebPrescriptionCapture)
+              ├── Camera viewfinder for handwritten prescription photo
+              ├── Secure file upload fallback (JPEG/PNG)
+              ├── Capture metadata and optional doctor notes
+              ├── Integrity-verification hash and quarantine status
+              └── Send Prescription Photo to Patient button
   ```
-- **Backend Requirements (Rust):** Agora token service, `POST /api/v1/prescriptions/sign-and-dispatch`.
+- **Backend Requirements (Rust):** `POST /api/v1/consultations/{appointment_id}/rtc-token`, `POST /api/v1/consultations/{appointment_id}/prescription`.
 - **Prototype Reference:** `index.html` lines containing `id="doctorWebShell"`.
 
 ---
@@ -451,25 +451,25 @@ Labels used:
 ### HD-ADMIN-COMPLIANCE (`adminPage_compliance`)
 - **Screen Name:** Clinical Protocol & Regulatory Oversight
 - **User Role:** `admin`
-- **Purpose:** Audits consultation durations, prescription completeness, and drug schedule compliance per DGDA/DGHS rules.
+- **Purpose:** Audits consultation durations, prescription-photo integrity, upload status, and clinical-outcome completeness.
 - **Backend Requirements (Rust):** `GET /api/v1/admin/compliance/audit-logs`.
 
 ### HD-ADMIN-LOGS (`adminPage_logs`)
 - **Screen Name:** App Incident Diagnostics & Failure Simulators
 - **User Role:** `admin`
-- **Purpose:** Subsystem error diagnostics covering bKash/Nagad webhooks, Agora RTC disconnects, and DGDA EMR synchronization errors. Includes the failure simulator `#adminSimulateFailureModal` (dev/staging only).
+- **Purpose:** Subsystem error diagnostics covering bKash/Nagad webhooks, Agora RTC disconnects, and upload-pipeline errors. Includes the failure simulator `#adminSimulateFailureModal` (dev/staging only).
 - **Backend Requirements (Rust):** `GET /api/v1/admin/logs/incidents`, `POST /api/v1/admin/logs/simulate-failure`.
 
 ### HD-ADMIN-GRIEVANCES (`adminPage_grievances`)
 - **Screen Name:** Grievance Arbitration & Disciplinary Board
 - **User Role:** `admin`
-- **Purpose:** Adjudicates patient disputes against doctors or system technical failures using auto-collected session telemetry. Provides one-click escrow refunds (`btnAdjudicateRefund`) and Internal Platform Compliance warnings (`btnAdjudicateWarning`).
+- **Purpose:** Adjudicates patient disputes against doctors or system technical failures using auto-collected session telemetry. Provides one-click payment refunds (`btnAdjudicateRefund`) and Internal Platform Compliance warnings (`btnAdjudicateWarning`).
 - **Backend Requirements (Rust):** `GET /api/v1/admin/grievances`, `POST /api/v1/admin/grievances/{id}/adjudicate`.
 
 ### HD-ADMIN-FINANCE (`adminPage_finance`)
-- **Screen Name:** Omnichannel Payment & Escrow Master Ledger
+- **Screen Name:** Omnichannel Payment-Hold Master Ledger
 - **User Role:** `admin`
-- **Purpose:** Tracks gross merchandise value (GMV), escrow reserves, 20% platform revenue, and MFS reconciliations with CSV export capabilities.
+- **Purpose:** Tracks gross merchandise value (GMV), payment holds, 20% platform revenue, and MFS reconciliations with CSV export capabilities.
 - **Backend Requirements (Rust):** `GET /api/v1/admin/finance/ledger`, `POST /api/v1/admin/finance/reconcile-webhooks`.
 
 ---
@@ -485,7 +485,7 @@ Labels used:
 | `HD-MODAL-RX-VIEWER` | `#labReportModal` | `shared` | Multi-page image viewer for inspecting uploaded prescriptions and lab reports (pages 1 to 5). |
 | `HD-MODAL-DOC-DOSSIER` | `#adminDoctorHistoryModal` | `admin` | Displays a physician's full profile: verified phone number, residential address, email, consultation logs, and disciplinary history. |
 | `HD-MODAL-ADMIN-GRIEVANCE`| `#adminGrievanceDetailModal`| `admin` | Deep forensic investigation console displaying call durations, Agora RTC SDK packet logs, and dispute adjudication controls. |
-| `HD-MODAL-TXN-DETAIL` | `#adminTransactionDetailModal`| `admin` | Audit log inspector for transactions, displaying MFS gateway payloads and escrow states. |
+| `HD-MODAL-TXN-DETAIL` | `#adminTransactionDetailModal`| `admin` | Audit log inspector for transactions, displaying MFS gateway payloads and payment states. |
 | `HD-MODAL-LOG-DETAIL` | `#adminLogDetailModal` | `admin` | Displays subsystem stack traces and provides retry or refund options. |
 | `HD-MODAL-SIM-FAILURE` | `#adminSimulateFailureModal`| `admin` | Diagnostic tool for simulating payment drops, Agora RTC timeouts, and gateway failures. |
 | `HD-MODAL-OFFLINE-GUARD` | `#offlineActionGuardModal` | `shared` | Intercepts destructive actions while offline and explains network requirements. |

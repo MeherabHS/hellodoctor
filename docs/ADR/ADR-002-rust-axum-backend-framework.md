@@ -7,7 +7,7 @@
 ---
 
 ## 1. Context
-The backend service must handle concurrent Agora token minting and telemetry ingestion, high-frequency teleconsultation telemetry streams, financial escrow transactions, and multi-file medical image ingestion without memory leaks or CPU bottlenecks. Healthcare software mandates extreme reliability, zero crash tolerance, and strict data confidentiality.
+The backend service must handle concurrent Agora token minting and telemetry ingestion, high-frequency teleconsultation telemetry streams, payment-hold transactions, and multi-file medical image ingestion without memory leaks or CPU bottlenecks. Healthcare software mandates extreme reliability, zero crash tolerance, and strict data confidentiality.
 
 ## 2. Decision
 We choose **Rust** as the backend language and **Axum** (built on `tokio`, `tower`, and `hyper`) as the asynchronous HTTP and WebSocket framework.
@@ -20,7 +20,7 @@ We choose **Rust** as the backend language and **Axum** (built on `tokio`, `towe
 ## 4. Rationale
 - **Memory Safety Without Garbage Collection:** Rust guarantees elimination of null pointer exceptions, data races, and use-after-free bugs at compile time.
 - **Predictable Performance:** Low-latency route handling and minimal memory footprint (~25-50 MB RAM under load).
-- **Type-Safe Domain Modeling:** Enums with payloads represent state machines (`AppointmentStatus`, `EscrowStatus`) deterministically.
+- **Type-Safe Domain Modeling:** Enums with payloads represent state machines (`AppointmentStatus`, `PaymentStatus`) deterministically.
 - **Agora Token Service:** Axum backend is responsible for minting short-lived secure Agora Dynamic RTC Tokens.
 
 ## 5. Consequences

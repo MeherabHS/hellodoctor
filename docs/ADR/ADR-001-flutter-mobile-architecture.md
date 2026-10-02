@@ -18,10 +18,10 @@ We choose **Flutter (Dart)** as the primary cross-platform mobile technology for
 3. **PWA / Web Wrapper:** Unacceptable hardware device integration, lack of reliable background push notifications, and higher memory footprints on low-spec devices.
 
 ## 4. Rationale
-- **Direct Skia/Impeller Rendering:** Flutter bypasses native OEM widgets and renders directly to the canvas, guaranteeing 100% pixel-fidelity across all Android and iOS device models.
+- **Direct Skia/Impeller Rendering:** Flutter provides a consistent rendering foundation; visual fidelity is verified against the prototype at supported device sizes rather than guaranteed identically across every device model.
 - **Single Unified Codebase:** Patient and Doctor mobile viewports can share domain models, API clients, and design token libraries.
 - **Robust Hardware Ecosystem:** `agora_rtc_engine` provides battle-tested bindings for native video/audio.
 
 ## 5. Consequences
-- **Positive:** Single codebase, deterministic pixel fidelity, fast development cycle, strong typing with Dart. `agora_rtc_engine` integration allows for resilient telehealth sessions on unreliable networks.
+- **Positive:** Single codebase, repeatable visual validation, fast development cycle, strong typing with Dart. `agora_rtc_engine` integration supports telehealth sessions with documented network-recovery behavior.
 - **Trade-off:** Initial app binary size is slightly larger (~25-30 MB) compared to a pure native app; mitigated via asset compression and ProGuard/R8 obfuscation.

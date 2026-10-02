@@ -58,6 +58,23 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
+### 2.2a `MfaCredential`
+- **Purpose:** Persistent administrator MFA enrollment and recovery state.
+- **Fields:**
+  - `id`: `UUID` (Primary Key)
+  - `user_id`: `UUID` (Foreign Key -> `User.id`, Required)
+  - `method`: `MfaMethod` (`TOTP`, `PASSKEY`)
+  - `totp_secret_encrypted`: `Bytes` (KMS envelope-encrypted; never logged)
+  - `recovery_codes_hash`: `Vec<String>` (Array of Argon2id hashed one-time recovery codes)
+  - `is_enabled`: `Boolean` (Default: `false`)
+  - `enabled_at`: `DateTime<Utc>` (Optional until enrollment confirmation)
+  - `last_verified_at`: `DateTime<Utc>` (Optional)
+  - `revoked_at`: `DateTime<Utc>` (Optional)
+  - `created_at`: `DateTime<Utc>`
+- **Sensitivity:** `IDENTITY` / Authentication secret.
+
+---
+
 ### 2.3 `AuditEvent`
 - **Purpose:** Immutable healthcare and system audit trail. (Immutability enforced by granting INSERT/SELECT only to the app role, and considering append-only archival.)
 - **Fields:**
@@ -92,7 +109,7 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `created_at`: `DateTime<Utc>`
   - `updated_at`: `DateTime<Utc>`
 - **Sensitivity:** `PHI` / `IDENTITY`
-- **Ownership:** Patient. Accessible by consulting doctor during active appointment.
+- **Ownership:** Patient. Accessible by the consulting doctor only during `CONFIRMED`, `WAITING`, or `IN_CONSULTATION`, and for up to 24 hours after `completed_at`.
 
 ---
 
@@ -148,11 +165,21 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `modality`: `ConsultationModality` (`VIDEO`, `CHAT`)
   - `status`: `AppointmentStatus` (`PENDING_PAYMENT`, `CONFIRMED`, `WAITING`, `IN_CONSULTATION`, `COMPLETED`, `CANCELLED`, `EXPIRED`, `PREMATURE_TERMINATION`, `DISPUTED`, `REFUNDED`)
   - `consultation_fee`: `Decimal` (Required)
-  - `chief_complaint`: `String` (Optional)
   - `clinical_outcome`: `String` (Optional, CHECK constraint: 'COMPLETED_WITH_RX', 'COMPLETED_NO_RX', 'REFERRED', 'ESCALATED')
+  - `completed_at`: `DateTime<Utc>` (Optional; required when status becomes `COMPLETED`)
   - `created_at`: `DateTime<Utc>`
   - `updated_at`: `DateTime<Utc>`
 - **Sensitivity:** `PHI` / `FINANCIAL`
+
+### 2.7a `AppointmentClinicalIntake`
+- **Purpose:** Isolates clinical free text from operational appointment/payment fields so non-clinical staff cannot read it.
+- **Fields:**
+  - `appointment_id`: `UUID` (Primary Key, Foreign Key -> `Appointment.id`)
+  - `chief_complaint`: `String` (Optional)
+  - `clinical_notes`: `String` (Doctor's internal notes during consultation)
+  - `created_at`: `DateTime<Utc>`
+  - `updated_at`: `DateTime<Utc>`
+- **Sensitivity:** `PHI`
 
 ---
 
@@ -196,31 +223,22 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
-### 2.10 `Prescription` & `PrescriptionItem`
-- **Purpose:** Official e-prescription authored and finalized by physician.
-- **Fields (`Prescription`):**
+### 2.10 `Prescription`
+- **Purpose:** Secure record of the assigned doctor's photographed handwritten prescription, or an explicit no-prescription clinical outcome. V1 does not provide native structured medicine authoring.
+- **Fields:**
   - `id`: `UUID` (Primary Key)
   - `appointment_id`: `UUID` (Foreign Key -> `Appointment.id`, Required, Unique)
   - `doctor_id`: `UUID` (Foreign Key -> `DoctorProfile.id`, Required)
   - `patient_id`: `UUID` (Foreign Key -> `PatientProfile.id`, Required)
   - `rx_number`: `String` (Unique)
-  - `diagnosis_notes`: `String`
-  - `investigations_advised`: `Vec<String>`
-  - `follow_up_date`: `Date`
   - `integrity_verification_hash`: `String` (HMAC integrity hash, not a legal digital signature)
-  - `pdf_object_bucket`: `String`
-  - `pdf_object_key`: `String`
+  - `rx_image_object_bucket`: `String` (Required unless `is_no_rx_required = true`)
+  - `rx_image_object_key`: `String` (Required unless `is_no_rx_required = true`)
+  - `doctor_notes`: `String` (Optional, max 500 chars)
+  - `is_no_rx_required`: `Boolean`
+  - `no_rx_reason`: `String` (Required when `is_no_rx_required = true`)
   - `created_at`: `DateTime<Utc>`
-- **Fields (`PrescriptionItem`):**
-  - `id`: `UUID` (Primary Key)
-  - `prescription_id`: `UUID` (Foreign Key -> `Prescription.id`, Required)
-  - `brand_name`: `String`
-  - `generic_name`: `String`
-  - `dosage_form`: `String`
-  - `strength`: `String`
-  - `dosage_frequency`: `String`
-  - `duration_days`: `u16`
-  - `instructions`: `String`
+- **Business Rule:** Images use the quarantine/malware-scan/re-encoding pipeline and private object storage. The API returns an opaque document ID, never an object-storage URL.
 - **Sensitivity:** `PHI`
 
 ---
@@ -260,16 +278,18 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `gross_amount`: `Decimal`
   - `platform_fee_amount`: `Decimal`
   - `net_amount`: `Decimal`
-  - `payment_status`: `PaymentStatus` (`INITIATED`, `ESCROW_HELD`, `SETTLED_TO_DOCTOR`, `DISBURSED`, `REFUNDED_TO_PATIENT`, `FAILED`)
+  - `payment_session_id`: `UUID` (Opaque, unique, persisted before redirect)
+  - `payment_status`: `PaymentStatus` (`INITIATED`, `PAYMENT_HELD`, `SETTLED_TO_DOCTOR`, `DISBURSED`, `REFUNDED_TO_PATIENT`, `FAILED`)
   - `created_at`: `DateTime<Utc>`
   - `settled_at`: `DateTime<Utc>` (Optional)
 - **Fields (`DoctorWallet`):**
   - `doctor_id`: `UUID` (Primary Key, Foreign Key -> `DoctorProfile.id`)
-  - `lifetime_gross_earnings`: `Decimal`
-  - `lifetime_platform_fee_withheld`: `Decimal`
-  - `lifetime_net_earnings`: `Decimal`
-  - `current_withdrawable_balance`: `Decimal`
-  - `last_payout_at`: `DateTime<Utc>` (Optional)
+  - `lifetime_gross`: `Decimal`
+  - `lifetime_fee_withheld`: `Decimal`
+  - `lifetime_net`: `Decimal`
+  - `pending_disbursement`: `Decimal` (Accrued settled net awaiting the next Finance-admin batch; not independently withdrawable)
+  - `last_disbursement_at`: `DateTime<Utc>` (Optional)
+  - `last_disbursement_amount`: `Decimal`
 - **Sensitivity:** `FINANCIAL`
 
 ---
@@ -297,3 +317,34 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `is_read`: `Boolean` (Default: `false`)
   - `sent_at`: `DateTime<Utc>`
 - **Sensitivity:** `PHI`
+
+---
+
+### 2.14 `DisbursementBatch` & `DisbursementItem`
+- **Purpose:** Monthly settlement runs for doctor earnings.
+- **Fields (`DisbursementBatch`):**
+  - `id`: `UUID` (Primary Key)
+  - `batch_number`: `String`
+  - `initiated_by`: `UUID` (Foreign Key -> `User.id`, Required)
+  - `period_start`: `Date`
+  - `period_end`: `Date`
+  - `total_doctors`: `i32`
+  - `total_gross`: `Decimal`
+  - `total_platform_fee`: `Decimal`
+  - `total_net_disbursed`: `Decimal`
+  - `status`: `String` (`PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`)
+  - `created_at`: `DateTime<Utc>`
+  - `completed_at`: `DateTime<Utc>`
+- **Fields (`DisbursementItem`):**
+  - `id`: `UUID` (Primary Key)
+  - `batch_id`: `UUID` (Foreign Key -> `DisbursementBatch.id`)
+  - `doctor_id`: `UUID` (Foreign Key -> `DoctorProfile.id`)
+  - `gross_amount`: `Decimal`
+  - `platform_fee`: `Decimal`
+  - `net_amount`: `Decimal`
+  - `gateway`: `PaymentGateway`
+  - `gateway_reference`: `String`
+  - `status`: `String` (`PENDING`, `SENT`, `CONFIRMED`, `FAILED`)
+  - `created_at`: `DateTime<Utc>`
+  - `confirmed_at`: `DateTime<Utc>`
+- **Sensitivity:** `FINANCIAL`

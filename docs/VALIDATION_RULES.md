@@ -39,7 +39,7 @@
 | **Consultation Fee** | Pricing / Billing | Positive decimal, min configurable amount, max configurable amount,000 | `fee >= min_fee AND fee <= max_fee`, strictly rounded to 2 decimals | `INVALID_FEE_AMOUNT` |
 | **Platform Charge** | Financial Settlement | Computed: `fee * 0.20` | Server-enforced: `withheld = round(gross * 0.20, 2)`, `net = gross - withheld` | `FEE_CALCULATION_MISMATCH` |
 | **Grievance Statement** | Dispute Filing | Min 10 chars, max 2000 chars | String length between 10 and 2000 chars, scrubbed of HTML tags | `STATEMENT_TOO_SHORT` |
-| **Integrity Verification Hash** | Prescription Sign | Doctor biometric / PIN confirmation | HMAC-SHA256 integrity verification hash computed with server-managed key | `INVALID_DIGITAL_SIGNATURE` |
+| **Prescription-Photo Integrity** | Prescription Photo Upload | Doctor confirms the captured/uploaded photo before submission | HMAC-SHA256 integrity verification hash computed with a server-managed key | `INTEGRITY_VERIFICATION_FAILED` |
 | **Chat Message** | 24h Chat Desk | Min 1 char, max 1000 chars; blocked if expired | `now() < conversation.expires_at`, text length $1 \le L \le 1000$ | `CHAT_WINDOW_EXPIRED` |
 
 ---

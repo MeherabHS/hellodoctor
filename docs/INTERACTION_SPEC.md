@@ -145,13 +145,13 @@ This document reverse-engineers the client-side JavaScript execution environment
 
 ---
 
-### INT-007: Admin Dispute Adjudication (BMDC Physician Warning)
+### INT-007: Admin Dispute Adjudication (Internal Platform Compliance Warning)
 - **Trigger:** Admin clicks "Issue Warning" (`adjudicateGrievanceWarning(grvId)`).
 - **Current State:** Dispute filed against physician conduct.
 - **Action:**
   - Updates grievance status to `WARNED`.
-  - Sets board remedy to `BMDC Disciplinary Warning Logged`.
-  - Appends reprimand entry into target doctor's file in `adminDoctorHistoryStore`.
+  - Sets board remedy to `Internal Platform Compliance Warning Logged`.
+  - Appends an internal compliance entry into the target doctor's platform dossier in `adminDoctorHistoryStore`.
 - **UI Change:**
   - Updates docket status.
   - Displays toast: *"Doctor Warned: Formal clinical misconduct warning registered."*

@@ -7,7 +7,7 @@
 ---
 
 ## 1. Context
-HelloDoctor manages clinical records, legal prescriptions, financial escrow ledgers, and appointment slots. Preventing concurrent double-booking of doctor slots and ensuring double-entry financial accounting requires strict ACID transaction guarantees.
+HelloDoctor manages clinical records, secure prescription-photo records, payment-hold ledgers, and appointment slots. Preventing concurrent double-booking of doctor slots and ensuring double-entry financial accounting requires strict ACID transaction guarantees.
 
 ## 2. Decision
 We choose **PostgreSQL 16+** as the central relational database, paired with **`sqlx`** in Rust for asynchronous connection pooling and compile-time verified queries (`sqlx::query!`).

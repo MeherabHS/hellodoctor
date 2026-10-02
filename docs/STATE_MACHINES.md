@@ -40,7 +40,7 @@ stateDiagram-v2
 - **Valid Transitions & Guards:**
   - `PENDING_PAYMENT -> CONFIRMED`: Guarded by verified MFS IPN webhook or gateway token.
   - `PENDING_PAYMENT -> EXPIRED`: Auto-triggered by background job after 600 seconds. Releases slot back to `AVAILABLE`.
-  - `IN_CONSULTATION -> COMPLETED`: Guarded by the presence of a set `clinical_outcome`. Note: A prescription is NOT required to complete an appointment, only an outcome.
+  - `IN_CONSULTATION -> COMPLETED`: Guarded by the presence of a set `clinical_outcome` and writes `completed_at = CURRENT_TIMESTAMP`. Note: A prescription is NOT required to complete an appointment, only an outcome. Doctor clinical access expires 24 hours after `completed_at`.
   - `CONFIRMED -> CANCELLED`: Guarded by `appointment_time - now() > 2 hours`. Full refund returned to patient.
 
 ---
@@ -51,20 +51,20 @@ Controls financial holding and settlement under the 20% platform charge model.
 ```mermaid
 stateDiagram-v2
     [*] --> INITIATED: User clicks Confirm & Pay
-    INITIATED --> ESCROW_HELD: MFS Gateway confirms debit
+    INITIATED --> PAYMENT_HELD: MFS Gateway confirms debit
     INITIATED --> FAILED: Insufficient balance / Cancelled
-    ESCROW_HELD --> SETTLED_TO_DOCTOR: Consultation completes without dispute
-    ESCROW_HELD --> REFUNDED_TO_PATIENT: Grievance Board orders refund
+    PAYMENT_HELD --> SETTLED_TO_DOCTOR: Consultation completes without dispute
+    PAYMENT_HELD --> REFUNDED_TO_PATIENT: Grievance Board orders refund
     SETTLED_TO_DOCTOR --> DISBURSED: Payout transferred to doctor MFS
     DISBURSED --> [*]
     REFUNDED_TO_PATIENT --> [*]
     FAILED --> [*]
 ```
 
-- **Debarment Transition (`ESCROW_HELD -> SETTLED_TO_DOCTOR`):**
+- **Settlement Transition (`PAYMENT_HELD -> SETTLED_TO_DOCTOR`):**
   - Gross Inflow: $G$
   - HeloDoc Platform Fee: $C = G \times 0.20$ (Credited to platform revenue ledger)
-  - Doctor Net Settlement: $N = G \times 0.80$ (Credited to `doctor_wallets.current_withdrawable_balance`)
+  - Doctor Net Settlement: $N = G \times 0.80$ (Credited to `doctor_wallets.pending_disbursement` until the Finance-admin batch)
 
 ---
 

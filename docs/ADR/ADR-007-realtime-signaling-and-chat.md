@@ -18,7 +18,7 @@ We implement a lightweight **WebSocket Chat Hub** directly inside the Rust backe
 
 ## 4. Rationale
 - **Low Memory Overhead:** Rust handles thousands of persistent WebSocket connections in a single process using Tokio green tasks with minimal RAM overhead.
-- **Zero Third-Party Dependency:** Chat messages remain entirely within the sovereign HeloDoc cloud boundary, ensuring full compliance with health privacy regulations.
+- **Controlled Third-Party Boundary:** Chat messages remain within the approved HeloDoc cloud boundary and are subject to documented privacy, security, and vendor-assurance controls.
 - **Direct Database Integration:** Chat messages can be validated and persisted asynchronously into PostgreSQL within the same application process.
 
 ## 5. Consequences

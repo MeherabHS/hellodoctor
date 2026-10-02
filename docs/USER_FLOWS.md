@@ -234,7 +234,7 @@ flowchart TD
     G -- Physician Misconduct --> I[Click 'Issue Warning' #btnAdjudicateWarning]
     G -- Unsubstantiated Claim --> J[Click 'Resolve / Dismiss' #btnAdjudicateResolve]
     H --> K[Disburse payment hold Refund to Patient bKash -> Status REFUNDED]
-    I --> L[Log Official Warning in Doctor BMDC Dossier -> Status WARNED]
+    I --> L[Log Internal Platform Compliance Warning in Physician Dossier -> Status WARNED]
     J --> M[Release payment hold to Doctor -> Status DISMISSED]
     K & L & M --> RESULT([Update Master Ledger & Notify Both Parties])
 ```
@@ -243,7 +243,7 @@ flowchart TD
 
 ### FLOW-ADMIN-003: Subsystem Diagnostics & Failure Simulation
 - **Step 1:** Administrator opens `adminPage_logs`.
-- **Step 2:** Filters logs by subsystem (`MFS_BKASH_GATEWAY`, `AGORA_RTC`, `DGDA_EMR_SYNC`).
+- **Step 2:** Filters logs by subsystem (`MFS_BKASH_GATEWAY`, `AGORA_RTC`, `UPLOAD_SECURITY_PIPELINE`).
 - **Step 3:** Clicks trace ID (e.g., `TRC-94812-BKASH`) to inspect error stack trace in `#adminLogDetailModal`.
 - **Step 4:** To test system resilience, clicks "Simulate Failure", opening `#adminSimulateFailureModal`.
 - **Step 5:** Selects scenario (e.g., *bKash IPN Webhook Timeout*), sets severity (*CRITICAL*), and clicks "Execute Simulation".

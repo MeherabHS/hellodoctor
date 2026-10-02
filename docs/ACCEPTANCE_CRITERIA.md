@@ -42,7 +42,7 @@ AND the pagination bar displays "Page X of Y" with functional Previous and Next 
 
 ---
 
-## 3. Slot Scheduling, Booking & Escrow Hold
+## 3. Slot Scheduling, Booking & Payment Hold
 
 ### AC-004: Atomic Slot Reservation & Double-Booking Prevention
 ```gherkin
@@ -55,13 +55,14 @@ AND the losing patient receives HTTP 409 with error code SLOT_NOT_AVAILABLE
 AND upon successful payment webhook, the slot transitions to BOOKED and appointment to CONFIRMED.
 ```
 
-### AC-005: Escrow Holding State
+### AC-005: Payment Holding State
 ```gherkin
 GIVEN a successful consultation booking of ৳ 800
-WHEN the payment gateway verifies the transaction
-THEN a transaction record is created with gross_amount = ৳ 800, platform_fee = ৳ 160 (20%), net_amount = ৳ 640
-AND the transaction escrow_status is set to ESCROW_HELD
-AND the doctor's withdrawable wallet balance is NOT incremented until the consultation completes.
+WHEN the payment session is created before redirect
+THEN a transaction record exists with payment_status = INITIATED, gross_amount = ৳ 800, platform_fee_amount = ৳ 160 (20%), and net_amount = ৳ 640
+AND its opaque payment_session_id is persisted before it is returned to the client
+AND when the verified payment webhook succeeds, payment_status transitions to PAYMENT_HELD
+AND the doctor's accrued net earnings are NOT incremented until the consultation completes.
 ```
 
 ---
@@ -74,7 +75,7 @@ GIVEN an active Agora RTC teleconsultation session
 WHEN the connection disconnects after only 15 seconds (callSeconds < 30)
 THEN the session is marked with status PREMATURE_TERMINATION
 AND the telemetry record stores call_duration_seconds = 15 and premature_end = true
-AND the escrow payment remains locked in ESCROW_HELD rather than auto-settling to the doctor.
+AND the payment remains in PAYMENT_HELD rather than auto-settling to the doctor.
 ```
 
 ### AC-007: 24-Hour Clinical Chat Auto-Lock
@@ -114,13 +115,13 @@ AND raw technical diagnostics remain hidden from the patient UI (aria-hidden="tr
 AND the grievance is queued in the Admin Portal docket with status PENDING_REVIEW.
 ```
 
-### AC-010: Grievance Adjudication: Escrow Refund Disbursal
+### AC-010: Grievance Adjudication: Payment Refund Disbursal
 ```gherkin
 GIVEN an administrator reviewing a grievance where telemetry confirms call_duration = 0m 08s and prescription = Not Issued
 WHEN the administrator clicks "Disburse Refund" (#btnAdjudicateRefund)
 THEN the grievance status updates to REFUNDED
-AND the board remedy updates to "Escrow Refund Disbursed (৳800)"
-AND the escrow transaction status updates to REFUNDED_TO_PATIENT
+AND the board remedy updates to "Payment Refund Disbursed (৳800)"
+AND the transaction payment_status updates to REFUNDED_TO_PATIENT
 AND an MFS refund API call is dispatched to the patient's bKash account.
 ```
 
@@ -162,7 +163,7 @@ AND a confirmation toast is displayed: "Language Updated: Application language s
 ### AC-014: Offline Action Interception
 ```gherkin
 GIVEN a patient or doctor without an active internet connection (offline)
-WHEN the user attempts a destructive action (Confirm & Pay, Book Slot, Sign Prescription)
+WHEN the user attempts a destructive action (Confirm & Pay, Book Slot, Upload Prescription Photo)
 THEN the submission is blocked before dispatching network requests
 AND the modal #offlineActionGuardModal is displayed
 AND previously entered form data is preserved until connectivity resumes.
@@ -179,6 +180,7 @@ WHEN the booking request is submitted
 THEN the appointment is created with status PENDING_PAYMENT
 AND the slot transitions to LOCKED_IN_PAYMENT
 AND a payment session is initiated with the MFS provider
+AND an INITIATED transaction and its payment_session_id are persisted before the redirect URL is returned
 AND the appointment transitions to CONFIRMED only after the payment webhook confirms successful debit.
 ```
 
@@ -222,6 +224,6 @@ AND the notification does NOT contain the doctor's name, diagnosis, prescription
 GIVEN a doctor in an active consultation where no medication is indicated
 WHEN the doctor selects clinical outcome 'No Prescription Required' and ends the session
 THEN the consultation transitions to COMPLETED with clinical_outcome = COMPLETED_NO_RX
-AND the escrow payment is settled to the doctor
+AND payment_status transitions from PAYMENT_HELD to SETTLED_TO_DOCTOR
 AND the patient is NOT blocked from proceeding.
 ```

@@ -35,21 +35,21 @@
 - **`view-1` (Core Services):** Translated into `CoreServicesScreen` with search bar and filtered service catalog.
 - **`view-3` (Find Specialist):** Translated into `SpecialistDirectoryScreen` with modality segmented controls, specialty chips, and `DoctorCard` list.
 - **`view-4` (Book Slot):** Translated into `AppointmentBookingScreen` with horizontal calendar, slot grid, `PrescriptionDropzone`, and payment gateway radio list.
-- **`view-5` (Health Vault):** Translated into `HealthVaultScreen` with prescription cards, PDF download triggers, and lab report tabs.
+- **`view-5` (Health Vault):** Translated into `HealthVaultScreen` with secure prescription-photo cards, short-lived download links, and lab-report tabs.
 - **`view-6` (24h Chat):** Translated into `ClinicalChatScreen` with message bubbles, typing indicators, canned medical query pills, and countdown timer.
 - **`view-7` (Account):** Translated into `PatientAccountScreen` with profile details, language modal trigger, and logout button.
 - **`view-10` (Waiting Room):** Translated into `WaitingRoomScreen` with circular countdown timer, attached prescription strip, and hardware check panel.
-- **`view-11` (Post-Consultation):** Translated into `PostConsultationScreen` with download prescription button and discrete grievance filing button.
+- **`view-11` (Post-Consultation):** Translated into `PostConsultationScreen` with secure prescription-photo button and discrete grievance filing button.
 - **`view-14` (Shimmer Loading):** Translated into `ShimmerPlaceholderCard` utilizing the `shimmer` package.
 
 ### 2.2 Doctor Screens
 - **`doc-view-0` (Doctor Queue):** Translated into `DoctorQueueScreen` with on-duty switch and live patient triage cards.
-- **`doc-view-1` (Smart Rx Scanner):** Translated into `RxComposerScreen` with camera OCR capture, DGDA drug auto-complete, and digital signature CTA.
+- **`doc-view-1` (Smart Rx Scanner):** Translated into `PrescriptionCaptureScreen` with camera capture/upload of a handwritten prescription photo, integrity verification, and secure send-to-patient CTA.
 - **`doc-view-2` (Schedule):** Translated into `DoctorScheduleScreen` with 15-minute slot generator modal.
 - **`doc-view-3` (Wallet & Earnings):** Translated into `DoctorWalletScreen` featuring `DoctorEarningsHeroCard` with 3-tier math and itemized ledger.
 - **`doc-view-4` (Chat Desk):** Translated into `DoctorChatDeskScreen` with active patient list and clinical quick-replies.
 - **`doc-view-5` (Q&A Triage):** Translated into `DoctorQnaScreen` for answering community inquiries.
 
 ### 2.3 Doctor Web Workstation & Central Admin
-- **`#doctorWebShell`:** Translated into desktop clinical console (Flutter Web or Next.js) with 1080p Agora RTC feed (via `agora_rtc_engine`) on left, split EMR and prescription authoring on right.
+- **`#doctorWebShell`:** Translated into desktop clinical console (Flutter Web or Next.js) with 1080p Agora RTC feed (via `agora_rtc_engine`) on left, split clinical record and prescription-photo capture/upload on right.
 - **`adminPage_*`:** Translated into Next.js / TypeScript Admin Portal or Flutter Web desktop application with 9 management dashboards.
