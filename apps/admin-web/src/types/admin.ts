@@ -118,3 +118,65 @@ export interface ActiveRoom {
   video_packet_loss: string;
   bitrate_kbps: number;
 }
+
+export interface DoctorEncounter {
+  time: string;
+  ptName: string;
+  mode: string;
+  fee: string;
+  diagnosis: string;
+  rx: string;
+}
+
+export interface DoctorDisbursementRecord {
+  date: string;
+  amount: string;
+  method: string;
+  txId: string;
+  commissionDeducted: string;
+  status: string;
+}
+
+export interface DoctorHistoryDetail extends DoctorProfile {
+  avatar: string;
+  bgColor: string;
+  email: string;
+  completedVisits: number;
+  chatSessions: number;
+  grossEarnings: string;
+  platformCut: string;
+  netPayout: string;
+  lifetimeConsultations: number;
+  chatTotalSessions: number;
+  lifetimeGross: string;
+  lifetimeNet: string;
+  payoutMethod: string;
+  statusText: string;
+  encounters: DoctorEncounter[];
+  disbursements: DoctorDisbursementRecord[];
+}
+
+export interface PatientEncounter {
+  date: string;
+  doctor: string;
+  spec: string;
+  mode: string;
+  diag: string;
+  rx: string;
+}
+
+export interface PatientVaultDoc {
+  name: string;
+  meta: string;
+}
+
+export interface PatientHistoryDetail extends PatientRecord {
+  avatar: string;
+  bgColor: string;
+  bp: string;
+  pulse: string;
+  cohort: string;
+  labs: string;
+  encounters: PatientEncounter[];
+  vaultDocuments: PatientVaultDoc[];
+}
