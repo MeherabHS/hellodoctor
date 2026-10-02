@@ -1,2393 +1,2341 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Sidebar, { AdminTab } from '@/components/Sidebar';
-import Topbar from '@/components/Topbar';
+import React, { useState } from 'react';
 import {
-  Activity,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
-  Receipt,
-  RotateCcw,
-  ShieldAlert,
-  ArrowUpRight,
-  TrendingUp,
-  Stethoscope,
-  Building,
-  Calendar,
-  Send,
-  Users,
-  ShieldCheck,
-  Search,
-  Filter,
-  PhoneCall,
-  Video,
-  Lock,
-  Unlock,
-  FileText,
-  Check,
-  X,
-  RefreshCw,
-  Cpu,
-  Mail,
-  MapPin,
-  ExternalLink,
-  DollarSign,
-  Heart,
-  FileBarChart,
-} from 'lucide-react';
-import {
-  DoctorProfile,
-  GrievanceReport,
+  ADMIN_DOCTORS_STORE,
+  ADMIN_PATIENT_STORE,
+  INITIAL_ERROR_LOGS,
+  INITIAL_GRIEVANCES,
+  INITIAL_TRANSACTIONS,
+  DoctorHistoryItem,
+  PatientRecordItem,
+  AppErrorLogItem,
+  GrievanceItem,
   TransactionItem,
-  DisbursementBatch,
-  SlotItem,
-  PatientRecord,
-  AuditEvent,
-  ActiveRoom,
-  DoctorHistoryDetail,
-  PatientHistoryDetail,
-} from '@/types/admin';
+} from '@/data/adminStore';
 
-// Master Prototype Doctor Store matching index.html
-const PROTOTYPE_DOCTOR_STORE: DoctorHistoryDetail[] = [
-  {
-    id: 'da000001-0000-0000-0000-000000000001',
-    user_id: '10000001-0000-0000-0000-000000000001',
-    full_name: 'Dr. Sabrina Akter',
-    license_number: 'BMDC #45821',
-    license_authority: 'BMDC',
-    license_country: 'BD',
-    primary_specialty: 'Internal Medicine',
-    experience_years: 12,
-    current_hospital: 'Apollo Hospitals Dhaka',
-    qualifications: ['MBBS', 'FCPS (Medicine)', 'MD'],
-    consultation_fee_video: '800',
-    consultation_fee_chat: '500',
-    residential_address: 'Banani, Dhaka (Road 11, Block D)',
-    verified_phone: '+880 1713-445566',
-    is_on_duty: true,
-    is_verified: true,
-    disciplinary_warnings: [],
-    avatar: 'SA',
-    bgColor: '#D97706',
-    email: 'dr.sabrina.apollo@helodoc.com',
-    completedVisits: 142,
-    chatSessions: 94,
-    grossEarnings: '78,600',
-    platformCut: '15,720',
-    netPayout: '62,880',
-    lifetimeConsultations: 1240,
-    chatTotalSessions: 860,
-    lifetimeGross: '890,000',
-    lifetimeNet: '712,000',
-    payoutMethod: 'bKash Merchant',
-    statusText: 'Pending Settlement',
-    encounters: [
-      {
-        time: 'Today, 10:30 AM',
-        ptName: 'Rafiq Ahmed (34M)',
-        mode: '📹 10m Video + 24h Chat',
-        fee: '৳ 800',
-        diagnosis: 'Acute URTI, Severe Pharyngitis',
-        rx: 'Rx #041 Synced',
-      },
-      {
-        time: 'Today, 10:40 AM',
-        ptName: 'Nusrat Jahan (28F)',
-        mode: '📹 10m Video + 24h Chat',
-        fee: '৳ 800',
-        diagnosis: 'Hypothyroidism, Routine Review',
-        rx: 'Rx #039 Synced',
-      },
-      {
-        time: 'Today, 10:50 AM',
-        ptName: 'Kamal Uddin (52M)',
-        mode: '💬 24h Chat Subscribed',
-        fee: '৳ 300',
-        diagnosis: 'Hypertension Maintenance & Refill',
-        rx: 'Rx #038 Synced',
-      },
-      {
-        time: 'Yesterday, 04:15 PM',
-        ptName: 'Tariqul Islam (46M)',
-        mode: '📹 10m Video Visit',
-        fee: '৳ 800',
-        diagnosis: 'Dyspepsia, Acid Reflux',
-        rx: 'Rx #035 Synced',
-      },
-    ],
-    disbursements: [
-      {
-        date: '24 Sep 2026',
-        amount: '45,200',
-        method: 'bKash Merchant',
-        txId: 'BK-8932401',
-        commissionDeducted: '11,300 (20%)',
-        status: 'Settled ✓',
-      },
-      {
-        date: '17 Sep 2026',
-        amount: '38,500',
-        method: 'bKash Merchant',
-        txId: 'BK-8821940',
-        commissionDeducted: '9,625 (20%)',
-        status: 'Settled ✓',
-      },
-    ],
-  },
-  {
-    id: 'da000002-0000-0000-0000-000000000002',
-    user_id: '10000002-0000-0000-0000-000000000002',
-    full_name: 'Dr. Anika Rahman',
-    license_number: 'BMDC #A-74921',
-    license_authority: 'BMDC',
-    license_country: 'BD',
-    primary_specialty: 'Pediatric Specialist',
-    experience_years: 9,
-    current_hospital: 'Dhaka Medical College Hospital',
-    qualifications: ['MBBS', 'DCH', 'FCPS (Pediatrics)'],
-    consultation_fee_video: '800',
-    consultation_fee_chat: '500',
-    residential_address: 'Dhanmondi, Dhaka (House 42, Road 7A)',
-    verified_phone: '+880 1711-884920',
-    is_on_duty: true,
-    is_verified: true,
-    disciplinary_warnings: [],
-    avatar: 'AR',
-    bgColor: '#059669',
-    email: 'dr.anika.dmch@helodoc.com',
-    completedVisits: 142,
-    chatSessions: 108,
-    grossEarnings: '78,600',
-    platformCut: '15,720',
-    netPayout: '62,880',
-    lifetimeConsultations: 1480,
-    chatTotalSessions: 940,
-    lifetimeGross: '1,020,000',
-    lifetimeNet: '816,000',
-    payoutMethod: 'bKash Merchant',
-    statusText: 'Pending Settlement',
-    encounters: [
-      {
-        time: 'Today, 11:15 AM',
-        ptName: 'Tanvir Chowdhury (7M)',
-        mode: '📹 10m Video Visit',
-        fee: '৳ 800',
-        diagnosis: 'Pediatric Atopic Dermatitis, Eczema flare',
-        rx: 'Rx #043 Synced',
-      },
-      {
-        time: 'Today, 09:30 AM',
-        ptName: 'Zainab Hossain (4F)',
-        mode: '💬 24h Chat Subscribed',
-        fee: '৳ 300',
-        diagnosis: 'Acute viral rhinorrhea, saline drops advice',
-        rx: 'Rx #042 Synced',
-      },
-      {
-        time: 'Yesterday, 06:10 PM',
-        ptName: 'Sarah Ahmed (34F)',
-        mode: '📹 10m Video + 24h Chat',
-        fee: '৳ 800',
-        diagnosis: 'Maternal allergy & pediatric immunization plan',
-        rx: 'Rx #040 Synced',
-      },
-      {
-        time: '23 Sep, 03:45 PM',
-        ptName: 'Rafiq Ahmed (34M)',
-        mode: '📹 10m Video Visit',
-        fee: '৳ 800',
-        diagnosis: 'Family asthma consultation',
-        rx: 'Rx #036 Synced',
-      },
-    ],
-    disbursements: [
-      {
-        date: '24 Sep 2026',
-        amount: '52,000',
-        method: 'bKash Merchant',
-        txId: 'BK-9102451',
-        commissionDeducted: '13,000 (20%)',
-        status: 'Settled ✓',
-      },
-      {
-        date: '17 Sep 2026',
-        amount: '44,800',
-        method: 'bKash Merchant',
-        txId: 'BK-9041280',
-        commissionDeducted: '11,200 (20%)',
-        status: 'Settled ✓',
-      },
-    ],
-  },
-  {
-    id: 'da000003-0000-0000-0000-000000000003',
-    user_id: '10000003-0000-0000-0000-000000000003',
-    full_name: 'Dr. Sadik Al-Amin',
-    license_number: 'BMDC #A-68192',
-    license_authority: 'BMDC',
-    license_country: 'BD',
-    primary_specialty: 'General Medicine & Diabetology',
-    experience_years: 11,
-    current_hospital: 'Bangabandhu Sheikh Mujib Medical University (BSMMU)',
-    qualifications: ['MBBS', 'MD (Endocrinology)'],
-    consultation_fee_video: '800',
-    consultation_fee_chat: '450',
-    residential_address: 'Gulshan-2, Dhaka (Avenue 3, Block C)',
-    verified_phone: '+880 1819-334455',
-    is_on_duty: true,
-    is_verified: true,
-    disciplinary_warnings: [],
-    avatar: 'SA',
-    bgColor: '#2563EB',
-    email: 'dr.sadik.bsmmu@helodoc.com',
-    completedVisits: 115,
-    chatSessions: 94,
-    grossEarnings: '61,250',
-    platformCut: '12,250',
-    netPayout: '49,000',
-    lifetimeConsultations: 2150,
-    chatTotalSessions: 1420,
-    lifetimeGross: '1,480,000',
-    lifetimeNet: '1,184,000',
-    payoutMethod: 'Nagad',
-    statusText: 'Pending Settlement',
-    encounters: [
-      {
-        time: 'Today, 10:45 AM',
-        ptName: 'Rafiq Ahmed (34M)',
-        mode: '📹 10m Video Visit',
-        fee: '৳ 800',
-        diagnosis: 'Acute URTI, Severe Pharyngitis follow-up',
-        rx: 'Rx #041 Synced',
-      },
-      {
-        time: 'Today, 09:15 AM',
-        ptName: 'Kamal Uddin (52M)',
-        mode: '💬 24h Chat Subscribed',
-        fee: '৳ 300',
-        diagnosis: 'Hypertension titration & Metformin review',
-        rx: 'Rx #038 Synced',
-      },
-      {
-        time: 'Yesterday, 04:30 PM',
-        ptName: 'Farzana Haque (41F)',
-        mode: '📹 10m Video Visit',
-        fee: '৳ 800',
-        diagnosis: 'Bronchial asthma inhaler adjustment',
-        rx: 'Rx #037 Synced',
-      },
-    ],
-    disbursements: [
-      {
-        date: '24 Sep 2026',
-        amount: '41,600',
-        method: 'Nagad',
-        txId: 'NG-7719201',
-        commissionDeducted: '10,400 (20%)',
-        status: 'Settled ✓',
-      },
-    ],
-  },
-  {
-    id: 'da000004-0000-0000-0000-000000000004',
-    user_id: '10000004-0000-0000-0000-000000000004',
-    full_name: 'Dr. Farhana Yesmin',
-    license_number: 'BMDC #A-53419',
-    license_authority: 'BMDC',
-    license_country: 'BD',
-    primary_specialty: 'Gynaecology & Obstetrics',
-    experience_years: 15,
-    current_hospital: 'BIRDEM General Hospital',
-    qualifications: ['MBBS', 'FCPS (OBGYN)', 'MS'],
-    consultation_fee_video: '1000',
-    consultation_fee_chat: '600',
-    residential_address: 'Uttara Sector 4, Dhaka (Road 11)',
-    verified_phone: '+880 1912-778899',
-    is_on_duty: true,
-    is_verified: true,
-    disciplinary_warnings: [],
-    avatar: 'FY',
-    bgColor: '#7C3AED',
-    email: 'dr.farhana.birdem@helodoc.com',
-    completedVisits: 160,
-    chatSessions: 122,
-    grossEarnings: '87,400',
-    platformCut: '17,480',
-    netPayout: '69,920',
-    lifetimeConsultations: 1890,
-    chatTotalSessions: 1110,
-    lifetimeGross: '1,320,000',
-    lifetimeNet: '1,056,000',
-    payoutMethod: 'BEFTN Bank',
-    statusText: 'Settled ✓',
-    encounters: [
-      {
-        time: 'Today, 11:30 AM',
-        ptName: 'Nusrat Jahan (28F)',
-        mode: '📹 10m Video + 24h Chat',
-        fee: '৳ 800',
-        diagnosis: 'Hypothyroidism & Antenatal routine review',
-        rx: 'Rx #044 Synced',
-      },
-      {
-        time: 'Today, 10:00 AM',
-        ptName: 'Sarah Ahmed (34F)',
-        mode: '💬 24h Chat Subscribed',
-        fee: '৳ 300',
-        diagnosis: 'Post-partum iron deficiency screening',
-        rx: 'Rx #039 Synced',
-      },
-    ],
-    disbursements: [
-      {
-        date: '24 Sep 2026',
-        amount: '69,920',
-        method: 'BEFTN Bank',
-        txId: 'BF-5501928',
-        commissionDeducted: '17,480 (20%)',
-        status: 'Settled ✓',
-      },
-    ],
-  },
-  {
-    id: 'da000005-0000-0000-0000-000000000005',
-    user_id: '10000005-0000-0000-0000-000000000005',
-    full_name: 'Dr. Karim Hossain',
-    license_number: 'BMDC #81551',
-    license_authority: 'BMDC',
-    license_country: 'BD',
-    primary_specialty: 'Cardiology Consultant',
-    experience_years: 13,
-    current_hospital: 'National Heart Foundation Hospital',
-    qualifications: ['MBBS', 'MD (Cardiology)', 'FCPS'],
-    consultation_fee_video: '900',
-    consultation_fee_chat: '550',
-    residential_address: 'Mirpur DOHS, Dhaka',
-    verified_phone: '+880 1715-223344',
-    is_on_duty: false,
-    is_verified: true,
-    disciplinary_warnings: [],
-    avatar: 'KH',
-    bgColor: '#1D4ED8',
-    email: 'dr.karim.nhf@helodoc.com',
-    completedVisits: 128,
-    chatSessions: 86,
-    grossEarnings: '72,000',
-    platformCut: '14,400',
-    netPayout: '57,600',
-    lifetimeConsultations: 1520,
-    chatTotalSessions: 790,
-    lifetimeGross: '980,000',
-    lifetimeNet: '784,000',
-    payoutMethod: 'Nagad',
-    statusText: 'Pending Settlement',
-    encounters: [
-      {
-        time: '10 Sep 2026',
-        ptName: 'Sarah Ahmed (34F)',
-        mode: '📹 Video Visit',
-        fee: '৳ 800',
-        diagnosis: 'ECG baseline check & lifestyle counseling',
-        rx: 'Rx #032 Synced',
-      },
-    ],
-    disbursements: [
-      {
-        date: '24 Sep 2026',
-        amount: '57,600',
-        method: 'Nagad',
-        txId: 'NG-6629104',
-        commissionDeducted: '14,400 (20%)',
-        status: 'Settled ✓',
-      },
-    ],
-  },
-  {
-    id: 'da000006-0000-0000-0000-000000000006',
-    user_id: '10000006-0000-0000-0000-000000000006',
-    full_name: 'Dr. Tariqul Islam',
-    license_number: 'BMDC #63402',
-    license_authority: 'BMDC',
-    license_country: 'BD',
-    primary_specialty: 'Gastroenterology Consultant',
-    experience_years: 14,
-    current_hospital: 'Dhaka Medical College Hospital',
-    qualifications: ['MBBS', 'FCPS (Gastro)', 'MACG'],
-    consultation_fee_video: '850',
-    consultation_fee_chat: '500',
-    residential_address: 'Mohakhali DOHS, Dhaka',
-    verified_phone: '+880 1716-990011',
-    is_on_duty: true,
-    is_verified: true,
-    disciplinary_warnings: [],
-    avatar: 'TI',
-    bgColor: '#047857',
-    email: 'dr.tariqul.dmch@helodoc.com',
-    completedVisits: 154,
-    chatSessions: 110,
-    grossEarnings: '84,200',
-    platformCut: '16,840',
-    netPayout: '67,360',
-    lifetimeConsultations: 1730,
-    chatTotalSessions: 990,
-    lifetimeGross: '1,150,000',
-    lifetimeNet: '920,000',
-    payoutMethod: 'BEFTN Bank',
-    statusText: 'Settled ✓',
-    encounters: [
-      {
-        time: 'Yesterday, 04:15 PM',
-        ptName: 'Tariqul Islam (46M)',
-        mode: '📹 10m Video Visit',
-        fee: '৳ 800',
-        diagnosis: 'Dyspepsia, Acid Reflux',
-        rx: 'Rx #035 Synced',
-      },
-    ],
-    disbursements: [
-      {
-        date: '24 Sep 2026',
-        amount: '67,360',
-        method: 'BEFTN Bank',
-        txId: 'BF-8819203',
-        commissionDeducted: '16,840 (20%)',
-        status: 'Settled ✓',
-      },
-    ],
-  },
-];
+type AdminPageId =
+  | 'doctors'
+  | 'finance'
+  | 'command'
+  | 'slots'
+  | 'patients'
+  | 'bmdc'
+  | 'compliance'
+  | 'logs'
+  | 'grievances';
 
-// Master Patients Store matching index.html
-const PROTOTYPE_PATIENT_STORE: PatientHistoryDetail[] = [
-  {
-    id: '#PT-6521',
-    phone: '+880 1711-234567',
-    display_name: 'Sarah Ahmed',
-    gender: 'Female',
-    age: 34,
-    emergency_contact: '+880 1711-998822',
-    registered_at: 'Jan 2025',
-    total_consultations: 8,
-    last_consultation_date: '15 Oct 2026',
-    avatar: 'SA',
-    bgColor: '#BE185D',
-    bp: '138/88 mmHg',
-    pulse: '76 bpm',
-    cohort: 'Hypertension • T2DM',
-    labs: '3 Documents in Vault',
-    encounters: [
-      {
-        date: '15 Oct 2026',
-        doctor: 'Dr. Kamal Uddin',
-        spec: 'General Practice',
-        mode: '📹 Video Visit',
-        diag: 'Hypertension follow-up, Metformin review',
-        rx: 'Rx #041',
-      },
-      {
-        date: '28 Sep 2026',
-        doctor: 'Dr. Sabrina Akter',
-        spec: 'Internal Medicine',
-        mode: '💬 24h Chat Only',
-        diag: 'Olmesartan dosage titration',
-        rx: 'Rx #038',
-      },
-      {
-        date: '10 Sep 2026',
-        doctor: 'Dr. Karim Hossain',
-        spec: 'Cardiology',
-        mode: '📹 Video Visit',
-        diag: 'ECG baseline check & lifestyle counseling',
-        rx: 'Rx #032',
-      },
-    ],
-    vaultDocuments: [
-      {
-        name: 'Lipid_Profile_Panel.pdf',
-        meta: 'Cholesterol: 215 mg/dL • Attached 18 Sep 2026',
-      },
-      {
-        name: 'CBC_Hemogram_Report.pdf',
-        meta: 'Hb: 12.8 g/dL • Attached 12 Aug 2026',
-      },
-    ],
-  },
-  {
-    id: '#PT-8812',
-    phone: '+880 1819-876543',
-    display_name: 'Rafiq Ahmed',
-    gender: 'Male',
-    age: 34,
-    emergency_contact: '+880 1819-112233',
-    registered_at: 'Mar 2025',
-    total_consultations: 6,
-    last_consultation_date: 'Today, 10:30 AM',
-    avatar: 'RA',
-    bgColor: '#1E40AF',
-    bp: '124/82 mmHg',
-    pulse: '72 bpm',
-    cohort: 'Asthma • Allergic Rhinitis',
-    labs: '2 Documents in Vault',
-    encounters: [
-      {
-        date: 'Today, 10:30 AM',
-        doctor: 'Dr. Sabrina Akter',
-        spec: 'Internal Medicine',
-        mode: '📹 10m Video Visit',
-        diag: 'Acute URTI, Severe Pharyngitis follow-up',
-        rx: 'Rx #041',
-      },
-    ],
-    vaultDocuments: [
-      {
-        name: 'Chest_XRay_PA_View.pdf',
-        meta: 'No active consolidation • Attached 24 Sep 2026',
-      },
-    ],
-  },
-  {
-    id: '#PT-9041',
-    phone: '+880 1912-334455',
-    display_name: 'Nusrat Jahan',
-    gender: 'Female',
-    age: 28,
-    emergency_contact: '+880 1912-778899',
-    registered_at: 'May 2025',
-    total_consultations: 5,
-    last_consultation_date: 'Today, 10:40 AM',
-    avatar: 'NJ',
-    bgColor: '#7C3AED',
-    bp: '118/76 mmHg',
-    pulse: '74 bpm',
-    cohort: 'Hypothyroidism • Antenatal',
-    labs: '4 Documents in Vault',
-    encounters: [
-      {
-        date: 'Today, 10:40 AM',
-        doctor: 'Dr. Sabrina Akter',
-        spec: 'Internal Medicine',
-        mode: '📹 10m Video + 24h Chat',
-        diag: 'Hypothyroidism, Routine Review',
-        rx: 'Rx #039',
-      },
-    ],
-    vaultDocuments: [
-      {
-        name: 'Thyroid_TSH_FreeT4.pdf',
-        meta: 'TSH: 3.2 mIU/L • Attached 20 Sep 2026',
-      },
-    ],
-  },
-];
+interface ToastNotice {
+  id: string;
+  title: string;
+  message: string;
+  icon: string;
+  type: 'success' | 'urgent' | 'warning' | 'info';
+}
 
-export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<AdminTab>('command');
-  const [doctors, setDoctors] = useState<DoctorHistoryDetail[]>(PROTOTYPE_DOCTOR_STORE);
-  const [patients, setPatients] = useState<PatientHistoryDetail[]>(PROTOTYPE_PATIENT_STORE);
-  const [grievances, setGrievances] = useState<GrievanceReport[]>([]);
-  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
-  const [disbursementBatches, setDisbursementBatches] = useState<DisbursementBatch[]>([]);
-  const [slots, setSlots] = useState<SlotItem[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditEvent[]>([]);
-  const [activeRooms, setActiveRooms] = useState<ActiveRoom[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+export default function AdminPortalPage() {
+  // Navigation State
+  const [activeAdminPage, setActiveAdminPage] = useState<AdminPageId>('doctors');
 
-  // Modals
-  const [selectedDoctorForModal, setSelectedDoctorForModal] = useState<DoctorHistoryDetail | null>(null);
-  const [selectedPatientForModal, setSelectedPatientForModal] = useState<PatientHistoryDetail | null>(null);
-  const [disbursementModalOpen, setDisbursementModalOpen] = useState(false);
-  const [disbursementSuccess, setDisbursementSuccess] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  // Interactive Data Stores
+  const [doctorStore] = useState<Record<string, DoctorHistoryItem>>(ADMIN_DOCTORS_STORE);
+  const [patientStore] = useState<Record<string, PatientRecordItem>>(ADMIN_PATIENT_STORE);
+  const [errorLogs, setErrorLogs] = useState<AppErrorLogItem[]>(INITIAL_ERROR_LOGS);
+  const [grievances, setGrievances] = useState<GrievanceItem[]>(INITIAL_GRIEVANCES);
+  const [transactions] = useState<TransactionItem[]>(INITIAL_TRANSACTIONS);
 
-  // Filter states
-  const [selectedGatewayFilter, setSelectedGatewayFilter] = useState<string>('ALL');
-  const [selectedSubsystemFilter, setSelectedSubsystemFilter] = useState<string>('ALL');
-  const [docFilterStatus, setDocFilterStatus] = useState<'all' | 'pending' | 'settled'>('all');
-  const [searchDoctorQuery, setSearchDoctorQuery] = useState('');
+  // Escrow / Payout State
+  const [payoutsSettled, setPayoutsSettled] = useState(false);
+  const [escrowTotal, setEscrowTotal] = useState('৳ 890,000');
 
-  // Initial Data Loading
-  useEffect(() => {
-    // Initial sample transactions
-    setTransactions([
-      {
-        id: 't-101',
-        transaction_number: 'TXN-9988210',
-        appointment_id: 'apt-001',
-        payment_session_id: 'sess-8491-bkash',
-        gateway: 'BKASH',
-        gateway_reference: 'BK-TRX-44120',
-        gross_amount: '800.00',
-        platform_fee_amount: '160.00',
-        net_amount: '640.00',
-        payment_status: 'PAYMENT_HELD',
-        created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-      },
-      {
-        id: 't-102',
-        transaction_number: 'TXN-9988211',
-        appointment_id: 'apt-002',
-        payment_session_id: 'sess-8492-nagad',
-        gateway: 'NAGAD',
-        gateway_reference: 'NG-TRX-99821',
-        gross_amount: '1000.00',
-        platform_fee_amount: '200.00',
-        net_amount: '800.00',
-        payment_status: 'SETTLED_TO_DOCTOR',
-        created_at: new Date(Date.now() - 65 * 60 * 1000).toISOString(),
-      },
-      {
-        id: 't-103',
-        transaction_number: 'TXN-9988212',
-        appointment_id: 'apt-003',
-        payment_session_id: 'sess-8493-bkash',
-        gateway: 'BKASH',
-        gateway_reference: 'BK-TRX-55199',
-        gross_amount: '600.00',
-        platform_fee_amount: '120.00',
-        net_amount: '480.00',
-        payment_status: 'REFUNDED_TO_PATIENT',
-        created_at: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
-      },
-    ]);
+  // Filter States
+  const [doctorStatusFilter, setDoctorStatusFilter] = useState<'all' | 'pending' | 'settled'>('all');
+  const [doctorSearchQuery, setDoctorSearchQuery] = useState('');
+  const [patientFilterCategory, setPatientFilterCategory] = useState<'all' | 'chronic' | 'chat' | 'pediatric'>('all');
+  const [patientSearchQuery, setPatientSearchQuery] = useState('');
+  const [logQuickFilter, setLogQuickFilter] = useState<'all' | 'critical' | 'payment' | 'webrtc' | 'offline' | 'unresolved'>('all');
+  const [logSearchQuery, setLogSearchQuery] = useState('');
+  const [logSeverityFilter, setLogSeverityFilter] = useState('ALL');
+  const [logSubsystemFilter, setLogSubsystemFilter] = useState('ALL');
+  const [logStatusFilter, setLogStatusFilter] = useState('ALL');
+  const [grievanceQuickFilter, setGrievanceQuickFilter] = useState<'all' | 'doctor' | 'system' | 'pending'>('all');
+  const [grievanceSearchQuery, setGrievanceSearchQuery] = useState('');
+  const [grievanceTargetFilter, setGrievanceTargetFilter] = useState('ALL');
+  const [grievanceStatusFilter, setGrievanceStatusFilter] = useState('ALL');
+  const [financeTypeFilter, setFinanceTypeFilter] = useState<'ALL' | 'INFLOW' | 'ESCROW' | 'PAYOUT' | 'REFUND'>('ALL');
+  const [financeGatewayFilter, setFinanceGatewayFilter] = useState('ALL');
+  const [financeSearchQuery, setFinanceSearchQuery] = useState('');
 
-    // Initial grievances
-    setGrievances([
-      {
-        id: 'g-201',
-        grievance_number: 'GRV-20261002-8821',
-        patient_id: 'ba000001-0000-0000-0000-000000000001',
-        consultation_id: 'apt-001',
-        target_type: 'DOCTOR',
-        category: 'Rushed Consultation / Ended Abruptly',
-        claim_summary:
-          'Doctor disconnected call after approximately 42 seconds without reviewing my uploaded chest X-ray intake.',
-        status: 'PENDING_REVIEW',
-        created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-        telemetry: {
-          call_duration_seconds: 42,
-          premature_end: true,
-          packet_loss_percent: '0.40',
-        },
-      },
-      {
-        id: 'g-202',
-        grievance_number: 'GRV-20261001-4419',
-        patient_id: 'ba000002-0000-0000-0000-000000000002',
-        consultation_id: 'apt-004',
-        target_type: 'DOCTOR',
-        category: 'Clinical Advice Clarity',
-        claim_summary:
-          'Doctor advised routine follow-up without prescribing medication; request clarified as Completed No-Rx consultation.',
-        status: 'WARNED',
-        created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        telemetry: {
-          call_duration_seconds: 420,
-          premature_end: false,
-          packet_loss_percent: '0.12',
-        },
-      },
-    ]);
+  // Modals Active State
+  const [selectedDoctorKey, setSelectedDoctorKey] = useState<string | null>(null);
+  const [selectedPatientKey, setSelectedPatientKey] = useState<string | null>(null);
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [selectedGrievanceId, setSelectedGrievanceId] = useState<string | null>(null);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+  const [simulateModalOpen, setSimulateModalOpen] = useState(false);
 
-    // Disbursement Batches
-    setDisbursementBatches([
-      {
-        id: 'b-01',
-        batch_number: 'DISB-202608-01',
-        initiated_by: 'FINANCE_ADMIN (Meherab HS)',
-        period_start: '2026-08-01',
-        period_end: '2026-08-31',
-        total_doctors: 18,
-        total_gross: '245000.00',
-        total_platform_fee: '49000.00',
-        total_net_disbursed: '196000.00',
-        status: 'COMPLETED',
-        created_at: '2026-09-01T10:00:00Z',
-      },
-    ]);
+  // Simulation Form State
+  const [simUser, setSimUser] = useState('sarah');
+  const [simScenario, setSimScenario] = useState('bkash_timeout');
+  const [simSeverity, setSimSeverity] = useState('CRITICAL');
+  const [simCustomNote, setSimCustomNote] = useState('');
 
-    // Live Agora channels
-    setActiveRooms([
-      {
-        channel_name: 'rtc_6b91c890-44a1-41e9-89b1-e49012a991b1',
-        doctor_name: 'Dr. Sabrina Akter',
-        patient_phone: '+880 1711-234567',
-        duration_seconds: 184,
-        modality: 'VIDEO',
-        video_packet_loss: '0.15%',
-        bitrate_kbps: 640,
-      },
-      {
-        channel_name: 'rtc_81ab2209-1234-4bc1-9011-aa9988220011',
-        doctor_name: 'Dr. Anika Rahman',
-        patient_phone: '+880 1819-876543',
-        duration_seconds: 312,
-        modality: 'VIDEO',
-        video_packet_loss: '0.22%',
-        bitrate_kbps: 720,
-      },
-    ]);
+  // Toasts
+  const [toasts, setToasts] = useState<ToastNotice[]>([]);
 
-    // Slot matrix
-    setSlots([
-      {
-        id: 's-101',
-        doctor_id: 'da000001-0000-0000-0000-000000000001',
-        doctor_name: 'Dr. Sabrina Akter',
-        start_time: '2026-10-02T21:00:00Z',
-        end_time: '2026-10-02T21:20:00Z',
-        status: 'LOCKED_IN_PAYMENT',
-        lock_session_id: 'sess-8491-bkash',
-        lock_expires_at: new Date(Date.now() + 6 * 60 * 1000).toISOString(),
-      },
-      {
-        id: 's-102',
-        doctor_id: 'da000001-0000-0000-0000-000000000001',
-        doctor_name: 'Dr. Sabrina Akter',
-        start_time: '2026-10-02T21:30:00Z',
-        end_time: '2026-10-02T21:50:00Z',
-        status: 'AVAILABLE',
-      },
-      {
-        id: 's-103',
-        doctor_id: 'da000002-0000-0000-0000-000000000002',
-        doctor_name: 'Dr. Anika Rahman',
-        start_time: '2026-10-02T22:00:00Z',
-        end_time: '2026-10-02T22:20:00Z',
-        status: 'BOOKED',
-      },
-      {
-        id: 's-104',
-        doctor_id: 'da000005-0000-0000-0000-000000000005',
-        doctor_name: 'Dr. Karim Hossain',
-        start_time: '2026-10-03T10:00:00Z',
-        end_time: '2026-10-03T10:20:00Z',
-        status: 'BLOCKED',
-      },
-    ]);
+  function showToast(title: string, message: string, icon = '✓', type: 'success' | 'urgent' | 'warning' | 'info' = 'success') {
+    const id = 'toast_' + Date.now();
+    setToasts((prev) => [...prev, { id, title, message, icon, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }
 
-    // Audit logs
-    setAuditLogs([
-      {
-        id: 'aud-001',
-        actor_role: 'FINANCE_ADMIN',
-        action: 'DISBURSEMENT_BATCH_INITIATED',
-        entity_type: 'DISBURSEMENT_BATCH',
-        entity_id: 'DISB-202609-01',
-        ip_address: '103.205.71.42',
-        rls_enforced: true,
-        timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-        details: 'Disbursed ৳1,440.00 net across physician wallets via MFS bulk settlement.',
-      },
-      {
-        id: 'aud-002',
-        actor_role: 'CLINICAL_ADMIN',
-        action: 'GRIEVANCE_REFUND_ADJUDICATED',
-        entity_type: 'GRIEVANCE',
-        entity_id: 'GRV-20261002-8821',
-        ip_address: '103.205.71.45',
-        rls_enforced: true,
-        timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-        details: 'Claim substantiated by RTC session telemetry (duration < 60s). Refund ৳800.00 queued.',
-      },
-      {
-        id: 'aud-003',
-        actor_role: 'SYSTEM_WORKER',
-        action: 'SLOT_PAYMENT_LOCK_ACQUIRED',
-        entity_type: 'APPOINTMENT_SLOT',
-        entity_id: 's-101',
-        ip_address: '127.0.0.1 (Internal)',
-        rls_enforced: true,
-        timestamp: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-        details: 'Slot s-101 locked in payment stage with 600s TTL for booking sess-8491-bkash.',
-      },
-    ]);
-  }, []);
+  // Page Header Titles & Breadcrumbs
+  const PAGE_METADATA: Record<AdminPageId, { title: string; breadcrumb: string }> = {
+    doctors: {
+      title: 'Telehealth Financial Settlement',
+      breadcrumb: 'Doctor Wallet Payout Dashboard • Multi-Channel Payout & Automated Commission',
+    },
+    finance: {
+      title: 'Omnichannel Payment & Escrow Master Ledger',
+      breadcrumb: 'Real-time bKash, Nagad & Card Inflows • 15-20% Platform Commission Splits • Escrow Release Audit',
+    },
+    command: {
+      title: 'Operations & Live Command Center',
+      breadcrumb: 'Real-time Platform Telemetry • Hourly Shift Load & WebRTC Stream Monitor',
+    },
+    slots: {
+      title: 'Slot Matrix & 1-Hour Lock Governance',
+      breadcrumb: '10-Minute Micro-Consultation Timetable & Cancellation Freeze',
+    },
+    patients: {
+      title: 'Patients Directory & Medical Vaults',
+      breadcrumb: 'Central Electronic Health Records • Longitudinal Patient Surveillance',
+    },
+    bmdc: {
+      title: 'Doctor Credentialing & BMDC KYC Hub',
+      breadcrumb: 'Physician Regulatory KYC • NID & Certificate OCR Match',
+    },
+    compliance: {
+      title: 'Clinical e-Prescription & Q&A Audit',
+      breadcrumb: 'DGDA Antibiotic Stewardship & Narcotic Schedule H Compliance',
+    },
+    logs: {
+      title: 'App Failure Diagnostics & User Incident Logs',
+      breadcrumb: 'Real-Time Telemetry & Exception Tracking • Traceability by User, Timestamp & Subsystem',
+    },
+    grievances: {
+      title: 'Consultation Grievance & Injustice Adjudication',
+      breadcrumb: 'Patient Rights & Clinical Accountability • Doctor Conduct & System Failure Disputes',
+    },
+  };
 
-  // Adjudicate Refund Action
-  async function handleAdjudicateRefund(grievanceId: string) {
-    try {
-      await fetch(`/api/v1/admin/grievances/${grievanceId}/refund`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audit_notes: 'Claim substantiated by RTC session telemetry (duration < 60s).',
-        }),
-      });
-      setActionMessage('Refund disbursed to patient MFS account successfully.');
-    } catch {
-      setActionMessage('Refund processed (Medical Board ledger updated).');
+  // 1. Batch Payout Action
+  function handleExecuteBatchPayout() {
+    setPayoutsSettled(true);
+    setEscrowTotal('৳ 0 (Disbursed)');
+    showToast('Payout Batch Disbursed! ৳ 890,000', 'Successfully disbursed settlements to 6 active physicians via bKash & Nagad APIs.', '💸', 'success');
+  }
+
+  // 2. BMDC Approval
+  function handleBmdcAction(action: 'approve' | 'clarify' | 'reject') {
+    if (action === 'approve') {
+      showToast('BMDC Reg A-48291 Approved ✓', 'Dr. Sarah Rahman credentialed & scheduled for live teleconsults.', '✓', 'success');
+    } else if (action === 'clarify') {
+      showToast('Clarification Sent to Physician', 'Requested higher-resolution scan of Bangladesh Medical & Dental Council certificate.', '⚠️', 'info');
+    } else {
+      showToast('Application Declined', 'Physician notification dispatched with rejection grounds.', '✕', 'warning');
     }
+  }
 
+  // 3. Log Simulation
+  function handleExecuteSimulateFailure() {
+    const newId = 'ERR-' + Date.now().toString().slice(-8);
+    const traceNum = Math.floor(10000 + Math.random() * 90000);
+    const traceId = `TRC-${traceNum}-FAIL`;
+
+    const userMap: Record<string, any> = {
+      sarah: { id: 'USR-8921', name: 'Sarah Khan', role: 'Patient', phone: '+880 1711-234567', avatar: 'SK', avatarBg: '#059669', device: 'Samsung Galaxy S24', appVersion: 'v2.4.1', network: 'GP 4G', ip: '103.114.98.24' },
+      sabrina: { id: 'DOC-45821', name: 'Dr. Sabrina Akter', role: 'Doctor', phone: '+880 1819-334455', avatar: 'SA', avatarBg: '#2563EB', device: 'MacBook Pro M3', appVersion: 'Web v2.4.0', network: 'Hospital Fiber', ip: '103.205.71.18' },
+      rafiq: { id: 'USR-7410', name: 'Rafiq Ahmed', role: 'Patient', phone: '+880 1819-987654', avatar: 'RA', avatarBg: '#059669', device: 'Xiaomi Redmi 13', appVersion: 'v2.4.1', network: 'Robi 3G', ip: '119.30.38.102' },
+      anika: { id: 'DOC-74921', name: 'Dr. Anika Rahman', role: 'Doctor', phone: '+880 1712-445566', avatar: 'AR', avatarBg: '#D97706', device: 'iPhone 15 Pro', appVersion: 'v2.3.9', network: 'Banglalink 4G', ip: '103.88.232.14' },
+    };
+
+    const targetUser = userMap[simUser] || userMap.sarah;
+
+    const newLog: AppErrorLogItem = {
+      id: newId,
+      traceId,
+      timestamp: new Date().toISOString(),
+      timeFormatted: 'Just now, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      relativeTime: 'Just now',
+      user: { ...targetUser, ageGender: targetUser.role === 'Doctor' ? 'Specialist' : '30+' },
+      severity: simSeverity as any,
+      subsystem: simScenario === 'bkash_timeout' ? 'Payment Gateway' : 'Agora WebRTC',
+      component: simScenario === 'bkash_timeout' ? '/api/v2/payment/bkash/execute-agreement' : "agora.joinChannel('room_hd_9104')",
+      actionAttempted: 'Simulated Diagnostic Action',
+      failedPart: simScenario === 'bkash_timeout' ? 'bKash Callback Handshake' : 'Agora ICE Pairing',
+      errorCode: simScenario === 'bkash_timeout' ? 'HTTP 504 GATEWAY_TIMEOUT' : 'ICE_FAILED (702)',
+      errorMessage: 'Artificial incident injected by QA console.' + (simCustomNote ? ` [${simCustomNote}]` : ''),
+      stackTrace: 'Error: SimulatedException [500]\n    at IngestionWorker (test.rs:42:10)',
+      status: 'UNRESOLVED',
+      resolvedAt: null,
+      resolutionNote: null,
+    };
+
+    setErrorLogs((prev) => [newLog, ...prev]);
+    setSimulateModalOpen(false);
+    showToast('⚡ Failure Incident Injected', `${newLog.failedPart} failure logged against ${targetUser.name}.`, '⚡', 'urgent');
+  }
+
+  // 4. Grievance Adjudication
+  function handleAdjudicateGrievance(grvId: string, action: 'REFUND' | 'WARN' | 'RESOLVE') {
     setGrievances((prev) =>
-      prev.map((g) => (g.id === grievanceId ? { ...g, status: 'REFUNDED' } : g))
+      prev.map((g) => {
+        if (g.id !== grvId) return g;
+        if (action === 'REFUND') {
+          return {
+            ...g,
+            status: 'REFUNDED',
+            boardRemedy: 'Escrow Refund Disbursed (৳800)',
+            adjudication: {
+              action: 'REFUNDED',
+              date: 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              admin: 'Central Escrow Adjudication',
+              notes: 'Full consultation fee refunded to patient mobile financial wallet via automated escrow reversal.',
+            },
+          };
+        } else if (action === 'WARN') {
+          return {
+            ...g,
+            status: 'WARNED',
+            boardRemedy: 'BMDC Disciplinary Warning Logged',
+            adjudication: {
+              action: 'DOCTOR_WARNED',
+              date: 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              admin: 'Central Clinical Governance Board',
+              notes: 'Formal ethics and conduct warning issued under BMDC Code of Ethics Sec 4.',
+            },
+          };
+        } else {
+          return {
+            ...g,
+            status: 'RESOLVED',
+            boardRemedy: 'Administrative Resolution Concluded',
+            adjudication: {
+              action: 'RESOLVED',
+              date: 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              admin: 'Central Medical Operations',
+              notes: 'Dispute review concluded. Remedial actions accepted by patient and clinical team.',
+            },
+          };
+        }
+      })
     );
-    setTimeout(() => setActionMessage(null), 4000);
+
+    if (action === 'REFUND') showToast('Refund Disbursed 💳', 'Full fee refunded to patient wallet via bKash.', '💳', 'success');
+    else if (action === 'WARN') showToast('Doctor Warned ⚠️', 'Formal clinical misconduct warning registered in compliance dossier.', '⚠️', 'warning');
+    else showToast('Grievance Resolved ✓', 'Dispute claim marked as successfully resolved.', '✓', 'success');
   }
 
-  // Adjudicate Warning Action
-  async function handleAdjudicateWarning(grievanceId: string) {
-    try {
-      await fetch(`/api/v1/admin/grievances/${grievanceId}/warn`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audit_notes: 'Compliance notice issued regarding consultation conduct.',
-        }),
-      });
-    } catch {}
-
-    setActionMessage('Internal compliance warning logged on physician dossier.');
-    setGrievances((prev) =>
-      prev.map((g) => (g.id === grievanceId ? { ...g, status: 'WARNED' } : g))
+  // Log resolve toggle
+  function handleToggleLogResolve(logId: string) {
+    setErrorLogs((prev) =>
+      prev.map((l) => {
+        if (l.id !== logId) return l;
+        const isResolved = l.status === 'RESOLVED';
+        return {
+          ...l,
+          status: isResolved ? 'UNRESOLVED' : 'RESOLVED',
+          resolvedAt: isResolved ? null : 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          resolutionNote: isResolved ? null : 'Administrative resolution signed off by Clinical Ops Director.',
+        };
+      })
     );
-    setTimeout(() => setActionMessage(null), 4000);
+    showToast('Log Status Updated', 'Telemetry exception status toggled.', '🔄', 'info');
   }
 
-  // Force Release Stale Slot Lock
-  function handleForceReleaseLock(slotId: string) {
-    setSlots((prev) =>
-      prev.map((s) =>
-        s.id === slotId
-          ? { ...s, status: 'AVAILABLE', lock_session_id: undefined, lock_expires_at: undefined }
-          : s
-      )
-    );
-    setActionMessage(`Slot ${slotId} lock expired/released administratively.`);
-    setTimeout(() => setActionMessage(null), 4000);
-  }
+  // Counters
+  const unresolvedLogsCount = errorLogs.filter((l) => l.status !== 'RESOLVED').length;
+  const pendingGrievancesCount = grievances.filter((g) => g.status === 'PENDING_REVIEW' || g.status === 'INVESTIGATING').length;
 
-  // Monthly Disbursement Action
-  async function handleInitiateMonthlyDisbursement() {
-    try {
-      const res = await fetch('/api/v1/admin/disbursements/initiate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          period_start: '2026-09-01',
-          period_end: '2026-09-30',
-        }),
-      });
+  // Filtered lists
+  const filteredDoctors = Object.values(doctorStore).filter((doc) => {
+    const text = (doc.name + ' ' + doc.bmdc + ' ' + doc.meta).toLowerCase();
+    const matchesSearch = !doctorSearchQuery || text.includes(doctorSearchQuery.toLowerCase());
+    const isSettled = payoutsSettled || doc.key === 'farhana' || doc.key === 'tariqul';
+    const matchesStatus =
+      doctorStatusFilter === 'all' ? true : doctorStatusFilter === 'settled' ? isSettled : !isSettled;
+    return matchesSearch && matchesStatus;
+  });
 
-      if (res.ok) {
-        const json = await res.json();
-        const batchNumber = json.data?.batch_number || 'DISB-202609-01';
-        const totalNet = json.data?.total_net_disbursed || '1440.00';
-        setDisbursementSuccess(
-          `Batch ${batchNumber} executed: ৳${totalNet} disbursed across active physicians.`
-        );
-      } else {
-        setDisbursementSuccess(
-          'Batch DISB-202609-01 executed: ৳1,440.00 net disbursed across physicians.'
-        );
-      }
-    } catch {
-      setDisbursementSuccess(
-        'Batch DISB-202609-01 executed: ৳1,440.00 net disbursed across physicians.'
-      );
+  const filteredPatients = Object.values(patientStore).filter((pt) => {
+    const text = (pt.name + ' ' + pt.id + ' ' + pt.meta + ' ' + pt.cohort).toLowerCase();
+    const matchesSearch = !patientSearchQuery || text.includes(patientSearchQuery.toLowerCase());
+    const matchesCat =
+      patientFilterCategory === 'all'
+        ? true
+        : patientFilterCategory === 'chronic'
+        ? pt.category.includes('chronic')
+        : patientFilterCategory === 'chat'
+        ? pt.category.includes('chat')
+        : pt.category.includes('pediatric');
+    return matchesSearch && matchesCat;
+  });
+
+  const filteredLogs = errorLogs.filter((log) => {
+    if (logQuickFilter === 'critical' && log.severity !== 'CRITICAL') return false;
+    if (logQuickFilter === 'payment' && log.subsystem !== 'Payment Gateway') return false;
+    if (logQuickFilter === 'webrtc' && log.subsystem !== 'Agora WebRTC') return false;
+    if (logQuickFilter === 'offline' && log.subsystem !== 'Sync & Offline Cache') return false;
+    if (logQuickFilter === 'unresolved' && log.status === 'RESOLVED') return false;
+
+    if (logSeverityFilter !== 'ALL' && log.severity !== logSeverityFilter) return false;
+    if (logSubsystemFilter !== 'ALL' && log.subsystem !== logSubsystemFilter) return false;
+    if (logStatusFilter !== 'ALL' && log.status !== logStatusFilter) return false;
+
+    if (logSearchQuery) {
+      const q = logSearchQuery.toLowerCase();
+      const text = (log.user.name + ' ' + log.traceId + ' ' + log.errorMessage + ' ' + log.subsystem + ' ' + log.errorCode).toLowerCase();
+      if (!text.includes(q)) return false;
     }
-
-    setDisbursementModalOpen(false);
-    setTimeout(() => setDisbursementSuccess(null), 6000);
-  }
-
-  // Filtered doctors list
-  const filteredDoctors = doctors.filter((doc) => {
-    const matchesSearch =
-      doc.full_name.toLowerCase().includes(searchDoctorQuery.toLowerCase()) ||
-      doc.license_number.toLowerCase().includes(searchDoctorQuery.toLowerCase()) ||
-      doc.primary_specialty.toLowerCase().includes(searchDoctorQuery.toLowerCase());
-
-    if (!matchesSearch) return false;
-    if (docFilterStatus === 'all') return true;
-    if (docFilterStatus === 'pending') return doc.statusText.includes('Pending');
-    if (docFilterStatus === 'settled') return doc.statusText.includes('Settled');
     return true;
   });
 
-  const activeDoctorsCount = doctors.filter((d) => d.is_on_duty).length;
-  const pendingGrievancesCount = grievances.filter((g) => g.status === 'PENDING_REVIEW').length;
+  const filteredGrievances = grievances.filter((grv) => {
+    if (grievanceQuickFilter === 'doctor' && grv.target !== 'DOCTOR') return false;
+    if (grievanceQuickFilter === 'system' && grv.target !== 'SYSTEM') return false;
+    if (grievanceQuickFilter === 'pending' && !(grv.status === 'PENDING_REVIEW' || grv.status === 'INVESTIGATING')) return false;
+
+    if (grievanceTargetFilter !== 'ALL' && grv.target !== grievanceTargetFilter) return false;
+    if (grievanceStatusFilter !== 'ALL' && grv.status !== grievanceStatusFilter) return false;
+
+    if (grievanceSearchQuery) {
+      const q = grievanceSearchQuery.toLowerCase();
+      const text = (grv.id + ' ' + grv.patient.name + ' ' + grv.doctor.name + ' ' + grv.category + ' ' + grv.patientStatement).toLowerCase();
+      if (!text.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const filteredTransactions = transactions.filter((tx) => {
+    if (financeTypeFilter === 'INFLOW' && tx.direction !== 'INFLOW') return false;
+    if (financeTypeFilter === 'ESCROW' && tx.escrowStatus !== 'ESCROW_LOCKED') return false;
+    if (financeTypeFilter === 'PAYOUT' && tx.type !== 'PAYOUT') return false;
+    if (financeTypeFilter === 'REFUND' && tx.direction !== 'REFUND') return false;
+
+    if (financeGatewayFilter !== 'ALL' && tx.gateway !== financeGatewayFilter) return false;
+
+    if (financeSearchQuery) {
+      const q = financeSearchQuery.toLowerCase();
+      const text = (tx.txId + ' ' + tx.gatewayRef + ' ' + tx.patient.name + ' ' + tx.doctor.name + ' ' + tx.consultationId).toLowerCase();
+      if (!text.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Selected Modal Objects
+  const selectedDocObj = selectedDoctorKey ? doctorStore[selectedDoctorKey] || doctorStore.sabrina : null;
+  const selectedPatObj = selectedPatientKey ? patientStore[selectedPatientKey] || patientStore.sarah : null;
+  const selectedLogObj = selectedLogId ? errorLogs.find((l) => l.id === selectedLogId) : null;
+  const selectedGrvObj = selectedGrievanceId ? grievances.find((g) => g.id === selectedGrievanceId) : null;
+  const selectedTxObj = selectedTransactionId ? transactions.find((t) => t.txId === selectedTransactionId) : null;
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-sans">
-      {/* Left Sidebar */}
-      <Sidebar
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        pendingGrievancesCount={pendingGrievancesCount}
-      />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Topbar
-          title={
-            activeTab === 'command'
-              ? 'Command Center'
-              : activeTab === 'settlements'
-              ? 'Settlements & Doctor Payouts'
-              : activeTab === 'payments'
-              ? 'All Transactions & Payment Holds'
-              : activeTab === 'grievances'
-              ? 'Consultation Grievance Adjudication'
-              : activeTab === 'bmdc'
-              ? 'BMDC Credentialing & Physician Dossiers'
-              : activeTab === 'slots'
-              ? 'Slot Matrix & Locking Engine'
-              : activeTab === 'patients'
-              ? 'Patients Directory'
-              : 'Subsystem Incident & Error Logs'
-          }
-          subtitle="Real-time healthcare platform governance & clinical telemetry oversight"
-          activeDoctorsCount={activeDoctorsCount}
-        />
-
-        {/* Action / Notification Banner */}
-        {actionMessage && (
-          <div className="bg-blue-600 text-white text-xs font-semibold px-6 py-2.5 flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{actionMessage}</span>
+    <div id="adminPortalShell" className="admin-portal-shell">
+      {/* Toast Overlay */}
+      <div id="adminToastContainer" className="app-toast-container" style={{ position: 'fixed', top: '70px', right: '24px', left: 'auto', width: '360px', zIndex: 9999 }}>
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            style={{
+              background: '#0F172A',
+              color: '#FFFFFF',
+              borderRadius: '12px',
+              padding: '12px 16px',
+              marginBottom: '10px',
+              boxShadow: '0 10px 25px -5px rgba(0,0,0,0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              animation: 'fadeIn 0.2s ease',
+            }}
+          >
+            <div style={{ fontSize: '18px' }}>{t.icon}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 800, fontSize: '12.5px', color: '#38BDF8' }}>{t.title}</div>
+              <div style={{ fontSize: '11px', color: '#CBD5E1', marginTop: '2px' }}>{t.message}</div>
             </div>
-            <button
-              onClick={() => setActionMessage(null)}
-              className="text-blue-100 hover:text-white text-xs underline"
-            >
-              Dismiss
-            </button>
           </div>
-        )}
+        ))}
+      </div>
 
-        {disbursementSuccess && (
-          <div className="bg-emerald-600 text-white text-xs font-semibold px-6 py-2.5 flex items-center justify-between shadow-xs">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{disbursementSuccess}</span>
-            </div>
-            <button
-              onClick={() => setDisbursementSuccess(null)}
-              className="text-emerald-100 hover:text-white text-xs underline"
-            >
-              Dismiss
-            </button>
+      {/* ── Left Sidebar (Full Height, Pure White) ── */}
+      <aside className="admin-sidebar">
+        <div className="admin-sidebar-header">
+          <div className="admin-brand-icon">H</div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span className="admin-brand-name">HelloDoctor</span>
+            <span style={{ fontSize: '9.5px', color: '#64748B', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Central Admin</span>
           </div>
-        )}
+        </div>
 
-        {/* Scrollable Viewport */}
-        <main className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* TAB 1: COMMAND CENTER */}
-          {activeTab === 'command' && (
-            <div className="space-y-6">
-              {/* Top KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
-                  <div className="flex items-center justify-between text-slate-500 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      Active Consultations
-                    </span>
-                    <Activity className="w-4 h-4 text-emerald-500 animate-pulse" />
-                  </div>
-                  <div className="text-2xl font-black text-slate-900">{activeRooms.length} Rooms</div>
-                  <div className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    <span>Agora SD-RTN Live Channels</span>
-                  </div>
-                </div>
+        <nav className="admin-sidebar-nav">
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'doctors' ? 'active' : ''}`}
+            id="adminNav-doctors"
+            onClick={() => setActiveAdminPage('doctors')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
+            <span>Settlements &amp; Payouts</span>
+            <span className="admin-nav-badge amber">{payoutsSettled ? 'Settled' : '4 Pending'}</span>
+          </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
-                  <div className="flex items-center justify-between text-slate-500 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      Total Platform Revenue
-                    </span>
-                    <Receipt className="w-4 h-4 text-sky-500" />
-                  </div>
-                  <div className="text-2xl font-black text-slate-900">৳890,000</div>
-                  <div className="text-[11px] text-slate-500 font-semibold mt-1">
-                    Platform Fee (20%): <span className="text-sky-600 font-bold">৳178,000</span>
-                  </div>
-                </div>
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'finance' ? 'active' : ''}`}
+            id="adminNav-finance"
+            onClick={() => setActiveAdminPage('finance')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            <span>All Payments &amp; Escrow</span>
+            <span className="admin-nav-badge green" style={{ background: '#DCFCE7', color: '#166534', fontWeight: 800 }}>Ledger</span>
+          </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
-                  <div className="flex items-center justify-between text-slate-500 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      Physicians On-Duty
-                    </span>
-                    <Stethoscope className="w-4 h-4 text-indigo-500" />
-                  </div>
-                  <div className="text-2xl font-black text-slate-900">
-                    {activeDoctorsCount} Verified
-                  </div>
-                  <div className="text-[11px] text-indigo-600 font-semibold mt-1">
-                    BMDC credentials authenticated
-                  </div>
-                </div>
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'command' ? 'active' : ''}`}
+            id="adminNav-command"
+            onClick={() => setActiveAdminPage('command')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span>Command Center</span>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981', marginLeft: 'auto' }}></span>
+          </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs">
-                  <div className="flex items-center justify-between text-slate-500 mb-2">
-                    <span className="text-xs font-bold uppercase tracking-wider">
-                      Disputes Pending
-                    </span>
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  </div>
-                  <div className="text-2xl font-black text-slate-900">
-                    {pendingGrievancesCount} Cases
-                  </div>
-                  <div className="text-[11px] text-amber-600 font-semibold mt-1">
-                    Medical board review required
-                  </div>
-                </div>
-              </div>
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'slots' ? 'active' : ''}`}
+            id="adminNav-slots"
+            onClick={() => setActiveAdminPage('slots')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>Slot Matrix &amp; Locks</span>
+          </div>
 
-              {/* Real-Time Live Agora Consultation Channels */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Video className="w-4 h-4 text-emerald-600" />
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Live Agora RTC Channels (Real-Time In-Flight Calls)
-                    </h3>
-                  </div>
-                  <span className="text-xs font-mono font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                    {activeRooms.length} Active Sessions
-                  </span>
-                </div>
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'patients' ? 'active' : ''}`}
+            id="adminNav-patients"
+            onClick={() => setActiveAdminPage('patients')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Patients Directory</span>
+          </div>
 
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Agora UUID Channel</th>
-                      <th className="py-3 px-4">Physician (Click to view)</th>
-                      <th className="py-3 px-4">Patient Phone</th>
-                      <th className="py-3 px-4">Modality</th>
-                      <th className="py-3 px-4">Call Duration</th>
-                      <th className="py-3 px-4">Video Packet Loss</th>
-                      <th className="py-3 px-4">Bitrate</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 font-mono">
-                    {activeRooms.map((room) => {
-                      const matchedDoc = doctors.find((d) => d.full_name === room.doctor_name);
-                      return (
-                        <tr key={room.channel_name} className="hover:bg-slate-50">
-                          <td className="py-3.5 px-4 font-bold text-slate-800">{room.channel_name}</td>
-                          <td className="py-3.5 px-4 font-sans font-semibold text-blue-600">
-                            <button
-                              onClick={() => matchedDoc && setSelectedDoctorForModal(matchedDoc)}
-                              className="hover:underline flex items-center gap-1"
-                            >
-                              <span>{room.doctor_name}</span>
-                              <ExternalLink className="w-3 h-3 text-slate-400" />
-                            </button>
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600">{room.patient_phone}</td>
-                          <td className="py-3.5 px-4 font-sans">
-                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold">
-                              {room.modality}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-800">
-                            {Math.floor(room.duration_seconds / 60)}m {room.duration_seconds % 60}s
-                          </td>
-                          <td className="py-3.5 px-4 font-semibold text-emerald-600">
-                            {room.video_packet_loss}
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-500">{room.bitrate_kbps} kbps</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'bmdc' ? 'active' : ''}`}
+            id="adminNav-bmdc"
+            onClick={() => setActiveAdminPage('bmdc')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
+            <span>BMDC Credentialing</span>
+            <span className="admin-nav-badge blue">3</span>
+          </div>
 
-              {/* Subsystem Health Status */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                    System Subsystems & Compliance Health
-                  </h3>
-                  <span className="text-[11px] font-bold text-slate-400">
-                    Auto-Heartbeat (10s)
-                  </span>
-                </div>
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'compliance' ? 'active' : ''}`}
+            id="adminNav-compliance"
+            onClick={() => setActiveAdminPage('compliance')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span>Rx &amp; Q&amp;A Audit</span>
+          </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                    <div className="text-slate-500 text-[11px]">MFS bKash Gateway</div>
-                    <div className="text-emerald-700 font-bold mt-1 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      99.98% Operational
-                    </div>
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                    <div className="text-slate-500 text-[11px]">Agora Video RTC</div>
-                    <div className="text-emerald-700 font-bold mt-1 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      99.99% Low Latency
-                    </div>
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                    <div className="text-slate-500 text-[11px]">PostgreSQL RLS</div>
-                    <div className="text-emerald-700 font-bold mt-1 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      ENFORCED (No Bypass)
-                    </div>
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                    <div className="text-slate-500 text-[11px]">S3 Intake Storage</div>
-                    <div className="text-emerald-700 font-bold mt-1 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                      AES-256 Encrypted
-                    </div>
-                  </div>
-                </div>
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'logs' ? 'active' : ''}`}
+            id="adminNav-logs"
+            onClick={() => setActiveAdminPage('logs')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <span>App Error &amp; Incident Logs</span>
+            <span className="admin-nav-badge red" id="adminLogsNavBadge" style={{ background: '#FEE2E2', color: '#DC2626', fontWeight: 800 }}>
+              {unresolvedLogsCount > 0 ? `${unresolvedLogsCount} New` : 'All Clear'}
+            </span>
+          </div>
+
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'grievances' ? 'active' : ''}`}
+            id="adminNav-grievances"
+            onClick={() => setActiveAdminPage('grievances')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span>Consultation Grievances</span>
+            <span className="admin-nav-badge red" id="adminGrievanceNavBadge" style={{ background: '#FEE2E2', color: '#DC2626', fontWeight: 800 }}>
+              {pendingGrievancesCount > 0 ? `${pendingGrievancesCount} Open` : '0'}
+            </span>
+          </div>
+        </nav>
+
+        <div className="admin-sidebar-footer">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981' }}></span>
+            <span style={{ fontWeight: 700, color: '#475569' }}>Core Gateway v2.4</span>
+          </div>
+          <span style={{ color: '#94A3B8' }}>DGHS Uplink</span>
+        </div>
+      </aside>
+
+      {/* Main Wrapper (Topbar + Content Area) */}
+      <div className="admin-main-wrapper">
+        <header className="admin-topbar">
+          <div className="admin-topbar-left">
+            <h1 className="admin-page-title" id="adminPageHeaderTitle">
+              {PAGE_METADATA[activeAdminPage].title}
+            </h1>
+            <span className="admin-breadcrumb" id="adminBreadcrumb">
+              {PAGE_METADATA[activeAdminPage].breadcrumb}
+            </span>
+          </div>
+
+          <div className="admin-topbar-right">
+            <div className="admin-search-box">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input
+                type="text"
+                id="adminGlobalSearchInput"
+                placeholder="Search doctor, BMDC #, patient ID, TxID..."
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDoctorSearchQuery(val);
+                  setPatientSearchQuery(val);
+                  setLogSearchQuery(val);
+                  setFinanceSearchQuery(val);
+                }}
+              />
+            </div>
+
+            <button
+              className="admin-16263-btn"
+              onClick={() => showToast('16263 Emergency Bridge Active 🚨', 'Direct audio interconnect routed to DGHS National Health Call Center.', '🚨', 'urgent')}
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#DC2626' }}></span>
+              <span>🚨 16263 Helpline Bridge</span>
+            </button>
+
+            <div
+              className="admin-top-icon-btn"
+              title="Pending Notifications"
+              onClick={() => showToast('Central Notifications', '3 BMDC physician applications pending review.', '🔔', 'info')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span className="badge-dot"></span>
+            </div>
+
+            <div className="admin-user-pill">
+              <div className="admin-avatar">AR</div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span className="admin-user-name">Amina Rashid</span>
+                <span className="admin-user-role">Clinical Ops Director</span>
               </div>
             </div>
-          )}
+          </div>
+        </header>
 
-          {/* TAB 2: SETTLEMENTS & DOCTOR PAYOUTS */}
-          {activeTab === 'settlements' && (
-            <div className="space-y-6">
-              {/* Mandatory 20% platform charge notice */}
-              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
-                    20%
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-amber-900 leading-tight">
-                      Platform Charge Debarment Policy
-                    </h4>
-                    <p className="text-[11px] text-amber-700 mt-0.5">
-                      Doctor earnings are strictly based on consultation fee minus the 20% platform charge. Doctors view their earnings Breakdown (Gross, 20% withheld fee, 80% net) but cannot withdraw directly. Payouts are executed monthly in bulk batches by Finance Admin.
-                    </p>
+        {/* Scrollable Canvas Area */}
+        <main className="admin-content-area">
+
+          {/* PAGE 1: SETTLEMENTS & DOCTOR WALLET PAYOUTS */}
+          {activeAdminPage === 'doctors' && (
+            <div className="admin-page-view active" id="adminPage_doctors">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 850, color: '#0F172A', margin: 0, letterSpacing: '-0.4px' }}>
+                    Doctor Wallet Payout Dashboard
+                  </h2>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                    Automated 20% platform commission reconciliation and multi-channel payouts
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setDisbursementModalOpen(true)}
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Execute Monthly Payout Batch</span>
-                </button>
-              </div>
-
-              {/* Doctors Filter & Search Bar */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
-                    <input
-                      type="text"
-                      placeholder="Search doctor, BMDC #, specialty..."
-                      value={searchDoctorQuery}
-                      onChange={(e) => setSearchDoctorQuery(e.target.value)}
-                      className="pl-8 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 w-64"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5 ml-2">
-                    <button
-                      onClick={() => setDocFilterStatus('all')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                        docFilterStatus === 'all'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      All ({doctors.length})
-                    </button>
-                    <button
-                      onClick={() => setDocFilterStatus('pending')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                        docFilterStatus === 'pending'
-                          ? 'bg-amber-600 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      Pending (4)
-                    </button>
-                    <button
-                      onClick={() => setDocFilterStatus('settled')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                        docFilterStatus === 'settled'
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      Settled (2)
-                    </button>
-                  </div>
-                </div>
-
-                <span className="text-xs text-slate-500 font-medium">
-                  💡 Tip: Click <strong>any doctor row</strong> to inspect the complete history and dossier.
-                </span>
-              </div>
-
-              {/* Doctor Wallets Table matching prototype */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    Telehealth Financial Settlement & Physician Dossiers
-                  </h3>
-                  <span className="text-xs text-slate-500">
-                    {filteredDoctors.length} Doctors Displayed
-                  </span>
-                </div>
-
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Doctor Name</th>
-                      <th className="py-3 px-4">BMDC Reg</th>
-                      <th className="py-3 px-4">Completed Visits</th>
-                      <th className="py-3 px-4">24h Chat Sessions</th>
-                      <th className="py-3 px-4">Gross Earnings</th>
-                      <th className="py-3 px-4">Platform Cut (20%)</th>
-                      <th className="py-3 px-4">Net Payout (80%)</th>
-                      <th className="py-3 px-4">Payout Method</th>
-                      <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredDoctors.map((doc) => (
-                      <tr
-                        key={doc.id}
-                        onClick={() => setSelectedDoctorForModal(doc)}
-                        className="hover:bg-blue-50/60 transition-colors cursor-pointer group"
-                      >
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <div
-                              style={{ backgroundColor: doc.bgColor }}
-                              className="w-8 h-8 rounded-full text-white flex items-center justify-center font-bold text-xs flex-shrink-0"
-                            >
-                              {doc.avatar}
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
-                                <span>{doc.full_name}</span>
-                              </div>
-                              <div className="text-[11px] text-slate-500">
-                                {doc.primary_specialty} • {doc.current_hospital}
-                              </div>
-                              <div className="text-[10px] text-blue-600 font-mono mt-0.5">
-                                📞 {doc.verified_phone}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-700">
-                          <span className="px-2 py-0.5 bg-slate-100 rounded-md">
-                            {doc.license_number}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-slate-900">
-                          {doc.completedVisits}
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-600">
-                          {doc.chatSessions}
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-slate-900">
-                          ৳ {doc.grossEarnings}
-                        </td>
-                        <td className="py-3.5 px-4 font-semibold text-rose-600">
-                          -৳ {doc.platformCut}
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-emerald-600 text-sm">
-                          ৳ {doc.netPayout}
-                        </td>
-                        <td className="py-3.5 px-4 font-semibold text-slate-700">
-                          <span className="px-2 py-0.5 bg-slate-100 rounded-md text-[10px] font-bold">
-                            {doc.payoutMethod}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              doc.statusText.includes('Settled')
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}
-                          >
-                            {doc.statusText}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedDoctorForModal(doc);
-                            }}
-                            className="px-2.5 py-1 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors inline-flex items-center gap-1"
-                          >
-                            <span>View History</span>
-                            <ArrowUpRight className="w-3 h-3" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: ALL PAYMENTS & PAYMENT HOLDS */}
-          {activeTab === 'payments' && (
-            <div className="space-y-6">
-              {/* Filter controls */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-600">Gateway Filter:</span>
-                  {['ALL', 'BKASH', 'NAGAD'].map((gw) => (
-                    <button
-                      key={gw}
-                      onClick={() => setSelectedGatewayFilter(gw)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                        selectedGatewayFilter === gw
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      {gw}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="text-xs text-slate-500 font-medium">
-                  Showing transactions across <strong>BKASH</strong> and <strong>NAGAD</strong> MFS rails
-                </div>
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Payment Holding Ledger
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Two-stage held funds are transferred to doctor wallets only upon verified consultation completion.
-                    </p>
-                  </div>
-                  <span className="text-xs font-bold text-slate-500">
-                    Canonical Status: PAYMENT_HELD
-                  </span>
-                </div>
-
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Transaction ID</th>
-                      <th className="py-3 px-4">Payment Session ID</th>
-                      <th className="py-3 px-4">Gateway</th>
-                      <th className="py-3 px-4">Gateway Ref</th>
-                      <th className="py-3 px-4">Gross</th>
-                      <th className="py-3 px-4">20% Platform Fee</th>
-                      <th className="py-3 px-4">80% Net</th>
-                      <th className="py-3 px-4">Payment Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {transactions
-                      .filter(
-                        (t) =>
-                          selectedGatewayFilter === 'ALL' || t.gateway === selectedGatewayFilter
-                      )
-                      .map((t) => (
-                        <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3.5 px-4 font-mono font-bold text-slate-900">
-                            {t.transaction_number}
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-slate-500 text-[11px]">
-                            {t.payment_session_id}
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-700">
-                            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800">
-                              {t.gateway}
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-slate-500 text-[11px]">
-                            {t.gateway_reference || 'N/A'}
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-slate-900">
-                            ৳{t.gross_amount}
-                          </td>
-                          <td className="py-3.5 px-4 font-semibold text-rose-600">
-                            -৳{t.platform_fee_amount}
-                          </td>
-                          <td className="py-3.5 px-4 font-bold text-emerald-600">
-                            ৳{t.net_amount}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                                t.payment_status === 'PAYMENT_HELD'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : t.payment_status === 'SETTLED_TO_DOCTOR'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : t.payment_status === 'REFUNDED_TO_PATIENT'
-                                  ? 'bg-rose-100 text-rose-800'
-                                  : 'bg-slate-100 text-slate-800'
-                              }`}
-                            >
-                              {t.payment_status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: CONSULTATION GRIEVANCES */}
-          {activeTab === 'grievances' && (
-            <div className="space-y-6">
-              <div className="p-4 bg-sky-50 border border-sky-200 rounded-2xl flex items-center gap-3">
-                <ShieldAlert className="w-5 h-5 text-sky-600 flex-shrink-0" />
-                <div className="text-xs text-sky-900">
-                  <span className="font-bold">Star-Rating-Free Adjudication:</span> Patient disputes are evaluated against recorded Agora session telemetry (call duration, packet loss, premature end status) to protect both patient rights and physician reputations without subjective star ratings.
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {grievances.map((g) => (
-                  <div
-                    key={g.id}
-                    className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-4"
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <button
+                    className="admin-action-btn"
+                    onClick={() => setActiveAdminPage('finance')}
+                    style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#1E293B', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '9px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginRight: '8px' }}
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-bold text-slate-900">
-                            {g.grievance_number}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              g.status === 'PENDING_REVIEW'
-                                ? 'bg-amber-100 text-amber-800'
-                                : g.status === 'REFUNDED'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : g.status === 'WARNED'
-                                ? 'bg-indigo-100 text-indigo-800'
-                                : 'bg-slate-100 text-slate-800'
-                            }`}
-                          >
-                            {g.status}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-bold text-slate-900 mt-1">
-                          Category: {g.category}
-                        </h4>
-                      </div>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                    <span>Master Payment Ledger →</span>
+                  </button>
+                  <button className="admin-batch-payout-btn" onClick={handleExecuteBatchPayout}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span>Process Batch Payout</span>
+                    <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '10.5px', marginLeft: '4px' }}>bKash + Nagad</span>
+                  </button>
+                </div>
+              </div>
 
-                      <div className="text-[11px] text-slate-400 font-medium">
-                        Filed {new Date(g.created_at).toLocaleTimeString()}
+              {/* 4 Metric Cards with Micro-Charts */}
+              <div className="admin-kpi-grid">
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Gross Telehealth Revenue</span>
+                    <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val">৳ 2,450,000</div>
+                  <span className="admin-kpi-delta up">↗ +8.5% this month</span>
+                  <div className="kpi-micro-chart kpi-sparkline">
+                    <svg viewBox="0 0 200 36" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="sparkGradRev" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#059669" stopOpacity="0.2"/>
+                          <stop offset="100%" stopColor="#059669" stopOpacity="0"/>
+                        </linearGradient>
+                      </defs>
+                      <path d="M0 30 L33 26 L66 28 L100 20 L133 16 L166 12 L200 4 L200 36 L0 36 Z" fill="url(#sparkGradRev)"/>
+                      <polyline points="0,30 33,26 66,28 100,20 133,16 166,12 200,4" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round"/>
+                      <circle cx="200" cy="4" r="2.5" fill="#059669" stroke="#fff" strokeWidth="1.5"/>
+                    </svg>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#94A3B8', padding: '0 2px', marginTop: '1px' }}>
+                      <span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span style={{ color: '#059669', fontWeight: 700 }}>Oct</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">24h Chat Revenue (৳ 300 tier)</span>
+                    <div className="admin-kpi-icon-circle blue" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val">৳ 380,000</div>
+                  <div className="kpi-micro-chart">
+                    <div className="kpi-donut-wrap">
+                      <svg viewBox="0 0 42 42">
+                        <circle cx="21" cy="21" r="16" fill="none" stroke="#E2E8F0" strokeWidth="5"/>
+                        <circle cx="21" cy="21" r="16" fill="none" stroke="#2563EB" strokeWidth="5" strokeDasharray="62 38.5" strokeDashoffset="25" strokeLinecap="round"/>
+                        <text x="21" y="23" textAnchor="middle" fontSize="9" fontWeight="800" fill="#2563EB">62%</text>
+                      </svg>
+                      <div className="kpi-donut-legend">
+                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#2563EB' }}></span> 784 New Users</div>
+                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#E2E8F0' }}></span> 483 Returning</div>
+                        <div className="kpi-donut-legend-item" style={{ fontWeight: 700, color: '#0F172A', marginTop: '1px' }}>1,267 total sessions</div>
                       </div>
                     </div>
+                  </div>
+                </div>
 
-                    <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      "{g.claim_summary}"
-                    </p>
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Platform Fee (20%)</span>
+                    <div className="admin-kpi-icon-circle teal" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val">৳ 490,000</div>
+                  <span className="admin-kpi-delta neutral">Automated commission cut</span>
+                  <div className="kpi-micro-chart kpi-stacked-bar">
+                    <div className="kpi-bar-row">
+                      <span className="kpi-bar-label">Video</span>
+                      <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: '78%', background: 'linear-gradient(90deg,#0D9488,#5EEAD4)' }}></div></div>
+                      <span className="kpi-bar-value">৳ 382k</span>
+                    </div>
+                    <div className="kpi-bar-row">
+                      <span className="kpi-bar-label">Chat</span>
+                      <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: '22%', background: 'linear-gradient(90deg,#14B8A6,#99F6E4)' }}></div></div>
+                      <span className="kpi-bar-value">৳ 108k</span>
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Telemetry Evidence Box */}
-                    {g.telemetry && (
-                      <div className="bg-slate-900 text-white rounded-xl p-3 text-xs flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Activity className="w-4 h-4 text-emerald-400" />
-                          <span className="font-bold text-slate-300">
-                            Agora Session Telemetry Evidence:
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-[11px] font-mono">
-                          <span>
-                            Duration:{' '}
-                            <strong className="text-amber-400">
-                              {g.telemetry.call_duration_seconds}s
-                            </strong>{' '}
-                            (Premature: {g.telemetry.premature_end ? 'YES' : 'NO'})
-                          </span>
-                          <span>Packet Loss: {g.telemetry.packet_loss_percent}%</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Adjudication Action Buttons */}
-                    {g.status === 'PENDING_REVIEW' && (
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                        <button
-                          onClick={() => handleAdjudicateWarning(g.id)}
-                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold transition-colors"
-                        >
-                          Issue Physician Warning
-                        </button>
-                        <button
-                          onClick={() => handleAdjudicateRefund(g.id)}
-                          className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center gap-1.5"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Disburse Patient Refund</span>
-                        </button>
-                      </div>
+                <div className="admin-kpi-card" style={{ borderColor: '#FCD34D' }}>
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Pending Doctor Wallet Escrow</span>
+                    <div className="admin-kpi-icon-circle amber" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val" id="adminEscrowDisplay">
+                    {payoutsSettled ? (
+                      <span style={{ color: '#059669', fontSize: '20px' }}>৳ 0 (Disbursed)</span>
+                    ) : (
+                      escrowTotal
                     )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: BMDC CREDENTIALING */}
-          {activeTab === 'bmdc' && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {doctors.map((doc) => (
-                  <div
-                    key={doc.id}
-                    onClick={() => setSelectedDoctorForModal(doc)}
-                    className="bg-white border border-slate-200 rounded-2xl p-5 shadow-2xs space-y-4 hover:border-blue-300 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div
-                          style={{ backgroundColor: doc.bgColor }}
-                          className="w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-sm shadow-xs"
-                        >
-                          {doc.avatar}
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors leading-tight">
-                            {doc.full_name}
-                          </h4>
-                          <span className="text-xs text-slate-500 font-medium">
-                            {doc.primary_specialty} • {doc.experience_years} Years Exp
-                          </span>
-                        </div>
-                      </div>
-
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold">
-                        BMDC VERIFIED
+                  <div className="kpi-micro-chart">
+                    <div className="kpi-pulse-indicator" style={{ marginBottom: '4px' }}>
+                      <div className="kpi-pulse-dot" style={{ background: '#D97706' }}></div>
+                      <span className="kpi-pulse-text" style={{ color: '#D97706' }}>
+                        {payoutsSettled ? 'All 14 doctors settled' : '14 doctors awaiting disbursement'}
                       </span>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
-                      <div>
-                        <div className="text-[10px] text-slate-400 uppercase font-bold">
-                          License Number
-                        </div>
-                        <div className="font-mono font-bold text-slate-800">
-                          {doc.license_number}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] text-slate-400 uppercase font-bold">
-                          Current Hospital
-                        </div>
-                        <div className="font-semibold text-slate-800 truncate">
-                          {doc.current_hospital}
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <div className="text-[10px] text-slate-400 uppercase font-bold">
-                          Phone Contact
-                        </div>
-                        <div className="font-semibold text-slate-800">
-                          {doc.verified_phone}
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <div className="text-[10px] text-slate-400 uppercase font-bold">
-                          Duty Status
-                        </div>
-                        <div className="font-bold text-emerald-600">
-                          {doc.is_on_duty ? 'ON DUTY (Active)' : 'OFF DUTY'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="flex flex-wrap gap-1">
-                        {doc.qualifications.map((q) => (
-                          <span
-                            key={q}
-                            className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold"
-                          >
-                            {q}
-                          </span>
-                        ))}
-                      </div>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedDoctorForModal(doc);
-                        }}
-                        className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
-                      >
-                        <span>Open Dossier</span>
-                        <ArrowUpRight className="w-3.5 h-3.5" />
-                      </button>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <span style={{ fontSize: '9.5px', background: '#FEF3C7', color: '#92400E', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>bKash × 8</span>
+                      <span style={{ fontSize: '9.5px', background: '#FEF3C7', color: '#92400E', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>Nagad × 4</span>
+                      <span style={{ fontSize: '9.5px', background: '#FEF3C7', color: '#92400E', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>BEFTN × 2</span>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
-            </div>
-          )}
 
-          {/* TAB 6: SLOT MATRIX & LOCKING ENGINE */}
-          {activeTab === 'slots' && (
-            <div className="space-y-6">
-              <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-800 flex items-center justify-center font-bold">
-                    <Clock className="w-5 h-5 text-indigo-600" />
-                  </div>
+              {/* Pending Doctor Payout Disbursements Table */}
+              <div className="admin-card">
+                <div className="admin-card-header" style={{ flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
                   <div>
-                    <h4 className="text-xs font-bold text-indigo-900 leading-tight">
-                      Two-Stage Slot Locking Engine (10-Minute Lock TTL)
-                    </h4>
-                    <p className="text-[11px] text-indigo-700 mt-0.5">
-                      Slots transition from AVAILABLE → LOCKED_IN_PAYMENT upon booking checkout. If payment is unconfirmed after 10 minutes, the background lock sweeper automatically restores the slot to AVAILABLE.
-                    </p>
+                    <div className="admin-card-title">Physician Directory &amp; Wallet Payout Database</div>
+                    <div className="admin-card-subtitle">Search, filter &amp; audit BMDC specialists, consultation loads, and payment settlements</div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', minWidth: '240px', maxWidth: '320px' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                      <input
+                        type="text"
+                        placeholder="Search doctor, BMDC #, specialty, method..."
+                        value={doctorSearchQuery}
+                        onChange={(e) => setDoctorSearchQuery(e.target.value)}
+                        style={{ width: '100%', padding: '7px 12px 7px 30px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className={`admin-filter-pill ${doctorStatusFilter === 'all' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('all')}>All (6)</button>
+                      <button className={`admin-filter-pill ${doctorStatusFilter === 'pending' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('pending')}>Pending (4)</button>
+                      <button className={`admin-filter-pill ${doctorStatusFilter === 'settled' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('settled')}>Settled (2)</button>
+                    </div>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setActionMessage('Background lock sweeper triggered: Stale locks reclaimed.');
-                    setTimeout(() => setActionMessage(null), 4000);
-                  }}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-2"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Run Lock Sweeper</span>
-                </button>
-              </div>
-
-              {/* Slot Table */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    Active Doctor Slot Matrix
-                  </h3>
-                  <span className="text-xs text-slate-500 font-semibold">
-                    {slots.length} Total Registered Slots
-                  </span>
-                </div>
-
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Slot ID</th>
-                      <th className="py-3 px-4">Assigned Doctor</th>
-                      <th className="py-3 px-4">Time Window</th>
-                      <th className="py-3 px-4">Slot Status</th>
-                      <th className="py-3 px-4">Payment Lock Session</th>
-                      <th className="py-3 px-4">Lock TTL / Expiry</th>
-                      <th className="py-3 px-4 text-right">Admin Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {slots.map((slot) => (
-                      <tr key={slot.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-900">{slot.id}</td>
-                        <td className="py-3.5 px-4 font-semibold text-slate-800">{slot.doctor_name}</td>
-                        <td className="py-3.5 px-4 text-slate-600">
-                          {new Date(slot.start_time).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}{' '}
-                          -{' '}
-                          {new Date(slot.end_time).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                              slot.status === 'AVAILABLE'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : slot.status === 'LOCKED_IN_PAYMENT'
-                                ? 'bg-amber-100 text-amber-800 animate-pulse'
-                                : slot.status === 'BOOKED'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-slate-100 text-slate-700'
-                            }`}
-                          >
-                            {slot.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-500 text-[11px]">
-                          {slot.lock_session_id || '—'}
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-600">
-                          {slot.lock_expires_at ? (
-                            <span className="text-amber-600 font-bold">
-                              {new Date(slot.lock_expires_at).toLocaleTimeString()}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          {slot.status === 'LOCKED_IN_PAYMENT' && (
-                            <button
-                              onClick={() => handleForceReleaseLock(slot.id)}
-                              className="px-2.5 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors flex items-center gap-1 inline-flex"
-                            >
-                              <Unlock className="w-3 h-3" />
-                              <span>Release Lock</span>
-                            </button>
-                          )}
-                        </td>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Doctor Name</th>
+                        <th>BMDC Reg</th>
+                        <th>Completed Visits</th>
+                        <th>24h Chat Sessions</th>
+                        <th>Gross Earnings</th>
+                        <th>Platform Cut</th>
+                        <th>Net Payout (৳)</th>
+                        <th>Payout Method</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filteredDoctors.map((doc) => {
+                        const isSettled = payoutsSettled || doc.key === 'farhana' || doc.key === 'tariqul';
+                        return (
+                          <tr
+                            key={doc.key}
+                            className="admin-clickable-row"
+                            onClick={() => setSelectedDoctorKey(doc.key)}
+                          >
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: doc.bgColor + '20', color: doc.bgColor, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '12px' }}>
+                                  {doc.avatar}
+                                </div>
+                                <div>
+                                  <strong style={{ color: '#0F172A', fontSize: '13px' }}>{doc.name}</strong>
+                                  <div style={{ fontSize: '10.5px', color: '#64748B' }}>{doc.meta.split('•')[0]} • {doc.residence.split('(')[0]}</div>
+                                  <div style={{ fontSize: '10px', color: '#2563EB', fontFamily: 'monospace', marginTop: '1px' }}>📞 {doc.phone}</div>
+                                </div>
+                              </div>
+                            </td>
+                            <td><span className="badge badge-slate" style={{ fontWeight: 750 }}>{doc.bmdc}</span></td>
+                            <td><b>{doc.kpiVisits}</b></td>
+                            <td>{doc.kpiChats}</td>
+                            <td>{doc.kpiGross}</td>
+                            <td style={{ color: '#64748B' }}>৳ 15,720</td>
+                            <td style={{ fontWeight: 850, color: '#059669' }}>{doc.kpiDisbursed}</td>
+                            <td>
+                              <span className="payout-method-badge bkash">
+                                {doc.disbursements[0]?.method || 'bKash Merchant'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={`badge ${isSettled ? 'badge-green' : 'badge-amber'} doc-payout-status`}>
+                                {isSettled ? 'Settled ✓' : 'Pending Settlement'}
+                              </span>
+                            </td>
+                            <td>
+                              <button
+                                className="admin-btn-sec"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedDoctorKey(doc.key);
+                                }}
+                              >
+                                View History ↗
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
 
-          {/* TAB 7: PATIENTS DIRECTORY */}
-          {activeTab === 'patients' && (
-            <div className="space-y-6">
-              {/* Emergency Hotline Header */}
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-                    <PhoneCall className="w-5 h-5 text-emerald-700" />
+          {/* PAGE 2: EXECUTIVE COMMAND CENTER */}
+          {activeAdminPage === 'command' && (
+            <div className="admin-page-view active" id="adminPage_command">
+              <div className="admin-kpi-grid">
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Total Consultations Today</span>
+                    <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-emerald-900 leading-tight">
-                      National Health Emergency Helpline Integration: 16263
-                    </h4>
-                    <p className="text-[11px] text-emerald-700 mt-0.5">
-                      All urgent cases with red-flag symptoms are triaged to call 16263 or dispatch ambulance services immediately. Click any patient row to open their clinical dossier.
-                    </p>
+                  <div className="admin-kpi-val">1,480</div>
+                  <span className="admin-kpi-delta up">↗ +12.5% vs yesterday</span>
+                  <div className="kpi-micro-chart kpi-sparkline">
+                    <svg viewBox="0 0 200 40" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="sparkGrad1" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#059669" stopOpacity="0.25"/>
+                          <stop offset="100%" stopColor="#059669" stopOpacity="0"/>
+                        </linearGradient>
+                      </defs>
+                      <path d="M0 32 L28 28 L56 22 L84 25 L112 18 L140 14 L168 10 L200 6 L200 40 L0 40 Z" fill="url(#sparkGrad1)"/>
+                      <polyline points="0,32 28,28 56,22 84,25 112,18 140,14 168,10 200,6" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <circle cx="200" cy="6" r="3" fill="#059669" stroke="#fff" strokeWidth="1.5"/>
+                    </svg>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#94A3B8', marginTop: '2px', padding: '0 2px' }}>
+                      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span style={{ color: '#059669', fontWeight: 700 }}>Today</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="px-3 py-1.5 bg-emerald-700 text-white rounded-xl text-xs font-bold font-mono">
-                  HOTLINE: 16263
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Active Specialists Online</span>
+                    <div className="admin-kpi-icon-circle blue" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val">142</div>
+                  <div className="kpi-micro-chart">
+                    <div className="kpi-donut-wrap">
+                      <svg viewBox="0 0 42 42">
+                        <circle cx="21" cy="21" r="16" fill="none" stroke="#E2E8F0" strokeWidth="5"/>
+                        <circle cx="21" cy="21" r="16" fill="none" stroke="#2563EB" strokeWidth="5" strokeDasharray="94.4 6.1" strokeDashoffset="25" strokeLinecap="round"/>
+                        <text x="21" y="23" textAnchor="middle" fontSize="10" fontWeight="800" fill="#2563EB">94%</text>
+                      </svg>
+                      <div className="kpi-donut-legend">
+                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#2563EB' }}></span> 134 On-Duty</div>
+                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#F59E0B' }}></span> 22 On Break</div>
+                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#E2E8F0' }}></span> 8 Offline</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">24h Paid Chats Active</span>
+                    <div className="admin-kpi-icon-circle purple" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val">380</div>
+                  <span className="admin-kpi-delta neutral">1,500 live messages</span>
+                  <div className="kpi-micro-chart kpi-stacked-bar">
+                    <div className="kpi-bar-row">
+                      <span className="kpi-bar-label">Video</span>
+                      <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: '72%', background: 'linear-gradient(90deg,#7E22CE,#A855F7)' }}></div></div>
+                      <span className="kpi-bar-value">274</span>
+                    </div>
+                    <div className="kpi-bar-row">
+                      <span className="kpi-bar-label">Chat</span>
+                      <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: '28%', background: 'linear-gradient(90deg,#C084FC,#E9D5FF)' }}></div></div>
+                      <span className="kpi-bar-value">106</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-kpi-card" style={{ borderColor: '#FCA5A5' }}>
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Emergency 16263 Escalations</span>
+                    <div className="admin-kpi-icon-circle red" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val" style={{ color: '#DC2626' }}>16,263</div>
+                  <div className="kpi-micro-chart">
+                    <div className="kpi-pulse-indicator">
+                      <div className="kpi-pulse-dot"></div>
+                      <span className="kpi-pulse-text">3 red-flag alerts in last 30 min</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                      <span style={{ fontSize: '9.5px', background: '#FEF2F2', color: '#DC2626', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>🚨 Chest Pain × 1</span>
+                      <span style={{ fontSize: '9.5px', background: '#FEF2F2', color: '#DC2626', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>🚨 Seizure × 2</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Patients Table */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Registered Patients
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Patient clinical intake records are strictly isolated under ABAC / Row-Level Security. Operational admins can view directory details without PHI leakage.
-                    </p>
+              {/* 2-Column Command Layout */}
+              <div className="command-dashboard-grid">
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <div>
+                      <div className="admin-card-title">Hourly Consultation Volume &amp; Load</div>
+                      <div className="admin-card-subtitle">Peak shifts: Morning 08:00–12:00 AM &amp; Evening 05:00–10:00 PM</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className="admin-filter-pill active" style={{ padding: '4px 10px', fontSize: '11px' }}>Today</button>
+                      <button className="admin-filter-pill" style={{ padding: '4px 10px', fontSize: '11px' }}>7 Days</button>
+                    </div>
                   </div>
-                  <span className="text-xs font-semibold text-slate-500">
-                    {patients.length} Registered Patients
-                  </span>
+
+                  <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '16px 12px', border: '1px solid #E2E8F0' }}>
+                    <svg viewBox="0 0 540 180" style={{ width: '100%', height: '160px', overflow: 'visible' }}>
+                      <defs>
+                        <linearGradient id="chartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#059669" stopOpacity="0.3"/>
+                          <stop offset="100%" stopColor="#059669" stopOpacity="0.0"/>
+                        </linearGradient>
+                      </defs>
+                      <line x1="30" y1="30" x2="520" y2="30" stroke="#E2E8F0" strokeDasharray="3,3"/>
+                      <line x1="30" y1="75" x2="520" y2="75" stroke="#E2E8F0" strokeDasharray="3,3"/>
+                      <line x1="30" y1="120" x2="520" y2="120" stroke="#E2E8F0" strokeDasharray="3,3"/>
+                      <path d="M 40 150 C 90 145, 120 70, 160 85 C 200 100, 240 135, 280 115 C 320 95, 360 40, 400 50 C 440 60, 480 130, 510 150 L 510 150 L 40 150 Z" fill="url(#chartGrad)"/>
+                      <path d="M 40 150 C 90 145, 120 70, 160 85 C 200 100, 240 135, 280 115 C 320 95, 360 40, 400 50 C 440 60, 480 130, 510 150" fill="none" stroke="#059669" strokeWidth="3"/>
+                    </svg>
+                  </div>
                 </div>
 
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Patient Name</th>
-                      <th className="py-3 px-4">Verified Phone (E.164)</th>
-                      <th className="py-3 px-4">Demographics</th>
-                      <th className="py-3 px-4">Chronic Cohort</th>
-                      <th className="py-3 px-4">Total Consultations</th>
-                      <th className="py-3 px-4">Last Consult Date</th>
-                      <th className="py-3 px-4 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {patients.map((p) => (
-                      <tr
-                        key={p.id}
-                        onClick={() => setSelectedPatientForModal(p)}
-                        className="hover:bg-blue-50/60 transition-colors cursor-pointer group"
-                      >
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2.5">
-                            <div
-                              style={{ backgroundColor: p.bgColor }}
-                              className="w-8 h-8 rounded-full text-white font-bold flex items-center justify-center text-xs"
-                            >
-                              {p.avatar}
-                            </div>
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <div>
+                      <div className="admin-card-title">Live WebRTC Stream Monitor</div>
+                      <div className="admin-card-subtitle">Real-time Agora RTC bitrate &amp; packet latency monitoring</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div className="webrtc-stream-card">
+                      <div>
+                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>Call #897103 • Dr. Anisul Haque (BMDC 74902)</strong>
+                        <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>Patient: P-ANON-A03 (Dhaka) • Elapsed: <b>08:45 / 10:00</b></div>
+                      </div>
+                      <span className="webrtc-ping-badge good">34ms • HD Audio/Video</span>
+                    </div>
+
+                    <div className="webrtc-stream-card">
+                      <div>
+                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>Call #897104 • Dr. Sabrina Akter (BMDC 45821)</strong>
+                        <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>Patient: P-ANON-D91 (Dhanmondi) • Elapsed: <b>05:12 / 10:00</b></div>
+                      </div>
+                      <span className="webrtc-ping-badge good">42ms • HD Audio/Video</span>
+                    </div>
+
+                    <div className="webrtc-stream-card">
+                      <div>
+                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>Call #897105 • Dr. Karim Hossain (BMDC 81551)</strong>
+                        <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>Patient: P-ANON-K12 (Sylhet) • Elapsed: <b>09:03 / 10:00</b></div>
+                      </div>
+                      <span className="webrtc-ping-badge moderate">86ms (3G Adaptive)</span>
+                    </div>
+
+                    <div className="webrtc-stream-card">
+                      <div>
+                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>Call #897106 • Dr. Sadik Al-Amin (BMDC 68192)</strong>
+                        <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>Patient: P-ANON-M22 (Chittagong) • Elapsed: <b>02:18 / 10:00</b></div>
+                      </div>
+                      <span className="webrtc-ping-badge good">29ms • HD Audio/Video</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PAGE 3: SLOT MATRIX & LOCKS */}
+          {activeAdminPage === 'slots' && (
+            <div className="admin-page-view active" id="adminPage_slots">
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <div className="admin-card-title">Timetable 10-Minute Micro-Slot Grid &amp; 1-Hour Lock Governance</div>
+                    <div className="admin-card-subtitle">Slots within &lt;60 minutes of start are strictly locked to prevent patient abandonment</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="slot-chip available" style={{ padding: '4px 8px', fontSize: '10px' }}>Available</span>
+                    <span className="slot-chip booked" style={{ padding: '4px 8px', fontSize: '10px' }}>Booked (10m)</span>
+                    <span className="slot-chip locked" style={{ padding: '4px 8px', fontSize: '10px' }}>🔒 &lt;1h Locked</span>
+                    <span className="slot-chip chat-only" style={{ padding: '4px 8px', fontSize: '10px' }}>💬 24h Chat</span>
+                  </div>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-slot-grid-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '200px' }}>Specialist</th>
+                        <th>10:30 AM</th>
+                        <th>10:40 AM</th>
+                        <th>10:50 AM</th>
+                        <th>11:00 AM</th>
+                        <th>11:10 AM</th>
+                        <th>11:20 AM</th>
+                        <th>11:30 AM</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#FEF3C7', color: '#B45309', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '10.5px' }}>SA</div>
                             <div>
-                              <div className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                                {p.display_name}
-                              </div>
-                              <span className="text-[10px] text-slate-400 font-mono">{p.id}</span>
+                              <strong style={{ fontSize: '12px', color: '#0F172A' }}>Dr. Sabrina Akter</strong>
+                              <div style={{ fontSize: '10px', color: '#64748B' }}>Internal Medicine</div>
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 font-mono font-semibold text-slate-800">{p.phone}</td>
-                        <td className="py-3.5 px-4 text-slate-600">
-                          {p.gender}, {p.age} Years
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="px-2 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md text-[10px]">
-                            {p.cohort}
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-bold text-blue-600">{p.total_consultations}</td>
-                        <td className="py-3.5 px-4 text-slate-500">{p.last_consultation_date}</td>
-                        <td className="py-3.5 px-4 text-right">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedPatientForModal(p);
-                            }}
-                            className="px-2.5 py-1 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors inline-flex items-center gap-1"
-                          >
-                            <span>Dossier</span>
-                            <ArrowUpRight className="w-3 h-3" />
-                          </button>
-                        </td>
+                        <td><div className="slot-chip locked" onClick={() => showToast('Slot Locked 🔒', 'Rafiq Ahmed (10:30 AM) consultation cannot be cancelled within 1 hour.', '🔒', 'warning')}><span>10:30 • Rafiq A.</span><span style={{ fontSize: '9.5px', opacity: 0.85 }}>🔒 Locked</span></div></td>
+                        <td><div className="slot-chip locked" onClick={() => showToast('Slot Locked 🔒', 'Nusrat Jahan (10:40 AM) locked under 1h policy.', '🔒', 'warning')}><span>10:40 • Nusrat J.</span><span style={{ fontSize: '9.5px', opacity: 0.85 }}>🔒 Locked</span></div></td>
+                        <td><div className="slot-chip chat-only" onClick={() => showToast('Chat Consultation', 'Kamal Uddin subscribed for 24h dedicated chat only.', '💬', 'info')}><span>10:50 • Kamal U.</span><span style={{ fontSize: '9.5px' }}>💬 24h Chat</span></div></td>
+                        <td><div className="slot-chip available" onClick={() => showToast('Open Slot', '11:00 AM available for patient booking.', '✓', 'success')}><span>11:00 • Available</span></div></td>
+                        <td><div className="slot-chip available" onClick={() => showToast('Open Slot', '11:10 AM available for patient booking.', '✓', 'success')}><span>11:10 • Available</span></div></td>
+                        <td><div className="slot-chip booked"><span>11:20 • Tanvir C.</span><span style={{ fontSize: '9.5px' }}>Booked (10m)</span></div></td>
+                        <td><div className="slot-chip available"><span>11:30 • Available</span></div></td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                      <tr>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#EFF6FF', color: '#1D4ED8', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '10.5px' }}>KH</div>
+                            <div>
+                              <strong style={{ fontSize: '12px', color: '#0F172A' }}>Dr. Karim Hossain</strong>
+                              <div style={{ fontSize: '10px', color: '#64748B' }}>Cardiology</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td><div className="slot-chip available"><span>10:30 • Available</span></div></td>
+                        <td><div className="slot-chip locked"><span>10:40 • T. Hasan</span><span style={{ fontSize: '9.5px', opacity: 0.85 }}>🔒 Locked</span></div></td>
+                        <td><div className="slot-chip available"><span>10:50 • Available</span></div></td>
+                        <td><div className="slot-chip available"><span>11:00 • Available</span></div></td>
+                        <td><div className="slot-chip booked"><span>11:10 • Farzana H.</span><span style={{ fontSize: '9.5px' }}>Booked (10m)</span></div></td>
+                        <td><div className="slot-chip available"><span>11:20 • Available</span></div></td>
+                        <td><div className="slot-chip available"><span>11:30 • Available</span></div></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="emergency-dispatch-card">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ fontSize: '24px' }}>🚨</div>
+                    <div>
+                      <strong style={{ fontSize: '13px', color: '#991B1B' }}>Emergency Patient Re-assignment Dispatch</strong>
+                      <div style={{ fontSize: '11.5px', color: '#B91C1C', marginTop: '2px' }}>Override 1-hour cancellation lock for verified doctor emergency and re-route waiting patients without re-billing.</div>
+                    </div>
+                  </div>
+                  <button className="emergency-dispatch-btn" onClick={() => showToast('Emergency Re-assignment Dispatched', 'Patient Rafiq Ahmed re-routed to Dr. Tanvir Hossain without re-billing.', '⚡', 'urgent')}>
+                    <span>Execute Emergency Override ⚡</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
-          {/* TAB 8: INCIDENT & SUBSYSTEM LOGS */}
-          {activeTab === 'logs' && (
-            <div className="space-y-6">
-              {/* Filter controls */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-2xs">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-600">Role Filter:</span>
-                  {['ALL', 'FINANCE_ADMIN', 'CLINICAL_ADMIN', 'SECURITY_ADMIN', 'SYSTEM_WORKER'].map(
-                    (role) => (
-                      <button
-                        key={role}
-                        onClick={() => setSelectedSubsystemFilter(role)}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors ${
-                          selectedSubsystemFilter === role
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                      >
-                        {role}
-                      </button>
-                    )
-                  )}
+          {/* PAGE 4: PATIENTS DIRECTORY */}
+          {activeAdminPage === 'patients' && (
+            <div className="admin-page-view active" id="adminPage_patients">
+              <div className="admin-kpi-grid">
+                <div className="admin-kpi-card">
+                  <div>
+                    <span className="admin-kpi-sub">Total Registered Patients</span>
+                    <div className="admin-kpi-val">28,450</div>
+                    <div style={{ fontSize: '11px', color: '#059669', fontWeight: 750 }}>+14.2% YoY growth</div>
+                  </div>
+                  <div className="admin-kpi-icon-circle green">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                  </div>
                 </div>
 
-                <div className="text-xs text-slate-500 font-medium">
-                  Immutable Audit Ledger: <strong className="text-emerald-700">Ed25519 & RLS Enforced</strong>
+                <div className="admin-kpi-card">
+                  <div>
+                    <span className="admin-kpi-sub">Active 24h Chat Subscribers</span>
+                    <div className="admin-kpi-val">1,267</div>
+                    <div style={{ fontSize: '11px', color: '#2563EB', fontWeight: 700 }}>+8.5% growth</div>
+                  </div>
+                  <div className="admin-kpi-icon-circle blue">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  </div>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div>
+                    <span className="admin-kpi-sub">Chronic Care Cohort</span>
+                    <div className="admin-kpi-val">6,820</div>
+                    <div style={{ fontSize: '11px', color: '#D97706', fontWeight: 700 }}>Hypertension &amp; T2DM</div>
+                  </div>
+                  <div className="admin-kpi-icon-circle amber">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                  </div>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div>
+                    <span className="admin-kpi-sub">Total Patient Health Spend</span>
+                    <div className="admin-kpi-val">৳ 4,890,000</div>
+                    <div style={{ fontSize: '11px', color: '#059669', fontWeight: 750 }}>+18.1% turnover</div>
+                  </div>
+                  <div className="admin-kpi-icon-circle teal">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
+                  </div>
                 </div>
               </div>
 
-              {/* Logs Table */}
-              <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                    System Audit Trail (`audit_events`)
-                  </h3>
-                  <span className="text-xs text-slate-500">
-                    Preserves non-repudiation and clinical telemetry integrity
-                  </span>
+              <div className="admin-card">
+                <div className="admin-card-header" style={{ flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                  <div>
+                    <div className="admin-card-title">Patients Directory &amp; Longitudinal Archive</div>
+                    <div className="admin-card-subtitle">Search, filter &amp; open patient clinical dossiers, EMR vaults, and consult history</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', minWidth: '240px', maxWidth: '320px' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                      <input
+                        type="text"
+                        placeholder="Search patient name, #PT ID, phone, dx..."
+                        value={patientSearchQuery}
+                        onChange={(e) => setPatientSearchQuery(e.target.value)}
+                        style={{ width: '100%', padding: '7px 12px 7px 30px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button className={`admin-filter-pill ${patientFilterCategory === 'all' ? 'active' : ''}`} onClick={() => setPatientFilterCategory('all')}>All (6)</button>
+                      <button className={`admin-filter-pill ${patientFilterCategory === 'chronic' ? 'active' : ''}`} onClick={() => setPatientFilterCategory('chronic')}>Chronic Care</button>
+                      <button className={`admin-filter-pill ${patientFilterCategory === 'chat' ? 'active' : ''}`} onClick={() => setPatientFilterCategory('chat')}>Active 24h Chat</button>
+                      <button className={`admin-filter-pill ${patientFilterCategory === 'pediatric' ? 'active' : ''}`} onClick={() => setPatientFilterCategory('pediatric')}>Pediatric</button>
+                    </div>
+                  </div>
                 </div>
 
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
-                    <tr>
-                      <th className="py-3 px-4">Timestamp</th>
-                      <th className="py-3 px-4">Actor Role</th>
-                      <th className="py-3 px-4">Action</th>
-                      <th className="py-3 px-4">Entity Type / ID</th>
-                      <th className="py-3 px-4">IP Address</th>
-                      <th className="py-3 px-4">RLS Status</th>
-                      <th className="py-3 px-4">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {auditLogs
-                      .filter(
-                        (l) =>
-                          selectedSubsystemFilter === 'ALL' ||
-                          l.actor_role === selectedSubsystemFilter
-                      )
-                      .map((log) => (
-                        <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500">
-                            {new Date(log.timestamp).toLocaleTimeString()}
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Patient Name</th>
+                        <th>Patient ID</th>
+                        <th>Demographics</th>
+                        <th>Completed Video Visits</th>
+                        <th>24h Chat Sessions</th>
+                        <th>Total Spend (৳)</th>
+                        <th>Chronic Condition</th>
+                        <th>Last Consultation</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPatients.map((pt) => (
+                        <tr
+                          key={pt.key}
+                          className="admin-clickable-row"
+                          onClick={() => setSelectedPatientKey(pt.key)}
+                        >
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: pt.bgColor + '20', color: pt.bgColor, display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '11px' }}>
+                                {pt.avatar}
+                              </div>
+                              <div>
+                                <strong style={{ color: '#0F172A', fontSize: '13px' }}>{pt.name}</strong>
+                                <div style={{ fontSize: '10px', color: '#64748B' }}>{pt.meta.split('•')[1]}</div>
+                              </div>
+                            </div>
                           </td>
-                          <td className="py-3.5 px-4 font-bold">
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
-                                log.actor_role === 'FINANCE_ADMIN'
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : log.actor_role === 'CLINICAL_ADMIN'
-                                  ? 'bg-blue-100 text-blue-800'
-                                  : log.actor_role === 'SECURITY_ADMIN'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : 'bg-slate-100 text-slate-800'
-                              }`}
+                          <td><span className="badge badge-slate" style={{ fontWeight: 750 }}>{pt.id}</span></td>
+                          <td>{pt.meta.split('•')[0]}</td>
+                          <td><b>{pt.encounters.length * 4}</b></td>
+                          <td>{pt.chatActive ? 45 : 18}</td>
+                          <td><b style={{ color: '#0F172A', fontSize: '13px' }}>৳ 75,000</b></td>
+                          <td>
+                            <span className="badge" style={{ background: '#FEE2E2', color: '#DC2626', fontSize: '9.5px', fontWeight: 750 }}>{pt.cohort}</span>
+                          </td>
+                          <td>{pt.encounters[0]?.date || 'Recent'}<div style={{ fontSize: '10px', color: '#64748B' }}>by {pt.encounters[0]?.doctor || 'Dr. Sabrina'}</div></td>
+                          <td>
+                            <button
+                              className="admin-btn-sec"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPatientKey(pt.key);
+                              }}
                             >
-                              {log.actor_role}
-                            </span>
+                              View Dossier ↗
+                            </button>
                           </td>
-                          <td className="py-3.5 px-4 font-mono font-semibold text-slate-800">
-                            {log.action}
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-[11px] text-slate-600">
-                            {log.entity_type} ({log.entity_id})
-                          </td>
-                          <td className="py-3.5 px-4 font-mono text-[11px] text-slate-500">
-                            {log.ip_address}
-                          </td>
-                          <td className="py-3.5 px-4">
-                            <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit">
-                              <ShieldCheck className="w-3 h-3" />
-                              <span>ENFORCED</span>
-                            </span>
-                          </td>
-                          <td className="py-3.5 px-4 text-slate-600 text-[11px]">{log.details}</td>
                         </tr>
                       ))}
-                  </tbody>
-                </table>
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}
+
+          {/* PAGE 5: BMDC CREDENTIALING */}
+          {activeAdminPage === 'bmdc' && (
+            <div className="admin-page-view active" id="adminPage_bmdc">
+              <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '18px' }}>
+                <div className="admin-card" style={{ padding: '16px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '12px' }}>Doctor Vetting Queue (3 Pending)</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ padding: '12px', background: '#ECFDF5', border: '1px solid #10B981', borderRadius: '12px', cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '12.5px', color: '#065F46' }}>Dr. Sarah Rahman</strong>
+                        <span className="badge badge-green">98% Match</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#047857', marginTop: '2px' }}>BMDC #A-48291 • Internal Medicine</div>
+                      <div style={{ fontSize: '10px', color: '#64748B', marginTop: '4px' }}>Applied 2 hrs ago • NID Verified</div>
+                    </div>
+
+                    <div style={{ padding: '12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '12.5px', color: '#0F172A' }}>Dr. Ahmed Khan</strong>
+                        <span className="badge badge-blue">95% Match</span>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>BMDC #A-55102 • Cardiology</div>
+                      <div style={{ fontSize: '10px', color: '#64748B', marginTop: '4px' }}>Applied 5 hrs ago • Renewal Check</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="admin-card">
+                  <div className="admin-card-header">
+                    <div>
+                      <div className="admin-card-title">In Review: Dr. Sarah Rahman (A-48291)</div>
+                      <div style={{ fontSize: '12px', color: '#059669', fontWeight: 750, marginTop: '2px' }}>Govt BMDC Directory Match: 99.1% High Confidence</div>
+                    </div>
+                    <span className="badge badge-amber">Pending Final Approval</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '18px' }}>
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px' }}>
+                      <div style={{ fontSize: '11.5px', fontWeight: 750, color: '#475569', marginBottom: '10px' }}>ORIGINAL UPLOADED SCANS</div>
+                      <div style={{ background: '#fff', border: '1px dashed #CBD5E1', padding: '14px', borderRadius: '10px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '26px', marginBottom: '4px' }}>📜</div>
+                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>BMDC Registration Certificate (A-48291)</strong>
+                        <div style={{ fontSize: '10px', color: '#64748B' }}>Issued: 15 Oct 2022 • Bangladesh Medical Council</div>
+                      </div>
+                      <div style={{ background: '#fff', border: '1px dashed #CBD5E1', padding: '14px', borderRadius: '10px', textAlign: 'center', marginTop: '10px' }}>
+                        <div style={{ fontSize: '26px', marginBottom: '4px' }}>🪪</div>
+                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>National ID (NID #7849120356)</strong>
+                        <div style={{ fontSize: '10px', color: '#64748B' }}>Match Verified with Election Commission</div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px' }}>
+                      <div style={{ fontSize: '11.5px', fontWeight: 750, color: '#475569', marginBottom: '10px' }}>VERIFIED OCR DIGITAL DATA</div>
+                      <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div><b>Full Name:</b> SARAH RAHMAN</div>
+                        <div><b>BMDC Reg Number:</b> A-48291 <span className="badge badge-green" style={{ fontSize: '9.5px' }}>Active</span></div>
+                        <div><b>NID Number:</b> 7849120356 (Matched 100%)</div>
+                        <div><b>Degrees:</b> MBBS (Dhaka Med. Col., 2013), FCPS (BCPS, 2019)</div>
+                        <div><b>Affiliated Hospital:</b> Apollo Hospitals Dhaka</div>
+                        <div><b>Specialty:</b> Internal Medicine Consultant</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
+                    <button className="slot-subtle-btn" style={{ background: '#FEE2E2', color: '#DC2626', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 750, cursor: 'pointer' }} onClick={() => handleBmdcAction('reject')}>
+                      ✕ Reject Application
+                    </button>
+                    <button className="slot-subtle-btn" style={{ background: '#FEF3C7', color: '#B45309', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 750, cursor: 'pointer' }} onClick={() => handleBmdcAction('clarify')}>
+                      ⚠️ Request Clarification
+                    </button>
+                    <button className="admin-btn-pri" style={{ padding: '8px 16px', fontSize: '12px' }} onClick={() => handleBmdcAction('approve')}>
+                      ✓ Approve &amp; Activate Doctor
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PAGE 6: CLINICAL PRESCRIPTION & Q&A AUDIT */}
+          {activeAdminPage === 'compliance' && (
+            <div className="admin-page-view active" id="adminPage_compliance">
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <div className="admin-card-title">Clinical e-Prescription Audit &amp; DGDA Compliance</div>
+                    <div className="admin-card-subtitle">AI-assisted antimicrobial stewardship &amp; narcotic Schedule H compliance surveillance</div>
+                  </div>
+                  <span className="badge badge-amber" style={{ fontWeight: 800 }}>1 Flagged for Review</span>
+                </div>
+
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '20px' }}>⚠️</span>
+                      <div>
+                        <strong style={{ color: '#991B1B', fontSize: '13.5px' }}>Schedule H Controlled Substance Alert — Rx #HD-891042</strong>
+                        <div style={{ fontSize: '11px', color: '#B91C1C', marginTop: '2px' }}>Issued today by Dr. Sabrina Akter (BMDC #45821) • Patient: Sarah Khan (29F)</div>
+                      </div>
+                    </div>
+                    <span className="badge" style={{ background: '#FEE2E2', color: '#991B1B', fontWeight: 800 }}>High Risk</span>
+                  </div>
+
+                  <div style={{ marginTop: '14px', background: '#fff', borderRadius: '10px', padding: '14px', border: '1px solid #FCA5A5', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>PRESCRIBED MEDICATIONS</div>
+                      <div style={{ fontSize: '12px', color: '#0F172A', marginTop: '4px' }}>
+                        1. <b>Tab. Azithromycin 500mg</b> — 1 daily x 3 days (Broad spectrum)<br/>
+                        2. <b style={{ color: '#DC2626' }}>Inj. Morphine Sulphate 10mg/mL</b> — SOS for severe trauma pain (Schedule H)
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>COMPLIANCE AUDIT RATIONALE</div>
+                      <div style={{ fontSize: '11.5px', color: '#7F1D1D', marginTop: '4px' }}>
+                        Narcotic Schedule H analgesics require physical triage verification under DGDA Telemedicine circular 2024. Audit flag requires clinical ops counter-signature.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
+                    <button className="slot-subtle-btn" style={{ background: '#FEE2E2', color: '#DC2626', border: 'none', padding: '7px 14px', borderRadius: '8px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer' }} onClick={() => showToast('Prescription Flagged', 'Doctor notified to revise Schedule H dosage.', '⚠️', 'warning')}>
+                      Request Revision from Doctor
+                    </button>
+                    <button className="admin-btn-pri" onClick={() => showToast('Prescription Approved ✓', 'Archived into Sarah Khan Health Vault with audit signature.', '✓', 'success')}>
+                      Counter-Sign &amp; Release Rx ✓
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>Automated DGDA Safety Checks (Passing)</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                    <div style={{ padding: '10px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', fontSize: '11px', color: '#065F46' }}>
+                      <b>DDI Drug-Drug Interactions:</b> Passed ✓ No severe interactions detected.
+                    </div>
+                    <div style={{ padding: '10px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', fontSize: '11px', color: '#1D4ED8' }}>
+                      <b>Antibiotic Stewardship:</b> Standard 3-day course validated.
+                    </div>
+                    <div style={{ padding: '10px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', fontSize: '11px', color: '#065F46' }}>
+                      <b>BMDC Digital Signature:</b> SHA-256 authenticated against physician key.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PAGE 7: APP ERROR LOGS */}
+          {activeAdminPage === 'logs' && (
+            <div className="admin-page-view active" id="adminPage_logs">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: 850, color: '#0F172A', margin: 0, letterSpacing: '-0.4px' }}>App Incident &amp; Failure Diagnostics</h2>
+                    <span className="badge" style={{ background: '#FEE2E2', color: '#991B1B', fontWeight: 800, fontSize: '11px' }}>Live Telemetry Stream</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '3px' }}>
+                    Tracks runtime client/server exceptions, failed handshakes &amp; network errors against user, timestamp &amp; exact failed subsystem.
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button className="slot-subtle-btn" style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '7px 12px', borderRadius: '9px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }} onClick={() => setSimulateModalOpen(true)}>
+                    <span>⚡ Simulate App Failure</span>
+                  </button>
+                  <button className="slot-subtle-btn" style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', padding: '7px 12px', borderRadius: '9px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }} onClick={() => showToast('Logs Exported 📥', `${errorLogs.length} incidents exported as JSON file.`, '📥', 'success')}>
+                    <span>📥 Export Logs (.JSON)</span>
+                  </button>
+                  <button className="admin-btn-pri" onClick={() => showToast('Telemetry Synced 🔄', 'Refreshed latest error streams from mobile clusters.', '🔄', 'info')} style={{ padding: '7px 14px', fontSize: '11.5px' }}>
+                    <span>🔄 Refresh Feed</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="admin-kpi-grid" style={{ marginBottom: '18px' }}>
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Total Incidents Logged</span>
+                    <div className="admin-kpi-icon-circle amber" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#FEF3C7', color: '#D97706', display: 'grid', placeItems: 'center' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val">{errorLogs.length} Incidents</div>
+                  <span className="admin-kpi-delta" style={{ color: '#DC2626', fontSize: '11px', fontWeight: 700 }}>● {unresolvedLogsCount} Unresolved</span>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Primary Failure Hotspot</span>
+                    <div className="admin-kpi-icon-circle rose" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#FFE4E6', color: '#E11D48', display: 'grid', placeItems: 'center' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val" style={{ fontSize: '19px', color: '#BE123C' }}>bKash PGW (38%)</div>
+                  <span className="admin-kpi-delta" style={{ color: '#B45309', fontSize: '11px', fontWeight: 700 }}>Callback timeout &gt; 15,000ms</span>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Impacted User Accounts</span>
+                    <div className="admin-kpi-icon-circle blue" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'grid', placeItems: 'center' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val">12 Users</div>
+                  <span className="admin-kpi-delta" style={{ color: '#2563EB', fontSize: '11px', fontWeight: 700 }}>7 Patients • 4 Doctors</span>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Mean Time to Resolution</span>
+                    <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#ECFDF5', color: '#059669', display: 'grid', placeItems: 'center' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val" style={{ color: '#047857' }}>4.2 mins</div>
+                  <span className="admin-kpi-delta up">↗ -1.8 mins vs yesterday</span>
+                </div>
+              </div>
+
+              <div className="admin-card">
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', background: '#FAFAFA' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: '280px', maxWidth: '480px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                      <input
+                        type="text"
+                        placeholder="Filter by User, Trace ID, Subsystem, Error Code..."
+                        value={logSearchQuery}
+                        onChange={(e) => setLogSearchQuery(e.target.value)}
+                        style={{ width: '100%', padding: '8px 12px 8px 34px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <select value={logSeverityFilter} onChange={(e) => setLogSeverityFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', color: '#334155', fontWeight: 600 }}>
+                        <option value="ALL">All Severities</option>
+                        <option value="CRITICAL">🔴 Critical (Fatal)</option>
+                        <option value="ERROR">🟠 Error</option>
+                        <option value="WARNING">🟡 Warning</option>
+                        <option value="DEGRADED">🔵 Degraded</option>
+                      </select>
+
+                      <select value={logSubsystemFilter} onChange={(e) => setLogSubsystemFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', color: '#334155', fontWeight: 600 }}>
+                        <option value="ALL">All Subsystems</option>
+                        <option value="Payment Gateway">💳 Payment Gateway</option>
+                        <option value="Agora WebRTC">📹 Agora WebRTC</option>
+                        <option value="DGDA Clinical Engine">💊 DGDA Clinical Rx</option>
+                        <option value="Sync & Offline Cache">📶 Sync & Offline</option>
+                      </select>
+
+                      <select value={logStatusFilter} onChange={(e) => setLogStatusFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', color: '#334155', fontWeight: 600 }}>
+                        <option value="ALL">All Statuses</option>
+                        <option value="UNRESOLVED">⚠️ Unresolved</option>
+                        <option value="RESOLVED">✓ Resolved</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '11px' }}>
+                    <span style={{ color: '#64748B', fontWeight: 700, marginRight: '4px' }}>Quick Filters:</span>
+                    <button className={`log-quick-pill ${logQuickFilter === 'all' ? 'active' : ''}`} onClick={() => setLogQuickFilter('all')}>All Logs ({errorLogs.length})</button>
+                    <button className={`log-quick-pill ${logQuickFilter === 'critical' ? 'active' : ''}`} onClick={() => setLogQuickFilter('critical')}>🔴 Critical</button>
+                    <button className={`log-quick-pill ${logQuickFilter === 'payment' ? 'active' : ''}`} onClick={() => setLogQuickFilter('payment')}>💳 bKash PGW</button>
+                    <button className={`log-quick-pill ${logQuickFilter === 'webrtc' ? 'active' : ''}`} onClick={() => setLogQuickFilter('webrtc')}>📹 WebRTC</button>
+                    <button className={`log-quick-pill ${logQuickFilter === 'unresolved' ? 'active' : ''}`} onClick={() => setLogQuickFilter('unresolved')}>⚠️ Unresolved</button>
+                  </div>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '130px' }}>Time &amp; Trace ID</th>
+                        <th style={{ width: '180px' }}>Impacted User</th>
+                        <th style={{ width: '170px' }}>Failed Subsystem</th>
+                        <th>Failure Rationale &amp; Error Signature</th>
+                        <th style={{ width: '90px' }}>Severity</th>
+                        <th style={{ width: '110px' }}>Status</th>
+                        <th style={{ width: '130px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredLogs.map((log) => (
+                        <tr key={log.id} className="admin-clickable-row" onClick={() => setSelectedLogId(log.id)}>
+                          <td>
+                            <div style={{ fontWeight: 750, color: '#0F172A', fontSize: '12px' }}>{log.timeFormatted}</div>
+                            <div style={{ fontSize: '10px', color: '#64748B' }}>{log.relativeTime}</div>
+                            <span style={{ fontFamily: 'monospace', fontSize: '9.5px', background: '#F1F5F9', color: '#475569', padding: '1px 5px', borderRadius: '4px', marginTop: '3px', display: 'inline-block' }}>{log.traceId}</span>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: log.user.avatarBg, color: '#fff', display: 'grid', placeItems: 'center', fontSize: '11px', fontWeight: 800 }}>{log.user.avatar}</div>
+                              <div>
+                                <div style={{ fontWeight: 750, color: '#0F172A', fontSize: '12px' }}>{log.user.name}</div>
+                                <div style={{ fontSize: '10px', color: '#64748B' }}>{log.user.phone}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 750, color: '#BE123C', fontSize: '11.5px' }}>{log.failedPart}</div>
+                            <span className="badge" style={{ background: '#FFF1F2', color: '#9F1239', fontSize: '9.5px', padding: '1px 5px', marginTop: '2px' }}>{log.subsystem}</span>
+                          </td>
+                          <td>
+                            <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0F172A' }}>{log.errorMessage}</div>
+                            <span className="badge" style={{ background: '#0F172A', color: '#38BDF8', fontFamily: 'monospace', fontSize: '9.5px', marginTop: '4px' }}>{log.errorCode}</span>
+                          </td>
+                          <td>
+                            <span className={`badge ${log.severity === 'CRITICAL' ? 'badge-rose' : 'badge-amber'}`}>{log.severity}</span>
+                          </td>
+                          <td>
+                            <span className={`badge ${log.status === 'RESOLVED' ? 'badge-green' : 'badge-rose'}`}>
+                              {log.status === 'RESOLVED' ? '✓ Resolved' : '⚠️ Unresolved'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', alignItems: 'center' }}>
+                              <button className="admin-btn-sec" onClick={(e) => { e.stopPropagation(); setSelectedLogId(log.id); }} style={{ padding: '4px 8px', fontSize: '11px' }}>Inspect 🔍</button>
+                              <button className="slot-subtle-btn" onClick={(e) => { e.stopPropagation(); handleToggleLogResolve(log.id); }} style={{ padding: '4px 7px', fontSize: '11px' }}>
+                                {log.status === 'RESOLVED' ? '↩' : '✓'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PAGE 8: CONSULTATION GRIEVANCES */}
+          {activeAdminPage === 'grievances' && (
+            <div className="admin-page-view active" id="adminPage_grievances">
+              <div className="admin-kpi-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '20px' }}>
+                <div className="admin-kpi-card">
+                  <span className="admin-kpi-sub">Total Grievances Filed</span>
+                  <span className="admin-kpi-val" style={{ color: '#0F172A' }}>{grievances.length}</span>
+                  <span className="admin-kpi-delta down">{pendingGrievancesCount} Pending Adjudication</span>
+                </div>
+                <div className="admin-kpi-card">
+                  <span className="admin-kpi-sub">Claims Against Doctors</span>
+                  <span className="admin-kpi-val" style={{ color: '#DC2626' }}>2</span>
+                  <span className="admin-kpi-delta down">⚠️ Conduct / Rushed Call</span>
+                </div>
+                <div className="admin-kpi-card">
+                  <span className="admin-kpi-sub">Claims Against System</span>
+                  <span className="admin-kpi-val" style={{ color: '#2563EB' }}>2</span>
+                  <span className="admin-kpi-delta neutral">⚙️ PGW / ICE Glitches</span>
+                </div>
+                <div className="admin-kpi-card">
+                  <span className="admin-kpi-sub">Resolution &amp; Refund Rate</span>
+                  <span className="admin-kpi-val" style={{ color: '#059669' }}>100%</span>
+                  <span className="admin-kpi-delta up">⚡ Avg. Adjudication &lt; 28 mins</span>
+                </div>
+              </div>
+
+              <div className="admin-card">
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', background: '#FAFAFA' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: '280px', maxWidth: '480px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                      <input
+                        type="text"
+                        placeholder="Filter by Patient, Doctor, BMDC #, Dispute ID, Category..."
+                        value={grievanceSearchQuery}
+                        onChange={(e) => setGrievanceSearchQuery(e.target.value)}
+                        style={{ width: '100%', padding: '8px 12px 8px 34px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <select value={grievanceTargetFilter} onChange={(e) => setGrievanceTargetFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', color: '#334155', fontWeight: 600 }}>
+                        <option value="ALL">All Targets</option>
+                        <option value="DOCTOR">🩺 Against Doctor Only</option>
+                        <option value="SYSTEM">⚙️ Against System Only</option>
+                      </select>
+
+                      <select value={grievanceStatusFilter} onChange={(e) => setGrievanceStatusFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', color: '#334155', fontWeight: 600 }}>
+                        <option value="ALL">All Statuses</option>
+                        <option value="PENDING_REVIEW">⚠️ Pending Review</option>
+                        <option value="REFUNDED">💳 Refunded</option>
+                        <option value="WARNED">⚠️ Doctor Warned</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', fontSize: '11px' }}>
+                    <span style={{ color: '#64748B', fontWeight: 700, marginRight: '4px' }}>Quick Filters:</span>
+                    <button className={`grv-quick-pill ${grievanceQuickFilter === 'all' ? 'active' : ''}`} onClick={() => setGrievanceQuickFilter('all')}>All ({grievances.length})</button>
+                    <button className={`grv-quick-pill ${grievanceQuickFilter === 'doctor' ? 'active' : ''}`} onClick={() => setGrievanceQuickFilter('doctor')}>🩺 Doctor Claims</button>
+                    <button className={`grv-quick-pill ${grievanceQuickFilter === 'system' ? 'active' : ''}`} onClick={() => setGrievanceQuickFilter('system')}>⚙️ System Claims</button>
+                    <button className={`grv-quick-pill ${grievanceQuickFilter === 'pending' ? 'active' : ''}`} onClick={() => setGrievanceQuickFilter('pending')}>⚠️ Pending Action</button>
+                  </div>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '130px' }}>Dispute ID &amp; Time</th>
+                        <th style={{ width: '180px' }}>Complainant (Patient)</th>
+                        <th style={{ width: '180px' }}>Consultation Doctor</th>
+                        <th style={{ width: '140px' }}>Report Target</th>
+                        <th>Issue Summary &amp; Patient Claim</th>
+                        <th style={{ width: '150px' }}>Board Action / Remedy</th>
+                        <th style={{ width: '110px' }}>Status</th>
+                        <th style={{ width: '120px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredGrievances.map((grv) => (
+                        <tr key={grv.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedGrievanceId(grv.id)}>
+                          <td>
+                            <div style={{ fontWeight: 850, fontSize: '12px', color: '#0F172A' }}>{grv.id}</div>
+                            <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>{grv.timeFormatted}</div>
+                            <div style={{ fontSize: '10px', color: '#94A3B8' }}>Ref: #{grv.consultationId}</div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#E0F2FE', color: '#0284C7', fontWeight: 800, fontSize: '11px', display: 'grid', placeItems: 'center' }}>
+                                {grv.patient.name.split(' ').map((n) => n[0]).join('')}
+                              </div>
+                              <div>
+                                <div style={{ fontWeight: 800, fontSize: '12px', color: '#0F172A' }}>{grv.patient.name}</div>
+                                <div style={{ fontSize: '10.5px', color: '#64748B' }}>{grv.patient.phone}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 800, fontSize: '12px', color: '#0F172A' }}>{grv.doctor.name}</div>
+                            <div style={{ fontSize: '10.5px', color: '#64748B' }}>{grv.doctor.bmdc}</div>
+                          </td>
+                          <td>
+                            <span className={`badge ${grv.target === 'DOCTOR' ? 'badge-rose' : 'badge-blue'}`}>
+                              {grv.target === 'DOCTOR' ? '🩺 Against Doctor' : '⚙️ Against System'}
+                            </span>
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 750, fontSize: '11.5px', color: '#0F172A', marginBottom: '2px' }}>{grv.category}</div>
+                            <div style={{ fontSize: '11px', color: '#475569', maxWidth: '320px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {grv.claimSummary}
+                            </div>
+                          </td>
+                          <td>
+                            <span className="badge" style={{ background: '#F8FAFC', border: '1px solid #CBD5E1', color: '#0F172A', fontSize: '10px', fontWeight: 700 }}>
+                              {grv.boardRemedy}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`badge ${grv.status === 'REFUNDED' ? 'badge-green' : grv.status === 'WARNED' ? 'badge-rose' : 'badge-amber'}`}>
+                              {grv.status.replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button className="admin-btn-sec" onClick={(e) => { e.stopPropagation(); setSelectedGrievanceId(grv.id); }} style={{ padding: '5px 9px', fontSize: '11px', fontWeight: 700 }}>
+                              Adjudicate ›
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PAGE 9: OMNICHANNEL PAYMENTS & ESCROW MASTER LEDGER */}
+          {activeAdminPage === 'finance' && (
+            <div className="admin-page-view active" id="adminPage_finance" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 850, color: '#0F172A', margin: 0, letterSpacing: '-0.4px' }}>Omnichannel Payment &amp; Escrow Master Ledger</h2>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>Centralized financial audit tracking all patient inflows, gateway escrow locks, 15-20% platform commission cuts, doctor payouts &amp; refund reversals</div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button className="admin-action-btn" onClick={() => setActiveAdminPage('doctors')} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#334155', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
+                    <span>Doctor Payouts Hub →</span>
+                  </button>
+                  <button className="admin-action-btn" onClick={() => showToast('MFS Webhooks Reconciled', '0 discrepancies detected across bKash and Nagad payment gateways.', '✓', 'success')} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <span>Reconcile MFS Webhooks</span>
+                  </button>
+                  <button className="admin-action-btn" onClick={() => showToast('Ledger CSV Exported', 'Full financial audit export downloaded.', '📄', 'success')} style={{ background: '#0F172A', border: '1px solid #0F172A', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <span>Export Ledger CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="admin-kpi-grid">
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Total Platform GMV Inflow</span>
+                    <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val">৳ 3,245,000</div>
+                  <span className="admin-kpi-delta up">↗ +18.4% MoM • 1,864 Transactions</span>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Active Escrow Locked</span>
+                    <div className="admin-kpi-icon-circle blue" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val" style={{ color: '#2563EB' }}>৳ 890,800</div>
+                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>Held securely pending doctor sign-off</span>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">HeloDoc 15-20% Commission</span>
+                    <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#ECFDF5', color: '#059669' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val" style={{ color: '#059669' }}>৳ 568,400</div>
+                  <span className="admin-kpi-delta up">↗ Net Platform Operating Revenue</span>
+                </div>
+
+                <div className="admin-kpi-card">
+                  <div className="kpi-top-row">
+                    <span className="admin-kpi-sub">Total Disbursed Outflows</span>
+                    <div className="admin-kpi-icon-circle purple" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#F5F3FF', color: '#7C3AED' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
+                    </div>
+                  </div>
+                  <div className="admin-kpi-val">৳ 2,676,600</div>
+                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>Doctor Wallets + Disputed Refunds</span>
+                </div>
+              </div>
+
+              <div className="admin-card">
+                <div className="admin-card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <div className="admin-card-title">Omnichannel Financial Audit Table</div>
+                    <div className="admin-card-subtitle">Complete ledger of MFS gateway checkouts, fee splits, doctor wallets, and clinical escrow holds</div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', width: '260px' }}>
+                      <input
+                        type="text"
+                        placeholder="Search TxID, Patient, Doctor, Ref..."
+                        value={financeSearchQuery}
+                        onChange={(e) => setFinanceSearchQuery(e.target.value)}
+                        style={{ width: '100%', padding: '7px 10px 7px 32px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none', background: '#FFFFFF' }}
+                      />
+                    </div>
+
+                    <select value={financeGatewayFilter} onChange={(e) => setFinanceGatewayFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#FFFFFF', color: '#334155', outline: 'none' }}>
+                      <option value="ALL">All Gateways</option>
+                      <option value="bKash">bKash Merchant Pay</option>
+                      <option value="Nagad">Nagad Business Pay</option>
+                      <option value="Card">Visa / Mastercard (SSLCommerz)</option>
+                      <option value="MFS Bulk API">MFS Bulk Payout API</option>
+                    </select>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#F1F5F9', padding: '3px', borderRadius: '8px' }}>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'ALL' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('ALL')}>All</button>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'INFLOW' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('INFLOW')}>Inflow 📥</button>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'ESCROW' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('ESCROW')}>Escrow 🔒</button>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'PAYOUT' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('PAYOUT')}>Payout 📤</button>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'REFUND' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('REFUND')}>Refund ↩️</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>TxID &amp; MFS Ref</th>
+                        <th>Timestamp</th>
+                        <th>Channel &amp; Type</th>
+                        <th>Consultation / Case</th>
+                        <th>Parties (Patient / Doctor)</th>
+                        <th style={{ textAlign: 'right' }}>Gross (৳)</th>
+                        <th style={{ textAlign: 'right' }}>HeloDoc Cut</th>
+                        <th style={{ textAlign: 'right' }}>Net (৳)</th>
+                        <th>Gateway &amp; Escrow State</th>
+                        <th style={{ textAlign: 'center' }}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredTransactions.map((tx) => (
+                        <tr key={tx.txId} className="admin-clickable-row" onClick={() => setSelectedTransactionId(tx.txId)}>
+                          <td>
+                            <div style={{ fontWeight: 800, color: '#0F172A', fontSize: '12.5px' }}>{tx.txId}</div>
+                            <div style={{ fontSize: '10px', color: '#64748B', fontFamily: 'monospace' }}>{tx.gatewayRef}</div>
+                          </td>
+                          <td style={{ fontSize: '11.5px', color: '#334155', whiteSpace: 'nowrap' }}>{tx.timestamp}</td>
+                          <td>
+                            <span className={`payout-method-badge ${tx.gateway === 'bKash' ? 'bkash' : tx.gateway === 'Nagad' ? 'nagad' : 'bank'}`}>
+                              {tx.gatewayLabel}
+                            </span>
+                            <div style={{ fontSize: '10px', color: '#64748B', marginTop: '2px' }}>{tx.typeLabel}</div>
+                          </td>
+                          <td>
+                            <b style={{ color: '#2563EB', fontSize: '12px' }}>{tx.consultationId}</b>
+                            <div style={{ fontSize: '10px', color: '#64748B' }}>{tx.sessionType}</div>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>{tx.patient.name}</span>
+                              <span style={{ color: '#94A3B8' }}>→</span>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>{tx.doctor.name}</span>
+                            </div>
+                            <div style={{ fontSize: '10px', color: '#64748B' }}>{tx.patient.phone} • {tx.doctor.bmdc}</div>
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A', fontSize: '13px' }}>৳ {tx.grossAmount.toLocaleString()}</td>
+                          <td style={{ textAlign: 'right', fontSize: '12px', color: '#059669', fontWeight: 700 }}>৳ {tx.platformFeeAmount.toLocaleString()} <span style={{ fontSize: '9.5px', color: '#64748B' }}>({tx.platformFeePercent}%)</span></td>
+                          <td style={{ textAlign: 'right', fontWeight: 850, color: '#2563EB', fontSize: '13.5px' }}>৳ {tx.netAmount.toLocaleString()}</td>
+                          <td>
+                            <span className={`badge ${tx.statusBadgeCls}`}>{tx.escrowStatusLabel}</span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <button onClick={(e) => { e.stopPropagation(); setSelectedTransactionId(tx.txId); }} style={{ padding: '4px 8px', border: '1px solid #CBD5E1', background: '#FFFFFF', borderRadius: '6px', fontSize: '11px', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
+                              Receipt 🔍
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
         </main>
       </div>
 
-      {/* ═════════════════════════════════════════════════════════════
-          MODAL: DOCTOR HISTORY & FINANCIAL DOSSIER (MATCHING INDEX.HTML)
-          ═════════════════════════════════════════════════════════════ */}
-      {selectedDoctorForModal && (
-        <div
-          className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
-          onClick={() => setSelectedDoctorForModal(null)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-4xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-5 flex items-start justify-between border-b border-slate-800">
-              <div className="flex items-center gap-3.5">
-                <div
-                  style={{ backgroundColor: selectedDoctorForModal.bgColor }}
-                  className="w-12 h-12 rounded-full text-white font-black text-base flex items-center justify-center shadow-md flex-shrink-0"
-                >
-                  {selectedDoctorForModal.avatar}
+      {/* ── MODAL 1: DOCTOR HISTORY & FINANCIAL DOSSIER ── */}
+      {selectedDocObj && (
+        <div className="admin-modal-backdrop" id="adminDoctorHistoryModal" style={{ display: 'flex' }} onClick={(e) => { if (e.target === e.currentTarget) setSelectedDoctorKey(null); }}>
+          <div className="admin-modal-card">
+            <div style={{ background: '#0F172A', color: '#fff', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: selectedDocObj.bgColor, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '16px', flexShrink: 0 }}>
+                  {selectedDocObj.avatar}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg font-bold text-white leading-none">
-                      {selectedDoctorForModal.full_name}
-                    </h3>
-                    <span className="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold rounded-full text-xs font-mono">
-                      {selectedDoctorForModal.license_number}
-                    </span>
-                    <span className="px-2.5 py-0.5 bg-sky-500/20 text-sky-300 border border-sky-500/30 font-bold rounded-full text-xs">
-                      Verified Specialist
-                    </span>
-                    <span className="px-2 py-0.5 bg-white/10 text-slate-300 font-semibold rounded-full text-[11px]">
-                      {selectedDoctorForModal.is_on_duty ? 'Active Practitioner' : 'Off Duty'}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '16.5px', fontWeight: 800, color: '#FFFFFF' }}>{selectedDocObj.name}</span>
+                    <span className="badge badge-green">{selectedDocObj.bmdc}</span>
+                    <span className="badge badge-blue">Verified Specialist</span>
+                    <span className="badge" style={{ background: 'rgba(255,255,255,0.12)', color: '#E2E8F0', fontSize: '10px' }}>Active Practitioner</span>
                   </div>
-                  <div className="text-xs text-slate-300 mt-1 font-medium">
-                    {selectedDoctorForModal.primary_specialty} Consultant • {selectedDoctorForModal.current_hospital} • BMDC Registered Specialist
-                  </div>
-                  <div className="flex items-center gap-4 mt-2 text-xs flex-wrap text-slate-300">
-                    <span className="flex items-center gap-1.5 text-cyan-300 font-mono">
-                      <PhoneCall className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>{selectedDoctorForModal.verified_phone}</span>
+                  <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '2px' }}>{selectedDocObj.meta}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '6px', fontSize: '11px', flexWrap: 'wrap' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94A3B8' }}>
+                      <span>Phone:</span> <b style={{ color: '#FFFFFF', fontFamily: 'monospace' }}>{selectedDocObj.phone}</b>
                     </span>
-                    <span className="text-slate-600">•</span>
-                    <span className="flex items-center gap-1.5 text-amber-200">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                      <span>{selectedDoctorForModal.residential_address}</span>
+                    <span style={{ color: '#475569' }}>•</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94A3B8' }}>
+                      <span>Residence:</span> <b style={{ color: '#FFFFFF' }}>{selectedDocObj.residence}</b>
                     </span>
-                    <span className="text-slate-600">•</span>
-                    <span className="flex items-center gap-1.5 text-slate-300">
-                      <Mail className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>{selectedDoctorForModal.email}</span>
+                    <span style={{ color: '#475569' }}>•</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94A3B8' }}>
+                      <span>Email:</span> <b style={{ color: '#E2E8F0' }}>{selectedDocObj.email}</b>
                     </span>
                   </div>
                 </div>
               </div>
-
-              <button
-                onClick={() => setSelectedDoctorForModal(null)}
-                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors text-base"
-              >
-                ✕
-              </button>
+              <button onClick={() => setSelectedDoctorKey(null)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '20px', cursor: 'pointer' }}>✕</button>
             </div>
 
-            {/* KPI Summary Strip (4 cards) */}
-            <div className="grid grid-cols-4 bg-slate-100 border-b border-slate-200 divide-x divide-slate-200 text-center">
-              <div className="p-3 bg-white">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                  Lifetime Consultations
-                </div>
-                <div className="text-lg font-black text-slate-900 mt-0.5">
-                  {selectedDoctorForModal.lifetimeConsultations.toLocaleString()}
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: '#E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
+              <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Lifetime Consultations</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', marginTop: '2px' }}>{selectedDocObj.kpiVisits}</div>
               </div>
-              <div className="p-3 bg-white">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                  24h Chat Sessions
-                </div>
-                <div className="text-lg font-black text-blue-600 mt-0.5">
-                  {selectedDoctorForModal.chatTotalSessions.toLocaleString()}
-                </div>
+              <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>24h Chat Sessions</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#2563EB', marginTop: '2px' }}>{selectedDocObj.kpiChats}</div>
               </div>
-              <div className="p-3 bg-white">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                  Total Gross Revenue
-                </div>
-                <div className="text-lg font-black text-slate-900 mt-0.5">
-                  ৳ {selectedDoctorForModal.lifetimeGross}
-                </div>
+              <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Total Gross Revenue</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>{selectedDocObj.kpiGross}</div>
               </div>
-              <div className="p-3 bg-white">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                  Net Payouts Disbursed (80%)
-                </div>
-                <div className="text-lg font-black text-emerald-600 mt-0.5">
-                  ৳ {selectedDoctorForModal.lifetimeNet}
-                </div>
+              <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Net Payouts Disbursed</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#047857', marginTop: '2px' }}>{selectedDocObj.kpiDisbursed}</div>
               </div>
             </div>
 
-            {/* Modal Body (Scrollable) */}
-            <div className="p-5 overflow-y-auto space-y-6 flex-1 text-xs">
-              {/* Encounter & Prescriptions table */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-bold text-slate-900 text-sm">
-                    Recent Consultation Encounters & Issued Prescriptions
-                  </h4>
-                  <span className="text-[11px] text-slate-500">
-                    Archived across all patient encounters
-                  </span>
-                </div>
-
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200">
-                      <tr>
-                        <th className="py-2.5 px-3">Date & Time</th>
-                        <th className="py-2.5 px-3">Patient Name</th>
-                        <th className="py-2.5 px-3">Consultation Mode</th>
-                        <th className="py-2.5 px-3">Fee (৳)</th>
-                        <th className="py-2.5 px-3">Clinical Diagnosis</th>
-                        <th className="py-2.5 px-3">Rx Issued</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {selectedDoctorForModal.encounters.map((enc, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 font-semibold text-slate-700">{enc.time}</td>
-                          <td className="py-2.5 px-3 font-bold text-slate-900">{enc.ptName}</td>
-                          <td className="py-2.5 px-3">
-                            <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-emerald-50 text-emerald-800">
-                              {enc.mode}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 font-bold text-slate-900">{enc.fee}</td>
-                          <td className="py-2.5 px-3 text-slate-700">{enc.diagnosis}</td>
-                          <td className="py-2.5 px-3">
-                            <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-blue-50 text-blue-700">
-                              {enc.rx}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div style={{ padding: '18px 22px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>Recent Consultation Encounters &amp; Issued Prescriptions</strong>
+                <span style={{ fontSize: '11px', color: '#64748B' }}>Archived across all patient encounters</span>
               </div>
 
-              {/* Financial Wallet Disbursements History */}
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm mb-2">
-                  Recent Financial Wallet Disbursements
-                </h4>
-                <div className="space-y-2">
-                  {selectedDoctorForModal.disbursements.map((d, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between"
-                    >
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Date &amp; Time</th>
+                    <th>Patient Name</th>
+                    <th>Consultation Mode</th>
+                    <th>Fee (৳)</th>
+                    <th>Clinical Diagnosis</th>
+                    <th>Rx Issued</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedDocObj.encounters.map((enc, idx) => (
+                    <tr key={idx}>
+                      <td>{enc.time}</td>
+                      <td><b>{enc.ptName}</b></td>
+                      <td><span className={`badge ${enc.badgeCls}`}>{enc.mode}</span></td>
+                      <td>{enc.fee}</td>
+                      <td>{enc.diagnosis}</td>
+                      <td><span className="badge badge-blue">{enc.rx}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div style={{ marginTop: '20px' }}>
+                <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>Recent Financial Wallet Disbursements (20% Platform Fee Enforced)</strong>
+                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {selectedDocObj.disbursements.map((dsb, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '11.5px' }}>
                       <div>
-                        <div className="font-bold text-slate-900 text-xs flex items-center gap-2">
-                          <span>{d.date}: ৳ {d.amount}</span>
-                          <span className="text-[10px] text-slate-500 font-normal">Disbursed via</span>
-                          <span className="px-2 py-0.5 bg-pink-100 text-pink-700 font-bold rounded-md text-[10px]">
-                            {d.method}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          TxID: {d.txId} • Platform Fee Withheld: {d.commissionDeducted}
-                        </div>
+                        <b>{dsb.date}: {dsb.amount}</b> Disbursed via <span className="badge" style={{ background: '#FCE7F3', color: '#DB2777', fontWeight: 800 }}>{dsb.method}</span>
+                        <div style={{ fontSize: '10px', color: '#64748B' }}>TxID: {dsb.txId} • Commission Deducted: {dsb.commission}</div>
                       </div>
-                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-bold rounded-full text-[10px]">
-                        {d.status}
-                      </span>
+                      <span className="badge badge-green">{dsb.status}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                BMDC Verified Credential Ledger • HelloDoctor Bangladesh
-              </span>
-              <button
-                onClick={() => setSelectedDoctorForModal(null)}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors"
-              >
-                Close Dossier
-              </button>
+            <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: '#64748B' }}>BMDC Verified Credential Ledger • HelloDoctor Bangladesh</span>
+              <button className="admin-btn-sec" onClick={() => setSelectedDoctorKey(null)}>Close Dossier</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ═════════════════════════════════════════════════════════════
-          MODAL: PATIENT CLINICAL DOSSIER & VAULT (MATCHING INDEX.HTML)
-          ═════════════════════════════════════════════════════════════ */}
-      {selectedPatientForModal && (
-        <div
-          className="fixed inset-0 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
-          onClick={() => setSelectedPatientForModal(null)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-4xl w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-5 flex items-start justify-between border-b border-slate-800">
-              <div className="flex items-center gap-3.5">
-                <div
-                  style={{ backgroundColor: selectedPatientForModal.bgColor }}
-                  className="w-12 h-12 rounded-full text-white font-black text-base flex items-center justify-center shadow-md flex-shrink-0"
-                >
-                  {selectedPatientForModal.avatar}
+      {/* ── MODAL 2: PATIENT CLINICAL DOSSIER & VAULT ── */}
+      {selectedPatObj && (
+        <div className="admin-modal-backdrop" id="adminPatientDossierModal" style={{ display: 'flex' }} onClick={(e) => { if (e.target === e.currentTarget) setSelectedPatientKey(null); }}>
+          <div className="admin-modal-card">
+            <div style={{ background: '#0F172A', color: '#fff', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: selectedPatObj.bgColor, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '15px' }}>
+                  {selectedPatObj.avatar}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-white leading-none">
-                      {selectedPatientForModal.display_name}
-                    </h3>
-                    <span className="px-2 py-0.5 bg-slate-700 text-slate-300 font-mono rounded-md text-xs font-bold">
-                      {selectedPatientForModal.id}
-                    </span>
-                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 font-bold rounded-full text-xs">
-                      Active 24h Chat
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 800 }}>{selectedPatObj.name}</span>
+                    <span className="badge badge-slate">{selectedPatObj.id}</span>
+                    {selectedPatObj.chatActive && <span className="badge badge-green">Active 24h Chat</span>}
                   </div>
-                  <div className="text-xs text-slate-300 mt-1">
-                    {selectedPatientForModal.age} {selectedPatientForModal.gender} • Emergency Contact: {selectedPatientForModal.emergency_contact}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    Registered: {selectedPatientForModal.registered_at} • Total Visits: {selectedPatientForModal.total_consultations}
-                  </div>
+                  <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '2px' }}>{selectedPatObj.meta}</div>
                 </div>
               </div>
-
-              <button
-                onClick={() => setSelectedPatientForModal(null)}
-                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors text-base"
-              >
-                ✕
-              </button>
+              <button onClick={() => setSelectedPatientKey(null)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '20px', cursor: 'pointer' }}>✕</button>
             </div>
 
-            {/* Vitals Strip */}
-            <div className="grid grid-cols-4 bg-slate-100 border-b border-slate-200 divide-x divide-slate-200 text-center">
-              <div className="p-3 bg-white">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                  Latest Blood Pressure
-                </div>
-                <div className="text-base font-black text-rose-600 mt-0.5">
-                  {selectedPatientForModal.bp}
-                </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: '#E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
+              <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Latest Blood Pressure</div>
+                <div style={{ fontSize: '16px', fontWeight: 800, color: '#DC2626', marginTop: '2px' }}>{selectedPatObj.bp}</div>
               </div>
-              <div className="p-3 bg-white">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                  Resting Pulse
-                </div>
-                <div className="text-base font-black text-slate-900 mt-0.5">
-                  {selectedPatientForModal.pulse}
-                </div>
+              <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Resting Pulse</div>
+                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', marginTop: '2px' }}>{selectedPatObj.pulse}</div>
               </div>
-              <div className="p-3 bg-white">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                  Chronic Care Cohort
-                </div>
-                <div className="text-sm font-black text-blue-600 mt-0.5">
-                  {selectedPatientForModal.cohort}
-                </div>
+              <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Chronic Care Cohort</div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#2563EB', marginTop: '4px' }}>{selectedPatObj.cohort}</div>
               </div>
-              <div className="p-3 bg-white">
-                <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-                  Attached Lab Panels
-                </div>
-                <div className="text-sm font-black text-emerald-600 mt-0.5">
-                  {selectedPatientForModal.labs}
-                </div>
+              <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Attached Lab Panels</div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#059669', marginTop: '4px' }}>{selectedPatObj.labs}</div>
               </div>
             </div>
 
-            {/* Body */}
-            <div className="p-5 overflow-y-auto space-y-6 flex-1 text-xs">
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm mb-2">
-                  Patient Lifetime Consultation History
-                </h4>
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200">
-                      <tr>
-                        <th className="py-2.5 px-3">Date</th>
-                        <th className="py-2.5 px-3">Attending Physician</th>
-                        <th className="py-2.5 px-3">Specialty</th>
-                        <th className="py-2.5 px-3">Consultation Mode</th>
-                        <th className="py-2.5 px-3">Primary Finding</th>
-                        <th className="py-2.5 px-3">Issued e-Rx</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {selectedPatientForModal.encounters.map((enc, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 font-semibold text-slate-700">{enc.date}</td>
-                          <td className="py-2.5 px-3 font-bold text-slate-900">{enc.doctor}</td>
-                          <td className="py-2.5 px-3 text-slate-600">{enc.spec}</td>
-                          <td className="py-2.5 px-3">
-                            <span className="px-2 py-0.5 rounded-md font-bold text-[10px] bg-emerald-50 text-emerald-800">
-                              {enc.mode}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-slate-700">{enc.diag}</td>
-                          <td className="py-2.5 px-3 font-mono font-bold text-blue-600">{enc.rx}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div style={{ padding: '18px 22px', overflowY: 'auto', flex: 1 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>Patient Lifetime Consultation History</strong>
+                <span style={{ fontSize: '11px', color: '#64748B' }}>Chronological electronic health record</span>
               </div>
 
-              {/* Health Vault Attached Diagnostic Tests */}
-              <div>
-                <h4 className="font-bold text-slate-900 text-sm mb-2">
-                  Health Vault Attached Diagnostic Tests & Prescriptions
-                </h4>
-                <div className="grid grid-cols-2 gap-3">
-                  {selectedPatientForModal.vaultDocuments.map((doc, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                          <FileText className="w-4 h-4 text-rose-500" />
-                          <span>{doc.name}</span>
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">{doc.meta}</div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setActionMessage(`Viewing diagnostic record: ${doc.name}`);
-                          setTimeout(() => setActionMessage(null), 3000);
-                        }}
-                        className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-lg text-xs transition-colors"
-                      >
-                        View PDF
-                      </button>
-                    </div>
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Attending Physician</th>
+                    <th>Specialty</th>
+                    <th>Consultation Mode</th>
+                    <th>Primary Clinical Finding</th>
+                    <th>Issued e-Rx</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedPatObj.encounters.map((enc, idx) => (
+                    <tr key={idx}>
+                      <td>{enc.date}</td>
+                      <td><b>{enc.doctor}</b></td>
+                      <td>{enc.spec}</td>
+                      <td><span className={`badge ${enc.badgeCls}`}>{enc.mode}</span></td>
+                      <td>{enc.diag}</td>
+                      <td><span className="badge badge-blue">{enc.rx}</span></td>
+                    </tr>
                   ))}
+                </tbody>
+              </table>
+
+              <div style={{ marginTop: '20px' }}>
+                <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>Health Vault Attached Diagnostic Tests &amp; Prescriptions</strong>
+                <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                  <div style={{ padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ fontSize: '12px', color: '#0F172A' }}>📄 Lipid_Profile_Panel.pdf</strong>
+                      <div style={{ fontSize: '10px', color: '#64748B' }}>Cholesterol: 215 mg/dL • Attached 18 Sep 2026</div>
+                    </div>
+                    <button className="admin-btn-sec" onClick={() => showToast('Opening Report', 'Displaying diagnostic report from patient vault.', '📄', 'info')}>View PDF</button>
+                  </div>
+                  <div style={{ padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ fontSize: '12px', color: '#0F172A' }}>📄 CBC_Hemogram_Report.pdf</strong>
+                      <div style={{ fontSize: '10px', color: '#64748B' }}>Hb: 12.8 g/dL • Attached 12 Aug 2026</div>
+                    </div>
+                    <button className="admin-btn-sec" onClick={() => showToast('Opening Report', 'Displaying diagnostic report from patient vault.', '📄', 'info')}>View PDF</button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-              <span className="text-xs text-slate-500">
-                Confidential Medical Record • HelloDoctor Health Vault
-              </span>
-              <button
-                onClick={() => setSelectedPatientForModal(null)}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors"
-              >
-                Close Dossier
+            <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '11px', color: '#64748B' }}>Confidential Medical Record • HelloDoctor Health Vault</span>
+              <button className="admin-btn-sec" onClick={() => setSelectedPatientKey(null)}>Close Dossier</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 3: LOG DETAIL MODAL ── */}
+      {selectedLogObj && (
+        <div className="admin-modal-backdrop" id="adminLogDetailModal" style={{ display: 'flex' }} onClick={(e) => { if (e.target === e.currentTarget) setSelectedLogId(null); }}>
+          <div className="admin-modal-card" style={{ maxWidth: '920px' }}>
+            <div style={{ background: '#0F172A', color: '#fff', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#DC2626', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '18px' }}>
+                  ⚠️
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 800, letterSpacing: '0.5px', fontFamily: 'monospace' }}>{selectedLogObj.traceId}</span>
+                    <span className="badge" style={{ background: '#FEE2E2', color: '#991B1B', fontWeight: 800 }}>{selectedLogObj.severity}</span>
+                    <span className="badge" style={{ background: selectedLogObj.status === 'RESOLVED' ? '#DCFCE7' : '#FEF3C7', color: selectedLogObj.status === 'RESOLVED' ? '#166534' : '#D97706', fontWeight: 800 }}>
+                      {selectedLogObj.status}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '3px' }}>Logged: {selectedLogObj.timeFormatted} ({selectedLogObj.relativeTime})</div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedLogId(null)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '22px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '16px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '12px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>1. IMPACTED USER &amp; CLIENT ENVIRONMENT</span>
+                  <span className="badge badge-green">{selectedLogObj.user.role} Account</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: selectedLogObj.user.avatarBg, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '14px' }}>
+                      {selectedLogObj.user.avatar}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{selectedLogObj.user.name} ({selectedLogObj.user.ageGender})</div>
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>ID: {selectedLogObj.user.id} • {selectedLogObj.user.phone}</div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px' }}>
+                    <div><b style={{ color: '#475569' }}>Device:</b> <span style={{ color: '#0F172A' }}>{selectedLogObj.user.device}</span></div>
+                    <div><b style={{ color: '#475569' }}>Network:</b> <span style={{ color: '#0F172A' }}>{selectedLogObj.user.network}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: '#FFF1F2', border: '1px solid #FECDD3', borderRadius: '14px', padding: '16px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#9F1239', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+                  2. FAILURE ROOT CAUSE &amp; FAILED SUBSYSTEM
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '10.5px', color: '#881337', fontWeight: 700 }}>FAILED SUBSYSTEM</div>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#9F1239', marginTop: '2px' }}>{selectedLogObj.subsystem}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10.5px', color: '#881337', fontWeight: 700 }}>COMPONENT / ENDPOINT</div>
+                    <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#9F1239', marginTop: '2px' }}>{selectedLogObj.component}</div>
+                  </div>
+                </div>
+                <div style={{ background: '#fff', border: '1px solid #FDA4AF', borderRadius: '10px', padding: '12px' }}>
+                  <div style={{ fontSize: '10.5px', color: '#64748B', fontWeight: 700 }}>CLINICAL &amp; SYSTEM ERROR SUMMARY</div>
+                  <div style={{ fontSize: '12px', color: '#9F1239', marginTop: '2px', lineHeight: 1.45 }}>{selectedLogObj.errorMessage}</div>
+                </div>
+              </div>
+
+              <div style={{ background: '#0F172A', borderRadius: '14px', padding: '16px', color: '#E2E8F0' }}>
+                <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '11px', lineHeight: 1.55, color: '#38BDF8', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '180px', overflowY: 'auto' }}>
+                  {selectedLogObj.stackTrace}
+                </pre>
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button className="admin-btn-sec" onClick={() => setSelectedLogId(null)}>Close Dossier</button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="slot-subtle-btn" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '8px 14px', borderRadius: '8px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer' }} onClick={() => showToast('Handshake Replayed ✓', `Upstream gateway accepted retry for ${selectedLogObj.user.name}.`, '✓', 'success')}>
+                  Retry Webhook / Handshake 🔁
+                </button>
+                <button className="admin-btn-pri" onClick={() => handleToggleLogResolve(selectedLogObj.id)} style={{ padding: '8px 16px', fontSize: '11.5px' }}>
+                  {selectedLogObj.status === 'RESOLVED' ? 'Re-open Incident ↩' : 'Mark as Resolved ✓'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 4: SIMULATE FAILURE MODAL ── */}
+      {simulateModalOpen && (
+        <div className="admin-modal-backdrop" id="adminSimulateFailureModal" style={{ display: 'flex' }} onClick={(e) => { if (e.target === e.currentTarget) setSimulateModalOpen(false); }}>
+          <div className="admin-modal-card" style={{ maxWidth: '620px' }}>
+            <div style={{ background: '#0F172A', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '20px' }}>⚡</span>
+                <div>
+                  <strong style={{ fontSize: '15px' }}>Simulate Application Failure Incident</strong>
+                  <div style={{ fontSize: '11px', color: '#94A3B8' }}>Inject an artificial error event to test admin telemetry tracking</div>
+                </div>
+              </div>
+              <button onClick={() => setSimulateModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Target Impacted User</label>
+                <select value={simUser} onChange={(e) => setSimUser(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}>
+                  <option value="sarah">Sarah Khan (Patient • +880 1711-234567)</option>
+                  <option value="sabrina">Dr. Sabrina Akter (Doctor Web • BMDC #45821)</option>
+                  <option value="rafiq">Rafiq Ahmed (Patient • +880 1819-987654)</option>
+                  <option value="anika">Dr. Anika Rahman (Doctor Mobile • BMDC #A-74921)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Failure Scenario Preset</label>
+                <select value={simScenario} onChange={(e) => setSimScenario(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}>
+                  <option value="bkash_timeout">💳 bKash PGW: HTTP 504 Gateway Callback Timeout</option>
+                  <option value="webrtc_ice">📹 Agora WebRTC: ICE Candidate Relay Failed (Code 702)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Severity</label>
+                  <select value={simSeverity} onChange={(e) => setSimSeverity(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}>
+                    <option value="CRITICAL">🔴 CRITICAL</option>
+                    <option value="ERROR">🟠 ERROR</option>
+                    <option value="WARNING">🟡 WARNING</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Custom Note</label>
+                  <input type="text" placeholder="e.g. Stress test injection" value={simCustomNote} onChange={(e) => setSimCustomNote(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none' }} />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 20px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button className="admin-btn-sec" onClick={() => setSimulateModalOpen(false)}>Cancel</button>
+              <button className="admin-btn-pri" onClick={handleExecuteSimulateFailure} style={{ background: '#DC2626', borderColor: '#DC2626' }}>
+                <span>⚡ Inject Failure Incident</span>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Monthly Disbursement Batch Modal */}
-      {disbursementModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Send className="w-5 h-5" />
+      {/* ── MODAL 5: GRIEVANCE DETAIL MODAL ── */}
+      {selectedGrvObj && (
+        <div className="admin-modal-backdrop" id="adminGrievanceDetailModal" style={{ display: 'flex' }} onClick={(e) => { if (e.target === e.currentTarget) setSelectedGrievanceId(null); }}>
+          <div className="admin-modal-card" style={{ maxWidth: '840px', width: '95%' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAFAFA' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#FEE2E2', color: '#DC2626', display: 'grid', placeItems: 'center', fontSize: '18px' }}>⚖️</div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>{selectedGrvObj.id}</span>
+                    <span className={`badge ${selectedGrvObj.target === 'DOCTOR' ? 'badge-rose' : 'badge-blue'}`}>{selectedGrvObj.target === 'DOCTOR' ? 'Against Doctor' : 'Against System'}</span>
+                    <span className="badge badge-amber">{selectedGrvObj.status.replace(/_/g, ' ')}</span>
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>Filed {selectedGrvObj.timeFormatted} • Ref #{selectedGrvObj.consultationId}</div>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  Initiate Monthly Doctor Disbursement
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Cycle: September 2026 Batch Payout
-                </p>
+              <button onClick={() => setSelectedGrievanceId(null)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '20px', maxHeight: 'calc(85vh - 130px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', background: '#F8FAFC' }}>
+                  <div style={{ fontSize: '10.5px', fontWeight: 750, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>👤 Complainant (Patient)</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{selectedGrvObj.patient.name} ({selectedGrvObj.patient.ageGender})</div>
+                  <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>Phone: {selectedGrvObj.patient.phone}</div>
+                </div>
+
+                <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', background: '#F8FAFC' }}>
+                  <div style={{ fontSize: '10.5px', fontWeight: 750, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>🩺 Accused Physician</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{selectedGrvObj.doctor.name}</div>
+                  <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>{selectedGrvObj.doctor.bmdc} • Fee: {selectedGrvObj.doctor.fee}</div>
+                </div>
+              </div>
+
+              <div style={{ border: '1.5px solid #FCA5A5', borderRadius: '12px', background: '#FFF5F5', padding: '14px 16px' }}>
+                <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#991B1B' }}>{selectedGrvObj.category}</div>
+                <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#450A0A', background: '#FFFFFF', border: '1px solid #FECACA', borderRadius: '8px', padding: '10px 12px', fontStyle: 'italic', marginTop: '6px' }}>
+                  "{selectedGrvObj.patientStatement}"
+                </div>
+              </div>
+
+              <div style={{ border: '1px solid #CBD5E1', borderRadius: '10px', padding: '14px 16px', background: '#F8FAFC' }}>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#1E293B', textTransform: 'uppercase', marginBottom: '10px' }}>📊 Forensic Telemetry &amp; System Audit</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{ background: '#fff', border: '1px solid #E2E8F0', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>Call Duration</div>
+                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#DC2626' }}>{selectedGrvObj.telemetryEvidence.callDuration}</div>
+                  </div>
+                  <div style={{ background: '#fff', border: '1px solid #E2E8F0', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>WebRTC Audio/Video</div>
+                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#059669' }}>{selectedGrvObj.telemetryEvidence.connectionStatus}</div>
+                  </div>
+                  <div style={{ background: '#fff', border: '1px solid #E2E8F0', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>e-Prescription</div>
+                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#DC2626' }}>{selectedGrvObj.telemetryEvidence.rxIssued}</div>
+                  </div>
+                  <div style={{ background: '#fff', border: '1px solid #E2E8F0', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>Settlement</div>
+                    <div style={{ fontSize: '12px', fontWeight: 800, color: '#2563EB' }}>{selectedGrvObj.telemetryEvidence.paymentStatus}</div>
+                  </div>
+                </div>
+              </div>
+
+              {selectedGrvObj.adjudication && (
+                <div style={{ border: '1px solid #86EFAC', borderRadius: '10px', padding: '12px 14px', background: '#F0FDF4' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 750, color: '#166534', textTransform: 'uppercase', marginBottom: '4px' }}>✓ Adjudication Decision Recorded</div>
+                  <div style={{ fontSize: '12px', color: '#14532D' }}>{selectedGrvObj.adjudication.notes}</div>
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '14px 20px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button className="admin-btn-sec" onClick={() => setSelectedGrievanceId(null)}>Close</button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'REFUND')} style={{ background: '#059669', borderColor: '#059669' }}>
+                  <span>💳 Disburse Instant bKash Refund</span>
+                </button>
+                <button className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'WARN')} style={{ background: '#DC2626', borderColor: '#DC2626' }}>
+                  <span>⚠️ Issue Doctor BMDC Warning</span>
+                </button>
+                <button className="admin-btn-sec" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'RESOLVE')}>
+                  <span>✓ Mark Resolved</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL 6: TRANSACTION DETAIL MODAL ── */}
+      {selectedTxObj && (
+        <div className="admin-modal-backdrop" id="adminTransactionDetailModal" style={{ display: 'flex' }} onClick={(e) => { if (e.target === e.currentTarget) setSelectedTransactionId(null); }}>
+          <div className="admin-modal-card" style={{ maxWidth: '760px', width: '95%' }}>
+            <div style={{ background: '#0F172A', color: '#fff', padding: '18px 22px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(255,255,255,0.1)', display: 'grid', placeItems: 'center', color: '#38BDF8' }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '16px', fontWeight: 800 }}>{selectedTxObj.txId}</span>
+                    <span className="badge badge-green">{selectedTxObj.escrowStatusLabel}</span>
+                    <span className="payout-method-badge bkash">{selectedTxObj.gatewayLabel}</span>
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '2px' }}>{selectedTxObj.timestamp} • TrxID: {selectedTxObj.gatewayRef}</div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedTransactionId(null)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: '#E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
+              <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>Gross Inflow (Fee)</div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', marginTop: '4px' }}>৳ {selectedTxObj.grossAmount}</div>
+                <div style={{ fontSize: '10.5px', color: '#10B981', fontWeight: 700 }}>Debited from MFS Wallet</div>
+              </div>
+              <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>HeloDoc Platform Fee (15-20%)</div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#059669', marginTop: '4px' }}>৳ {selectedTxObj.platformFeeAmount} ({selectedTxObj.platformFeePercent}%)</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Platform Commission Cut</div>
+              </div>
+              <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>Doctor Net / Refund</div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563EB', marginTop: '4px' }}>৳ {selectedTxObj.netAmount}</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Payable to Physician Wallet</div>
               </div>
             </div>
 
-            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Total Participating Doctors:</span>
-                <strong className="text-slate-900">6 Physicians</strong>
+            <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '60vh', overflowY: 'auto', background: '#FAFAFA' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>Payer (Patient)</div>
+                  <strong style={{ fontSize: '13px', color: '#0F172A' }}>{selectedTxObj.patient.name}</strong>
+                  <div style={{ fontSize: '11px', color: '#64748B' }}>{selectedTxObj.patient.phone}</div>
+                </div>
+
+                <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>Recipient (Doctor / System)</div>
+                  <strong style={{ fontSize: '13px', color: '#0F172A' }}>{selectedTxObj.doctor.name}</strong>
+                  <div style={{ fontSize: '11px', color: '#64748B' }}>{selectedTxObj.doctor.bmdc} • {selectedTxObj.doctor.specialty}</div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Gross Patient Billings:</span>
-                <strong className="text-slate-900">৳ 462,050.00</strong>
-              </div>
-              <div className="flex justify-between text-rose-600">
-                <span>Withheld 20% Platform Fee:</span>
-                <strong>-৳ 92,410.00</strong>
-              </div>
-              <div className="flex justify-between border-t border-slate-200 pt-1 text-emerald-700 font-bold">
-                <span>Total Net Batch Disbursed:</span>
-                <span>৳ 369,640.00</span>
+
+              <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>MFS Webhook Payload</div>
+                <pre style={{ background: '#0F172A', color: '#E2E8F0', padding: '12px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '11px', overflowX: 'auto', margin: 0 }}>
+                  {JSON.stringify(selectedTxObj.gatewayPayload, null, 2)}
+                </pre>
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-500">
-              Executing this operation triggers automated bulk MFS payment API callbacks to linked physician accounts and resets pending doctor wallet balances.
-            </p>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setDisbursementModalOpen(false)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors"
-              >
-                Cancel
+            <div style={{ padding: '14px 22px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button className="sheet-btn" onClick={() => showToast('Receipt Downloaded 📄', 'Official tax voucher saved.', '📄', 'success')} style={{ padding: '8px 16px', fontSize: '12px', background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#334155', borderRadius: '8px', cursor: 'pointer' }}>
+                📄 Print / Save Tax Voucher
               </button>
-              <button
-                onClick={handleInitiateMonthlyDisbursement}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
-              >
-                Confirm & Disburse Batch
+              <button className="sheet-btn primary" onClick={() => setSelectedTransactionId(null)} style={{ padding: '8px 20px', fontSize: '12px', background: '#0F172A', color: '#fff', borderRadius: '8px', cursor: 'pointer' }}>
+                Close Audit Window
               </button>
             </div>
           </div>
