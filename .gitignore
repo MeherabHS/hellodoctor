@@ -17,3 +17,10 @@ Thumbs.db
 # Logs & temp
 *.log
 tmp/
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+.env*.local
+*.tsbuildinfo
