@@ -12,8 +12,7 @@ pub struct RegisterOtpRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct VerifyOtpRequest {
-    pub phone_number: Option<String>,
-    pub session_token: Option<String>,
+    pub phone_number: String,
     pub otp_code: String,
 }
 
@@ -51,12 +50,14 @@ pub async fn register_otp(
     State(state): State<AppState>,
     Json(payload): Json<RegisterOtpRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let (session_token, expires_in) = AuthService::request_patient_otp(&state, &payload.phone_number)?;
+    let _ = payload.role;
+    let (session_token, expires_in, debug_otp_code) = AuthService::request_patient_otp(&state, &payload.phone_number).await?;
     Ok(Json(ApiResponse {
         success: true,
         data: serde_json::json!({
             "session_token": session_token,
-            "expires_in": expires_in
+            "expires_in": expires_in,
+            "debug_otp_code": debug_otp_code
         }),
     }))
 }
@@ -65,13 +66,7 @@ pub async fn verify_otp_and_login(
     State(state): State<AppState>,
     Json(payload): Json<VerifyOtpRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let phone = payload.phone_number.unwrap_or_else(|| "+8801712345678".into());
-    let login_resp = AuthService::verify_otp_and_login(
-        &state,
-        &phone,
-        &payload.otp_code,
-        "helodoc-jwt-secret-key-ed25519",
-    )?;
+    let login_resp = AuthService::verify_otp_and_login(&state, &payload.phone_number, &payload.otp_code).await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -83,12 +78,13 @@ pub async fn doctor_login(
     State(state): State<AppState>,
     Json(payload): Json<DoctorLoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let session_token = AuthService::doctor_login_step1(&state, &payload.license_number, &payload.password)?;
+    let (session_token, debug_code) = AuthService::doctor_login_step1(&state, &payload.license_number, &payload.password).await?;
     Ok(Json(ApiResponse {
         success: true,
         data: serde_json::json!({
             "session_token": session_token,
-            "requires_otp": true
+            "requires_otp": true,
+            "debug_otp_code": debug_code
         }),
     }))
 }
@@ -97,13 +93,7 @@ pub async fn doctor_verify_otp(
     State(state): State<AppState>,
     Json(payload): Json<DoctorVerifyOtpRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let doc_id = uuid::Uuid::parse_str("da000001-0000-0000-0000-000000000001").unwrap();
-    let login_resp = AuthService::doctor_verify_otp(
-        &state,
-        doc_id,
-        &payload.otp_code,
-        "helodoc-jwt-secret-key-ed25519",
-    )?;
+    let login_resp = AuthService::doctor_verify_otp(&state, &payload.session_token, &payload.otp_code).await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -115,13 +105,7 @@ pub async fn admin_login(
     State(state): State<AppState>,
     Json(payload): Json<AdminLoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let login_resp = AuthService::admin_login(
-        &state,
-        &payload.email,
-        &payload.password,
-        &payload.totp_code,
-        "helodoc-jwt-secret-key-ed25519",
-    )?;
+    let login_resp = AuthService::admin_login(&state, &payload.email, &payload.password, &payload.totp_code).await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -133,8 +117,7 @@ pub async fn refresh_token(
     State(state): State<AppState>,
     Json(payload): Json<RefreshRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let (access_token, new_refresh_token) =
-        AuthService::refresh_session(&state, &payload.refresh_token, "helodoc-jwt-secret-key-ed25519")?;
+    let (access_token, new_refresh_token) = AuthService::refresh_session(&state, &payload.refresh_token).await?;
 
     Ok(Json(ApiResponse {
         success: true,

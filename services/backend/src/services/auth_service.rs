@@ -1,327 +1,256 @@
+use crate::crypto;
 use crate::domain::models::*;
+use crate::domain::validation;
 use crate::error::AppError;
-use crate::repository::AppState;
+use crate::repository::{doctor_repo, otp_repo, patient_repo, session_repo, user_repo, AppState};
 use chrono::{Duration, Utc};
-use jsonwebtoken::{encode, EncodingKey, Header};
-use rand::{distributions::Alphanumeric, Rng};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+use rand::RngCore;
+use serde::Serialize;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: String,
-    pub user_id: Uuid,
+const OTP_TTL_SECONDS: i64 = 120;
+const OTP_MAX_ATTEMPTS: i16 = 3;
+const REFRESH_TOKEN_TTL_DAYS: i64 = 7;
+const MFA_CHALLENGE_TTL_SECONDS: i64 = 300;
+
+#[derive(Debug, Serialize)]
+pub struct LoginUserDto {
+    pub id: Uuid,
     pub role: UserRole,
-    pub iss: String,
-    pub aud: String,
-    pub exp: usize,
-    pub iat: usize,
+    pub phone_number: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct LoginResponse {
+#[derive(Debug, Serialize)]
+pub struct LoginResponseDto {
     pub access_token: String,
     pub refresh_token: String,
-    pub user: UserDto,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UserDto {
-    pub id: Uuid,
-    pub phone_number: String,
-    pub role: UserRole,
-    pub preferred_language: String,
+    pub user: LoginUserDto,
 }
 
 pub struct AuthService;
 
 impl AuthService {
-    /// Send OTP for phone registration or login (Patients)
-    pub fn request_patient_otp(state: &AppState, phone: &str) -> Result<(String, i64), AppError> {
-        let code = "584920"; // Deterministic test/default OTP matching spec
-        let session_token = format!("otp_sess_{}", Uuid::new_v4().to_string().replace('-', ""));
-        let expires_at = Utc::now() + Duration::seconds(120);
+    /// Step 1 of patient login: generate, hash, and persist a real one-time code.
+    /// In `development`, the plaintext code is also returned so test/local clients without a
+    /// real SMS gateway can complete the flow; this is never populated in any other environment.
+    pub async fn request_patient_otp(state: &AppState, phone: &str) -> Result<(String, i64, Option<String>), AppError> {
+        validation::validate_phone_number(phone)?;
 
-        state
-            .phone_otps
-            .write()
-            .insert(phone.to_string(), (code.to_string(), expires_at));
+        let code = crypto::generate_numeric_code(6);
+        let code_hash = crypto::hash_code(&code);
+        let expires_at = Utc::now() + Duration::seconds(OTP_TTL_SECONDS);
+        otp_repo::upsert(&state.db, phone, &code_hash, expires_at).await?;
 
-        Ok((session_token, 120))
+        // Real deployments dispatch this via an SMS gateway. Never log the code itself.
+        tracing::info!("OTP generated and dispatched for a patient login attempt");
+
+        let debug_code = (state.config.environment == "development").then_some(code);
+        Ok((Uuid::new_v4().to_string(), OTP_TTL_SECONDS, debug_code))
     }
 
-    /// Verify OTP and log in / register patient
-    pub fn verify_otp_and_login(
-        state: &AppState,
-        phone: &str,
-        otp_code: &str,
-        jwt_secret: &str,
-    ) -> Result<LoginResponse, AppError> {
-        // Validate OTP
-        let mut otps = state.phone_otps.write();
-        let (stored_code, expiry) = otps.get(phone).ok_or_else(|| {
-            AppError::Unauthorized("No OTP request found for this phone number.".into())
-        })?;
+    /// Step 2 of patient login: verify the real OTP, find-or-create the patient, issue tokens.
+    pub async fn verify_otp_and_login(state: &AppState, phone: &str, otp_code: &str) -> Result<LoginResponseDto, AppError> {
+        let record = otp_repo::find(&state.db, phone)
+            .await?
+            .ok_or_else(|| AppError::Unauthorized("No OTP was requested for this number, or it has expired.".into()))?;
 
-        if Utc::now() > *expiry {
-            otps.remove(phone);
-            return Err(AppError::Unauthorized("OTP code has expired. Please request a new one.".into()));
+        if Utc::now() > record.expires_at {
+            otp_repo::delete(&state.db, phone).await?;
+            return Err(AppError::Unauthorized("OTP has expired. Please request a new code.".into()));
         }
 
-        if stored_code != otp_code && otp_code != "584920" {
-            return Err(AppError::Unauthorized("Invalid OTP verification code.".into()));
+        if record.attempts >= OTP_MAX_ATTEMPTS {
+            return Err(AppError::RateLimitExceeded(
+                "Too many incorrect attempts. Please request a new OTP.".into(),
+            ));
         }
 
-        // Find or create patient user
-        let mut users = state.users.write();
-        let user = if let Some(existing) = users.values().find(|u| u.phone_number == phone) {
-            existing.clone()
-        } else {
-            let new_user = User {
-                id: Uuid::new_v4(),
-                phone_number: phone.to_string(),
-                email: None,
-                password_hash: None,
-                role: UserRole::Patient,
-                preferred_language: "en".into(),
-                is_active: true,
-                is_verified: true,
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
-                deleted_at: None,
-            };
-            users.insert(new_user.id, new_user.clone());
+        if !crypto::verify_code(otp_code, &record.code_hash) {
+            otp_repo::increment_attempts(&state.db, phone).await?;
+            return Err(AppError::Unauthorized("Incorrect OTP code.".into()));
+        }
 
-            // Initialize patient profile
-            let mut profiles = state.patient_profiles.write();
-            profiles.insert(
-                new_user.id,
-                PatientProfile {
-                    id: Uuid::new_v4(),
-                    user_id: new_user.id,
-                    full_name: "Patient User".into(),
-                    date_of_birth: chrono::NaiveDate::from_ymd_opt(1995, 1, 1).unwrap(),
-                    gender: Gender::Other,
-                    blood_group: None,
-                    weight_kg: None,
-                    emergency_contact_phone: None,
-                    emergency_contact_relation: None,
-                    created_at: Utc::now(),
-                    updated_at: Utc::now(),
-                },
-            );
+        otp_repo::delete(&state.db, phone).await?;
 
-            new_user
+        let user = match user_repo::find_by_phone(&state.db, phone).await? {
+            Some(u) => u,
+            None => user_repo::create_patient_user(&state.db, phone).await?,
         };
 
-        // Mint Tokens
-        let (access_token, refresh_token) = Self::mint_session(state, user.id, user.role, jwt_secret)?;
-
-        Ok(LoginResponse {
-            access_token,
-            refresh_token,
-            user: UserDto {
-                id: user.id,
-                phone_number: user.phone_number,
-                role: user.role,
-                preferred_language: user.preferred_language,
-            },
-        })
-    }
-
-    /// Doctor MFA Login Step 1: License + Password
-    pub fn doctor_login_step1(
-        state: &AppState,
-        license_number: &str,
-        _password: &str,
-    ) -> Result<String, AppError> {
-        let docs = state.doctor_profiles.read();
-        let doc = docs
-            .values()
-            .find(|d| d.license_number.eq_ignore_ascii_case(license_number))
-            .ok_or_else(|| {
-                AppError::Unauthorized("Invalid medical license credentials or password.".into())
-            })?;
-
-        // In production, verify Argon2id password hash here
-        let session_token = format!("mfa_sess_{}", doc.id);
-        Ok(session_token)
-    }
-
-    /// Doctor MFA Login Step 2: Verify second-factor OTP
-    pub fn doctor_verify_otp(
-        state: &AppState,
-        doctor_id: Uuid,
-        otp_code: &str,
-        jwt_secret: &str,
-    ) -> Result<LoginResponse, AppError> {
-        if otp_code != "837194" && otp_code != "584920" && otp_code != "123456" {
-            return Err(AppError::Unauthorized("Invalid doctor second-factor OTP code.".into()));
+        if patient_repo::find_by_user_id(&state.db, user.id).await?.is_none() {
+            let now = Utc::now();
+            let profile = PatientProfile {
+                id: Uuid::new_v4(),
+                user_id: user.id,
+                full_name: "Patient User".into(),
+                date_of_birth: chrono::NaiveDate::from_ymd_opt(1995, 1, 1).unwrap(),
+                gender: Gender::Other,
+                blood_group: None,
+                weight_kg: None,
+                emergency_contact_phone: None,
+                emergency_contact_relation: None,
+                created_at: now,
+                updated_at: now,
+            };
+            patient_repo::insert(&state.db, &profile).await?;
         }
 
-        let docs = state.doctor_profiles.read();
-        let doc = docs.get(&doctor_id).ok_or_else(|| {
-            AppError::NotFound("Doctor profile not found.".into())
-        })?;
-
-        let (access_token, refresh_token) = Self::mint_session(state, doc.user_id, UserRole::Doctor, jwt_secret)?;
-
-        Ok(LoginResponse {
-            access_token,
-            refresh_token,
-            user: UserDto {
-                id: doc.user_id,
-                phone_number: doc.verified_phone.clone(),
-                role: UserRole::Doctor,
-                preferred_language: "en".into(),
-            },
-        })
+        Self::issue_login_response(state, &user).await
     }
 
-    /// Admin Login: Email + Password + TOTP
-    pub fn admin_login(
-        state: &AppState,
-        _email: &str,
-        _password: &str,
-        totp_code: &str,
-        jwt_secret: &str,
-    ) -> Result<LoginResponse, AppError> {
-        if totp_code != "123456" && totp_code != "584920" {
-            return Err(AppError::Unauthorized("Invalid administrative TOTP code.".into()));
+    /// Doctor step 1: real Argon2id password verification, issues a second-factor challenge.
+    /// In `development`, the plaintext second-factor code is also returned (see `request_patient_otp`).
+    pub async fn doctor_login_step1(state: &AppState, license_number: &str, password: &str) -> Result<(String, Option<String>), AppError> {
+        validation::validate_license_number(license_number)?;
+
+        let invalid_credentials = || AppError::Unauthorized("Invalid license number or password.".into());
+
+        let doctor = doctor_repo::find_by_license(&state.db, license_number)
+            .await?
+            .ok_or_else(invalid_credentials)?;
+        let user = user_repo::find_by_id(&state.db, doctor.user_id)
+            .await?
+            .ok_or_else(invalid_credentials)?;
+        let hash = user.password_hash.as_deref().ok_or_else(invalid_credentials)?;
+
+        if !crypto::verify_password(password, hash) {
+            return Err(invalid_credentials());
         }
 
-        let admin_user_id = Uuid::parse_str("a0000001-0000-0000-0000-000000000001").unwrap();
-        let (access_token, refresh_token) =
-            Self::mint_session(state, admin_user_id, UserRole::PlatformAdmin, jwt_secret)?;
+        let code = crypto::generate_numeric_code(6);
+        let code_hash = crypto::hash_code(&code);
+        let token = Uuid::new_v4().to_string();
+        let expires_at = Utc::now() + Duration::seconds(MFA_CHALLENGE_TTL_SECONDS);
+        session_repo::insert_pending_challenge(&state.db, &token, user.id, &code_hash, expires_at).await?;
 
-        Ok(LoginResponse {
-            access_token,
-            refresh_token,
-            user: UserDto {
-                id: admin_user_id,
-                phone_number: "+8801700000000".into(),
-                role: UserRole::PlatformAdmin,
-                preferred_language: "en".into(),
-            },
-        })
+        tracing::info!("Doctor second-factor code generated and dispatched");
+
+        let debug_code = (state.config.environment == "development").then_some(code);
+        Ok((token, debug_code))
     }
 
-    /// Refresh token rotation with family reuse detection
-    pub fn refresh_session(
-        state: &AppState,
-        presented_refresh_token: &str,
-        jwt_secret: &str,
-    ) -> Result<(String, String), AppError> {
-        let hash = format!("{:x}", Sha256::digest(presented_refresh_token.as_bytes()));
+    /// Doctor step 2: verify the real second-factor code for the pending challenge session.
+    pub async fn doctor_verify_otp(state: &AppState, session_token: &str, otp_code: &str) -> Result<LoginResponseDto, AppError> {
+        let challenge = session_repo::find_pending_challenge(&state.db, session_token)
+            .await?
+            .ok_or_else(|| AppError::Unauthorized("Invalid or expired verification session.".into()))?;
 
-        let mut sessions = state.auth_sessions.write();
-        let session = sessions
-            .values()
-            .find(|s| s.refresh_token_hash == hash)
-            .cloned();
-
-        match session {
-            Some(mut s) => {
-                if s.revoked_at.is_some() || s.rotated_at.is_some() {
-                    // Reuse detection triggered: revoke entire family
-                    let family_id = s.token_family_id;
-                    for ses in sessions.values_mut() {
-                        if ses.token_family_id == family_id {
-                            ses.revoked_at = Some(Utc::now());
-                        }
-                    }
-                    return Err(AppError::Unauthorized(
-                        "Refresh token reuse detected. All active sessions have been revoked.".into(),
-                    ));
-                }
-
-                // Invalidate old session
-                s.rotated_at = Some(Utc::now());
-                sessions.insert(s.id, s.clone());
-
-                // Mint new session within the same family
-                let new_raw_token: String = rand::thread_rng()
-                    .sample_iter(&Alphanumeric)
-                    .take(64)
-                    .map(char::from)
-                    .collect();
-                let new_hash = format!("{:x}", Sha256::digest(new_raw_token.as_bytes()));
-
-                let new_session = AuthSession {
-                    id: Uuid::new_v4(),
-                    user_id: s.user_id,
-                    token_family_id: s.token_family_id,
-                    refresh_token_hash: new_hash,
-                    device_fingerprint: s.device_fingerprint,
-                    ip_hash: s.ip_hash,
-                    user_agent: s.user_agent,
-                    created_at: Utc::now(),
-                    last_used_at: Utc::now(),
-                    rotated_at: None,
-                    revoked_at: None,
-                    expires_at: Utc::now() + Duration::days(7),
-                };
-                sessions.insert(new_session.id, new_session);
-
-                // Generate new access token
-                let access_token = Self::create_jwt(s.user_id, UserRole::Patient, jwt_secret)?;
-                Ok((access_token, new_raw_token))
-            }
-            None => Err(AppError::Unauthorized("Invalid refresh token.".into())),
+        if Utc::now() > challenge.expires_at {
+            session_repo::delete_pending_challenge(&state.db, session_token).await?;
+            return Err(AppError::Unauthorized("Verification session expired. Please log in again.".into()));
         }
+
+        if !crypto::verify_code(otp_code, &challenge.code_hash) {
+            return Err(AppError::Unauthorized("Incorrect verification code.".into()));
+        }
+
+        session_repo::delete_pending_challenge(&state.db, session_token).await?;
+
+        let user = user_repo::find_by_id(&state.db, challenge.user_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("User record for verified session is missing.".into()))?;
+
+        Self::issue_login_response(state, &user).await
     }
 
-    fn mint_session(
-        state: &AppState,
-        user_id: Uuid,
-        role: UserRole,
-        jwt_secret: &str,
-    ) -> Result<(String, String), AppError> {
-        let access_token = Self::create_jwt(user_id, role, jwt_secret)?;
+    /// Admin login: real Argon2id password + real TOTP second factor.
+    pub async fn admin_login(state: &AppState, email: &str, password: &str, totp_code: &str) -> Result<LoginResponseDto, AppError> {
+        let invalid_credentials = || AppError::Unauthorized("Invalid credentials.".into());
 
-        let raw_refresh_token: String = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(64)
-            .map(char::from)
-            .collect();
-        let refresh_token_hash = format!("{:x}", Sha256::digest(raw_refresh_token.as_bytes()));
+        let user = user_repo::find_by_email(&state.db, email)
+            .await?
+            .ok_or_else(invalid_credentials)?;
+        let hash = user.password_hash.as_deref().ok_or_else(invalid_credentials)?;
+
+        if !crypto::verify_password(password, hash) {
+            return Err(invalid_credentials());
+        }
+
+        let mfa = session_repo::find_mfa_credential(&state.db, user.id, MfaMethod::Totp)
+            .await?
+            .ok_or_else(|| AppError::Unauthorized("TOTP is not configured for this account.".into()))?;
+
+        let secret = crypto::decrypt_totp_secret(&mfa.totp_secret_encrypted, &state.config.totp_encryption_key_b64)?;
+        if !crypto::verify_totp(&secret, totp_code)? {
+            return Err(AppError::Unauthorized("Invalid TOTP code.".into()));
+        }
+
+        session_repo::touch_mfa_verified(&state.db, mfa.id, Utc::now()).await?;
+
+        Self::issue_login_response(state, &user).await
+    }
+
+    /// Rotates a refresh token, detecting reuse of an already-rotated token by revoking the whole family.
+    pub async fn refresh_session(state: &AppState, presented_refresh_token: &str) -> Result<(String, String), AppError> {
+        let presented_hash = crypto::hash_code(presented_refresh_token);
+
+        let session = session_repo::find_active_by_token_hash(&state.db, &presented_hash)
+            .await?
+            .ok_or_else(|| AppError::Unauthorized("Refresh token is invalid, expired, or has been revoked.".into()))?;
+
+        if Utc::now() > session.expires_at {
+            return Err(AppError::Unauthorized("Refresh token has expired.".into()));
+        }
+
+        // Reuse detection: if this hash was already rotated away from (rotated_at set),
+        // presenting it again means the token was stolen — revoke the entire family.
+        if session.rotated_at.is_some() {
+            session_repo::revoke_family(&state.db, session.token_family_id).await?;
+            return Err(AppError::Unauthorized(
+                "Refresh token reuse detected; all sessions in this family have been revoked.".into(),
+            ));
+        }
+
+        let user = user_repo::find_by_id(&state.db, session.user_id)
+            .await?
+            .ok_or_else(|| AppError::Internal("User for this session no longer exists.".into()))?;
+
+        let new_refresh_raw = generate_opaque_token();
+        let new_refresh_hash = crypto::hash_code(&new_refresh_raw);
+        session_repo::rotate(&state.db, session.id, &new_refresh_hash, Utc::now()).await?;
+
+        let access_token = crypto::create_access_token(user.id, user.role.as_str(), &state.config.jwt_ed25519_private_key_b64)?;
+
+        Ok((access_token, new_refresh_raw))
+    }
+
+    async fn issue_login_response(state: &AppState, user: &User) -> Result<LoginResponseDto, AppError> {
+        let refresh_raw = generate_opaque_token();
+        let refresh_hash = crypto::hash_code(&refresh_raw);
+        let now = Utc::now();
 
         let session = AuthSession {
             id: Uuid::new_v4(),
-            user_id,
+            user_id: user.id,
             token_family_id: Uuid::new_v4(),
-            refresh_token_hash,
+            refresh_token_hash: refresh_hash,
             device_fingerprint: None,
             ip_hash: None,
             user_agent: None,
-            created_at: Utc::now(),
-            last_used_at: Utc::now(),
+            created_at: now,
+            last_used_at: now,
             rotated_at: None,
             revoked_at: None,
-            expires_at: Utc::now() + Duration::days(7),
+            expires_at: now + Duration::days(REFRESH_TOKEN_TTL_DAYS),
         };
+        session_repo::insert_session(&state.db, &session).await?;
 
-        state.auth_sessions.write().insert(session.id, session);
-        Ok((access_token, raw_refresh_token))
+        let access_token = crypto::create_access_token(user.id, user.role.as_str(), &state.config.jwt_ed25519_private_key_b64)?;
+
+        Ok(LoginResponseDto {
+            access_token,
+            refresh_token: refresh_raw,
+            user: LoginUserDto {
+                id: user.id,
+                role: user.role,
+                phone_number: user.phone_number.clone(),
+            },
+        })
     }
+}
 
-    fn create_jwt(user_id: Uuid, role: UserRole, secret: &str) -> Result<String, AppError> {
-        let claims = Claims {
-            sub: user_id.to_string(),
-            user_id,
-            role,
-            iss: "https://api.hellodoctor.asia".into(),
-            aud: "hellodoctor-client".into(),
-            exp: (Utc::now() + Duration::minutes(15)).timestamp() as usize,
-            iat: Utc::now().timestamp() as usize,
-        };
-
-        encode(
-            &Header::default(),
-            &claims,
-            &EncodingKey::from_secret(secret.as_bytes()),
-        )
-        .map_err(|e| AppError::Internal(format!("Failed to mint access token: {}", e)))
-    }
+fn generate_opaque_token() -> String {
+    let mut bytes = [0u8; 48];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    hex::encode(bytes)
 }

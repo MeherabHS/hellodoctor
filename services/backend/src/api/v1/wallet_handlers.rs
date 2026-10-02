@@ -11,15 +11,10 @@ pub struct ApiResponse<T> {
     pub data: T,
 }
 
-pub async fn get_doctor_wallet(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
+pub async fn get_doctor_wallet(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
     // Default to seeded doctor 1 for viewing
     let doc_id = Uuid::parse_str("da000001-0000-0000-0000-000000000001").unwrap();
-    let summary = DisbursementService::get_doctor_wallet_summary(&state, doc_id)?;
+    let summary = DisbursementService::get_doctor_wallet_summary(&state, doc_id).await?;
 
-    Ok(Json(ApiResponse {
-        success: true,
-        data: summary,
-    }))
+    Ok(Json(ApiResponse { success: true, data: summary }))
 }

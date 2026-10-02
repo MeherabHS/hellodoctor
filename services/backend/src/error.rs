@@ -36,6 +36,9 @@ pub enum AppError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -80,6 +83,10 @@ impl IntoResponse for AppError {
             AppError::PaymentRequired(msg) => (StatusCode::PAYMENT_REQUIRED, "PAYMENT_REQUIRED", msg.clone()),
             AppError::Internal(msg) => {
                 tracing::error!("Internal error: {}", msg);
+                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "An unexpected error occurred.".into())
+            }
+            AppError::Database(e) => {
+                tracing::error!("Database error: {}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", "An unexpected error occurred.".into())
             }
         };

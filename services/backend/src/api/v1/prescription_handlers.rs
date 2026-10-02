@@ -6,6 +6,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -37,6 +38,13 @@ pub struct ApiResponse<T> {
     pub data: T,
 }
 
+fn decode_base64_payload(raw: &str) -> Result<Vec<u8>, AppError> {
+    let stripped = raw.split(',').next_back().unwrap_or(raw);
+    STANDARD
+        .decode(stripped)
+        .map_err(|_| AppError::UnprocessableEntity("File content is not valid base64.".into()))
+}
+
 pub async fn upload_patient_intake(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -46,16 +54,11 @@ pub async fn upload_patient_intake(
     let mut files = Vec::new();
 
     for f in payload.files {
-        // Dummy JPEG header fallback if mock string provided
-        let bytes = if f.base64_content.starts_with("/9j/") || f.base64_content.starts_with("data:") {
-            vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46] // JPEG magic bytes
-        } else {
-            f.base64_content.into_bytes()
-        };
+        let bytes = decode_base64_payload(&f.base64_content)?;
         files.push((f.mime_type, bytes));
     }
 
-    let uploaded = PrescriptionService::upload_patient_intake_documents(&state, id, patient_id, files)?;
+    let uploaded = PrescriptionService::upload_patient_intake_documents(&state, id, patient_id, files).await?;
 
     Ok((
         axum::http::StatusCode::CREATED,
@@ -76,23 +79,11 @@ pub async fn upload_doctor_prescription(
     Json(payload): Json<DoctorRxPhotoUploadRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let doc_id = Uuid::parse_str("da000001-0000-0000-0000-000000000001").unwrap();
-    let bytes = vec![0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]; // Valid JPEG stream
+    let bytes = decode_base64_payload(&payload.base64_photo)?;
 
-    let rx = PrescriptionService::upload_doctor_prescription_photo(
-        &state,
-        appointment_id,
-        doc_id,
-        bytes,
-        payload.doctor_notes,
-    )?;
+    let rx = PrescriptionService::upload_doctor_prescription_photo(&state, appointment_id, doc_id, bytes, payload.doctor_notes).await?;
 
-    Ok((
-        axum::http::StatusCode::CREATED,
-        Json(ApiResponse {
-            success: true,
-            data: rx,
-        }),
-    ))
+    Ok((axum::http::StatusCode::CREATED, Json(ApiResponse { success: true, data: rx })))
 }
 
 pub async fn complete_no_rx(
@@ -101,17 +92,9 @@ pub async fn complete_no_rx(
     Json(payload): Json<CompleteNoRxRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let doc_id = Uuid::parse_str("da000001-0000-0000-0000-000000000001").unwrap();
-    let rx = PrescriptionService::complete_without_prescription(
-        &state,
-        appointment_id,
-        doc_id,
-        payload.reason,
-    )?;
+    let rx = PrescriptionService::complete_without_prescription(&state, appointment_id, doc_id, payload.reason).await?;
 
-    Ok(Json(ApiResponse {
-        success: true,
-        data: rx,
-    }))
+    Ok(Json(ApiResponse { success: true, data: rx }))
 }
 
 pub async fn get_document_download_url(

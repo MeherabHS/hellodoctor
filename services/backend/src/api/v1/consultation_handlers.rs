@@ -38,9 +38,10 @@ pub async fn mint_agora_token(
         &state,
         appointment_id,
         user_id,
-        "a1b2c3d4e5f67890123456789abcdef0",
-        "cert_secure_server_only_secret_9988",
-    )?;
+        &state.config.agora_app_id,
+        &state.config.agora_app_certificate,
+    )
+    .await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -65,7 +66,8 @@ pub async fn submit_telemetry(
         payload.call_duration_seconds,
         payload.connection_state,
         payload.prescription_issued,
-    )?;
+    )
+    .await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -82,7 +84,7 @@ pub async fn complete_consultation(
     Path(appointment_id): Path<Uuid>,
     Json(payload): Json<CompleteConsultationRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    ConsultationService::complete_consultation(&state, appointment_id, payload.outcome)?;
+    ConsultationService::complete_consultation(&state, appointment_id, payload.outcome).await?;
 
     Ok(Json(ApiResponse {
         success: true,

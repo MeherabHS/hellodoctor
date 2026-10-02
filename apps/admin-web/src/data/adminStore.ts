@@ -608,7 +608,7 @@ export interface GrievanceItem {
     escrowStatus?: string;
     auditTimeline?: { time: string; event: string }[];
   };
-  status: 'PENDING_REVIEW' | 'INVESTIGATING' | 'REFUNDED' | 'WARNED' | 'RESOLVED';
+  status: 'PENDING_REVIEW' | 'UNDER_INVESTIGATION' | 'REFUNDED' | 'WARNED' | 'DISMISSED';
   adjudication: {
     action: string;
     date: string;
@@ -723,7 +723,7 @@ export const INITIAL_GRIEVANCES: GrievanceItem[] = [
         { time: '14:48:25', event: 'Session severed due to network gateway timeout' }
       ]
     },
-    status: 'INVESTIGATING',
+    status: 'UNDER_INVESTIGATION',
     adjudication: null
   },
   {

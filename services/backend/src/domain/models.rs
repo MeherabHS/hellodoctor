@@ -3,9 +3,11 @@ use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "user_role_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum UserRole {
+    #[default]
     Patient,
     Doctor,
     PlatformAdmin,
@@ -16,13 +18,22 @@ pub enum UserRole {
     SecurityAdmin,
 }
 
-impl Default for UserRole {
-    fn default() -> Self {
-        UserRole::Patient
+impl UserRole {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            UserRole::Patient => "PATIENT",
+            UserRole::Doctor => "DOCTOR",
+            UserRole::PlatformAdmin => "PLATFORM_ADMIN",
+            UserRole::ClinicalAdmin => "CLINICAL_ADMIN",
+            UserRole::FinanceAdmin => "FINANCE_ADMIN",
+            UserRole::Support => "SUPPORT",
+            UserRole::Compliance => "COMPLIANCE",
+            UserRole::SecurityAdmin => "SECURITY_ADMIN",
+        }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct User {
     pub id: Uuid,
     pub phone_number: String,
@@ -37,7 +48,7 @@ pub struct User {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct AuthSession {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -53,14 +64,15 @@ pub struct AuthSession {
     pub expires_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "mfa_method_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum MfaMethod {
     Totp,
     Passkey,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct MfaCredential {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -74,15 +86,16 @@ pub struct MfaCredential {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "gender_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Gender {
     Male,
     Female,
     Other,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct PatientProfile {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -97,7 +110,7 @@ pub struct PatientProfile {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DoctorProfile {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -120,8 +133,9 @@ pub struct DoctorProfile {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "slot_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SlotStatus {
     Available,
     LockedInPayment,
@@ -129,7 +143,7 @@ pub enum SlotStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ScheduleSlot {
     pub id: Uuid,
     pub doctor_id: Uuid,
@@ -139,8 +153,9 @@ pub struct ScheduleSlot {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "appointment_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AppointmentStatus {
     PendingPayment,
     Confirmed,
@@ -154,13 +169,16 @@ pub enum AppointmentStatus {
     Refunded,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "modality_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Modality {
     Video,
     Chat,
 }
 
+/// Stored as plain TEXT + CHECK constraint in Postgres (not a native enum type),
+/// so DB rows carry it as `Option<String>` and convert through this type at the edges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ClinicalOutcome {
@@ -170,7 +188,28 @@ pub enum ClinicalOutcome {
     Escalated,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl ClinicalOutcome {
+    pub fn as_db_str(&self) -> &'static str {
+        match self {
+            ClinicalOutcome::CompletedWithRx => "COMPLETED_WITH_RX",
+            ClinicalOutcome::CompletedNoRx => "COMPLETED_NO_RX",
+            ClinicalOutcome::Referred => "REFERRED",
+            ClinicalOutcome::Escalated => "ESCALATED",
+        }
+    }
+
+    pub fn parse_db_str(value: &str) -> Option<Self> {
+        match value {
+            "COMPLETED_WITH_RX" => Some(ClinicalOutcome::CompletedWithRx),
+            "COMPLETED_NO_RX" => Some(ClinicalOutcome::CompletedNoRx),
+            "REFERRED" => Some(ClinicalOutcome::Referred),
+            "ESCALATED" => Some(ClinicalOutcome::Escalated),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Appointment {
     pub id: Uuid,
     pub appointment_number: String,
@@ -180,13 +219,13 @@ pub struct Appointment {
     pub modality: Modality,
     pub status: AppointmentStatus,
     pub consultation_fee: BigDecimal,
-    pub clinical_outcome: Option<ClinicalOutcome>,
+    pub clinical_outcome: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct AppointmentClinicalIntake {
     pub appointment_id: Uuid,
     pub patient_id: Uuid,
@@ -196,7 +235,7 @@ pub struct AppointmentClinicalIntake {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct PrescriptionIntakeDocument {
     pub id: Uuid,
     pub appointment_id: Uuid,
@@ -210,8 +249,9 @@ pub struct PrescriptionIntakeDocument {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "session_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SessionStatus {
     Initialized,
     Active,
@@ -219,7 +259,7 @@ pub enum SessionStatus {
     PrematureTermination,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ConsultationSession {
     pub id: Uuid,
     pub appointment_id: Uuid,
@@ -230,7 +270,7 @@ pub struct ConsultationSession {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ConsultationTelemetry {
     pub id: Uuid,
     pub session_id: Uuid,
@@ -243,7 +283,7 @@ pub struct ConsultationTelemetry {
     pub captured_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Prescription {
     pub id: Uuid,
     pub appointment_id: Uuid,
@@ -259,7 +299,7 @@ pub struct Prescription {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ChatConversation {
     pub id: Uuid,
     pub appointment_id: Uuid,
@@ -270,7 +310,7 @@ pub struct ChatConversation {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ChatMessage {
     pub id: Uuid,
     pub conversation_id: Uuid,
@@ -285,15 +325,17 @@ pub struct ChatMessage {
     pub sent_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "grievance_target_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GrievanceTarget {
     Doctor,
     System,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "grievance_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GrievanceStatus {
     PendingReview,
     UnderInvestigation,
@@ -302,7 +344,7 @@ pub enum GrievanceStatus {
     Dismissed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct GrievanceReport {
     pub id: Uuid,
     pub grievance_number: String,
@@ -315,7 +357,7 @@ pub struct GrievanceReport {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct GrievanceAdjudication {
     pub id: Uuid,
     pub grievance_id: Uuid,
@@ -326,8 +368,9 @@ pub struct GrievanceAdjudication {
     pub adjudicated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "gateway_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Gateway {
     Bkash,
     Nagad,
@@ -335,8 +378,9 @@ pub enum Gateway {
     Mpesa,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "payment_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PaymentStatus {
     Initiated,
     PaymentHeld,
@@ -346,7 +390,7 @@ pub enum PaymentStatus {
     Failed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Transaction {
     pub id: Uuid,
     pub transaction_number: String,
@@ -362,7 +406,7 @@ pub struct Transaction {
     pub settled_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DoctorWallet {
     pub doctor_id: Uuid,
     pub lifetime_gross: BigDecimal,
@@ -374,7 +418,7 @@ pub struct DoctorWallet {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DisbursementBatch {
     pub id: Uuid,
     pub batch_number: String,
@@ -390,7 +434,7 @@ pub struct DisbursementBatch {
     pub completed_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DisbursementItem {
     pub id: Uuid,
     pub batch_id: Uuid,
@@ -405,7 +449,7 @@ pub struct DisbursementItem {
     pub confirmed_at: Option<DateTime<Utc>>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct AuditEvent {
     pub id: Uuid,
     pub actor_id: Option<Uuid>,
@@ -421,15 +465,34 @@ pub struct AuditEvent {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct IdempotencyRecord {
     pub id: Uuid,
     pub key_hash: String,
-    pub user_id: Uuid,
+    pub user_id: Option<Uuid>,
     pub route: String,
     pub request_hash: String,
-    pub response_status: u16,
+    pub response_status: i16,
     pub response_body_ref: Option<Uuid>,
+    pub response_body: Option<String>,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct PendingMfaChallenge {
+    pub token: String,
+    pub user_id: Uuid,
+    pub code_hash: String,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct PhoneOtp {
+    pub phone_number: String,
+    pub code_hash: String,
+    pub attempts: i16,
+    pub expires_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
 }

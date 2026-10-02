@@ -1,6 +1,6 @@
 use crate::domain::models::*;
 use crate::error::AppError;
-use crate::repository::AppState;
+use crate::repository::{appointment_repo, AppState};
 use crate::services::AppointmentService;
 use axum::{
     extract::{Path, State},
@@ -38,7 +38,8 @@ pub async fn book_appointment(
         payload.modality,
         payload.gateway,
         payload.chief_complaint,
-    )?;
+    )
+    .await?;
 
     Ok((
         axum::http::StatusCode::CREATED,
@@ -56,17 +57,10 @@ pub async fn book_appointment(
     ))
 }
 
-pub async fn get_appointment(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> Result<impl IntoResponse, AppError> {
-    let apts = state.appointments.read();
-    let apt = apts.get(&id).cloned().ok_or_else(|| {
-        AppError::NotFound("Appointment not found.".into())
-    })?;
+pub async fn get_appointment(State(state): State<AppState>, Path(id): Path<Uuid>) -> Result<impl IntoResponse, AppError> {
+    let apt = appointment_repo::find_by_id(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
 
-    Ok(Json(ApiResponse {
-        success: true,
-        data: apt,
-    }))
+    Ok(Json(ApiResponse { success: true, data: apt }))
 }

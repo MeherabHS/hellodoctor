@@ -31,11 +31,7 @@ pub async fn handle_payment_webhook(
         return Err(AppError::Conflict("Payment failed or cancelled at gateway.".into()));
     }
 
-    let apt = AppointmentService::process_payment_webhook(
-        &state,
-        payload.payment_session_id,
-        &payload.transaction_reference,
-    )?;
+    let apt = AppointmentService::process_payment_webhook(&state, payload.payment_session_id, &payload.transaction_reference).await?;
 
     Ok(Json(ApiResponse {
         success: true,

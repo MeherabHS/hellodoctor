@@ -10,8 +10,15 @@ import type {
   GrievanceItem,
   TransactionItem,
 } from '@/data/adminStore';
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+import {
+  getAdminDoctors,
+  getDoctorDossier,
+  getAdminPatients,
+  getPatientDossier,
+  getAdminLogs,
+  getAdminGrievances,
+  getAdminTransactions,
+} from '@/lib/api';
 
 const AVATAR_COLORS = ['#059669', '#2563EB', '#7C3AED', '#D97706', '#DC2626', '#0891B2'];
 
@@ -152,7 +159,16 @@ export function backendGrievanceToStoreItem(g: any): GrievanceItem {
     severity: 'HIGH',
     claimSummary: g.claim_summary,
     patientStatement: g.claim_summary,
-    boardRemedy: g.status === 'REFUNDED' ? 'Escrow Refund Disbursed' : 'Under Governance Review',
+    boardRemedy:
+      g.status === 'REFUNDED'
+        ? 'Escrow Refund Disbursed'
+        : g.status === 'WARNED'
+        ? 'Internal Platform Compliance Warning Logged'
+        : g.status === 'DISMISSED'
+        ? 'Claim Reviewed and Dismissed'
+        : g.status === 'UNDER_INVESTIGATION'
+        ? 'Under Active Investigation'
+        : 'Under Governance Review',
     telemetryEvidence: {
       callDuration: g.telemetry ? `${g.telemetry.duration_seconds}s` : 'Unknown',
       connectionStatus: g.telemetry?.connection_state || 'Connected',
@@ -168,7 +184,10 @@ export function backendGrievanceToStoreItem(g: any): GrievanceItem {
         reconnectCount: 0,
       },
     },
-    status: g.status === 'REFUNDED' ? 'REFUNDED' : g.status === 'WARNED' ? 'WARNED' : 'PENDING_REVIEW',
+    status:
+      g.status === 'REFUNDED' || g.status === 'WARNED' || g.status === 'DISMISSED' || g.status === 'UNDER_INVESTIGATION'
+        ? g.status
+        : 'PENDING_REVIEW',
     adjudication: null,
   };
 }
@@ -232,96 +251,51 @@ export function useBackendSync(callbacks: BackendSyncCallbacks) {
   const fetchAll = useCallback(async () => {
     try {
       // 1. Fetch doctors with dossier
-      const docsRes = await fetch(`${API}/admin/doctors`);
-      if (docsRes.ok) {
-        const docsJson = await docsRes.json();
-        const backendDocs: any[] = docsJson.data || [];
-
-        const docStore: Record<string, DoctorHistoryItem> = {};
-        for (let i = 0; i < backendDocs.length; i++) {
-          const doc = backendDocs[i];
-          try {
-            const dossierRes = await fetch(`${API}/admin/doctors/${doc.id}/dossier`);
-            if (dossierRes.ok) {
-              const dossierJson = await dossierRes.json();
-              const merged = { ...doc, ...dossierJson.data };
-              docStore[doc.id] = backendDocToStoreItem(merged, i);
-            } else {
-              docStore[doc.id] = backendDocToStoreItem(doc, i);
-            }
-          } catch {
-            docStore[doc.id] = backendDocToStoreItem(doc, i);
-          }
-        }
-
-        if (Object.keys(docStore).length > 0) {
-          cbRef.current.onDoctorsUpdate(docStore);
+      const backendDocs = await getAdminDoctors();
+      const docStore: Record<string, DoctorHistoryItem> = {};
+      for (let i = 0; i < backendDocs.length; i++) {
+        const doc = backendDocs[i];
+        try {
+          const dossier = await getDoctorDossier(doc.id);
+          docStore[doc.id] = backendDocToStoreItem({ ...doc, ...dossier }, i);
+        } catch {
+          docStore[doc.id] = backendDocToStoreItem(doc, i);
         }
       }
+      // Replace (not merge) — once the backend answers, its data is the truth,
+      // including a correctly-empty result, instead of layering onto mock seed data.
+      cbRef.current.onDoctorsUpdate(docStore);
 
       // 2. Fetch patients
-      const ptsRes = await fetch(`${API}/admin/patients`);
-      if (ptsRes.ok) {
-        const ptsJson = await ptsRes.json();
-        const backendPts: any[] = ptsJson.data || [];
-
-        const ptStore: Record<string, PatientRecordItem> = {};
-        for (let i = 0; i < backendPts.length; i++) {
-          const pt = backendPts[i];
-          try {
-            const dossierRes = await fetch(`${API}/admin/patients/${pt.id}/dossier`);
-            if (dossierRes.ok) {
-              const dossierJson = await dossierRes.json();
-              const merged = { ...pt, ...(dossierJson.data?.patient || {}), encounters: dossierJson.data?.encounters || [] };
-              ptStore[pt.id] = backendPatientToStoreItem(merged, i);
-            } else {
-              ptStore[pt.id] = backendPatientToStoreItem(pt, i);
-            }
-          } catch {
-            ptStore[pt.id] = backendPatientToStoreItem(pt, i);
-          }
-        }
-
-        if (Object.keys(ptStore).length > 0) {
-          cbRef.current.onPatientsUpdate(ptStore);
+      const backendPts = await getAdminPatients();
+      const ptStore: Record<string, PatientRecordItem> = {};
+      for (let i = 0; i < backendPts.length; i++) {
+        const pt = backendPts[i];
+        try {
+          const dossier = await getPatientDossier(pt.id);
+          const merged = { ...pt, ...(dossier.patient || {}), encounters: dossier.encounters || [] };
+          ptStore[pt.id] = backendPatientToStoreItem(merged, i);
+        } catch {
+          ptStore[pt.id] = backendPatientToStoreItem(pt, i);
         }
       }
+      cbRef.current.onPatientsUpdate(ptStore);
 
       // 3. Fetch logs
-      const logsRes = await fetch(`${API}/admin/logs`);
-      if (logsRes.ok) {
-        const logsJson = await logsRes.json();
-        const backendLogs: any[] = logsJson.data || [];
-        if (backendLogs.length > 0) {
-          const mappedLogs = backendLogs.map(backendLogToStoreItem);
-          cbRef.current.onLogsUpdate(mappedLogs);
-        }
-      }
+      const backendLogs = await getAdminLogs();
+      cbRef.current.onLogsUpdate(backendLogs.map(backendLogToStoreItem));
 
       // 4. Fetch grievances
-      const grvRes = await fetch(`${API}/admin/grievances`);
-      if (grvRes.ok) {
-        const grvJson = await grvRes.json();
-        const backendGrvs: any[] = grvJson.data || [];
-        if (backendGrvs.length > 0) {
-          const mappedGrvs = backendGrvs.map(backendGrievanceToStoreItem);
-          cbRef.current.onGrievancesUpdate(mappedGrvs);
-        }
-      }
+      const backendGrvs = await getAdminGrievances();
+      cbRef.current.onGrievancesUpdate(backendGrvs.map(backendGrievanceToStoreItem));
 
       // 5. Fetch transactions
-      const txRes = await fetch(`${API}/admin/finance/transactions`);
-      if (txRes.ok) {
-        const txJson = await txRes.json();
-        const backendTxs: any[] = txJson.data || [];
-        if (backendTxs.length > 0) {
-          const mappedTxs = backendTxs.map(backendTransactionToStoreItem);
-          cbRef.current.onTransactionsUpdate(mappedTxs);
-        }
-      }
+      const backendTxs = await getAdminTransactions();
+      cbRef.current.onTransactionsUpdate(backendTxs.map(backendTransactionToStoreItem));
     } catch (err) {
-      // Backend not reachable — silently continue with mock data
-      console.warn('[useBackendSync] Backend unreachable, using local mock data:', err);
+      // Backend not reachable at all — keep whatever is currently on screen
+      // (mock data on first load, or the last good backend snapshot) instead of clearing it.
+      console.warn('[useBackendSync] Backend unreachable, keeping last known data:', err);
     }
   }, []);
 

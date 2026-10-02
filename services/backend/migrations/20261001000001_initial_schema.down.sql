@@ -1,0 +1,37 @@
+-- Reverse of 20261001000001_initial_schema.up.sql
+DROP TABLE IF EXISTS idempotency_records;
+DROP TABLE IF EXISTS audit_events;
+DROP TABLE IF EXISTS system_error_logs;
+DROP TABLE IF EXISTS payment_events;
+DROP TABLE IF EXISTS disbursement_items;
+DROP TABLE IF EXISTS disbursement_batches;
+DROP TABLE IF EXISTS doctor_wallets;
+DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS grievance_adjudications;
+DROP TABLE IF EXISTS grievance_reports;
+DROP TABLE IF EXISTS chat_messages;
+DROP TABLE IF EXISTS chat_conversations;
+DROP TABLE IF EXISTS prescriptions;
+DROP TABLE IF EXISTS consultation_telemetry;
+DROP TABLE IF EXISTS consultation_sessions;
+DROP TABLE IF EXISTS prescription_intake_documents;
+DROP TABLE IF EXISTS appointment_clinical_intake;
+DROP TABLE IF EXISTS appointments;
+DROP TABLE IF EXISTS doctor_schedule_slots;
+DROP TABLE IF EXISTS doctor_profiles;
+DROP TABLE IF EXISTS patient_profiles;
+DROP TABLE IF EXISTS mfa_credentials;
+DROP TABLE IF EXISTS auth_sessions;
+DROP TABLE IF EXISTS users;
+
+DROP TYPE IF EXISTS payment_status_enum;
+DROP TYPE IF EXISTS gateway_enum;
+DROP TYPE IF EXISTS grievance_status_enum;
+DROP TYPE IF EXISTS grievance_target_enum;
+DROP TYPE IF EXISTS session_status_enum;
+DROP TYPE IF EXISTS modality_enum;
+DROP TYPE IF EXISTS appointment_status_enum;
+DROP TYPE IF EXISTS slot_status_enum;
+DROP TYPE IF EXISTS gender_enum;
+DROP TYPE IF EXISTS mfa_method_enum;
+DROP TYPE IF EXISTS user_role_enum;

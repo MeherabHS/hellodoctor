@@ -1,14 +1,15 @@
 use crate::domain::models::*;
 use crate::error::AppError;
-use crate::repository::AppState;
+use crate::repository::{consultation_repo, grievance_repo, transaction_repo, AppState};
 use chrono::Utc;
 use uuid::Uuid;
 
 pub struct GrievanceService;
 
 impl GrievanceService {
-    /// Patient files formal medical grievance (Star-Rating-Free)
-    pub fn submit_grievance(
+    /// Patient files formal medical grievance (Star-Rating-Free). `consultation_id` must be
+    /// a real `consultation_sessions.id` — the FK constraint enforces this at the DB level.
+    pub async fn submit_grievance(
         state: &AppState,
         patient_id: Uuid,
         consultation_id: Uuid,
@@ -16,8 +17,12 @@ impl GrievanceService {
         category: String,
         claim_summary: String,
     ) -> Result<GrievanceReport, AppError> {
+        consultation_repo::find_by_id(&state.db, consultation_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Consultation session not found.".into()))?;
+
         let grv_id = Uuid::new_v4();
-        let grv_num = format!("GRV-{}-{}", Utc::now().format("%Y%m%d"), &grv_id.to_string()[0..4].to_uppercase());
+        let grv_num = format!("GRV-{}-{}", Utc::now().format("%Y%m%d"), grv_id.to_string()[0..4].to_uppercase());
 
         let report = GrievanceReport {
             id: grv_id,
@@ -31,28 +36,24 @@ impl GrievanceService {
             created_at: Utc::now(),
         };
 
-        state.grievance_reports.write().insert(grv_id, report.clone());
+        grievance_repo::insert(&state.db, &report).await?;
         Ok(report)
     }
 
     /// Admin Medical Board Adjudicates: Disburse Refund
-    pub fn adjudicate_refund(
-        state: &AppState,
-        grievance_id: Uuid,
-        admin_id: Uuid,
-        audit_notes: String,
-    ) -> Result<GrievanceReport, AppError> {
-        let mut reports = state.grievance_reports.write();
-        let report = reports.get_mut(&grievance_id).ok_or_else(|| {
-            AppError::NotFound("Grievance report not found.".into())
-        })?;
+    pub async fn adjudicate_refund(state: &AppState, grievance_id: Uuid, admin_id: Uuid, audit_notes: String) -> Result<GrievanceReport, AppError> {
+        let mut tx = state.db.begin().await?;
 
+        let mut report = grievance_repo::find_by_id(&mut *tx, grievance_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Grievance report not found.".into()))?;
+
+        grievance_repo::set_status(&mut *tx, grievance_id, GrievanceStatus::Refunded).await?;
         report.status = GrievanceStatus::Refunded;
 
-        // Record board adjudication
-        state.grievance_adjudications.write().insert(
-            grievance_id,
-            GrievanceAdjudication {
+        grievance_repo::insert_adjudication(
+            &mut *tx,
+            &GrievanceAdjudication {
                 id: Uuid::new_v4(),
                 grievance_id,
                 adjudicated_by_admin_id: admin_id,
@@ -61,34 +62,33 @@ impl GrievanceService {
                 audit_notes,
                 adjudicated_at: Utc::now(),
             },
-        );
+        )
+        .await?;
 
-        // Update transaction to REFUNDED_TO_PATIENT
-        let mut txns = state.transactions.write();
-        if let Some(txn) = txns.values_mut().find(|t| t.appointment_id == report.consultation_id) {
-            txn.payment_status = PaymentStatus::RefundedToPatient;
+        if let Some(session) = consultation_repo::find_by_id(&mut *tx, report.consultation_id).await? {
+            if let Some(txn) = transaction_repo::find_by_appointment(&mut *tx, session.appointment_id).await? {
+                transaction_repo::mark_status(&mut *tx, txn.id, PaymentStatus::RefundedToPatient).await?;
+            }
         }
 
-        Ok(report.clone())
+        tx.commit().await?;
+        Ok(report)
     }
 
     /// Admin Medical Board Adjudicates: Issue Compliance Warning
-    pub fn adjudicate_warning(
-        state: &AppState,
-        grievance_id: Uuid,
-        admin_id: Uuid,
-        audit_notes: String,
-    ) -> Result<GrievanceReport, AppError> {
-        let mut reports = state.grievance_reports.write();
-        let report = reports.get_mut(&grievance_id).ok_or_else(|| {
-            AppError::NotFound("Grievance report not found.".into())
-        })?;
+    pub async fn adjudicate_warning(state: &AppState, grievance_id: Uuid, admin_id: Uuid, audit_notes: String) -> Result<GrievanceReport, AppError> {
+        let mut tx = state.db.begin().await?;
 
+        let mut report = grievance_repo::find_by_id(&mut *tx, grievance_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Grievance report not found.".into()))?;
+
+        grievance_repo::set_status(&mut *tx, grievance_id, GrievanceStatus::Warned).await?;
         report.status = GrievanceStatus::Warned;
 
-        state.grievance_adjudications.write().insert(
-            grievance_id,
-            GrievanceAdjudication {
+        grievance_repo::insert_adjudication(
+            &mut *tx,
+            &GrievanceAdjudication {
                 id: Uuid::new_v4(),
                 grievance_id,
                 adjudicated_by_admin_id: admin_id,
@@ -97,8 +97,39 @@ impl GrievanceService {
                 audit_notes,
                 adjudicated_at: Utc::now(),
             },
-        );
+        )
+        .await?;
 
-        Ok(report.clone())
+        tx.commit().await?;
+        Ok(report)
+    }
+
+    /// Admin Medical Board Adjudicates: Dismiss (no action warranted)
+    pub async fn adjudicate_dismiss(state: &AppState, grievance_id: Uuid, admin_id: Uuid, audit_notes: String) -> Result<GrievanceReport, AppError> {
+        let mut tx = state.db.begin().await?;
+
+        let mut report = grievance_repo::find_by_id(&mut *tx, grievance_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Grievance report not found.".into()))?;
+
+        grievance_repo::set_status(&mut *tx, grievance_id, GrievanceStatus::Dismissed).await?;
+        report.status = GrievanceStatus::Dismissed;
+
+        grievance_repo::insert_adjudication(
+            &mut *tx,
+            &GrievanceAdjudication {
+                id: Uuid::new_v4(),
+                grievance_id,
+                adjudicated_by_admin_id: admin_id,
+                board_remedy: "Claim Reviewed and Dismissed — No Compliance Action Warranted".into(),
+                action_type: "DISMISS".into(),
+                audit_notes,
+                adjudicated_at: Utc::now(),
+            },
+        )
+        .await?;
+
+        tx.commit().await?;
+        Ok(report)
     }
 }

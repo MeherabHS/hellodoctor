@@ -416,3 +416,13 @@ export async function adjudicateGrievanceWarn(
     body: JSON.stringify({ audit_notes }),
   });
 }
+
+export async function adjudicateGrievanceDismiss(
+  id: string,
+  audit_notes: string
+): Promise<any> {
+  return request<any>(`/admin/grievances/${id}/dismiss`, {
+    method: "POST",
+    body: JSON.stringify({ audit_notes }),
+  });
+}

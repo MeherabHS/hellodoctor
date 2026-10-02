@@ -26,12 +26,21 @@ sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+base64 = "0.22"
 
 # Image Processing (Upload Security Pipeline)
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 
 # Database & Migrations
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "bigdecimal", "migrate", "sqlite"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "bigdecimal", "migrate", "macros"] }
+
+# MFA (admin TOTP) & encryption-at-rest for TOTP secrets
+totp-rs = { version = "5.6", features = ["gen_secret"] }
+aes-gcm = "0.10"
+
+# Telemetry
+metrics = "0.23"
+metrics-exporter-prometheus = "0.15"
 
 # Logging & Observability
 tracing = "0.1"

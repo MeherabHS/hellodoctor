@@ -41,7 +41,8 @@ pub async fn submit_grievance(
         payload.target,
         payload.category,
         payload.claim_summary,
-    )?;
+    )
+    .await?;
 
     Ok((
         axum::http::StatusCode::CREATED,
@@ -63,7 +64,7 @@ pub async fn adjudicate_refund(
     Json(payload): Json<AdjudicateRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let admin_id = Uuid::parse_str("a0000001-0000-0000-0000-000000000001").unwrap();
-    let report = GrievanceService::adjudicate_refund(&state, id, admin_id, payload.audit_notes)?;
+    let report = GrievanceService::adjudicate_refund(&state, id, admin_id, payload.audit_notes).await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -81,7 +82,7 @@ pub async fn adjudicate_warn(
     Json(payload): Json<AdjudicateRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let admin_id = Uuid::parse_str("a0000001-0000-0000-0000-000000000001").unwrap();
-    let report = GrievanceService::adjudicate_warning(&state, id, admin_id, payload.audit_notes)?;
+    let report = GrievanceService::adjudicate_warning(&state, id, admin_id, payload.audit_notes).await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -89,6 +90,24 @@ pub async fn adjudicate_warn(
             "grievance_id": report.id,
             "status": report.status,
             "board_remedy": "Internal Platform Compliance Warning Logged in Doctor Dossier"
+        }),
+    }))
+}
+
+pub async fn adjudicate_dismiss(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<AdjudicateRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let admin_id = Uuid::parse_str("a0000001-0000-0000-0000-000000000001").unwrap();
+    let report = GrievanceService::adjudicate_dismiss(&state, id, admin_id, payload.audit_notes).await?;
+
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({
+            "grievance_id": report.id,
+            "status": report.status,
+            "board_remedy": "Claim Reviewed and Dismissed — No Compliance Action Warranted"
         }),
     }))
 }

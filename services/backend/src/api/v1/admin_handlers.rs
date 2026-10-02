@@ -1,7 +1,9 @@
 use crate::domain::models::*;
 use crate::error::AppError;
-use crate::repository::AppState;
-use crate::services::DisbursementService;
+use crate::repository::{
+    audit_repo, consultation_repo, doctor_repo, grievance_repo, patient_repo, prescription_repo, transaction_repo, wallet_repo, AppState,
+};
+use crate::services::{AuditService, DisbursementService};
 use axum::{
     extract::{Path, State},
     response::IntoResponse,
@@ -61,49 +63,40 @@ pub struct AdjudicateBmdcRequest {
     pub note: Option<String>,
 }
 
+const ADMIN_ACTOR_ID: &str = "a0000001-0000-0000-0000-000000000001";
+
+fn admin_id() -> Uuid {
+    Uuid::parse_str(ADMIN_ACTOR_ID).unwrap()
+}
+
 /// GET /api/v1/admin/overview
-pub async fn get_admin_overview(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let docs = state.doctor_profiles.read();
+pub async fn get_admin_overview(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let docs = doctor_repo::list(&state.db).await?;
     let total_doctors = docs.len();
-    let on_duty_doctors = docs.values().filter(|d| d.is_on_duty).count();
-    let pending_bmdc = docs.values().filter(|d| !d.is_verified).count();
+    let on_duty_doctors = docs.iter().filter(|d| d.is_on_duty).count();
+    let pending_bmdc = docs.iter().filter(|d| !d.is_verified).count();
 
-    let sessions = state.consultation_sessions.read();
-    let active_consultations = sessions
-        .values()
-        .filter(|s| s.status == SessionStatus::Active)
-        .count();
+    let active_consultations = consultation_repo::list_active(&state.db).await?.len();
 
-    let txs = state.transactions.read();
+    let txs = transaction_repo::list_all(&state.db).await?;
     let mut gross_volume = BigDecimal::from(0);
     let mut platform_fees = BigDecimal::from(0);
-    for tx in txs.values() {
+    for tx in &txs {
         gross_volume += &tx.gross_amount;
         platform_fees += &tx.platform_fee_amount;
     }
 
-    let wallets = state.doctor_wallets.read();
+    let wallets = wallet_repo::list_all(&state.db).await?;
     let mut pending_disbursement = BigDecimal::from(0);
-    for w in wallets.values() {
+    for w in &wallets {
         pending_disbursement += &w.pending_disbursement;
     }
 
-    let grievances = state.grievance_reports.read();
-    let pending_grievances = grievances
-        .values()
-        .filter(|g| g.status == GrievanceStatus::PendingReview)
-        .count();
+    let grievances = grievance_repo::list_all(&state.db).await?;
+    let pending_grievances = grievances.iter().filter(|g| g.status == GrievanceStatus::PendingReview).count();
 
-    let patients = state.patient_profiles.read();
-    let total_patients = patients.len();
-
-    let audit = state.audit_events.read();
-    let unresolved_traces = audit
-        .iter()
-        .filter(|a| a.result == "FAILURE" || a.result == "ERROR")
-        .count();
+    let total_patients = patient_repo::list(&state.db).await?.len();
+    let unresolved_traces = audit_repo::count_unresolved(&state.db).await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -124,28 +117,15 @@ pub async fn get_admin_overview(
 }
 
 /// GET /api/v1/admin/doctors
-pub async fn list_admin_doctors(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let docs = state.doctor_profiles.read();
-    let wallets = state.doctor_wallets.read();
-    let appts = state.appointments.read();
+pub async fn list_admin_doctors(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let docs = doctor_repo::list(&state.db).await?;
+    let appts = crate::repository::appointment_repo::list_all(&state.db).await?;
 
     let mut list = Vec::new();
-    for doc in docs.values() {
-        let wallet = wallets.get(&doc.id).cloned().unwrap_or(DoctorWallet {
-            doctor_id: doc.id,
-            lifetime_gross: BigDecimal::from(0),
-            lifetime_fee_withheld: BigDecimal::from(0),
-            lifetime_net: BigDecimal::from(0),
-            pending_disbursement: BigDecimal::from(0),
-            last_disbursement_at: None,
-            last_disbursement_amount: BigDecimal::from(0),
-            updated_at: Utc::now(),
-        });
-
+    for doc in docs {
+        let wallet = wallet_repo::get_or_default(&state.db, doc.id).await?;
         let consult_count = appts
-            .values()
+            .iter()
             .filter(|a| a.doctor_id == doc.id && a.status == AppointmentStatus::Completed)
             .count();
 
@@ -175,10 +155,7 @@ pub async fn list_admin_doctors(
         }));
     }
 
-    Ok(Json(ApiResponse {
-        success: true,
-        data: list,
-    }))
+    Ok(Json(ApiResponse { success: true, data: list }))
 }
 
 /// POST /api/v1/admin/doctors
@@ -190,11 +167,16 @@ pub async fn create_doctor(
     let doc_id = Uuid::new_v4();
     let now = Utc::now();
 
+    // Admin-created doctors get a random temporary password (Argon2id-hashed at rest);
+    // returned once here so the admin can relay it for the doctor's first login.
+    let temporary_password = crate::crypto::generate_numeric_code(10);
+    let password_hash = crate::crypto::hash_password(&temporary_password)?;
+
     let user = User {
         id: user_id,
         phone_number: payload.verified_phone.clone(),
         email: None,
-        password_hash: None,
+        password_hash: Some(password_hash),
         role: UserRole::Doctor,
         preferred_language: "en".into(),
         is_active: true,
@@ -203,7 +185,7 @@ pub async fn create_doctor(
         updated_at: now,
         deleted_at: None,
     };
-    state.users.write().insert(user_id, user);
+    crate::repository::user_repo::insert_user(&state.db, &user).await?;
 
     let doc = DoctorProfile {
         id: doc_id,
@@ -218,9 +200,7 @@ pub async fn create_doctor(
         qualifications: payload.qualifications.unwrap_or_else(|| vec!["MBBS".into()]),
         consultation_fee_video: payload.consultation_fee_video,
         consultation_fee_chat: payload.consultation_fee_chat,
-        residential_address: payload
-            .residential_address
-            .unwrap_or_else(|| "Dhaka, Bangladesh".into()),
+        residential_address: payload.residential_address.unwrap_or_else(|| "Dhaka, Bangladesh".into()),
         verified_phone: payload.verified_phone,
         is_on_duty: true,
         is_verified: true,
@@ -228,78 +208,50 @@ pub async fn create_doctor(
         updated_at: now,
         deleted_at: None,
     };
-    state.doctor_profiles.write().insert(doc_id, doc.clone());
-
-    state.doctor_wallets.write().insert(
-        doc_id,
-        DoctorWallet {
-            doctor_id: doc_id,
-            lifetime_gross: BigDecimal::from(0),
-            lifetime_fee_withheld: BigDecimal::from(0),
-            lifetime_net: BigDecimal::from(0),
-            pending_disbursement: BigDecimal::from(0),
-            last_disbursement_at: None,
-            last_disbursement_amount: BigDecimal::from(0),
-            updated_at: now,
-        },
-    );
+    doctor_repo::insert(&state.db, &doc).await?;
+    wallet_repo::insert_default(&state.db, doc_id).await?;
 
     Ok((
         axum::http::StatusCode::CREATED,
         Json(ApiResponse {
             success: true,
-            data: doc,
+            data: serde_json::json!({
+                "doctor": doc,
+                "temporary_password": temporary_password,
+            }),
         }),
     ))
 }
 
 /// GET /api/v1/admin/doctors/:id/dossier
-pub async fn get_doctor_dossier(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> Result<impl IntoResponse, AppError> {
-    let docs = state.doctor_profiles.read();
-    let doc = docs.get(&id).cloned().ok_or_else(|| {
-        AppError::NotFound("Doctor profile not found.".into())
-    })?;
+pub async fn get_doctor_dossier(State(state): State<AppState>, Path(id): Path<Uuid>) -> Result<impl IntoResponse, AppError> {
+    let doc = doctor_repo::find_by_id(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Doctor profile not found.".into()))?;
 
-    let wallets = state.doctor_wallets.read();
-    let wallet = wallets.get(&id).cloned().unwrap_or(DoctorWallet {
-        doctor_id: id,
-        lifetime_gross: BigDecimal::from(0),
-        lifetime_fee_withheld: BigDecimal::from(0),
-        lifetime_net: BigDecimal::from(0),
-        pending_disbursement: BigDecimal::from(0),
-        last_disbursement_at: None,
-        last_disbursement_amount: BigDecimal::from(0),
-        updated_at: Utc::now(),
-    });
+    let wallet = wallet_repo::get_or_default(&state.db, id).await?;
+    let appts = crate::repository::appointment_repo::list_all(&state.db).await?;
 
-    let appts = state.appointments.read();
-    let patients = state.patient_profiles.read();
-    let doctor_appts: Vec<_> = appts
-        .values()
-        .filter(|a| a.doctor_id == id)
-        .map(|a| {
-            let patient_name = patients
-                .get(&a.patient_id)
-                .map(|p| p.full_name.clone())
-                .unwrap_or_else(|| "Patient".into());
-            serde_json::json!({
-                "appointment_id": a.id,
-                "appointment_number": a.appointment_number,
-                "patient_name": patient_name,
-                "modality": a.modality,
-                "status": a.status,
-                "consultation_fee": a.consultation_fee.to_string(),
-                "created_at": a.created_at,
-                "clinical_outcome": a.clinical_outcome,
-            })
-        })
-        .collect();
+    let mut doctor_appts = Vec::new();
+    for a in appts.iter().filter(|a| a.doctor_id == id) {
+        let patient_name = patient_repo::find_by_id(&state.db, a.patient_id)
+            .await?
+            .map(|p| p.full_name)
+            .unwrap_or_else(|| "Patient".into());
 
-    let disb_items = state.disbursement_items.read();
-    let doctor_disbs = disb_items.get(&id).cloned().unwrap_or_default();
+        doctor_appts.push(serde_json::json!({
+            "appointment_id": a.id,
+            "appointment_number": a.appointment_number,
+            "patient_name": patient_name,
+            "modality": a.modality,
+            "status": a.status,
+            "consultation_fee": a.consultation_fee.to_string(),
+            "created_at": a.created_at,
+            "clinical_outcome": a.clinical_outcome,
+        }));
+    }
+
+    let doctor_disbs = wallet_repo::list_items_for_doctor(&state.db, id).await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -339,43 +291,32 @@ pub async fn initiate_disbursement(
     State(state): State<AppState>,
     Json(payload): Json<InitiateDisbursementRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let admin_id = Uuid::parse_str("a0000001-0000-0000-0000-000000000001").unwrap();
-    let batch = DisbursementService::initiate_monthly_disbursement(
-        &state,
-        admin_id,
-        payload.period_start,
-        payload.period_end,
-    )?;
+    let batch = DisbursementService::initiate_monthly_disbursement(&state, admin_id(), payload.period_start, payload.period_end).await?;
 
-    Ok((
-        axum::http::StatusCode::CREATED,
-        Json(ApiResponse {
-            success: true,
-            data: batch,
-        }),
-    ))
+    Ok((axum::http::StatusCode::CREATED, Json(ApiResponse { success: true, data: batch })))
 }
 
 /// GET /api/v1/admin/finance/transactions
-pub async fn list_admin_transactions(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let txs = state.transactions.read();
-    let appts = state.appointments.read();
-    let patients = state.patient_profiles.read();
-    let doctors = state.doctor_profiles.read();
+pub async fn list_admin_transactions(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let txs = transaction_repo::list_all(&state.db).await?;
 
     let mut list = Vec::new();
-    for tx in txs.values() {
-        let appt = appts.get(&tx.appointment_id);
-        let patient_name = appt
-            .and_then(|a| patients.get(&a.patient_id))
-            .map(|p| p.full_name.clone())
-            .unwrap_or_else(|| "Patient".into());
-        let doctor_name = appt
-            .and_then(|a| doctors.get(&a.doctor_id))
-            .map(|d| d.full_name.clone())
-            .unwrap_or_else(|| "Physician".into());
+    for tx in &txs {
+        let appt = crate::repository::appointment_repo::find_by_id(&state.db, tx.appointment_id).await?;
+        let patient_name = match &appt {
+            Some(a) => patient_repo::find_by_id(&state.db, a.patient_id)
+                .await?
+                .map(|p| p.full_name)
+                .unwrap_or_else(|| "Patient".into()),
+            None => "Patient".into(),
+        };
+        let doctor_name = match &appt {
+            Some(a) => doctor_repo::find_by_id(&state.db, a.doctor_id)
+                .await?
+                .map(|d| d.full_name)
+                .unwrap_or_else(|| "Physician".into()),
+            None => "Physician".into(),
+        };
 
         list.push(serde_json::json!({
             "id": tx.id,
@@ -395,17 +336,12 @@ pub async fn list_admin_transactions(
         }));
     }
 
-    Ok(Json(ApiResponse {
-        success: true,
-        data: list,
-    }))
+    Ok(Json(ApiResponse { success: true, data: list }))
 }
 
 /// GET /api/v1/admin/finance/summary
-pub async fn get_finance_summary(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let txs = state.transactions.read();
+pub async fn get_finance_summary(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let txs = transaction_repo::list_all(&state.db).await?;
     let mut total_gross = BigDecimal::from(0);
     let mut total_platform_fee = BigDecimal::from(0);
     let mut total_net = BigDecimal::from(0);
@@ -414,7 +350,7 @@ pub async fn get_finance_summary(
     let mut nagad_vol = BigDecimal::from(0);
     let mut card_vol = BigDecimal::from(0);
 
-    for tx in txs.values() {
+    for tx in &txs {
         total_gross += &tx.gross_amount;
         total_platform_fee += &tx.platform_fee_amount;
         total_net += &tx.net_amount;
@@ -427,9 +363,9 @@ pub async fn get_finance_summary(
         }
     }
 
-    let wallets = state.doctor_wallets.read();
+    let wallets = wallet_repo::list_all(&state.db).await?;
     let mut pending_disbursement = BigDecimal::from(0);
-    for w in wallets.values() {
+    for w in &wallets {
         pending_disbursement += &w.pending_disbursement;
     }
 
@@ -450,49 +386,43 @@ pub async fn get_finance_summary(
 }
 
 /// GET /api/v1/admin/command/telemetry
-pub async fn get_command_telemetry(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let docs = state.doctor_profiles.read();
-    let active_specialists = docs.values().filter(|d| d.is_on_duty).count();
+pub async fn get_command_telemetry(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let docs = doctor_repo::list(&state.db).await?;
+    let active_specialists = docs.iter().filter(|d| d.is_on_duty).count();
 
-    let sessions = state.consultation_sessions.read();
-    let telemetries = state.consultation_telemetries.read();
-    let appts = state.appointments.read();
-    let patients = state.patient_profiles.read();
+    let sessions = consultation_repo::list_active(&state.db).await?;
+    let appts = crate::repository::appointment_repo::list_all(&state.db).await?;
 
     let mut active_streams = Vec::new();
-    for session in sessions.values() {
-        if session.status == SessionStatus::Active || session.status == SessionStatus::Initialized {
-            let appt = appts.get(&session.appointment_id);
-            let doc_name = appt
-                .and_then(|a| docs.get(&a.doctor_id))
-                .map(|d| d.full_name.clone())
-                .unwrap_or_else(|| "Doctor".into());
-            let patient_name = appt
-                .and_then(|a| patients.get(&a.patient_id))
-                .map(|p| p.full_name.clone())
-                .unwrap_or_else(|| "Patient".into());
-            let telemetry = telemetries.values().find(|t| t.session_id == session.id);
+    for session in &sessions {
+        let appt = appts.iter().find(|a| a.id == session.appointment_id);
+        let doc_name = match appt {
+            Some(a) => docs.iter().find(|d| d.id == a.doctor_id).map(|d| d.full_name.clone()).unwrap_or_else(|| "Doctor".into()),
+            None => "Doctor".into(),
+        };
+        let patient_name = match appt {
+            Some(a) => patient_repo::find_by_id(&state.db, a.patient_id)
+                .await?
+                .map(|p| p.full_name)
+                .unwrap_or_else(|| "Patient".into()),
+            None => "Patient".into(),
+        };
+        let telemetry = consultation_repo::find_by_session(&state.db, session.id).await?;
 
-            active_streams.push(serde_json::json!({
-                "session_id": session.id,
-                "appointment_id": session.appointment_id,
-                "channel_name": session.agora_channel_name,
-                "doctor_name": doc_name,
-                "patient_name": patient_name,
-                "started_at": session.started_at,
-                "packet_loss_percent": telemetry.and_then(|t| t.packet_loss_percent.as_ref().map(|p| p.to_string())).unwrap_or_else(|| "0.0".into()),
-                "rtt_ms": telemetry.and_then(|t| t.round_trip_time_ms).unwrap_or(24),
-                "connection_state": telemetry.map(|t| t.connection_state.as_str()).unwrap_or("Connected"),
-            }));
-        }
+        active_streams.push(serde_json::json!({
+            "session_id": session.id,
+            "appointment_id": session.appointment_id,
+            "channel_name": session.agora_channel_name,
+            "doctor_name": doc_name,
+            "patient_name": patient_name,
+            "started_at": session.started_at,
+            "packet_loss_percent": telemetry.as_ref().and_then(|t| t.packet_loss_percent.as_ref().map(|p| p.to_string())).unwrap_or_else(|| "0.0".into()),
+            "rtt_ms": telemetry.as_ref().and_then(|t| t.round_trip_time_ms).unwrap_or(24),
+            "connection_state": telemetry.as_ref().map(|t| t.connection_state.clone()).unwrap_or_else(|| "Connected".into()),
+        }));
     }
 
-    let completed_today = appts
-        .values()
-        .filter(|a| a.status == AppointmentStatus::Completed)
-        .count();
+    let completed_today = appts.iter().filter(|a| a.status == AppointmentStatus::Completed).count();
 
     Ok(Json(ApiResponse {
         success: true,
@@ -506,17 +436,14 @@ pub async fn get_command_telemetry(
 }
 
 /// GET /api/v1/admin/slots
-pub async fn list_admin_slots(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let slots = state.schedule_slots.read();
-    let docs = state.doctor_profiles.read();
+pub async fn list_admin_slots(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let slots = doctor_repo::list_all_slots(&state.db).await?;
 
     let mut list = Vec::new();
-    for slot in slots.values() {
-        let doctor_name = docs
-            .get(&slot.doctor_id)
-            .map(|d| d.full_name.clone())
+    for slot in &slots {
+        let doctor_name = doctor_repo::find_by_id(&state.db, slot.doctor_id)
+            .await?
+            .map(|d| d.full_name)
             .unwrap_or_else(|| "Doctor".into());
 
         list.push(serde_json::json!({
@@ -530,10 +457,7 @@ pub async fn list_admin_slots(
         }));
     }
 
-    Ok(Json(ApiResponse {
-        success: true,
-        data: list,
-    }))
+    Ok(Json(ApiResponse { success: true, data: list }))
 }
 
 /// POST /api/v1/admin/slots
@@ -542,60 +466,50 @@ pub async fn create_or_toggle_slot(
     Json(payload): Json<SlotToggleRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     if let Some(slot_id) = payload.slot_id {
-        let mut slots = state.schedule_slots.write();
-        let slot = slots.get_mut(&slot_id).ok_or_else(|| {
-            AppError::NotFound("Slot not found.".into())
-        })?;
+        let slot = doctor_repo::find_slot(&state.db, slot_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Slot not found.".into()))?;
 
-        if slot.status == SlotStatus::Available {
-            slot.status = SlotStatus::Cancelled;
-        } else if slot.status == SlotStatus::Cancelled {
-            slot.status = SlotStatus::Available;
-        }
+        let new_status = match slot.status {
+            SlotStatus::Available => SlotStatus::Cancelled,
+            SlotStatus::Cancelled => SlotStatus::Available,
+            other => other,
+        };
+        doctor_repo::set_slot_status(&state.db, slot_id, new_status).await?;
 
         return Ok(Json(ApiResponse {
             success: true,
-            data: serde_json::json!({
-                "slot_id": slot.id,
-                "status": slot.status,
-            }),
+            data: serde_json::json!({ "slot_id": slot_id, "status": new_status }),
         }));
     }
 
     if let (Some(doctor_id), Some(start), Some(end)) = (payload.doctor_id, payload.start_time, payload.end_time) {
-        let slot_id = Uuid::new_v4();
+        crate::domain::validation::validate_slot_times(start, end)?;
+
         let slot = ScheduleSlot {
-            id: slot_id,
+            id: Uuid::new_v4(),
             doctor_id,
             start_time: start,
             end_time: end,
             status: SlotStatus::Available,
             created_at: Utc::now(),
         };
-        state.schedule_slots.write().insert(slot_id, slot.clone());
+        doctor_repo::insert_slot(&state.db, &slot).await?;
 
-        return Ok(Json(ApiResponse {
-            success: true,
-            data: serde_json::json!(slot),
-        }));
+        return Ok(Json(ApiResponse { success: true, data: serde_json::json!(slot) }));
     }
 
     Err(AppError::Validation("Invalid slot parameters.".into()))
 }
 
 /// GET /api/v1/admin/patients
-pub async fn list_admin_patients(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let patients = state.patient_profiles.read();
-    let appts = state.appointments.read();
+pub async fn list_admin_patients(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let patients = patient_repo::list(&state.db).await?;
+    let appts = crate::repository::appointment_repo::list_all(&state.db).await?;
 
     let mut list = Vec::new();
-    for p in patients.values() {
-        let patient_appts: Vec<_> = appts
-            .values()
-            .filter(|a| a.patient_id == p.id)
-            .collect();
+    for p in &patients {
+        let patient_appts: Vec<_> = appts.iter().filter(|a| a.patient_id == p.id).collect();
         let last_consult = patient_appts.iter().map(|a| a.created_at).max();
 
         list.push(serde_json::json!({
@@ -613,52 +527,36 @@ pub async fn list_admin_patients(
         }));
     }
 
-    Ok(Json(ApiResponse {
-        success: true,
-        data: list,
-    }))
+    Ok(Json(ApiResponse { success: true, data: list }))
 }
 
 /// GET /api/v1/admin/patients/:id/dossier
-pub async fn get_patient_dossier(
-    State(state): State<AppState>,
-    Path(id): Path<Uuid>,
-) -> Result<impl IntoResponse, AppError> {
-    let patients = state.patient_profiles.read();
-    let patient = patients.get(&id).cloned().ok_or_else(|| {
-        AppError::NotFound("Patient profile not found.".into())
-    })?;
+pub async fn get_patient_dossier(State(state): State<AppState>, Path(id): Path<Uuid>) -> Result<impl IntoResponse, AppError> {
+    let patient = patient_repo::find_by_id(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Patient profile not found.".into()))?;
 
-    let appts = state.appointments.read();
-    let doctors = state.doctor_profiles.read();
-    let encounters: Vec<_> = appts
-        .values()
-        .filter(|a| a.patient_id == id)
-        .map(|a| {
-            let doc_name = doctors
-                .get(&a.doctor_id)
-                .map(|d| d.full_name.clone())
-                .unwrap_or_else(|| "Physician".into());
-            serde_json::json!({
-                "appointment_id": a.id,
-                "appointment_number": a.appointment_number,
-                "doctor_name": doc_name,
-                "modality": a.modality,
-                "status": a.status,
-                "fee": a.consultation_fee.to_string(),
-                "created_at": a.created_at,
-                "clinical_outcome": a.clinical_outcome,
-            })
-        })
-        .collect();
+    let appts = crate::repository::appointment_repo::list_all(&state.db).await?;
+    let mut encounters = Vec::new();
+    for a in appts.iter().filter(|a| a.patient_id == id) {
+        let doc_name = doctor_repo::find_by_id(&state.db, a.doctor_id)
+            .await?
+            .map(|d| d.full_name)
+            .unwrap_or_else(|| "Physician".into());
 
-    let intake_docs = state.intake_documents.read();
-    let vault_records: Vec<_> = intake_docs
-        .values()
-        .flat_map(|docs| docs.iter())
-        .filter(|d| d.patient_id == id)
-        .cloned()
-        .collect();
+        encounters.push(serde_json::json!({
+            "appointment_id": a.id,
+            "appointment_number": a.appointment_number,
+            "doctor_name": doc_name,
+            "modality": a.modality,
+            "status": a.status,
+            "fee": a.consultation_fee.to_string(),
+            "created_at": a.created_at,
+            "clinical_outcome": a.clinical_outcome,
+        }));
+    }
+
+    let vault_records = prescription_repo::list_intake_documents_for_patient(&state.db, id).await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -671,20 +569,9 @@ pub async fn get_patient_dossier(
 }
 
 /// GET /api/v1/admin/bmdc/queue
-pub async fn get_bmdc_queue(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let docs = state.doctor_profiles.read();
-    let queue: Vec<_> = docs
-        .values()
-        .filter(|d| !d.is_verified)
-        .cloned()
-        .collect();
-
-    Ok(Json(ApiResponse {
-        success: true,
-        data: queue,
-    }))
+pub async fn get_bmdc_queue(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let queue: Vec<_> = doctor_repo::list(&state.db).await?.into_iter().filter(|d| !d.is_verified).collect();
+    Ok(Json(ApiResponse { success: true, data: queue }))
 }
 
 /// POST /api/v1/admin/bmdc/:id/verify
@@ -693,37 +580,27 @@ pub async fn verify_bmdc_doctor(
     Path(id): Path<Uuid>,
     Json(payload): Json<AdjudicateBmdcRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let mut docs = state.doctor_profiles.write();
-    let doc = docs.get_mut(&id).ok_or_else(|| {
-        AppError::NotFound("Doctor profile not found in BMDC queue.".into())
-    })?;
+    doctor_repo::find_by_id(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Doctor profile not found in BMDC queue.".into()))?;
 
-    doc.is_verified = true;
-    doc.updated_at = Utc::now();
+    doctor_repo::set_verified(&state.db, id, true, None).await?;
 
-    let mut audit = state.audit_events.write();
-    audit.push(AuditEvent {
-        id: Uuid::new_v4(),
-        actor_id: Some(Uuid::parse_str("a0000001-0000-0000-0000-000000000001").unwrap()),
-        actor_role: UserRole::PlatformAdmin,
-        action: "BMDC_VERIFY".into(),
-        resource_type: "DOCTOR_PROFILE".into(),
-        resource_id: Some(id),
-        session_id: None,
-        request_id: None,
-        ip_hash: None,
-        result: "SUCCESS".into(),
-        reason: payload.note,
-        created_at: Utc::now(),
-    });
+    AuditService::log(
+        &state,
+        Some(admin_id()),
+        UserRole::PlatformAdmin,
+        "BMDC_VERIFY",
+        "DOCTOR_PROFILE",
+        Some(id),
+        "SUCCESS",
+        payload.note,
+    )
+    .await?;
 
     Ok(Json(ApiResponse {
         success: true,
-        data: serde_json::json!({
-            "doctor_id": id,
-            "is_verified": true,
-            "status": "APPROVED",
-        }),
+        data: serde_json::json!({ "doctor_id": id, "is_verified": true, "status": "APPROVED" }),
     }))
 }
 
@@ -733,61 +610,46 @@ pub async fn reject_bmdc_doctor(
     Path(id): Path<Uuid>,
     Json(payload): Json<AdjudicateBmdcRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let mut docs = state.doctor_profiles.write();
-    let doc = docs.get_mut(&id).ok_or_else(|| {
-        AppError::NotFound("Doctor profile not found in BMDC queue.".into())
-    })?;
+    doctor_repo::find_by_id(&state.db, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Doctor profile not found in BMDC queue.".into()))?;
 
-    doc.is_verified = false;
-    doc.is_on_duty = false;
-    doc.updated_at = Utc::now();
+    doctor_repo::set_verified(&state.db, id, false, Some(false)).await?;
 
-    let mut audit = state.audit_events.write();
-    audit.push(AuditEvent {
-        id: Uuid::new_v4(),
-        actor_id: Some(Uuid::parse_str("a0000001-0000-0000-0000-000000000001").unwrap()),
-        actor_role: UserRole::PlatformAdmin,
-        action: "BMDC_REJECT".into(),
-        resource_type: "DOCTOR_PROFILE".into(),
-        resource_id: Some(id),
-        session_id: None,
-        request_id: None,
-        ip_hash: None,
-        result: "REJECTED".into(),
-        reason: payload.note,
-        created_at: Utc::now(),
-    });
+    AuditService::log(
+        &state,
+        Some(admin_id()),
+        UserRole::PlatformAdmin,
+        "BMDC_REJECT",
+        "DOCTOR_PROFILE",
+        Some(id),
+        "REJECTED",
+        payload.note,
+    )
+    .await?;
 
     Ok(Json(ApiResponse {
         success: true,
-        data: serde_json::json!({
-            "doctor_id": id,
-            "is_verified": false,
-            "status": "REJECTED",
-        }),
+        data: serde_json::json!({ "doctor_id": id, "is_verified": false, "status": "REJECTED" }),
     }))
 }
 
 /// GET /api/v1/admin/compliance/alerts
-pub async fn get_compliance_alerts(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let prescriptions = state.prescriptions.read();
-    let doctors = state.doctor_profiles.read();
-    let patients = state.patient_profiles.read();
+pub async fn get_compliance_alerts(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let prescriptions = prescription_repo::list_all_prescriptions(&state.db).await?;
 
     let mut alerts = Vec::new();
-    for rx in prescriptions.values() {
+    for rx in &prescriptions {
         if let Some(notes) = &rx.doctor_notes {
             let lower = notes.to_lowercase();
             if lower.contains("morphine") || lower.contains("pethidine") || lower.contains("schedule h") {
-                let doc_name = doctors
-                    .get(&rx.doctor_id)
-                    .map(|d| d.full_name.clone())
+                let doc_name = doctor_repo::find_by_id(&state.db, rx.doctor_id)
+                    .await?
+                    .map(|d| d.full_name)
                     .unwrap_or_else(|| "Doctor".into());
-                let patient_name = patients
-                    .get(&rx.patient_id)
-                    .map(|p| p.full_name.clone())
+                let patient_name = patient_repo::find_by_id(&state.db, rx.patient_id)
+                    .await?
+                    .map(|p| p.full_name)
                     .unwrap_or_else(|| "Patient".into());
 
                 alerts.push(serde_json::json!({
@@ -805,24 +667,13 @@ pub async fn get_compliance_alerts(
         }
     }
 
-    Ok(Json(ApiResponse {
-        success: true,
-        data: alerts,
-    }))
+    Ok(Json(ApiResponse { success: true, data: alerts }))
 }
 
 /// GET /api/v1/admin/logs
-pub async fn list_admin_logs(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let audit = state.audit_events.read();
-    let mut logs: Vec<_> = audit.iter().cloned().collect();
-    logs.reverse();
-
-    Ok(Json(ApiResponse {
-        success: true,
-        data: logs,
-    }))
+pub async fn list_admin_logs(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let logs = audit_repo::list_recent(&state.db, 500).await?;
+    Ok(Json(ApiResponse { success: true, data: logs }))
 }
 
 /// POST /api/v1/admin/logs/simulate
@@ -830,58 +681,44 @@ pub async fn simulate_admin_log(
     State(state): State<AppState>,
     Json(payload): Json<SimulateLogRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let event = AuditEvent {
-        id: Uuid::new_v4(),
-        actor_id: Some(Uuid::parse_str("a0000001-0000-0000-0000-000000000001").unwrap()),
-        actor_role: UserRole::PlatformAdmin,
-        action: payload.action,
-        resource_type: payload.subsystem,
-        resource_id: Some(Uuid::new_v4()),
-        session_id: None,
-        request_id: Some(format!("sim-trace-{}", &Uuid::new_v4().to_string()[0..8])),
-        ip_hash: None,
-        result: payload.severity.to_uppercase(),
-        reason: Some(payload.error_summary),
-        created_at: Utc::now(),
-    };
+    let event = AuditService::log(
+        &state,
+        Some(admin_id()),
+        UserRole::PlatformAdmin,
+        &payload.action,
+        &payload.subsystem,
+        Some(Uuid::new_v4()),
+        &payload.severity.to_uppercase(),
+        Some(payload.error_summary),
+    )
+    .await?;
 
-    state.audit_events.write().push(event.clone());
+    let _ = payload.stack_trace;
 
-    Ok((
-        axum::http::StatusCode::CREATED,
-        Json(ApiResponse {
-            success: true,
-            data: event,
-        }),
-    ))
+    Ok((axum::http::StatusCode::CREATED, Json(ApiResponse { success: true, data: event })))
 }
 
 /// GET /api/v1/admin/grievances
-pub async fn list_admin_grievances(
-    State(state): State<AppState>,
-) -> Result<impl IntoResponse, AppError> {
-    let grievances = state.grievance_reports.read();
-    let patients = state.patient_profiles.read();
-    let appts = state.appointments.read();
-    let docs = state.doctor_profiles.read();
-    let telemetries = state.consultation_telemetries.read();
+pub async fn list_admin_grievances(State(state): State<AppState>) -> Result<impl IntoResponse, AppError> {
+    let grievances = grievance_repo::list_all(&state.db).await?;
 
     let mut list = Vec::new();
-    for g in grievances.values() {
-        let patient_name = patients
-            .get(&g.patient_id)
-            .map(|p| p.full_name.clone())
+    for g in &grievances {
+        let patient_name = patient_repo::find_by_id(&state.db, g.patient_id)
+            .await?
+            .map(|p| p.full_name)
             .unwrap_or_else(|| "Patient".into());
 
-        let appt = appts.get(&g.consultation_id);
-        let doctor_name = appt
-            .and_then(|a| docs.get(&a.doctor_id))
-            .map(|d| d.full_name.clone())
-            .unwrap_or_else(|| "Doctor".into());
+        let session = consultation_repo::find_by_id(&state.db, g.consultation_id).await?;
+        let doctor_name = match &session {
+            Some(s) => match crate::repository::appointment_repo::find_by_id(&state.db, s.appointment_id).await? {
+                Some(a) => doctor_repo::find_by_id(&state.db, a.doctor_id).await?.map(|d| d.full_name).unwrap_or_else(|| "Doctor".into()),
+                None => "Doctor".into(),
+            },
+            None => "Doctor".into(),
+        };
 
-        let telemetry = telemetries
-            .values()
-            .find(|t| t.session_id == g.consultation_id);
+        let telemetry = consultation_repo::find_by_session(&state.db, g.consultation_id).await?;
 
         list.push(serde_json::json!({
             "id": g.id,
@@ -906,8 +743,5 @@ pub async fn list_admin_grievances(
         }));
     }
 
-    Ok(Json(ApiResponse {
-        success: true,
-        data: list,
-    }))
+    Ok(Json(ApiResponse { success: true, data: list }))
 }

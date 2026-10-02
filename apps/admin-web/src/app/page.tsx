@@ -3,6 +3,15 @@
 import React, { useState } from 'react';
 import { useBackendSync } from '@/lib/useBackendSync';
 import {
+  initiateDisbursement,
+  verifyBmdcDoctor,
+  rejectBmdcDoctor,
+  simulateAdminLog,
+  adjudicateGrievanceRefund,
+  adjudicateGrievanceWarn,
+  adjudicateGrievanceDismiss,
+} from '@/lib/api';
+import {
   ADMIN_DOCTORS_STORE,
   ADMIN_PATIENT_STORE,
   INITIAL_ERROR_LOGS,
@@ -46,33 +55,23 @@ export default function AdminPortalPage() {
   const [transactions, setTransactions] = useState<TransactionItem[]>(INITIAL_TRANSACTIONS);
 
   // Live Backend Synchronization Hook
+  // Once the backend has answered at least once, its data is the source of truth —
+  // including a correctly-empty result — and fully replaces the initial mock seed data.
   useBackendSync({
     onDoctorsUpdate: (backendDocs) => {
-      setDoctorStore((prev) => ({ ...prev, ...backendDocs }));
+      setDoctorStore(backendDocs);
     },
     onPatientsUpdate: (backendPatients) => {
-      setPatientStore((prev) => ({ ...prev, ...backendPatients }));
+      setPatientStore(backendPatients);
     },
     onLogsUpdate: (backendLogs) => {
-      setErrorLogs((prev) => {
-        const existingIds = new Set(prev.map((l) => l.id));
-        const newOnes = backendLogs.filter((l) => !existingIds.has(l.id));
-        return [...newOnes, ...prev];
-      });
+      setErrorLogs(backendLogs);
     },
     onGrievancesUpdate: (backendGrvs) => {
-      setGrievances((prev) => {
-        const existingIds = new Set(prev.map((g) => g.id));
-        const newOnes = backendGrvs.filter((g) => !existingIds.has(g.id));
-        return [...newOnes, ...prev];
-      });
+      setGrievances(backendGrvs);
     },
     onTransactionsUpdate: (backendTxs) => {
-      setTransactions((prev) => {
-        const existingIds = new Set(prev.map((t) => t.txId));
-        const newOnes = backendTxs.filter((t) => !existingIds.has(t.txId));
-        return [...newOnes, ...prev];
-      });
+      setTransactions(backendTxs);
     },
   });
 
@@ -131,7 +130,7 @@ export default function AdminPortalPage() {
     },
     finance: {
       title: 'Omnichannel Payment & Escrow Master Ledger',
-      breadcrumb: 'Real-time bKash, Nagad & Card Inflows • 15-20% Platform Commission Splits • Escrow Release Audit',
+      breadcrumb: 'Real-time bKash, Nagad & Card Inflows • 20% Platform Commission Splits • Escrow Release Audit',
     },
     command: {
       title: 'Operations & Live Command Center',
@@ -172,31 +171,23 @@ export default function AdminPortalPage() {
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const end = now.toISOString().split('T')[0];
-    fetch('http://localhost:8080/api/v1/admin/disbursements/initiate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ period_start: start, period_end: end }),
-    }).catch((e) => console.warn('Disbursement API notice:', e));
+    initiateDisbursement(start, end).catch((e) => console.warn('Disbursement API notice:', e));
   }
 
   // 2. BMDC Approval
   function handleBmdcAction(action: 'approve' | 'clarify' | 'reject') {
     if (action === 'approve') {
       showToast('BMDC Reg A-48291 Approved ✓', 'Dr. Sarah Rahman credentialed & scheduled for live teleconsults.', '✓', 'success');
-      fetch('http://localhost:8080/api/v1/admin/bmdc/da000001-0000-0000-0000-000000000001/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: 'BMDC Reg A-48291 Approved' }),
-      }).catch((e) => console.warn('BMDC verify API notice:', e));
+      verifyBmdcDoctor('da000001-0000-0000-0000-000000000001', 'BMDC Reg A-48291 Approved').catch((e) =>
+        console.warn('BMDC verify API notice:', e)
+      );
     } else if (action === 'clarify') {
       showToast('Clarification Sent to Physician', 'Requested higher-resolution scan of Bangladesh Medical & Dental Council certificate.', '⚠️', 'info');
     } else {
       showToast('Application Declined', 'Physician notification dispatched with rejection grounds.', '✕', 'warning');
-      fetch('http://localhost:8080/api/v1/admin/bmdc/da000001-0000-0000-0000-000000000001/reject', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: 'Application Declined' }),
-      }).catch((e) => console.warn('BMDC reject API notice:', e));
+      rejectBmdcDoctor('da000001-0000-0000-0000-000000000001', 'Application Declined').catch((e) =>
+        console.warn('BMDC reject API notice:', e)
+      );
     }
   }
 
@@ -239,16 +230,12 @@ export default function AdminPortalPage() {
     setSimulateModalOpen(false);
     showToast('⚡ Failure Incident Injected', `${newLog.failedPart} failure logged against ${targetUser.name}.`, '⚡', 'urgent');
 
-    fetch('http://localhost:8080/api/v1/admin/logs/simulate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: newLog.actionAttempted,
-        subsystem: newLog.subsystem,
-        severity: newLog.severity,
-        error_summary: newLog.errorMessage,
-        stack_trace: newLog.stackTrace,
-      }),
+    simulateAdminLog({
+      action: newLog.actionAttempted,
+      subsystem: newLog.subsystem,
+      severity: newLog.severity,
+      error_summary: newLog.errorMessage,
+      stack_trace: newLog.stackTrace,
     }).catch((e) => console.warn('Log simulate API notice:', e));
   }
 
@@ -284,13 +271,13 @@ export default function AdminPortalPage() {
         } else {
           return {
             ...g,
-            status: 'RESOLVED',
-            boardRemedy: 'Administrative Resolution Concluded',
+            status: 'DISMISSED',
+            boardRemedy: 'Claim Reviewed and Dismissed — No Compliance Action Warranted',
             adjudication: {
-              action: 'RESOLVED',
+              action: 'DISMISS',
               date: 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               admin: 'Central Medical Operations',
-              notes: 'Dispute review concluded. Remedial actions accepted by patient and clinical team.',
+              notes: 'Dispute review concluded. Telemetry evidence did not substantiate the claim.',
             },
           };
         }
@@ -299,20 +286,19 @@ export default function AdminPortalPage() {
 
     if (action === 'REFUND') {
       showToast('Refund Disbursed 💳', 'Full fee refunded to patient wallet via bKash.', '💳', 'success');
-      fetch(`http://localhost:8080/api/v1/admin/grievances/${grvId}/refund`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audit_notes: 'Central Escrow Adjudication refund' }),
-      }).catch((e) => console.warn('Grievance refund API notice:', e));
+      adjudicateGrievanceRefund(grvId, 'Central Escrow Adjudication refund').catch((e) =>
+        console.warn('Grievance refund API notice:', e)
+      );
     } else if (action === 'WARN') {
       showToast('Doctor Warned ⚠️', 'Formal clinical misconduct warning registered in compliance dossier.', '⚠️', 'warning');
-      fetch(`http://localhost:8080/api/v1/admin/grievances/${grvId}/warn`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audit_notes: 'Central Clinical Governance warning' }),
-      }).catch((e) => console.warn('Grievance warn API notice:', e));
+      adjudicateGrievanceWarn(grvId, 'Central Clinical Governance warning').catch((e) =>
+        console.warn('Grievance warn API notice:', e)
+      );
     } else {
-      showToast('Grievance Resolved ✓', 'Dispute claim marked as successfully resolved.', '✓', 'success');
+      showToast('Grievance Dismissed ✓', 'Dispute claim reviewed and dismissed — no compliance action warranted.', '✓', 'success');
+      adjudicateGrievanceDismiss(grvId, 'Telemetry evidence did not substantiate the claim').catch((e) =>
+        console.warn('Grievance dismiss API notice:', e)
+      );
     }
   }
 
@@ -335,7 +321,7 @@ export default function AdminPortalPage() {
 
   // Counters
   const unresolvedLogsCount = errorLogs.filter((l) => l.status !== 'RESOLVED').length;
-  const pendingGrievancesCount = grievances.filter((g) => g.status === 'PENDING_REVIEW' || g.status === 'INVESTIGATING').length;
+  const pendingGrievancesCount = grievances.filter((g) => g.status === 'PENDING_REVIEW' || g.status === 'UNDER_INVESTIGATION').length;
 
   // Filtered lists
   const filteredDoctors = Object.values(doctorStore).filter((doc) => {
@@ -383,7 +369,7 @@ export default function AdminPortalPage() {
   const filteredGrievances = grievances.filter((grv) => {
     if (grievanceQuickFilter === 'doctor' && grv.target !== 'DOCTOR') return false;
     if (grievanceQuickFilter === 'system' && grv.target !== 'SYSTEM') return false;
-    if (grievanceQuickFilter === 'pending' && !(grv.status === 'PENDING_REVIEW' || grv.status === 'INVESTIGATING')) return false;
+    if (grievanceQuickFilter === 'pending' && !(grv.status === 'PENDING_REVIEW' || grv.status === 'UNDER_INVESTIGATION')) return false;
 
     if (grievanceTargetFilter !== 'ALL' && grv.target !== grievanceTargetFilter) return false;
     if (grievanceStatusFilter !== 'ALL' && grv.status !== grievanceStatusFilter) return false;
@@ -753,6 +739,11 @@ export default function AdminPortalPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#64748B', margin: '-8px 0 16px' }}>
+                <span>ℹ️</span>
+                <span>Total calculation is based including the platform charge 20%.</span>
               </div>
 
               {/* Pending Doctor Payout Disbursements Table */}
@@ -1642,8 +1633,10 @@ export default function AdminPortalPage() {
                       <select value={grievanceStatusFilter} onChange={(e) => setGrievanceStatusFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', color: '#334155', fontWeight: 600 }}>
                         <option value="ALL">All Statuses</option>
                         <option value="PENDING_REVIEW">⚠️ Pending Review</option>
+                        <option value="UNDER_INVESTIGATION">🔍 Under Investigation</option>
                         <option value="REFUNDED">💳 Refunded</option>
                         <option value="WARNED">⚠️ Doctor Warned</option>
+                        <option value="DISMISSED">✓ Dismissed</option>
                       </select>
                     </div>
                   </div>
@@ -1735,7 +1728,7 @@ export default function AdminPortalPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <h2 style={{ fontSize: '20px', fontWeight: 850, color: '#0F172A', margin: 0, letterSpacing: '-0.4px' }}>Omnichannel Payment &amp; Escrow Master Ledger</h2>
-                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>Centralized financial audit tracking all patient inflows, gateway escrow locks, 15-20% platform commission cuts, doctor payouts &amp; refund reversals</div>
+                  <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>Centralized financial audit tracking all patient inflows, gateway escrow locks, 20% platform commission cuts, doctor payouts &amp; refund reversals</div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1777,7 +1770,7 @@ export default function AdminPortalPage() {
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">HeloDoc 15-20% Commission</span>
+                    <span className="admin-kpi-sub">HeloDoc 20% Commission</span>
                     <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#ECFDF5', color: '#059669' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     </div>
@@ -1796,6 +1789,11 @@ export default function AdminPortalPage() {
                   <div className="admin-kpi-val">৳ 2,676,600</div>
                   <span className="admin-kpi-delta" style={{ color: '#64748B' }}>Doctor Wallets + Disputed Refunds</span>
                 </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#64748B', margin: '-8px 0 16px' }}>
+                <span>ℹ️</span>
+                <span>Total calculation is based including the platform charge 20%.</span>
               </div>
 
               <div className="admin-card">
@@ -1951,6 +1949,10 @@ export default function AdminPortalPage() {
                 <div style={{ fontSize: '10.5px', color: '#64748B' }}>Net Payouts Disbursed</div>
                 <div style={{ fontSize: '18px', fontWeight: 800, color: '#047857', marginTop: '2px' }}>{selectedDocObj.kpiDisbursed}</div>
               </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: '#64748B', padding: '8px 16px 0' }}>
+              <span>ℹ️</span>
+              <span>Total calculation is based including the platform charge 20%.</span>
             </div>
 
             <div style={{ padding: '18px 22px', overflowY: 'auto', flex: 1 }}>
@@ -2373,7 +2375,7 @@ export default function AdminPortalPage() {
                 <div style={{ fontSize: '10.5px', color: '#10B981', fontWeight: 700 }}>Debited from MFS Wallet</div>
               </div>
               <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
-                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>HeloDoc Platform Fee (15-20%)</div>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>HeloDoc Platform Fee (20%)</div>
                 <div style={{ fontSize: '20px', fontWeight: 900, color: '#059669', marginTop: '4px' }}>৳ {selectedTxObj.platformFeeAmount} ({selectedTxObj.platformFeePercent}%)</div>
                 <div style={{ fontSize: '10.5px', color: '#64748B' }}>Platform Commission Cut</div>
               </div>
@@ -2382,6 +2384,10 @@ export default function AdminPortalPage() {
                 <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563EB', marginTop: '4px' }}>৳ {selectedTxObj.netAmount}</div>
                 <div style={{ fontSize: '10.5px', color: '#64748B' }}>Payable to Physician Wallet</div>
               </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: '#64748B', padding: '8px 18px 0', background: '#FFFFFF' }}>
+              <span>ℹ️</span>
+              <span>Total calculation is based including the platform charge 20%.</span>
             </div>
 
             <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '60vh', overflowY: 'auto', background: '#FAFAFA' }}>
