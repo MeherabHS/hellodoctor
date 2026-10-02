@@ -13,7 +13,7 @@
        │
        ▼
 Is this an internal technical error?
-       ├── YES ──> Log complete stack trace & context to `system_error_logs` with unique `trace_id`
+       ├── YES ──> Log the technical stack trace plus allow-listed sanitized diagnostic context to `system_error_logs` with unique `trace_id`
        │           Return sanitized generic message to user with `trace_id` for support.
        │
        └── NO  ──> Map to strongly typed domain error (`VALIDATION_ERROR`, `SLOT_NOT_AVAILABLE`)
@@ -48,7 +48,7 @@ When unexpected infrastructure failures occur (e.g., MFS IPN webhook failure or 
   "subsystem": "MFS_BKASH_GATEWAY",
   "component": "BkashWebhookHandler",
   "severity": "CRITICAL",
-  "action_attempted": "EXECUTE_payment hold_HOLD",
+  "action_attempted": "CONFIRM_PAYMENT_HOLD",
   "error_message": "IPN Webhook signature validation failed: Connection reset by peer.",
   "stack_trace": "services/backend/src/services/payment_service.rs:184\nservices/backend/src/api/v1/payment_handlers.rs:92",
   "impacted_user_id": "u-c1f7b8a2-9481-4b72-9132-841920842011",
@@ -56,7 +56,7 @@ When unexpected infrastructure failures occur (e.g., MFS IPN webhook failure or 
   "logged_at": "2026-10-01T05:32:15Z"
 }
 ```
-Administrators can inspect these incidents in `adminPage_logs` and use `#adminSimulateFailureModal` to simulate test failures and verify fallback behaviors.
+Administrators can inspect these incidents in `adminPage_logs`. Failure simulation is available only in development and staging environments. It is stripped from production builds.
 
 ## 4. Logging Rules
 Never dump entire request objects, JWTs, authorization headers, prescription content, uploaded filenames, or PHI. Use allow-list approach for logged fields.

@@ -11,7 +11,7 @@
 This document defines the domain entities reverse-engineered from the HelloDoctor platform. Every entity includes field definitions, type specifications, validation constraints, lifecycle states, and sensitive data classifications.
 
 ### Data Sensitivity Classifications
-- **PHI (Protected Health Information):** High confidentiality. Requires encryption at rest and in transit. Strict role-based access.
+- **PHI (Protected Health Information):** High confidentiality. Requires encryption at rest and in transit. Strict role-based access. (Note: RLS provides defense-in-depth but application-layer ABAC is authoritative. RLS must never contradict ABAC.)
 - **FINANCIAL:** High integrity. Subject to strict double-entry ledger audits.
 - **IDENTITY:** PII (Personally Identifiable Information). Subject to GDPR / local privacy regulations.
 - **PUBLIC / OPERATIONAL:** Non-sensitive operational data.
@@ -27,7 +27,7 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `phone_number`: `String` (Required, Unique, E.164 format: `+880...` or `+254...`)
   - `email`: `String` (Optional, Unique)
   - `password_hash`: `String` (Optional, Argon2id. Nullable for OTP-only users)
-  - `role`: `UserRole` (`PATIENT`, `DOCTOR`, `ADMIN`, `PLATFORM_ADMIN`, `CLINICAL_ADMIN`, `FINANCE_ADMIN`, `SUPPORT`, `COMPLIANCE`)
+  - `role`: `UserRole` (`PATIENT`, `DOCTOR`, `PLATFORM_ADMIN`, `CLINICAL_ADMIN`, `FINANCE_ADMIN`, `SUPPORT`, `COMPLIANCE`, `SECURITY_ADMIN`)
   - `is_active`: `Boolean` (Default: `true`)
   - `is_verified`: `Boolean` (Default: `false`)
   - `preferred_language`: `String` (Default: `'en'`, values: `'en'`, `'sw'`)
@@ -59,7 +59,7 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 ---
 
 ### 2.3 `AuditEvent`
-- **Purpose:** Immutable healthcare and system audit trail.
+- **Purpose:** Immutable healthcare and system audit trail. (Immutability enforced by granting INSERT/SELECT only to the app role, and considering append-only archival.)
 - **Fields:**
   - `id`: `UUID` (Primary Key)
   - `actor_id`: `UUID`
@@ -149,7 +149,7 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `status`: `AppointmentStatus` (`PENDING_PAYMENT`, `CONFIRMED`, `WAITING`, `IN_CONSULTATION`, `COMPLETED`, `CANCELLED`, `EXPIRED`, `PREMATURE_TERMINATION`, `DISPUTED`, `REFUNDED`)
   - `consultation_fee`: `Decimal` (Required)
   - `chief_complaint`: `String` (Optional)
-  - `clinical_outcome`: `String` (Optional: 'COMPLETED_WITH_RX', 'COMPLETED_NO_RX', 'REFERRED', 'ESCALATED')
+  - `clinical_outcome`: `String` (Optional, CHECK constraint: 'COMPLETED_WITH_RX', 'COMPLETED_NO_RX', 'REFERRED', 'ESCALATED')
   - `created_at`: `DateTime<Utc>`
   - `updated_at`: `DateTime<Utc>`
 - **Sensitivity:** `PHI` / `FINANCIAL`
@@ -271,3 +271,29 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `current_withdrawable_balance`: `Decimal`
   - `last_payout_at`: `DateTime<Utc>` (Optional)
 - **Sensitivity:** `FINANCIAL`
+
+---
+
+### 2.13 `ChatConversation` & `ChatMessage`
+- **Purpose:** Asynchronous clinical chats within a 24-hour window.
+- **Fields (`ChatConversation`):**
+  - `id`: `UUID` (Primary Key)
+  - `appointment_id`: `UUID` (Foreign Key -> `Appointment.id`, Required, Unique)
+  - `patient_id`: `UUID` (Foreign Key -> `PatientProfile.id`, Required)
+  - `doctor_id`: `UUID` (Foreign Key -> `DoctorProfile.id`, Required)
+  - `expires_at`: `DateTime<Utc>`
+  - `is_locked`: `Boolean`
+  - `created_at`: `DateTime<Utc>`
+- **Fields (`ChatMessage`):**
+  - `id`: `UUID` (Primary Key)
+  - `conversation_id`: `UUID` (Foreign Key -> `ChatConversation.id`, Required)
+  - `sender_id`: `UUID` (Foreign Key -> `User.id`, Required)
+  - `content`: `String` (Required)
+  - `attachment_bucket`: `String` (Optional)
+  - `attachment_object_key`: `String` (Optional)
+  - `attachment_mime`: `String` (Optional)
+  - `attachment_size`: `u64` (Optional)
+  - `attachment_hash`: `String` (Optional)
+  - `is_read`: `Boolean` (Default: `false`)
+  - `sent_at`: `DateTime<Utc>`
+- **Sensitivity:** `PHI`

@@ -51,7 +51,7 @@ sequenceDiagram
     "sub": "u-c1f7b8a2-9481-4b72-9132-841920842011",
     "role": "PATIENT",
     "permissions": ["appointments:book", "records:read_own", "grievances:create"],
-    "iss": "https://api.hellodoctor.com",
+    "iss": "https://api.hellodoctor.asia", // The iss claim must exactly match the production API domain. For staging, use the staging domain.
     "aud": "hellodoctor-mobile",
     "exp": 1790835900,
     "iat": 1790835000
@@ -77,7 +77,7 @@ sequenceDiagram
 
 ## 3. Attribute-Based Access Control (ABAC) Matrix
 
-Authorization relies on Attribute-Based Access Control (ABAC). Beyond standard roles, endpoints verify ownership, the active doctor-patient relationship, and the appointment context.
+Authorization relies on Attribute-Based Access Control (ABAC). Beyond standard roles, endpoints verify ownership, the active doctor-patient relationship, and the appointment context. Note: All admin roles (PLATFORM_ADMIN, CLINICAL_ADMIN, FINANCE_ADMIN, SUPPORT, COMPLIANCE, SECURITY_ADMIN) are defined in both AUTH_SECURITY and DATABASE_SCHEMA. The legacy generic ADMIN role has been removed to prevent overly broad permission grants.
 
 | Resource / Endpoint | `PATIENT` | `DOCTOR` | Admins (`PLATFORM_ADMIN`, `CLINICAL_ADMIN`, `FINANCE_ADMIN`, `SUPPORT`, `COMPLIANCE`, `SECURITY_ADMIN`) |
 |---|---|---|---|

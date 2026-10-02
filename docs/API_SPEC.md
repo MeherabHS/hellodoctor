@@ -94,11 +94,11 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
   ```
 
 ### `POST /api/v1/auth/doctor/login`
-- **Purpose:** Initiates doctor login using BMDC credentials and password (Step 1 of MFA).
+- **Purpose:** Initiates doctor login using Medical license credentials + password (Step 1 of MFA). Note: Keep UI labels as "BMDC Registration Number" for Bangladesh deployment. The /bmdc/ path is kept as a V1 Bangladesh-specific path.
 - **Auth:** Public.
 - **Request Body:**
   ```json
-  { "bmdc_number": "BMDC #45821", "password": "SecurePassword123!" }
+  { "license_number": "BMDC #45821", "password": "SecurePassword123!" }
   ```
 - **Response:** `200 OK`
   ```json
@@ -171,7 +171,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
 ## 3. Doctor Catalog & Discovery Endpoints
 
 ### `GET /api/v1/doctors`
-- **Purpose:** Filtered directory of BMDC-verified specialist doctors.
+- **Purpose:** Filtered directory of Medical license-verified specialist doctors.
 - **Auth:** Public / Optional Patient Token.
 - **Query Parameters:**
   - `modality`: `all` | `video` | `chat` (Default: `all`)
@@ -187,7 +187,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
       {
         "id": "doc-sabrina",
         "name": "Dr. Sabrina Akter",
-        "bmdc": "BMDC #45821",
+        "license_number": "BMDC #45821",
         "specialty": "Internal Medicine",
         "experience_years": 12,
         "current_hospital": "Dhaka Medical College Hospital",
@@ -287,7 +287,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
 ## 5. Telehealth Video (Agora RTC) & Telemetry Capture
 
 ### `POST /api/v1/consultations/{appointment_id}/rtc-token`
-- **Purpose:** Mints an authorized, short-lived Agora Dynamic RTC Token for entering a video consultation room.
+- **Purpose:** Mints an authorized, short-lived Agora Dynamic RTC Token for entering a video consultation room. Note: Channel names are server-generated UUIDs. They must NOT be derived from appointment IDs, phone numbers, doctor IDs, or patient IDs.
 - **Auth:** `PATIENT` or `DOCTOR` (Caller must be participant in the appointment).
 - **Request Body:** Empty.
 - **Response:** `200 OK`
@@ -295,7 +295,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
   {
     "success": true,
     "data": {
-      "channel_name": "apt-94812",
+      "channel_name": "rtc_7baf3072_96bd_4fae_a735_e8d2c1f94b3a",
       "token": "007eJxTYGCoM2y+5tW2Z1n380vP4...",
       "uid": 94812,
       "app_id": "a1b2c3d4e5f6...",
@@ -336,7 +336,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
     "success": true,
     "data": {
       "doctor_name": "Dr. Sabrina Akter",
-      "bmdc": "BMDC #45821",
+      "license_number": "BMDC #45821",
       "total_gross": 35562.50,
       "platform_charge_percent": 20.0,
       "withheld_fee": 7112.50,
@@ -414,7 +414,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
       "grievance_id": "GRV-20261001-73",
       "status": "WARNED",
       "board_remedy": "Internal Platform Compliance Warning Logged",
-      "doctor_bmdc": "BMDC #45821"
+      "doctor_license": "BMDC #45821"
     }
   }
   ```
@@ -433,7 +433,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
     "data": {
       "id": "doc-anika",
       "name": "Dr. Anika Rahman",
-      "bmdc": "BMDC #52891",
+      "license_number": "BMDC #52891",
       "phone": "+880 1711-884920",
       "residence": "Dhanmondi, Dhaka (House 42, Road 7A)",
       "email": "dr.anika.dmch@helodoc.com",

@@ -27,7 +27,7 @@ To guarantee high visual fidelity while keeping the Flutter APK and IPA under 35
 | `avatar_doc_anika` | `scratch/images/020cd31...png` | PNG | 400x400 | Doctor portrait: Dr. Anika Rahman | `view-3`, `view-9`, `adminPage_doctors` | Remote / Bundled Sample | Convert to WebP (38KB) |
 | `avatar_doc_sadik` | `scratch/images/1220dd6...png` | PNG | 400x400 | Doctor portrait: Dr. Sadik Al-Amin | `view-3`, `view-9`, `adminPage_doctors` | Remote / Bundled Sample | Convert to WebP (42KB) |
 | `avatar_doc_farhana` | `scratch/images/a37b4b7...png` | PNG | 400x400 | Doctor portrait: Dr. Farhana Yesmin | `view-3`, `view-9`, `adminPage_doctors` | Remote / Bundled Sample | Convert to WebP (39KB) |
-| `avatar_patient_rafiq`| `scratch/images/7ca8502...png` | PNG | 200x200 | Patient portrait: Rafiq Ahmed | `view-0`, `view-7`, `doc-view-0` | Remote / Bundled Sample | Convert to WebP (18KB) |
+| `avatar_patient_rafiq`| `scratch/images/7ca8502...png` | PNG | 200x200 | Patient portrait: Rafiq Ahmed. This is fictional/mock prototype data only. Real patient images must never be bundled in production application assets. | `view-0`, `view-7`, `doc-view-0` | Remote / Bundled Sample | Convert to WebP (18KB) |
 | `icon_service_doctor` | Inline SVG | SVG Vector | 32x32 | Core service icon: Specialist consultation | `view-0`, `view-1` | Bundled SVG | None |
 | `icon_service_medicine`| Inline SVG | SVG Vector | 32x32 | Core service icon: Prescription pharmacy | `view-0`, `view-1` | Bundled SVG | None |
 | `icon_service_lab` | Inline SVG | SVG Vector | 32x32 | Core service icon: Diagnostic sample tests | `view-0`, `view-1` | Bundled SVG | None |

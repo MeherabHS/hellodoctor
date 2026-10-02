@@ -46,12 +46,13 @@ AND the pagination bar displays "Page X of Y" with functional Previous and Next 
 
 ### AC-004: Atomic Slot Reservation & Double-Booking Prevention
 ```gherkin
-GIVEN two patients simultaneously attempting to book the identical 10:00 AM slot for Dr. Sabrina Akter
-WHEN Patient A and Patient B both submit confirmation
-THEN the database transaction locks the slot for Patient A and transitions it to BOOKED
-AND Patient A receives a 201 Created confirmation with appointment ID
-AND Patient B's transaction fails with 409 Conflict (SLOT_NOT_AVAILABLE)
-AND Patient B is prompted with: "This appointment slot was just booked by another patient. Please select an alternative slot."
+GIVEN two patients simultaneously select the same available time slot
+WHEN both booking requests arrive at the server concurrently
+THEN exactly one patient atomically acquires the slot via SELECT FOR UPDATE SKIP LOCKED
+AND the winning patient's slot transitions to LOCKED_IN_PAYMENT
+AND the winning patient's appointment is created with status PENDING_PAYMENT
+AND the losing patient receives HTTP 409 with error code SLOT_NOT_AVAILABLE
+AND upon successful payment webhook, the slot transitions to BOOKED and appointment to CONFIRMED.
 ```
 
 ### AC-005: Escrow Holding State

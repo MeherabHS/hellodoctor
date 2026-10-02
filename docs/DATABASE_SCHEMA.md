@@ -42,7 +42,7 @@ CREATE EXTENSION IF NOT EXISTS btree_gist;
 -- 1. USERS & AUTHENTICATION
 -- ============================================================================
 CREATE TYPE user_role_enum AS ENUM (
-    'PATIENT', 'DOCTOR', 'ADMIN', 'PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'FINANCE_ADMIN', 'SUPPORT', 'COMPLIANCE'
+    'PATIENT', 'DOCTOR', 'PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'FINANCE_ADMIN', 'SUPPORT', 'COMPLIANCE', 'SECURITY_ADMIN'
 );
 
 CREATE TABLE users (
@@ -170,7 +170,10 @@ CREATE TABLE appointments (
     status appointment_status_enum NOT NULL DEFAULT 'PENDING_PAYMENT',
     consultation_fee NUMERIC(10, 2) NOT NULL CHECK (consultation_fee >= 0),
     chief_complaint TEXT,
-    clinical_outcome VARCHAR(50),
+    clinical_outcome VARCHAR(50) CHECK (
+        clinical_outcome IS NULL
+        OR clinical_outcome IN ('COMPLETED_WITH_RX', 'COMPLETED_NO_RX', 'REFERRED', 'ESCALATED')
+    ),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -274,7 +277,11 @@ CREATE TABLE chat_messages (
     conversation_id UUID NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
     sender_id UUID NOT NULL REFERENCES users(id),
     content TEXT NOT NULL,
-    attachment_url TEXT,
+    attachment_bucket VARCHAR(100),
+    attachment_object_key VARCHAR(500),
+    attachment_mime VARCHAR(50),
+    attachment_size BIGINT,
+    attachment_hash VARCHAR(128),
     is_read BOOLEAN NOT NULL DEFAULT FALSE,
     sent_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -389,6 +396,17 @@ CREATE INDEX idx_audit_actor ON audit_events(actor_id, created_at);
 CREATE INDEX idx_audit_resource ON audit_events(resource_type, resource_id);
 CREATE INDEX idx_audit_action ON audit_events(action, created_at);
 
+-- Immutability enforcement:
+-- The application database role (hellodoctor_app) must be granted
+-- INSERT and SELECT only on audit_events. No UPDATE or DELETE.
+--
+-- GRANT INSERT, SELECT ON audit_events TO hellodoctor_app;
+-- REVOKE UPDATE, DELETE ON audit_events FROM hellodoctor_app;
+--
+-- For stronger tamper-evidence in production, consider:
+-- - Periodic hash-chain integrity checks
+-- - Append-only archival to immutable storage (e.g., S3 Object Lock)
+
 CREATE TABLE idempotency_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     key_hash VARCHAR(128) NOT NULL,
@@ -400,20 +418,48 @@ CREATE TABLE idempotency_records (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMPTZ NOT NULL
 );
-CREATE UNIQUE INDEX idx_idempotency_key ON idempotency_records(key_hash) WHERE expires_at > CURRENT_TIMESTAMP;
+CREATE UNIQUE INDEX idx_idempotency_key
+ON idempotency_records(user_id, route, key_hash);
+
+-- Expired rows cleaned by periodic maintenance job:
+-- DELETE FROM idempotency_records WHERE expires_at < now();
 
 -- ============================================================================
 -- 13. ROW LEVEL SECURITY (RLS) POLICIES
 -- ============================================================================
+-- IMPORTANT: Application must use SET LOCAL within transactions:
+--   SET LOCAL app.current_user_id = '<uuid>';
+--   SET LOCAL app.current_role = '<role>';
+-- SET LOCAL automatically resets when the transaction ends,
+-- preventing identity leakage across pooled connections.
+--
+-- Design principle: Application-layer ABAC is authoritative.
+-- RLS provides defense-in-depth for selected PHI tables.
+-- RLS policies do not encode the entire ABAC engine but must
+-- never contradict it.
+
 -- Enable RLS
 ALTER TABLE patient_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
 
--- patient_profiles: Users can view/edit their own profiles.
-CREATE POLICY patient_profiles_self_access ON patient_profiles
-    FOR ALL
-    USING (user_id = current_setting('app.current_user_id')::UUID);
+-- patient_profiles: Users can view their own profiles, or if they are authorized admins, or assigned doctors.
+CREATE POLICY patient_profiles_select ON patient_profiles
+    FOR SELECT USING (
+        user_id = current_setting('app.current_user_id')::UUID
+        OR current_setting('app.current_role') IN ('CLINICAL_ADMIN', 'COMPLIANCE', 'SECURITY_ADMIN')
+        OR (
+            current_setting('app.current_role') = 'DOCTOR'
+            AND id IN (
+                SELECT patient_id FROM appointments
+                WHERE doctor_id = (
+                    SELECT id FROM doctor_profiles
+                    WHERE user_id = current_setting('app.current_user_id')::UUID
+                )
+                AND status IN ('CONFIRMED', 'WAITING', 'IN_CONSULTATION', 'COMPLETED')
+            )
+        )
+    );
 
 -- appointments: Patients see their own, Doctors see theirs.
 CREATE POLICY appointments_patient_access ON appointments
