@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useBackendSync } from '@/lib/useBackendSync';
 import {
   ADMIN_DOCTORS_STORE,
   ADMIN_PATIENT_STORE,
@@ -38,11 +39,42 @@ export default function AdminPortalPage() {
   const [activeAdminPage, setActiveAdminPage] = useState<AdminPageId>('doctors');
 
   // Interactive Data Stores
-  const [doctorStore] = useState<Record<string, DoctorHistoryItem>>(ADMIN_DOCTORS_STORE);
-  const [patientStore] = useState<Record<string, PatientRecordItem>>(ADMIN_PATIENT_STORE);
+  const [doctorStore, setDoctorStore] = useState<Record<string, DoctorHistoryItem>>(ADMIN_DOCTORS_STORE);
+  const [patientStore, setPatientStore] = useState<Record<string, PatientRecordItem>>(ADMIN_PATIENT_STORE);
   const [errorLogs, setErrorLogs] = useState<AppErrorLogItem[]>(INITIAL_ERROR_LOGS);
   const [grievances, setGrievances] = useState<GrievanceItem[]>(INITIAL_GRIEVANCES);
-  const [transactions] = useState<TransactionItem[]>(INITIAL_TRANSACTIONS);
+  const [transactions, setTransactions] = useState<TransactionItem[]>(INITIAL_TRANSACTIONS);
+
+  // Live Backend Synchronization Hook
+  useBackendSync({
+    onDoctorsUpdate: (backendDocs) => {
+      setDoctorStore((prev) => ({ ...prev, ...backendDocs }));
+    },
+    onPatientsUpdate: (backendPatients) => {
+      setPatientStore((prev) => ({ ...prev, ...backendPatients }));
+    },
+    onLogsUpdate: (backendLogs) => {
+      setErrorLogs((prev) => {
+        const existingIds = new Set(prev.map((l) => l.id));
+        const newOnes = backendLogs.filter((l) => !existingIds.has(l.id));
+        return [...newOnes, ...prev];
+      });
+    },
+    onGrievancesUpdate: (backendGrvs) => {
+      setGrievances((prev) => {
+        const existingIds = new Set(prev.map((g) => g.id));
+        const newOnes = backendGrvs.filter((g) => !existingIds.has(g.id));
+        return [...newOnes, ...prev];
+      });
+    },
+    onTransactionsUpdate: (backendTxs) => {
+      setTransactions((prev) => {
+        const existingIds = new Set(prev.map((t) => t.txId));
+        const newOnes = backendTxs.filter((t) => !existingIds.has(t.txId));
+        return [...newOnes, ...prev];
+      });
+    },
+  });
 
   // Escrow / Payout State
   const [payoutsSettled, setPayoutsSettled] = useState(false);
@@ -136,16 +168,35 @@ export default function AdminPortalPage() {
     setPayoutsSettled(true);
     setEscrowTotal('৳ 0 (Disbursed)');
     showToast('Payout Batch Disbursed! ৳ 890,000', 'Successfully disbursed settlements to 6 active physicians via bKash & Nagad APIs.', '💸', 'success');
+
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const end = now.toISOString().split('T')[0];
+    fetch('http://localhost:8080/api/v1/admin/disbursements/initiate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ period_start: start, period_end: end }),
+    }).catch((e) => console.warn('Disbursement API notice:', e));
   }
 
   // 2. BMDC Approval
   function handleBmdcAction(action: 'approve' | 'clarify' | 'reject') {
     if (action === 'approve') {
       showToast('BMDC Reg A-48291 Approved ✓', 'Dr. Sarah Rahman credentialed & scheduled for live teleconsults.', '✓', 'success');
+      fetch('http://localhost:8080/api/v1/admin/bmdc/da000001-0000-0000-0000-000000000001/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: 'BMDC Reg A-48291 Approved' }),
+      }).catch((e) => console.warn('BMDC verify API notice:', e));
     } else if (action === 'clarify') {
       showToast('Clarification Sent to Physician', 'Requested higher-resolution scan of Bangladesh Medical & Dental Council certificate.', '⚠️', 'info');
     } else {
       showToast('Application Declined', 'Physician notification dispatched with rejection grounds.', '✕', 'warning');
+      fetch('http://localhost:8080/api/v1/admin/bmdc/da000001-0000-0000-0000-000000000001/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: 'Application Declined' }),
+      }).catch((e) => console.warn('BMDC reject API notice:', e));
     }
   }
 
@@ -187,6 +238,18 @@ export default function AdminPortalPage() {
     setErrorLogs((prev) => [newLog, ...prev]);
     setSimulateModalOpen(false);
     showToast('⚡ Failure Incident Injected', `${newLog.failedPart} failure logged against ${targetUser.name}.`, '⚡', 'urgent');
+
+    fetch('http://localhost:8080/api/v1/admin/logs/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: newLog.actionAttempted,
+        subsystem: newLog.subsystem,
+        severity: newLog.severity,
+        error_summary: newLog.errorMessage,
+        stack_trace: newLog.stackTrace,
+      }),
+    }).catch((e) => console.warn('Log simulate API notice:', e));
   }
 
   // 4. Grievance Adjudication
@@ -234,9 +297,23 @@ export default function AdminPortalPage() {
       })
     );
 
-    if (action === 'REFUND') showToast('Refund Disbursed 💳', 'Full fee refunded to patient wallet via bKash.', '💳', 'success');
-    else if (action === 'WARN') showToast('Doctor Warned ⚠️', 'Formal clinical misconduct warning registered in compliance dossier.', '⚠️', 'warning');
-    else showToast('Grievance Resolved ✓', 'Dispute claim marked as successfully resolved.', '✓', 'success');
+    if (action === 'REFUND') {
+      showToast('Refund Disbursed 💳', 'Full fee refunded to patient wallet via bKash.', '💳', 'success');
+      fetch(`http://localhost:8080/api/v1/admin/grievances/${grvId}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audit_notes: 'Central Escrow Adjudication refund' }),
+      }).catch((e) => console.warn('Grievance refund API notice:', e));
+    } else if (action === 'WARN') {
+      showToast('Doctor Warned ⚠️', 'Formal clinical misconduct warning registered in compliance dossier.', '⚠️', 'warning');
+      fetch(`http://localhost:8080/api/v1/admin/grievances/${grvId}/warn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audit_notes: 'Central Clinical Governance warning' }),
+      }).catch((e) => console.warn('Grievance warn API notice:', e));
+    } else {
+      showToast('Grievance Resolved ✓', 'Dispute claim marked as successfully resolved.', '✓', 'success');
+    }
   }
 
   // Log resolve toggle
