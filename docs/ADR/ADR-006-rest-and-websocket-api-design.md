@@ -7,12 +7,12 @@
 ---
 
 ## 1. Context
-HelloDoctor includes transactional operations (appointment booking, payment escrow authorization, prescription signing) as well as continuous bi-directional streams (WebRTC call signaling, 24-hour asynchronous clinical messaging). Selecting a single transport protocol for all interactions would be suboptimal.
+HelloDoctor includes transactional operations (appointment booking, payment escrow authorization, prescription signing) as well as continuous bi-directional streams (24-hour asynchronous clinical messaging). Selecting a single transport protocol for all interactions would be suboptimal.
 
 ## 2. Decision
 We adopt a **Hybrid Protocol Strategy**:
 1. **REST APIs (JSON over HTTPS):** For all standard CRUD, directory queries, booking, authentication, and financial transactions.
-2. **WebSockets (WSS):** Exclusively for real-time WebRTC signaling and active 24-hour consultation chat message exchange.
+2. **WebSockets (WSS):** Exclusively for active 24-hour consultation chat message exchange.
 3. **Server-Sent Events (SSE) / Polling:** For waiting room queue countdowns and background presence checks.
 
 ## 3. Alternatives Considered
@@ -21,7 +21,7 @@ We adopt a **Hybrid Protocol Strategy**:
 
 ## 4. Rationale
 - **REST for Determinism:** Financial transactions, slot reservations, and prescription signing require standard HTTP semantics (`Idempotency-Key`, cache-control headers, status codes `201`, `409`, `422`).
-- **WebSockets Where Justified:** Low-latency signaling and live chat benefit from persistent socket framing without HTTP polling overhead.
+- **WebSockets Where Justified:** Live chat benefits from persistent socket framing without HTTP polling overhead. Video/audio RTC is handled entirely by Agora SDK — WebSockets are NOT used for RTC signaling.
 
 ## 5. Consequences
 - **Positive:** Clear separation of transactional vs. streaming traffic; optimal battery and bandwidth consumption.

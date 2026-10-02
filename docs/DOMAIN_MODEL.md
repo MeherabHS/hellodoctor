@@ -2,7 +2,7 @@
 
 > **Document Version:** 1.0.0  
 > **Target Frameworks:** Rust Domain Models (`serde`, `validator`), Flutter Models (`freezed`, `json_serializable`)  
-> **Compliance Standard:** Healthcare Privacy (PHI), BMDC Credentialing, Financial Auditability
+> **Compliance Standard:** Healthcare Privacy (PHI), Medical Credentialing, Financial Auditability
 
 ---
 
@@ -26,8 +26,8 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `id`: `UUID` (Primary Key, Required)
   - `phone_number`: `String` (Required, Unique, E.164 format: `+880...` or `+254...`)
   - `email`: `String` (Optional, Unique)
-  - `password_hash`: `String` (Required, Argon2id)
-  - `role`: `UserRole` (`PATIENT`, `DOCTOR`, `ADMIN`)
+  - `password_hash`: `String` (Optional, Argon2id. Nullable for OTP-only users)
+  - `role`: `UserRole` (`PATIENT`, `DOCTOR`, `ADMIN`, `PLATFORM_ADMIN`, `CLINICAL_ADMIN`, `FINANCE_ADMIN`, `SUPPORT`, `COMPLIANCE`)
   - `is_active`: `Boolean` (Default: `true`)
   - `is_verified`: `Boolean` (Default: `false`)
   - `preferred_language`: `String` (Default: `'en'`, values: `'en'`, `'sw'`)
@@ -39,7 +39,45 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
-### 2.2 `PatientProfile`
+### 2.2 `AuthSession`
+- **Purpose:** Secure session tracking and device fingerprinting.
+- **Fields:**
+  - `id`: `UUID` (Primary Key)
+  - `user_id`: `UUID` (Foreign Key -> `User.id`, Required)
+  - `token_family_id`: `UUID`
+  - `refresh_token_hash`: `String`
+  - `device_fingerprint`: `String`
+  - `ip_hash`: `String`
+  - `user_agent`: `String`
+  - `created_at`: `DateTime<Utc>`
+  - `last_used_at`: `DateTime<Utc>`
+  - `rotated_at`: `DateTime<Utc>` (Optional)
+  - `revoked_at`: `DateTime<Utc>` (Optional)
+  - `expires_at`: `DateTime<Utc>`
+- **Sensitivity:** `OPERATIONAL`
+
+---
+
+### 2.3 `AuditEvent`
+- **Purpose:** Immutable healthcare and system audit trail.
+- **Fields:**
+  - `id`: `UUID` (Primary Key)
+  - `actor_id`: `UUID`
+  - `actor_role`: `UserRole`
+  - `action`: `String`
+  - `resource_type`: `String`
+  - `resource_id`: `UUID`
+  - `session_id`: `UUID`
+  - `request_id`: `String`
+  - `ip_hash`: `String`
+  - `result`: `String`
+  - `reason`: `String`
+  - `created_at`: `DateTime<Utc>`
+- **Sensitivity:** `OPERATIONAL` / Forensic
+
+---
+
+### 2.4 `PatientProfile`
 - **Purpose:** Clinical identity and demographic details for patients.
 - **Fields:**
   - `id`: `UUID` (Primary Key, Required)
@@ -58,20 +96,22 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
-### 2.3 `DoctorProfile`
+### 2.5 `DoctorProfile`
 - **Purpose:** Professional physician profile, clinical credentials, and practice parameters.
 - **Fields:**
   - `id`: `UUID` (Primary Key, Required)
   - `user_id`: `UUID` (Foreign Key -> `User.id`, Required, Unique)
   - `full_name`: `String` (Required, prefixed with "Dr.")
-  - `bmdc_number`: `String` (Required, Unique, e.g., "BMDC #45821")
-  - `primary_specialty`: `MedicalSpecialty` (Required, e.g., `INTERNAL_MEDICINE`, `CARDIOLOGY`)
+  - `license_number`: `String` (Required, Unique, e.g., "123456")
+  - `license_authority`: `String` (Required)
+  - `license_country`: `String` (Required, Default 'BD')
+  - `primary_specialty`: `MedicalSpecialty` (Required)
   - `secondary_specialties`: `Vec<MedicalSpecialty>`
   - `experience_years`: `u8` (Required, 0–70)
-  - `current_hospital`: `String` (Required, e.g., "Dhaka Medical College Hospital")
-  - `qualifications`: `Vec<String>` (e.g., `["MBBS", "FCPS", "MD"]`)
-  - `consultation_fee_video`: `Decimal` (Required, e.g., `800.00`)
-  - `consultation_fee_chat`: `Decimal` (Required, e.g., `500.00`)
+  - `current_hospital`: `String` (Required)
+  - `qualifications`: `Vec<String>`
+  - `consultation_fee_video`: `Decimal` (Required)
+  - `consultation_fee_chat`: `Decimal` (Required)
   - `residential_address`: `String` (Required, for verification and dossier)
   - `verified_phone`: `String` (Required)
   - `is_on_duty`: `Boolean` (Default: `false`)
@@ -83,8 +123,8 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
-### 2.4 `DoctorScheduleSlot`
-- **Purpose:** 15-minute or 20-minute availability blocks for teleconsultation.
+### 2.6 `DoctorScheduleSlot`
+- **Purpose:** Availability blocks for teleconsultation.
 - **Fields:**
   - `id`: `UUID` (Primary Key)
   - `doctor_id`: `UUID` (Foreign Key -> `DoctorProfile.id`, Required)
@@ -97,7 +137,7 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
-### 2.5 `Appointment`
+### 2.7 `Appointment`
 - **Purpose:** Scheduled consultation booking linking patient, doctor, and slot.
 - **Fields:**
   - `id`: `UUID` (Primary Key)
@@ -106,24 +146,27 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `doctor_id`: `UUID` (Foreign Key -> `DoctorProfile.id`, Required)
   - `slot_id`: `UUID` (Foreign Key -> `DoctorScheduleSlot.id`, Required)
   - `modality`: `ConsultationModality` (`VIDEO`, `CHAT`)
-  - `status`: `AppointmentStatus` (`PENDING_PAYMENT`, `CONFIRMED`, `WAITING`, `IN_CONSULTATION`, `COMPLETED`, `CANCELLED`, `DISPUTED`)
+  - `status`: `AppointmentStatus` (`PENDING_PAYMENT`, `CONFIRMED`, `WAITING`, `IN_CONSULTATION`, `COMPLETED`, `CANCELLED`, `EXPIRED`, `PREMATURE_TERMINATION`, `DISPUTED`, `REFUNDED`)
   - `consultation_fee`: `Decimal` (Required)
-  - `chief_complaint`: `String` (Optional, max 500 chars)
+  - `chief_complaint`: `String` (Optional)
+  - `clinical_outcome`: `String` (Optional: 'COMPLETED_WITH_RX', 'COMPLETED_NO_RX', 'REFERRED', 'ESCALATED')
   - `created_at`: `DateTime<Utc>`
   - `updated_at`: `DateTime<Utc>`
 - **Sensitivity:** `PHI` / `FINANCIAL`
 
 ---
 
-### 2.6 `PrescriptionIntakeDocument` (Max 5 Images)
+### 2.8 `PrescriptionIntakeDocument` (Max 5 Images)
 - **Purpose:** Physical prescription or lab report uploaded by patient prior to consultation.
 - **Fields:**
   - `id`: `UUID` (Primary Key)
   - `appointment_id`: `UUID` (Foreign Key -> `Appointment.id`, Required)
   - `patient_id`: `UUID` (Foreign Key -> `PatientProfile.id`, Required)
   - `page_number`: `u8` (Required, 1 to 5)
-  - `file_url`: `String` (Encrypted object storage URL)
-  - `file_size_bytes`: `u64` (Max 10,485,760 bytes = 10 MB)
+  - `object_bucket`: `String` (Required)
+  - `object_key`: `String` (Required)
+  - `content_hash`: `String` (Optional)
+  - `file_size_bytes`: `u64` (Max 10 MB)
   - `mime_type`: `String` (`image/jpeg`, `image/png`, `application/pdf`)
   - `created_at`: `DateTime<Utc>`
 - **Business Rule:** Total documents per `appointment_id` must not exceed 5.
@@ -131,12 +174,12 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
-### 2.7 `ConsultationSession` & `ConsultationTelemetry`
+### 2.9 `ConsultationSession` & `ConsultationTelemetry`
 - **Purpose:** Live teleconsultation record and objective technical telemetry.
 - **Fields (`ConsultationSession`):**
   - `id`: `UUID` (Primary Key)
   - `appointment_id`: `UUID` (Foreign Key -> `Appointment.id`, Required, Unique)
-  - `room_id`: `String` (WebRTC room identifier)
+  - `agora_channel_name`: `String` (Agora RTC channel identifier)
   - `started_at`: `DateTime<Utc>`
   - `ended_at`: `DateTime<Utc>`
   - `status`: `SessionStatus` (`INITIALIZED`, `ACTIVE`, `COMPLETED`, `PREMATURE_TERMINATION`)
@@ -144,7 +187,7 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `id`: `UUID` (Primary Key)
   - `session_id`: `UUID` (Foreign Key -> `ConsultationSession.id`, Required, Unique)
   - `call_duration_seconds`: `u32` (Actual connected duration)
-  - `ice_connection_state`: `String` (e.g., "COMPLETED", "FAILED", "DISCONNECTED")
+  - `connection_state`: `String` (e.g., "COMPLETED", "FAILED", "DISCONNECTED")
   - `packet_loss_percent`: `Decimal`
   - `round_trip_time_ms`: `u32`
   - `premature_end`: `Boolean` (`call_duration_seconds < 30`)
@@ -153,51 +196,52 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
-### 2.8 `Prescription` & `PrescriptionItem`
-- **Purpose:** Official legal e-prescription authored and digitally signed by physician.
+### 2.10 `Prescription` & `PrescriptionItem`
+- **Purpose:** Official e-prescription authored and finalized by physician.
 - **Fields (`Prescription`):**
   - `id`: `UUID` (Primary Key)
   - `appointment_id`: `UUID` (Foreign Key -> `Appointment.id`, Required, Unique)
   - `doctor_id`: `UUID` (Foreign Key -> `DoctorProfile.id`, Required)
   - `patient_id`: `UUID` (Foreign Key -> `PatientProfile.id`, Required)
-  - `rx_number`: `String` (Unique, e.g., "RX-20261001-841")
-  - `diagnosis_notes`: `String` (Clinical summary)
-  - `investigations_advised`: `Vec<String>` (Lab tests: e.g., "CBC with ESR")
-  - `follow_up_date`: `Date` (Optional)
-  - `digital_signature_hash`: `String` (HMAC-SHA256 signature)
-  - `pdf_storage_url`: `String`
+  - `rx_number`: `String` (Unique)
+  - `diagnosis_notes`: `String`
+  - `investigations_advised`: `Vec<String>`
+  - `follow_up_date`: `Date`
+  - `integrity_verification_hash`: `String` (HMAC integrity hash, not a legal digital signature)
+  - `pdf_object_bucket`: `String`
+  - `pdf_object_key`: `String`
   - `created_at`: `DateTime<Utc>`
 - **Fields (`PrescriptionItem`):**
   - `id`: `UUID` (Primary Key)
   - `prescription_id`: `UUID` (Foreign Key -> `Prescription.id`, Required)
-  - `brand_name`: `String` (e.g., "Napa Extra")
-  - `generic_name`: `String` (e.g., "Paracetamol + Caffeine")
-  - `dosage_form`: `String` (e.g., "Tablet", "Syrup")
-  - `strength`: `String` (e.g., "500mg + 65mg")
-  - `dosage_frequency`: `String` (e.g., "1+0+1")
-  - `duration_days`: `u16` (e.g., 5)
-  - `instructions`: `String` (e.g., "After meal")
+  - `brand_name`: `String`
+  - `generic_name`: `String`
+  - `dosage_form`: `String`
+  - `strength`: `String`
+  - `dosage_frequency`: `String`
+  - `duration_days`: `u16`
+  - `instructions`: `String`
 - **Sensitivity:** `PHI`
 
 ---
 
-### 2.9 `GrievanceReport` & `GrievanceAdjudication`
+### 2.11 `GrievanceReport` & `GrievanceAdjudication`
 - **Purpose:** Formal dispute filing and Central Governance Board arbitration.
 - **Fields (`GrievanceReport`):**
   - `id`: `UUID` (Primary Key)
-  - `grievance_number`: `String` (e.g., "GRV-20261001-73")
+  - `grievance_number`: `String`
   - `patient_id`: `UUID` (Foreign Key -> `PatientProfile.id`, Required)
   - `consultation_id`: `UUID` (Foreign Key -> `ConsultationSession.id`, Required)
   - `target_type`: `GrievanceTarget` (`DOCTOR`, `SYSTEM`)
-  - `category`: `String` (e.g., "Rushed Consultation", "WebRTC Video Freeze")
-  - `claim_summary`: `String` (Patient narrative)
-  - `status`: `GrievanceStatus` (`PENDING_REVIEW`, `REFUNDED`, `WARNED`, `DISMISSED`)
+  - `category`: `String`
+  - `claim_summary`: `String`
+  - `status`: `GrievanceStatus` (`PENDING_REVIEW`, `UNDER_INVESTIGATION`, `REFUNDED`, `WARNED`, `DISMISSED`)
   - `created_at`: `DateTime<Utc>`
 - **Fields (`GrievanceAdjudication`):**
   - `id`: `UUID` (Primary Key)
   - `grievance_id`: `UUID` (Foreign Key -> `GrievanceReport.id`, Required, Unique)
   - `adjudicated_by_admin_id`: `UUID` (Foreign Key -> `User.id`, Required)
-  - `board_remedy`: `String` (e.g., "Escrow Refund Disbursed (৳800)")
+  - `board_remedy`: `String`
   - `action_type`: `AdjudicationAction` (`REFUND_DISBURSED`, `DOCTOR_WARNED`, `CLAIM_DISMISSED`)
   - `audit_notes`: `String`
   - `adjudicated_at`: `DateTime<Utc>`
@@ -205,25 +249,25 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
-### 2.10 `Transaction` & `DoctorWallet`
-- **Purpose:** Financial accounting, escrow locking, and 20% platform charge debarment.
+### 2.12 `Transaction` & `DoctorWallet`
+- **Purpose:** Financial accounting, payment holding, and 20% platform charge debarment.
 - **Fields (`Transaction`):**
   - `id`: `UUID` (Primary Key)
-  - `transaction_number`: `String` (Unique, e.g., "TXN-BK-94812")
+  - `transaction_number`: `String`
   - `appointment_id`: `UUID` (Foreign Key -> `Appointment.id`, Required)
   - `gateway`: `PaymentGateway` (`BKASH`, `NAGAD`, `CARD`, `MPESA`)
-  - `gateway_reference`: `String` (IPN Webhook ID)
-  - `gross_amount`: `Decimal` (e.g., `800.00`)
-  - `platform_fee_amount`: `Decimal` (Strictly `gross_amount * 0.20`, e.g., `160.00`)
-  - `net_amount`: `Decimal` (Strictly `gross_amount * 0.80`, e.g., `640.00`)
-  - `escrow_status`: `EscrowStatus` (`ESCROW_HELD`, `SETTLED_TO_DOCTOR`, `REFUNDED_TO_PATIENT`)
+  - `gateway_reference`: `String`
+  - `gross_amount`: `Decimal`
+  - `platform_fee_amount`: `Decimal`
+  - `net_amount`: `Decimal`
+  - `payment_status`: `PaymentStatus` (`INITIATED`, `ESCROW_HELD`, `SETTLED_TO_DOCTOR`, `DISBURSED`, `REFUNDED_TO_PATIENT`, `FAILED`)
   - `created_at`: `DateTime<Utc>`
   - `settled_at`: `DateTime<Utc>` (Optional)
 - **Fields (`DoctorWallet`):**
   - `doctor_id`: `UUID` (Primary Key, Foreign Key -> `DoctorProfile.id`)
-  - `lifetime_gross_earnings`: `Decimal` (Default: `0.00`)
-  - `lifetime_platform_fee_withheld`: `Decimal` (Default: `0.00`)
-  - `lifetime_net_earnings`: `Decimal` (Default: `0.00`)
-  - `current_withdrawable_balance`: `Decimal` (Default: `0.00`)
+  - `lifetime_gross_earnings`: `Decimal`
+  - `lifetime_platform_fee_withheld`: `Decimal`
+  - `lifetime_net_earnings`: `Decimal`
+  - `current_withdrawable_balance`: `Decimal`
   - `last_payout_at`: `DateTime<Utc>` (Optional)
 - **Sensitivity:** `FINANCIAL`

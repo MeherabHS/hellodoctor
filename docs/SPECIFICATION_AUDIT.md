@@ -3,47 +3,56 @@
 > **Audit Date:** 2026-10-01  
 > **Auditor:** Principal Systems Architect & QA Reviewer  
 > **Target Production Tech Stack:** Flutter Mobile + Rust Axum Backend + PostgreSQL + Next.js Web Services  
-> **Audit Status:** **100% PASSED — PRODUCTION-READY FOR CLAUDE CODE**
+> **Audit Status:** **REMEDIATION IN PROGRESS** (Implementation is BLOCKED until remediation completes)
 
 ---
 
 ## 1. Traceability & Consistency Verification Matrix
 
-| Audit Dimension | Questions Verified | Result | Cross-Reference |
-|---|---|---|---|
-| **Screen Coverage** | Are all screens, modals, overlays, and loading states documented? | **100% COMPLETE** (15 patient views, 6 doctor views, workstation, 9 admin pages, 11 modals) | `docs/SCREEN_INVENTORY.md` |
-| **Interaction Fidelity** | Are triggers, actions, state mutations, UI changes, and backend calls detailed? | **100% COMPLETE** (All 9 core interactive subsystems mapped) | `docs/INTERACTION_SPEC.md` |
-| **Domain Modeling** | Do all clinical and financial entities exist with fields, validation, and lifecycle? | **100% COMPLETE** (11 core healthcare and financial entities) | `docs/DOMAIN_MODEL.md` |
-| **Database DDL** | Is the PostgreSQL schema syntactically valid with foreign keys, checks, and indexes? | **100% COMPLETE** (Full PostgreSQL DDL script with 12 tables) | `docs/DATABASE_SCHEMA.md` |
-| **API Contract** | Does every frontend action map to a strongly typed REST/WS endpoint? | **100% COMPLETE** (Standardized JSON envelopes with error codes) | `docs/API_SPEC.md` |
-| **State Machines** | Are invalid transitions blocked with pre-condition guards? | **100% COMPLETE** (Appointment, Escrow, Grievance, Upload states) | `docs/STATE_MACHINES.md` |
-| **Testing Strategy** | Are unit, widget, and integration tests specified with deterministic criteria? | **100% COMPLETE** (Unit, widget, and integration test coverage) | `docs/TESTING_STRATEGY.md` |
-| **Acceptance Criteria** | Does every capability have deterministic GIVEN-WHEN-THEN criteria? | **100% COMPLETE** (14 formal BDD scenarios) | `docs/ACCEPTANCE_CRITERIA.md` |
-| **Design System Tokens**| Are colors, typography, radii, and shadows faithful to the prototype? | **100% COMPLETE** (Hex codes, Plus Jakarta Sans, 8pt scale) | `docs/UI_DESIGN_SYSTEM.md` |
-| **Asset Specification**| Are doctor avatars, icons, banners, and audio cues cataloged? | **100% COMPLETE** (68 PNGs, SVGs, audio chimes indexed) | `docs/ASSET_SPEC.md` |
-| **Claude Operating Loop**| Is `CLAUDE.md` actionable, persistent, and milestone-oriented? | **100% COMPLETE** (25 operational rules, exact CLI commands) | `CLAUDE.md` |
+| Category | Audit Point | Status |
+|---|---|---|
+| **CRITICAL** | Architecture Remediation | PENDING |
+| **CRITICAL** | Security Model (BOLA/IDOR/ABAC) | PENDING |
+| **CRITICAL** | Database v2 (Schema & Constraints) | PENDING |
+| **CRITICAL** | Payment & Settlement Ledger | PENDING |
+| **CRITICAL** | Agora RTC Implementation Specs | RESOLVED |
+| **CRITICAL** | Auth Session Table & Refresh Tokens | PENDING |
+| **CRITICAL** | Ed25519 JWT Validation Rules | PENDING |
+| **CRITICAL** | PHI Leakage Prevention & Audit | PENDING |
+| **HIGH** | File Upload Security Validation | PENDING |
+| **HIGH** | HMAC-SHA256 Integrity Verification | PENDING |
+| **HIGH** | GiST Exclusion Constraint on Schedules | PENDING |
+| **HIGH** | Push Notification PHI Scrubber | PENDING |
+| **HIGH** | Internal Platform Compliance Tools | PENDING |
+| **HIGH** | Agora Telemetry & Call Drop Handling | RESOLVED |
+| **HIGH** | Escrow & MFS Webhook Flows | PENDING |
+| **HIGH** | Object Key Presigned URL TTL | PENDING |
+| **MEDIUM** | Emergency Contact Number Config | RESOLVED |
+| **MEDIUM** | Bangla Localization Planning | RESOLVED |
+| **MEDIUM** | Zero Star Ratings Guarantee | RESOLVED |
+| **MEDIUM** | Medical Record Retention Config | PENDING |
+| **MEDIUM** | Doctor Earnings Platform Charge | RESOLVED |
+| **MEDIUM** | Multi-Prescription Limit (Max 5) | RESOLVED |
+| **MEDIUM** | Bilingual Regional Localization | RESOLVED |
+| **MEDIUM** | Swagger / API Spec Updates | PENDING |
+| **MEDIUM** | Error Logs Diagnostics | PENDING |
+| **MEDIUM** | Domain Modeling Completeness | PENDING |
+| **MEDIUM** | Flutter BLoC State Definitions | PENDING |
+| **MEDIUM** | Rust Backend Routes Update | PENDING |
+| **MEDIUM** | Test Strategy Update (OWASP) | PENDING |
+| **MEDIUM** | BDD Scenarios (Security & BOLA) | PENDING |
+| **MEDIUM** | Design System Tokens | RESOLVED |
+| **MEDIUM** | UI Mocks vs Specs Consistency | PENDING |
+| **MEDIUM** | Asset Specification Catalog | PENDING |
+| **MEDIUM** | Claude Operating Loop Specs | RESOLVED |
+| **MEDIUM** | Next.js Admin Views Review | PENDING |
+| **MEDIUM** | Offline Action Guard Modal | PENDING |
+| **MEDIUM** | Telemetry Endpoints Sync | PENDING |
 
 ---
 
-## 2. Verification of Critical Product Constraints
+## 2. Summary
 
-1. **Zero Star Ratings & Vanity Reviews:**  
-   - Verified across `SCREEN_INVENTORY.md`, `USER_FLOWS.md`, `ACCEPTANCE_CRITERIA.md`, and `VISUAL_FIDELITY.md`.  
-   - Zero star symbols (`⭐`, `★`) or popularity reviews exist on patient-facing screens. Governed by BMDC credentials and Grievance Board adjudication.
-2. **Doctor Earnings 20% Debarred Calculation:**  
-   - Verified formula: $\text{Gross } (G) \longrightarrow \text{20\% Withheld } (C = G \times 0.20) \longrightarrow \text{Final Net } (N = G \times 0.80)$.  
-   - Mandatory note *"Total calculation is based including the platform charge 20%"* verified on all views.
-3. **Multi-Prescription Upload Engine (Max 5 Images):**  
-   - Verified client and server capping at 5 photos (`MAX_PRESCRIPTION_IMAGES = 5`). Truncation warning toast and multi-page inspection modal (`#labReportModal`) specified.
-4. **Emergency Contact Helpline (Call 16263):**  
-   - Verified position: positioned directly above Upcoming Appointments on `view-0`. Strict omission of "24/7" prefix.
-5. **Bilingual Regional Localization:**  
-   - Verified instant toggle between English (`en`) and Swahili (`sw`) with dynamic badge `#patientActiveLangBadge`.
-6. **Agora RTC Video Infrastructure:**  
-   - Verified across `ADR-008`, `REALTIME.md`, `FLUTTER_ARCHITECTURE.md`, `API_SPEC.md`, `DATA_FLOW.md`, and `IMPLEMENTATION_ROADMAP.md`. Live teleconsultation utilizes the managed Agora RTC SDK (`agora_rtc_engine` in Flutter + dynamic token generation in Rust Axum), eliminating custom WebRTC TURN/SFU server maintenance.
+The previous specification claimed 100% completion, which was inaccurate. Significant gaps were identified regarding Agora RTC integration, security (BOLA/IDOR, file uploads, PHI in pushes), database schema, and payment flows. 
 
----
-
-## 3. Autonomous Implementation Readiness Verdict
-
-The specification package is **complete, coherent, and deterministic**. Another autonomous agent — Claude Code — can read this documentation package and execute the implementation loop (Read Spec -> Read Prototype -> Read Roadmap -> Implement -> Test -> Audit -> Update Progress -> Commit) without repeatedly stopping to ask routine design or architectural questions.
+Implementation is currently **BLOCKED** pending full remediation of the above 37 audit points.

@@ -17,7 +17,13 @@
   - `X-Request-Id: <UUIDv4>` (Traceability header auto-injected by proxy or client)
   - `Idempotency-Key: <UUIDv4>` (Required for financial and booking mutations)
 
-### 1.2 Standard Success Response Envelope
+### 1.2 Authorization & ABAC Note
+All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addition to Role-Based Access Control (RBAC). Beyond checking the user's role, the system verifies:
+- Ownership of the resource (e.g., patient accessing their own records)
+- Active doctor-patient relationship
+- Context of an ongoing or completed appointment
+
+### 1.3 Standard Success Response Envelope
 ```json
 {
   "success": true,
@@ -29,7 +35,7 @@
 }
 ```
 
-### 1.3 Standard Error Response Envelope
+### 1.4 Standard Error Response Envelope
 ```json
 {
   "success": false,
@@ -52,7 +58,7 @@
 ## 2. Authentication & Profile Endpoints
 
 ### `POST /api/v1/auth/register-otp`
-- **Purpose:** Initiates registration by sending an SMS verification OTP.
+- **Purpose:** Initiates registration by sending an SMS verification OTP for patients.
 - **Auth:** Public.
 - **Request Body:**
   ```json
@@ -64,7 +70,7 @@
   ```
 
 ### `POST /api/v1/auth/verify-otp-and-login`
-- **Purpose:** Verifies OTP and returns JWT access and refresh tokens.
+- **Purpose:** Verifies OTP and returns JWT access and opaque refresh tokens.
 - **Auth:** Public.
 - **Request Body:**
   ```json
@@ -76,7 +82,7 @@
     "success": true,
     "data": {
       "access_token": "eyJhbGciOi...",
-      "refresh_token": "eyJhbGciOi...",
+      "refresh_token": "a8f4c2e1b9d7...",
       "user": {
         "id": "u-9481",
         "phone_number": "+8801712345678",
@@ -86,6 +92,79 @@
     }
   }
   ```
+
+### `POST /api/v1/auth/doctor/login`
+- **Purpose:** Initiates doctor login using BMDC credentials and password (Step 1 of MFA).
+- **Auth:** Public.
+- **Request Body:**
+  ```json
+  { "bmdc_number": "BMDC #45821", "password": "SecurePassword123!" }
+  ```
+- **Response:** `200 OK`
+  ```json
+  { "success": true, "data": { "session_token": "mfa_sess_123", "requires_otp": true } }
+  ```
+
+### `POST /api/v1/auth/doctor/verify-otp`
+- **Purpose:** Verifies the second factor OTP for doctor login (Step 2 of MFA).
+- **Auth:** Public.
+- **Request Body:**
+  ```json
+  { "session_token": "mfa_sess_123", "otp_code": "837194" }
+  ```
+- **Response:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "data": {
+      "access_token": "eyJhbGciOi...",
+      "refresh_token": "a8f4c2e1b9d7...",
+      "user": { "id": "doc-sabrina", "role": "DOCTOR" }
+    }
+  }
+  ```
+
+### `POST /api/v1/auth/admin/login`
+- **Purpose:** Administrator login using Email, Password, and TOTP in a single request.
+- **Auth:** Public.
+- **Request Body:**
+  ```json
+  { "email": "admin@helodoc.com", "password": "SecurePassword123!", "totp_code": "123456" }
+  ```
+- **Response:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "data": {
+      "access_token": "eyJhbGciOi...",
+      "refresh_token": "a8f4c2e1b9d7...",
+      "user": { "id": "adm-1", "role": "PLATFORM_ADMIN" }
+    }
+  }
+  ```
+
+### `POST /api/v1/auth/refresh`
+- **Purpose:** Exchanges a valid opaque refresh token for a new access/refresh token pair. Employs token rotation and reuse detection.
+- **Auth:** Public.
+- **Request Body:**
+  ```json
+  { "refresh_token": "a8f4c2e1b9d7..." }
+  ```
+- **Response:** `200 OK`
+
+### `POST /api/v1/auth/logout`
+- **Purpose:** Revokes the current session's refresh token.
+- **Auth:** Authenticated.
+- **Request Body:**
+  ```json
+  { "refresh_token": "a8f4c2e1b9d7..." }
+  ```
+- **Response:** `200 OK`
+
+### `POST /api/v1/auth/logout-all`
+- **Purpose:** Revokes all active sessions for the user.
+- **Auth:** Authenticated.
+- **Response:** `200 OK`
 
 ---
 
@@ -130,21 +209,9 @@
 - **Purpose:** Retrieves available 15-minute consultation slots for a specific date.
 - **Query Parameters:** `date` (YYYY-MM-DD, e.g., `2026-10-01`).
 - **Response:** `200 OK`
-  ```json
-  {
-    "success": true,
-    "data": {
-      "date": "2026-10-01",
-      "slots": [
-        { "id": "slot-01", "start_time": "2026-10-01T10:00:00Z", "end_time": "2026-10-01T10:15:00Z", "status": "AVAILABLE" },
-        { "id": "slot-02", "start_time": "2026-10-01T10:15:00Z", "end_time": "2026-10-01T10:30:00Z", "status": "AVAILABLE" }
-      ]
-    }
-  }
-  ```
 
 ### `POST /api/v1/appointments/book`
-- **Purpose:** Atomically reserves slot and initiates MFS escrow authorization.
+- **Purpose:** Atomically reserves a slot and initiates payment authorization. The slot transitions to `LOCKED_IN_PAYMENT`.
 - **Auth:** `PATIENT`.
 - **Headers:** `Idempotency-Key: <UUID>`
 - **Request Body:**
@@ -164,14 +231,20 @@
     "data": {
       "appointment_id": "apt-94812",
       "appointment_number": "APT-20261001-9481",
-      "status": "CONFIRMED",
-      "escrow_transaction_id": "TXN-BK-94812",
+      "status": "PENDING_PAYMENT",
+      "payment_session_id": "sess_bkash_9123",
+      "payment_redirect_url": "https://gateway.bkash.com/pay/sess_bkash_9123",
       "amount": 800.00
     }
   }
   ```
 
-### `POST /api/v1/appointments/{id}/prescriptions/upload`
+### `POST /api/v1/webhooks/payment/{provider}`
+- **Purpose:** Webhook endpoint for payment providers (e.g., BKASH) to confirm payment status. Transitions appointment from `PENDING_PAYMENT` to `CONFIRMED`.
+- **Auth:** Provider-specific Signature / HMAC Verification.
+- **Response:** `200 OK` (Provider specific acknowledgment).
+
+### `POST /api/v1/appointments/{id}/prescriptions`
 - **Purpose:** Uploads 1 to 5 physical prescription or lab report images for pre-consultation intake.
 - **Auth:** `PATIENT`.
 - **Content-Type:** `multipart/form-data`
@@ -186,10 +259,25 @@
       "appointment_id": "apt-94812",
       "uploaded_count": 3,
       "documents": [
-        { "id": "doc-01", "page_number": 1, "url": "https://storage.../rx1.jpg", "size_bytes": 1245000 },
-        { "id": "doc-02", "page_number": 2, "url": "https://storage.../rx2.jpg", "size_bytes": 1450000 },
-        { "id": "doc-03", "page_number": 3, "url": "https://storage.../rx3.jpg", "size_bytes": 980000 }
+        { "id": "doc-01", "page_number": 1, "mime_type": "image/jpeg", "size_bytes": 1245000 },
+        { "id": "doc-02", "page_number": 2, "mime_type": "image/jpeg", "size_bytes": 1450000 },
+        { "id": "doc-03", "page_number": 3, "mime_type": "image/jpeg", "size_bytes": 980000 }
       ]
+    }
+  }
+  ```
+
+### `GET /api/v1/appointments/{id}/documents/{document_id}`
+- **Purpose:** Returns a short-lived pre-signed download URL for a specific document, enforcing ABAC authorization checks.
+- **Auth:** `PATIENT` or `DOCTOR`.
+- **Response:** `200 OK`
+  ```json
+  {
+    "success": true,
+    "data": {
+      "document_id": "doc-01",
+      "download_url": "https://storage.helodoc.com/pre-signed/doc-01?expires=...",
+      "expires_in": 300
     }
   }
   ```
@@ -198,15 +286,10 @@
 
 ## 5. Telehealth Video (Agora RTC) & Telemetry Capture
 
-### `POST /api/v1/telehealth/agora-token`
+### `POST /api/v1/consultations/{appointment_id}/rtc-token`
 - **Purpose:** Mints an authorized, short-lived Agora Dynamic RTC Token for entering a video consultation room.
 - **Auth:** `PATIENT` or `DOCTOR` (Caller must be participant in the appointment).
-- **Request Body:**
-  ```json
-  {
-    "appointment_id": "apt-94812"
-  }
-  ```
+- **Request Body:** Empty.
 - **Response:** `200 OK`
   ```json
   {
@@ -222,13 +305,13 @@
   ```
 
 ### `POST /api/v1/consultations/{appointment_id}/telemetry`
-- **Purpose:** Submits auto-captured technical telemetry upon consultation termination (derived from Agora's `onRtcStats`).
+- **Purpose:** Submits auto-captured technical telemetry upon consultation termination (derived from Agora's `onRtcStats`). Telemetry is cross-validated server-side with Agora webhooks/callbacks to ensure integrity.
 - **Auth:** System / Doctor Client / Patient Client.
 - **Request Body:**
   ```json
   {
     "call_duration_seconds": 15,
-    "ice_connection_state": "COMPLETED",
+    "connection_state": "COMPLETED",
     "packet_loss_percent": 0.0,
     "round_trip_time_ms": 48,
     "premature_end": true,
@@ -305,8 +388,8 @@
   ```
 
 ### `POST /api/v1/admin/grievances/{id}/refund`
-- **Purpose:** Admin Board disburses escrow refund to patient MFS account.
-- **Auth:** `ADMIN`.
+- **Purpose:** Admin Board disburses payment refund to patient MFS account.
+- **Auth:** `FINANCE_ADMIN` or `PLATFORM_ADMIN`.
 - **Response:** `200 OK`
   ```json
   {
@@ -314,15 +397,15 @@
     "data": {
       "grievance_id": "GRV-20261001-73",
       "status": "REFUNDED",
-      "board_remedy": "Escrow Refund Disbursed (৳800)",
+      "board_remedy": "Payment Refund Disbursed (৳800)",
       "refund_trx_id": "BK-REF-876862"
     }
   }
   ```
 
 ### `POST /api/v1/admin/grievances/{id}/warn`
-- **Purpose:** Admin Board logs a formal BMDC disciplinary warning into doctor's dossier.
-- **Auth:** `ADMIN`.
+- **Purpose:** Admin Board logs a formal internal compliance warning into doctor's dossier.
+- **Auth:** `CLINICAL_ADMIN` or `PLATFORM_ADMIN`.
 - **Response:** `200 OK`
   ```json
   {
@@ -330,7 +413,7 @@
     "data": {
       "grievance_id": "GRV-20261001-73",
       "status": "WARNED",
-      "board_remedy": "BMDC Disciplinary Warning Logged",
+      "board_remedy": "Internal Platform Compliance Warning Logged",
       "doctor_bmdc": "BMDC #45821"
     }
   }
@@ -342,7 +425,7 @@
 
 ### `GET /api/v1/admin/doctors/{id}/dossier`
 - **Purpose:** Comprehensive physician dossier including verified phone and residential address.
-- **Auth:** `ADMIN`.
+- **Auth:** `PLATFORM_ADMIN` or `COMPLIANCE`.
 - **Response:** `200 OK`
   ```json
   {

@@ -16,7 +16,7 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Q:** *How many prescriptions can a patient upload?*  
   **A:** **1 to 5 images maximum** (`MAX_PRESCRIPTION_IMAGES = 5`).
 - **Q:** *Where is the emergency call button placed?*  
-  **A:** **Directly above Upcoming Consultation** on `view-0`, labeled "Emergency Contact" (no "24/7" prefix), dialing `16263`.
+  **A:** **Directly above Upcoming Consultation** on `view-0`, labeled "Emergency Contact" (no "24/7" prefix), dialing `16263` (or local equivalent).
 - **Q:** *What languages are supported?*  
 - **Q:** *What video infrastructure will be used for live teleconsultation?*  
   **A:** **Agora RTC SDK** (`agora_rtc_engine` in Flutter + dynamic token generation in Rust). No custom WebRTC server will be built.
@@ -39,4 +39,22 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Why It Matters:** Final production SMS OTP delivery requires provider API tokens.
 - **Affected Components:** `services/backend/src/services/auth_service.rs`.
 - **Safe Default:** Implement mock OTP logger in development mode (fixed code `584920` or printed to console logs) while providing configurable environment variables (`SMS_API_KEY`, `SMS_SENDER_ID`) for production.
+- **Blocks Implementation?** **NON-BLOCKER.**
+
+---
+
+### Q-NEW-1: What jurisdiction-specific medical record retention periods apply? (BD vs KE)
+- **Question:** How long must clinical data be stored legally based on jurisdiction?
+- **Blocks Implementation?** **NON-BLOCKER.**
+
+### Q-NEW-2: Does the MFS payment hold arrangement constitute legal escrow or is it a payment hold?
+- **Question:** Does the MFS payment hold arrangement constitute legal escrow or is it a payment hold? Affects terminology.
+- **Blocks Implementation?** **NON-BLOCKER.**
+
+### Q-NEW-3: What Bangla localization timeline is appropriate for Bangladesh market launch?
+- **Question:** What Bangla localization timeline is appropriate for Bangladesh market launch?
+- **Blocks Implementation?** **NON-BLOCKER.**
+
+### Q-NEW-4: What Agora data-region configuration is needed for BD/KE compliance?
+- **Question:** What Agora data-region configuration is needed for BD/KE compliance?
 - **Blocks Implementation?** **NON-BLOCKER.**

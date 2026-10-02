@@ -20,6 +20,7 @@ sequenceDiagram
     participant Svc as AppointmentService
     participant Repo as AppointmentRepository
     participant DB as PostgreSQL (ACID Transaction)
+    participant MFS as Telco MFS Gateway
 
     Patient->>Bloc: Tap "Confirm & Pay ৳ 800"
     Bloc->>Bloc: Emit BookingSubmittingState
@@ -36,16 +37,17 @@ sequenceDiagram
     DB-->>Repo: Slot status == 'AVAILABLE'
     Svc->>Repo: update_slot_status(slot_id, 'BOOKED')
     Repo->>DB: UPDATE doctor_schedule_slots SET status = 'BOOKED'
-    Svc->>Repo: create_appointment(...)
+    Svc->>Repo: create_appointment(status='PENDING_PAYMENT')
     Repo->>DB: INSERT INTO appointments ... RETURNING id
-    Svc->>Repo: create_escrow_transaction(fee = ৳ 800, platform_fee = ৳ 160, net = ৳ 640)
-    Repo->>DB: INSERT INTO transactions (..., escrow_status = 'ESCROW_HELD')
     Svc->>DB: COMMIT TRANSACTION
-    Svc-->>Axum: Return AppointmentBookingResult
-    Axum-->>Dio: 201 Created { appointment_id, escrow_status: "ESCROW_HELD" }
-    Dio-->>Bloc: OnSuccess(bookingResult)
-    Bloc->>Bloc: Emit BookingSuccessState
-    Bloc->>Patient: Navigate to Waiting Room (view-10)
+    Svc-->>Axum: Return payment URL
+    Axum-->>Dio: 201 Created { payment_url }
+    Dio-->>Patient: Navigate to MFS Gateway
+    Patient->>MFS: Complete Payment
+    MFS->>Axum: POST Webhook (Payment Success)
+    Axum->>DB: UPDATE appointments SET status='CONFIRMED'
+    Axum->>DB: INSERT INTO transactions (..., escrow_status = 'ESCROW_HELD')
+    Axum-->>MFS: 200 OK
 ```
 
 ---
@@ -68,7 +70,7 @@ sequenceDiagram
     loop For each file
         Axum->>S3: Stream bytes to S3 bucket (enc-aes256)
         S3-->>Axum: Return storage_key & eTag
-        Axum->>DB: INSERT INTO prescription_intake_documents (page_number, file_url, size_bytes)
+        Axum->>DB: INSERT INTO prescription_intake_documents (page_number, object_key, size_bytes)
     end
     Axum-->>Bloc: 201 Created { uploaded_count: 3, documents: [...] }
     Bloc->>Bloc: Emit PrescriptionsUploadedState
@@ -97,7 +99,7 @@ sequenceDiagram
     Doctor->>Agora: joinChannel(token, "apt-94812", 10421)
     Note over Patient,Doctor,Agora: Adaptive 720p/1080p Video via Agora SD-RTN
     Note over Patient: Agora RtcStats tracks callSeconds, packetLoss, RTT
-    Doctor->>Agora: leaveChannel() & Sign Prescription
+    Doctor->>Agora: leaveChannel() & Create integrity verification hash for Prescription
     Patient->>TelemetrySvc: POST /consultations/{id}/telemetry (from onRtcStats)
     Note over TelemetrySvc: Payload: call_duration = 642s, packet_loss = 0.4%, premature_end = false
     TelemetrySvc->>DB: INSERT INTO consultation_telemetry (...)
@@ -130,4 +132,29 @@ sequenceDiagram
     SettlementSvc->>DB: UPDATE transactions SET escrow_status = 'REFUNDED_TO_PATIENT'
     SettlementSvc->>DB: UPDATE grievance_reports SET status = 'REFUNDED', board_remedy = 'Escrow Refund Disbursed (৳800)'
     SettlementSvc-->>Admin: 200 OK (Dispute Closed, Refund Disbursed)
+```
+
+---
+
+## 5. Flow 5: Auth Session Lifecycle
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as Patient Mobile App
+    participant Axum as Rust Backend API
+    participant AuthSvc as AuthService
+    participant DB as PostgreSQL
+
+    Client->>Axum: POST /api/v1/auth/login
+    Axum->>AuthSvc: verify_credentials()
+    AuthSvc->>DB: INSERT INTO auth_sessions (user_id, refresh_token, ip, user_agent, expires_at)
+    AuthSvc-->>Axum: (access_token (Ed25519), refresh_token)
+    Axum-->>Client: 200 OK
+    Note over Client: Access Token expires in 15 mins
+    Client->>Axum: POST /api/v1/auth/refresh (refresh_token)
+    Axum->>AuthSvc: rotate_refresh_token()
+    AuthSvc->>DB: UPDATE auth_sessions SET refresh_token = new_token
+    AuthSvc-->>Axum: (new_access_token, new_refresh_token)
+    Axum-->>Client: 200 OK
 ```

@@ -33,13 +33,13 @@
 | **Phone Number (BD)** | Auth / Profile | Regex `^(?:\+8801\|01)[3-9]\d{8}$` | Normalized to E.164: `^\+8801[3-9]\d{8}$` | `INVALID_PHONE_NUMBER` |
 | **Phone Number (KE)** | Auth / Profile | Regex `^(?:\+254\|0)[17]\d{8}$` | Normalized to E.164: `^\+254[17]\d{8}$` | `INVALID_PHONE_NUMBER` |
 | **Password** | Registration / Reset | Min 12 chars, 1 uppercase, 1 digit, 1 symbol | Min 12 chars, checked against Pwned Passwords list | `WEAK_PASSWORD` |
-| **BMDC Number** | Doctor Profile | String starting with "BMDC #" or "BMDC A-" | Regex `^BMDC\s*(?:#\|A-)\d{4,6}$` + DB uniqueness | `INVALID_BMDC_NUMBER` |
+| **Medical License Number** | Doctor Profile | String starting with "BMDC #" or "BMDC A-" | Regex `^BMDC\s*(?:#\|A-)\d{4,6}$` + DB uniqueness | `INVALID_BMDC_NUMBER` |
 | **Prescription Photos** | Pre-Consult Intake | Max 5 files total; files > 10 MB rejected | Array length $1 \le N \le 5$, file size $\le 10,485,760$ bytes, MIME $\in \{\text{image/jpeg}, \text{image/png}, \text{application/pdf}\}$ | `MAX_PRESCRIPTION_IMAGES_EXCEEDED` |
 | **Consultation Slot** | Booking | Must be future date within 14 days | `start_time > now() AND start_time < now() + INTERVAL '14 days'`, slot status == `AVAILABLE` (Row-locked) | `SLOT_NOT_AVAILABLE` |
-| **Consultation Fee** | Pricing / Billing | Positive decimal, min ৳ 100, max ৳ 50,000 | `fee >= 100.00 AND fee <= 50000.00`, strictly rounded to 2 decimals | `INVALID_FEE_AMOUNT` |
+| **Consultation Fee** | Pricing / Billing | Positive decimal, min configurable amount, max configurable amount,000 | `fee >= min_fee AND fee <= max_fee`, strictly rounded to 2 decimals | `INVALID_FEE_AMOUNT` |
 | **Platform Charge** | Financial Settlement | Computed: `fee * 0.20` | Server-enforced: `withheld = round(gross * 0.20, 2)`, `net = gross - withheld` | `FEE_CALCULATION_MISMATCH` |
 | **Grievance Statement** | Dispute Filing | Min 10 chars, max 2000 chars | String length between 10 and 2000 chars, scrubbed of HTML tags | `STATEMENT_TOO_SHORT` |
-| **Digital Signature** | Prescription Sign | Doctor biometric / PIN confirmation | HMAC-SHA256 hash verified against doctor private secret | `INVALID_DIGITAL_SIGNATURE` |
+| **Integrity Verification Hash** | Prescription Sign | Doctor biometric / PIN confirmation | HMAC-SHA256 integrity verification hash computed with server-managed key | `INVALID_DIGITAL_SIGNATURE` |
 | **Chat Message** | 24h Chat Desk | Min 1 char, max 1000 chars; blocked if expired | `now() < conversation.expires_at`, text length $1 \le L \le 1000$ | `CHAT_WINDOW_EXPIRED` |
 
 ---
@@ -68,3 +68,11 @@ fn validate_payment_gateway(gateway: &str) -> Result<(), validator::ValidationEr
     }
 }
 ```
+
+## 4. File Upload Security Rules
+- Magic-byte validation (server verifies content matches MIME)
+- Image re-encoding (strip EXIF, re-encode to safe format)
+- PDF structural validation
+- No executable/SVG/HTML content
+- Per-user storage quotas
+- Server-generated object names

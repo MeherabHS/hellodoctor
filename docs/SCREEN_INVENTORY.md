@@ -249,7 +249,7 @@ Labels used:
       ├── Medication Count ("3 Medicines Prescribed")
       └── CTA "Download Official Prescription PDF"
   └── Hidden Forensic Telemetry Card (#v11TelemetryCard aria-hidden="true" style="display:none;")
-      └── Background Session Record (Call Duration, WebRTC RTT, Escrow ID)
+      └── Background Session Record (Call Duration, Agora RTC RTT, Escrow ID)
   └── Grievance Trigger Button ("Having an issue with this consultation? Report to Medical Administration")
   └── Home Navigation CTA
   ```
@@ -398,7 +398,7 @@ Labels used:
       └── Duty Toggle Switch
   └── Dual-Pane Workstation Body:
       ├── Left Pane: Live Telehealth Video Feed (#docWebVideoFeed)
-      │   ├── 1080p WebRTC Video Display
+      │   ├── 1080p Agora RTC video feed
       │   ├── Audio/Video Controls, Screen Sharing
       │   └── Call End & Prescribe Trigger
       └── Right Pane: Split-Screen Longitudinal EMR
@@ -411,7 +411,7 @@ Labels used:
               ├── Diagnostic Investigation Checklist
               └── Digital Signature & Dispatch Button
   ```
-- **Backend Requirements (Rust):** WebRTC signaling server, `POST /api/v1/prescriptions/sign-and-dispatch`.
+- **Backend Requirements (Rust):** Agora token service, `POST /api/v1/prescriptions/sign-and-dispatch`.
 - **Prototype Reference:** `index.html` lines containing `id="doctorWebShell"`.
 
 ---
@@ -457,13 +457,13 @@ Labels used:
 ### HD-ADMIN-LOGS (`adminPage_logs`)
 - **Screen Name:** App Incident Diagnostics & Failure Simulators
 - **User Role:** `admin`
-- **Purpose:** Subsystem error diagnostics covering bKash/Nagad webhooks, WebRTC ICE disconnects, and DGDA EMR synchronization errors. Includes the failure simulator `#adminSimulateFailureModal`.
+- **Purpose:** Subsystem error diagnostics covering bKash/Nagad webhooks, Agora RTC disconnects, and DGDA EMR synchronization errors. Includes the failure simulator `#adminSimulateFailureModal` (dev/staging only).
 - **Backend Requirements (Rust):** `GET /api/v1/admin/logs/incidents`, `POST /api/v1/admin/logs/simulate-failure`.
 
 ### HD-ADMIN-GRIEVANCES (`adminPage_grievances`)
 - **Screen Name:** Grievance Arbitration & Disciplinary Board
 - **User Role:** `admin`
-- **Purpose:** Adjudicates patient disputes against doctors or system technical failures using auto-collected session telemetry. Provides one-click escrow refunds (`btnAdjudicateRefund`) and BMDC disciplinary warnings (`btnAdjudicateWarning`).
+- **Purpose:** Adjudicates patient disputes against doctors or system technical failures using auto-collected session telemetry. Provides one-click escrow refunds (`btnAdjudicateRefund`) and Internal Platform Compliance warnings (`btnAdjudicateWarning`).
 - **Backend Requirements (Rust):** `GET /api/v1/admin/grievances`, `POST /api/v1/admin/grievances/{id}/adjudicate`.
 
 ### HD-ADMIN-FINANCE (`adminPage_finance`)
@@ -478,14 +478,14 @@ Labels used:
 
 | Modal Identifier | DOM Element ID | User Role | Purpose & Clinical Actions |
 |---|---|---|---|
-| `HD-MODAL-GRIEVANCE` | `#patientGrievanceModal` | `patient` | Captures patient complaints; binds background WebRTC/escrow telemetry silently without exposing raw diagnostics to the user. |
+| `HD-MODAL-GRIEVANCE` | `#patientGrievanceModal` | `patient` | Captures patient complaints; binds background Agora RTC/payment telemetry silently without exposing raw diagnostics to the user. |
 | `HD-MODAL-DOC-STATEMENT` | `#doctorStatementModal` | `doctor` | Itemized monthly earnings ledger showing gross amounts, 20% platform fees, and net take-home pay. |
 | `HD-MODAL-CONSULT-FEE` | `#docConsultationFeeModal`| `doctor` | Displays 3-tier fee calculations for single consultations (Gross -> 20% Fee -> Net). |
 | `HD-MODAL-LANGUAGE` | `#languageModal` | `patient` | In-memory language selection between English and Swahili (Kiswahili). |
 | `HD-MODAL-RX-VIEWER` | `#labReportModal` | `shared` | Multi-page image viewer for inspecting uploaded prescriptions and lab reports (pages 1 to 5). |
 | `HD-MODAL-DOC-DOSSIER` | `#adminDoctorHistoryModal` | `admin` | Displays a physician's full profile: verified phone number, residential address, email, consultation logs, and disciplinary history. |
-| `HD-MODAL-ADMIN-GRIEVANCE`| `#adminGrievanceDetailModal`| `admin` | Deep forensic investigation console displaying call durations, WebRTC packet logs, and dispute adjudication controls. |
+| `HD-MODAL-ADMIN-GRIEVANCE`| `#adminGrievanceDetailModal`| `admin` | Deep forensic investigation console displaying call durations, Agora RTC SDK packet logs, and dispute adjudication controls. |
 | `HD-MODAL-TXN-DETAIL` | `#adminTransactionDetailModal`| `admin` | Audit log inspector for transactions, displaying MFS gateway payloads and escrow states. |
 | `HD-MODAL-LOG-DETAIL` | `#adminLogDetailModal` | `admin` | Displays subsystem stack traces and provides retry or refund options. |
-| `HD-MODAL-SIM-FAILURE` | `#adminSimulateFailureModal`| `admin` | Diagnostic tool for simulating payment drops, WebRTC timeouts, and gateway failures. |
+| `HD-MODAL-SIM-FAILURE` | `#adminSimulateFailureModal`| `admin` | Diagnostic tool for simulating payment drops, Agora RTC timeouts, and gateway failures. |
 | `HD-MODAL-OFFLINE-GUARD` | `#offlineActionGuardModal` | `shared` | Intercepts destructive actions while offline and explains network requirements. |

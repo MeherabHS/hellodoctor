@@ -18,8 +18,8 @@
    - [4.2 Appointment Scheduling & Slot Allocation](#42-appointment-scheduling--slot-allocation)
    - [4.3 Multi-Prescription Intake Engine (Max 5 Images)](#43-multi-prescription-intake-engine-max-5-images)
    - [4.4 Virtual Waiting Room & Device Readiness](#44-virtual-waiting-room--device-readiness)
-   - [4.5 Live Teleconsultation (WebRTC Video & 24h Clinical Chat)](#45-live-teleconsultation-webrtc-video--24h-clinical-chat)
-   - [4.6 DGDA-Compliant E-Prescription & Longitudinal Health Vault](#46-dgda-compliant-e-prescription--longitudinal-health-vault)
+   - [4.5 Live Teleconsultation (Agora RTC Video & 24h Clinical Chat)](#45-live-teleconsultation-Agora-video--24h-clinical-chat)
+   - [4.6 DGDA-Compliant (configurable per deployment country) E-Prescription & Longitudinal Health Vault](#46-dgda-compliant-e-prescription--longitudinal-health-vault)
    - [4.7 Clinical Grievance Redressal & Star-Rating Elimination](#47-clinical-grievance-redressal--star-rating-elimination)
    - [4.8 Doctor Earnings & 20% Debarred Settlement Engine](#48-doctor-earnings--20-debarred-settlement-engine)
    - [4.9 Emergency Contact Helpline System](#49-emergency-contact-helpline-system)
@@ -34,7 +34,7 @@
    - [5.6 Clinical Protocol & Compliance Oversight](#56-clinical-protocol--compliance-oversight)
    - [5.7 App Incident Diagnostics & Telemetric Error Logs](#57-app-incident-diagnostics--telemetric-error-logs)
    - [5.8 Grievance Arbitration & Disciplinary Adjudication](#58-grievance-arbitration--disciplinary-adjudication)
-   - [5.9 Omnichannel Payment & Escrow Master Ledger](#59-omnichannel-payment--escrow-master-ledger)
+   - [5.9 Omnichannel Payment & payment hold Master Ledger (Note: 'payment hold' terminology should be confirmed legally; system uses 'payment hold' model)](#59-omnichannel-payment--payment hold-master-ledger)
 6. ["What Does What" Component & Screen Reference Matrix](#6-what-does-what-component--screen-reference-matrix)
    - [6.1 Patient Mobile Viewports (`view-0` to `view-14`)](#61-patient-mobile-viewports-view-0-to-view-14)
    - [6.2 Doctor Mobile Viewports (`doc-view-0` to `doc-view-5`)](#62-doctor-mobile-viewports-doc-view-0-to-doc-view-5)
@@ -54,7 +54,7 @@
 
 1. **Elimination of Subjective Star Ratings (Zero Commercialization)**:
    - Traditional e-commerce rating paradigms (5-star reviews, thumbs up, popularity algorithms) are strictly prohibited across all patient-facing surfaces.
-   - Physician quality is governed by **BMDC (Bangladesh Medical and Dental Council)** credentialing, years of certified clinical practice, and institutional affiliations.
+   - Physician quality is governed by **BMDC (configurable per deployment country)** credentialing, years of certified clinical practice, and institutional affiliations.
    - Patient dissatisfaction is handled through an evidence-based **Grievance Redressal Board** rather than public vanity scores.
 
 2. **Transparent Financial Debarment (20% Platform Fee Model)**:
@@ -92,7 +92,7 @@ The system operates as an integrated Single-Page Application (SPA) driven by an 
 │ (#patientAppShell)│   │ (#doctorAppShell)│                 │ (#doctorWebShell)│    │ (#adminPortalShell)│
 ├──────────────────┤    ├──────────────────┤                 ├──────────────────┤    ├────────────────────┤
 │ • 15 Mobile Views│    │ • 6 Mobile Views │                 │ • Dual EMR Split │    │ • 9 Operations Pgs │
-│ • 1-5 Rx Upload  │    │ • 20% Fee Wallet │                 │ • 1080p Telehealth│   │ • Escrow Ledger    │
+│ • 1-5 Rx Upload  │    │ • 20% Fee Wallet │                 │ • 1080p Telehealth│   │ • payment hold Ledger    │
 │ • Swahili/English│    │ • 24h Chat Desk  │                 │ • Cloud Rx Engine│    │ • BMDC Dossiers    │
 │ • Emergency 16263│    │ • Smart Rx Scan  │                 │ • Revenue Center │    │ • Grievance Board  │
 └──────────────────┘    └──────────────────┘                 └──────────────────┘    └────────────────────┘
@@ -114,27 +114,27 @@ The active workspace is managed by `wbSwitchShell(targetShell)`:
 | Actor | Identification | Permissions | Core Responsibilities |
 |---|---|---|---|
 | **Patient** | Phone number, National ID / Clinical MRN | Read doctor directory, book slots, upload 1–5 Rx images, engage in video/chat, lodge grievances, access health vault | Seeks medical consultations, provides medical history, manages family profiles |
-| **Physician** | BMDC Registration Number, National ID | Set availability, join calls, review multi-image records, author e-prescriptions, track 20% debarred wallet earnings | Conducts clinical assessments, authors legal digital prescriptions, monitors patient follow-ups |
-| **Central Admin** | Secure Superuser / Governance Credentials | Full CRUD over physician rosters, escrow ledger management, BMDC validation, grievance adjudication, system log diagnostics | Clinical governance, fraud prevention, dispute settlement, MFS payment reconciliation |
+| **Physician** | Medical License Number (configurable per deployment country), National ID | Set availability, join calls, review multi-image records, author e-prescriptions, track 20% debarred wallet earnings | Conducts clinical assessments, authors legal digital prescriptions, monitors patient follow-ups |
+| **Central Admin** | Secure Superuser / Governance Credentials | Full CRUD over physician rosters, payment hold ledger management, BMDC validation, grievance adjudication, system log diagnostics | Clinical governance, fraud prevention, dispute settlement, MFS payment reconciliation |
 
 ### 3.2 Consultation Lifecycle State Machine
 
 ```mermaid
 stateDiagram-v2
     [*] --> SLOT_SELECTED: Patient selects Specialist & Time
-    SLOT_SELECTED --> ESCROW_HELD: Payment via bKash / Nagad / M-Pesa
-    ESCROW_HELD --> INTAKE_PENDING: Multi-Prescription Upload (1-5 Photos)
+    SLOT_SELECTED --> PAYMENT_HELD: Payment via bKash (configurable per deployment country) / Nagad / M-Pesa
+    PAYMENT_HELD --> INTAKE_PENDING: Multi-Prescription Upload (1-5 Photos)
     INTAKE_PENDING --> WAITING_ROOM: Patient Enters Waiting Room
-    WAITING_ROOM --> IN_CALL: WebRTC Video / Chat Initialized
-    IN_CALL --> CONSULTATION_COMPLETED: Doctor Ends Session & Issues Rx
+    WAITING_ROOM --> IN_CALL: Agora Video / Chat Initialized
+    IN_CALL --> CONSULTATION_COMPLETED: Doctor Ends Session (Records Clinical Outcome)
     IN_CALL --> PREMATURE_TERMINATION: Network Drop / Early Exit (<30s)
     
-    CONSULTATION_COMPLETED --> ESCROW_RELEASED: 80% to Doctor Wallet, 20% Platform Fee
+    CONSULTATION_COMPLETED --> PAYMENT_RELEASED: 80% to Doctor Wallet, 20% Platform Fee
     PREMATURE_TERMINATION --> DISPUTE_PENDING: Patient Lodges Grievance
-    DISPUTE_PENDING --> ESCROW_REFUNDED: Admin Board Grants Patient Refund
-    DISPUTE_PENDING --> ESCROW_RELEASED: Admin Board Dismisses Claim
-    ESCROW_RELEASED --> [*]
-    ESCROW_REFUNDED --> [*]
+    DISPUTE_PENDING --> PAYMENT_REFUNDED: Admin Board Grants Patient Refund
+    DISPUTE_PENDING --> PAYMENT_RELEASED: Admin Board Dismisses Claim
+    PAYMENT_RELEASED --> [*]
+    PAYMENT_REFUNDED --> [*]
 ```
 
 ---
@@ -151,10 +151,10 @@ stateDiagram-v2
      - **Medical Specialty**: Internal Medicine, Cardiology, Dermatology, Pediatrics, Gynecology, etc. (`filterDoctorBySpecialty`).
 3. **Clinical Credential Display**:
    - Doctor cards explicitly showcase:
-     - Full Name and BMDC Registration Number (e.g., `BMDC #45821`).
+     - Full Name and Medical License Number (configurable per deployment country) (e.g., `BMDC #45821`).
      - Clinical Experience (e.g., `12 Years Exp`).
      - Hospital / Institutional Affiliation (e.g., `Dhaka Medical College Hospital`).
-     - Transparent Consultation Fees (e.g., Video: `৳ 800`, Chat: `৳ 500`).
+     - Transparent Consultation Fees (e.g., Video: `৳ (configurable per deployment country) 800`, Chat: `৳ (configurable per deployment country) 500`).
      - No star rating badges or subjective review counts are displayed.
 
 ---
@@ -164,9 +164,9 @@ stateDiagram-v2
 1. **Date & Slot Selection (`view-4`)**:
    - The booking interface presents available calendar dates and dynamically generated 15-minute or 20-minute clinical slots.
    - Slots are categorized into Morning, Afternoon, and Evening sessions.
-2. **Escrow Payment Authorization**:
-   - The patient selects a Mobile Financial Services (MFS) provider: **bKash**, **Nagad**, or **Card / M-Pesa**.
-   - Consultation fees are placed in an **Escrow Holding State** (`adminTransactionStore`). The funds are not credited to the physician until the consultation is completed successfully.
+2. **payment hold Payment Authorization**:
+   - The patient selects a Mobile Financial Services (MFS) provider: **bKash (configurable per deployment country)**, **Nagad**, or **Card / M-Pesa**.
+   - Consultation fees are placed in an **payment hold Holding State** (`adminTransactionStore`). The funds are not credited to the physician until the consultation is completed successfully.
 
 ---
 
@@ -205,7 +205,7 @@ flowchart LR
 1. **Waiting Room Dashboard (`view-10`)**:
    - Displays real-time queue position (e.g., `You are next in line`), scheduled start time, and a live countdown timer.
 2. **Device Hardware Pre-Flight Check**:
-   - Tests local camera, microphone, and WebRTC peer connection compatibility.
+   - Tests local camera, microphone, and Agora peer connection compatibility.
    - Successful tests trigger confirmation toasts:
      > *"Camera & Mic Ready: Your device permissions are ready for the consultation."*
 3. **Pre-Consultation Document Inspection**:
@@ -213,12 +213,12 @@ flowchart LR
 
 ---
 
-### 4.5 Live Teleconsultation (WebRTC Video & 24h Clinical Chat)
+### 4.5 Live Teleconsultation (Agora RTC Video & 24h Clinical Chat)
 
-#### A. WebRTC Video Teleconsultation
-- **Resolution**: Adaptive 720p / 1080p WebRTC stream with fallback to audio-only if bandwidth drops below 128 kbps.
+#### A. Agora RTC SDK Video Teleconsultation
+- **Resolution**: Adaptive 720p / 1080p Agora RTC stream with fallback to audio-only if bandwidth drops below 128 kbps.
 - **Session Telemetry Engine**:
-  - Automatically records call connection events, ICE candidate states, packet loss, and actual call duration (`callSeconds`).
+  - Automatically records call connection events, Agora connection states (onRtcStats, onUserOffline), packet loss, and actual call duration (`callSeconds`).
   - Distinguishes between completed clinical consultations and premature call drops (<30 seconds).
 
 #### B. 24-Hour Time-Boxed Clinical Chat (`view-6` / `doc-view-4`)
@@ -233,11 +233,11 @@ flowchart LR
 
 ---
 
-### 4.6 DGDA-Compliant E-Prescription & Longitudinal Health Vault
+### 4.6 DGDA-Compliant (configurable per deployment country) E-Prescription & Longitudinal Health Vault
 
 1. **Digital Prescription Authoring (`doc-view-1` / `#doctorWebShell`)**:
-   - Physicians generate digitally signed prescriptions containing:
-     - Doctor details: Name, Qualifications, BMDC Number, Digital Signature Hash.
+   - Physicians generate prescriptions with integrity verification hash (Note: HMAC-SHA256 provides integrity authentication, not a legally binding integrity verification hash) containing:
+     - Doctor details: Name, Qualifications, Medical License Number (configurable per deployment country), Integrity Verification Hash.
      - Patient details: Name, Age, Gender, Weight, Blood Pressure, Clinical Complaints.
      - Rx Drugs: Brand name, generic molecule (DGDA verified), dosage form (tablet, syrup, injection), frequency (`1+0+1`), duration (`5 days`), and instructions (`After meals`).
      - Diagnostic investigations required (e.g., `CBC with ESR`, `Serum Creatinine`).
@@ -255,14 +255,14 @@ To uphold medical ethics and prevent defamatory or commercialized review spam, H
 flowchart TD
     A[Patient Lodges Grievance] --> B{Select Target}
     B -- DOCTOR --> C[Select Clinical Issue:<br/>• Rushed Consultation<br/>• Abrupt Disconnection<br/>• Rx Refusal / Miscommunication]
-    B -- SYSTEM --> D[Select Technical Issue:<br/>• WebRTC Video Freeze<br/>• MFS Debited but No Call<br/>• Audio Inaudible]
+    B -- SYSTEM --> D[Select Technical Issue:<br/>• Agora Video Freeze<br/>• MFS Debited but No Call<br/>• Audio Inaudible]
     C --> E[Auto-Collect Session Telemetry in Background]
     D --> E
     E --> F[Inject into adminAppErrorLogsStore if System]
     E --> G[Route to Central Grievance Board for Adjudication]
     G --> H{Admin Adjudication Decision}
-    H -- Justified Patient Claim --> I[Execute Escrow Refund via MFS API]
-    H -- Doctor Breach --> J[Issue BMDC Disciplinary Warning]
+    H -- Justified Patient Claim --> I[Execute payment hold Refund via MFS API]
+    H -- Doctor Breach --> J[Issue Internal Platform Compliance Warning]
     H -- Unsubstantiated --> K[Dismiss with Clinical Explanation]
 ```
 
@@ -277,16 +277,16 @@ flowchart TD
      - *Unprofessional Clinical Conduct / Miscommunication*
      - *Doctor Was Inattentive / Late to Session*
    - **Complaints against SYSTEM**:
-     - *WebRTC Video / Audio Freeze During Consultation*
-     - *bKash Payment Debited But Session Failed to Launch*
+     - *Agora Video / Audio Freeze During Consultation*
+     - *bKash (configurable per deployment country) Payment Debited But Session Failed to Launch*
      - *Camera / Microphone Permission Trapped in Loop*
      - *Prescription PDF Failed to Generate / Download*
 3. **Telemetry Auto-Collection**:
    - The patient grievance modal (`#patientGrievanceModal`) automatically binds to the consultation's forensic telemetry record:
      - Exact call duration (`callDuration`, e.g., `0m 15s`).
-     - Network connection status (`Stable 4G` vs. `ICE Failed`).
+     - Network connection status (`Stable 4G` vs. `Agora Disconnected`).
      - Prescription issuance status (`Issued` vs. `Not Issued`).
-     - Escrow payment ID (`TXN-BK-94812`).
+     - payment hold payment ID (`TXN-BK-94812`).
      - Chronological event timeline (e.g., `Room Created -> Peer Joined -> Connection Drop`).
 4. **Patient Privacy & Experience Rule**:
    - Raw technical diagnostics are captured silently in the background and hidden on the patient end (`aria-hidden="true"`, `style="display:none;"`), preventing confusing diagnostic dumps while providing the Admin Board with full forensic visibility.
@@ -313,10 +313,10 @@ $$\begin{aligned}
 ┌────────────────────────────────────────────────────────────────────────┐
 │                      DOCTOR WALLET & EARNINGS                         │
 ├────────────────────────────────────────────────────────────────────────┤
-│ Total Earnings (Gross)                       ৳ 35,562.50               │
-│ HeloDoc Platform Charge (20% Withheld)     - ৳  7,112.50               │
+│ Total Earnings (Gross)                       ৳ (configurable per deployment country) 35,562.50               │
+│ HeloDoc Platform Charge (20% Withheld)     - ৳ (configurable per deployment country)  7,112.50               │
 ├────────────────────────────────────────────────────────────────────────┤
-│ Final Earning (Net Take-Home)                ৳ 28,450.00               │
+│ Final Earning (Net Take-Home)                ৳ (configurable per deployment country) 28,450.00               │
 ├────────────────────────────────────────────────────────────────────────┤
 │ ℹ️ Total calculation is based including the platform charge 20%.       │
 └────────────────────────────────────────────────────────────────────────┘
@@ -328,9 +328,9 @@ $$\begin{aligned}
    - The explanatory note: *"Total calculation is based including the platform charge 20%"* must accompany every earnings card across mobile and desktop workstations.
 2. **Itemized Transaction Breakdown**:
    - Every row in the physician's ledger (`#docConsultationsLedgerContainer`) reflects this 3-tier formula:
-     - Example: `৳ 800 (Gross) - ৳ 160 (20% Withheld) = ৳ 640 (Final Net)`
+     - Example: `৳ (configurable per deployment country) 800 (Gross) - ৳ (configurable per deployment country) 160 (20% Withheld) = ৳ (configurable per deployment country) 640 (Final Net)`
 3. **Disbursement Channels**:
-   - Net earnings are disbursed directly to the physician's verified MFS account (bKash Merchant / Personal or Nagad) with zero hidden payout processing fees.
+   - Net earnings are disbursed directly to the physician's verified MFS account (bKash (configurable per deployment country) Merchant / Personal or Nagad) with zero hidden payout processing fees.
 
 ---
 
@@ -341,7 +341,7 @@ $$\begin{aligned}
    - This layout ensures patients in acute distress can access emergency services before scrolling through routine appointments.
 2. **Wording Standards**:
    - Labeled clearly as **"Emergency Contact"** (the ambiguous *"24/7"* prefix is intentionally excluded).
-   - Prominently displays the national emergency healthcare shortcode: **`Call 16263`**.
+   - Prominently displays the national emergency healthcare shortcode: **`Call 16263 (configurable per deployment country)`**.
    - One-tap dialing triggers immediate connection to certified government emergency triage operators (`tel:16263`).
 
 ---
@@ -409,22 +409,22 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 │ 6. Compliance │ Clinical Protocol Audits, Prescribing Adherence Logs   │
 │ 7. Logs       │ Real-Time Subsystem Error Diagnostics & Simulators     │
 │ 8. Grievances │ Dispute Arbitration, Telemetry Evidence, Refund Desk   │
-│ 9. Finance    │ Omnichannel Payment & Escrow Master Ledger             │
+│ 9. Finance    │ Omnichannel Payment & payment hold Master Ledger (Note: 'payment hold' terminology should be confirmed legally; system uses 'payment hold' model)             │
 └───────────────┴────────────────────────────────────────────────────────┘
 ```
 
 ### 5.1 Executive Command Center (`adminPage_command`)
 - **Key Performance Indicators (KPIs)**:
   - Active Live Consultations, Available On-Duty Physicians, System Capacity Utilization.
-  - 24-Hour GMV, Total Escrow in Holding, Unresolved Grievances, Critical System Incidents.
+  - 24-Hour GMV, Total payment hold in Holding, Unresolved Grievances, Critical System Incidents.
 - **Quick Action Triggers**:
-  - Emergency Broadcast Dispatch, Telehealth Capacity Surge Toggle, Master Database Flush.
+  - Emergency Broadcast Dispatch, Telehealth Capacity Surge Toggle, Emergency Capacity Surge Override.
 
 ---
 
 ### 5.2 Doctor Directory & Physician Dossiers (`adminPage_doctors`)
 - **Master Physician Table**:
-  - Detailed listing of all registered specialists with BMDC ID, Specialty, Hospital, Status, and Lifetime Consultations.
+  - Detailed listing of all registered specialists with Medical License ID (configurable per deployment country), Specialty, Hospital, Status, and Lifetime Consultations.
 - **Comprehensive Physician Dossier Modal (`#adminDoctorHistoryModal`)**:
   - Contains complete operational and contact records:
     - **Phone Number** (e.g., `+880 1711-884920`).
@@ -457,20 +457,20 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 
 ### 5.6 Clinical Protocol & Compliance Oversight (`adminPage_compliance`)
 - Verifies teleconsultation adherence to Directorate General of Health Services (DGHS) guidelines.
-- Monitors prescription completeness: ensures mandatory dosage schedules, duration limits on controlled substances, and digital signature validity.
+- Monitors prescription completeness: ensures mandatory dosage schedules, duration limits on controlled substances, and integrity verification hash validity.
 
 ---
 
 ### 5.7 App Incident Diagnostics & Telemetric Error Logs (`adminPage_logs`)
 - **Subsystem Coverage**:
-  - `MFS_BKASH_GATEWAY`: bKash API webhook failures, signature mismatches, IPN timeouts.
+  - `MFS_BKASH_GATEWAY`: bKash (configurable per deployment country) API webhook failures, signature mismatches, IPN timeouts.
   - `MFS_NAGAD_GATEWAY`: Nagad payment verification drops.
-  - `WEBRTC_SIGNALING`: ICE candidate disconnects, STUN/TURN server latency spikes.
+  - `AGORA_RTC`: Agora RTC connection drops, latency spikes.
   - `DGDA_EMR_SYNC`: Cloud prescription catalog synchronization errors.
 - **Incident Detail Modal (`#adminLogDetailModal`)**:
   - Shows full trace IDs (`TRC-94812-BKASH`), affected user accounts, component names, and complete stack traces.
-- **Failure Simulator Modal (`#adminSimulateFailureModal`)**:
-  - Allows administrators to simulate webhook dropouts, WebRTC timeouts, and gateway failures for system resilience testing.
+- **Failure Simulator (Dev/Staging Only)**:
+  - Allows developers to simulate webhook dropouts, Agora timeouts, and gateway failures for system resilience testing.
 
 ---
 
@@ -479,26 +479,26 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
   - Tracks all open patient claims, categorized by target (`DOCTOR` vs. `SYSTEM`).
 - **Forensic Investigation Modal (`#adminGrievanceDetailModal`)**:
   - Displays session telemetry side-by-side with patient statements:
-    - Call duration verified against server WebRTC session logs.
+    - Call duration verified against server Agora session logs.
     - Packet loss, network drops, and audio codec statistics.
     - Verification of whether a valid prescription was saved to the patient vault.
 - **Board Adjudication Actions**:
-  - **Disburse Escrow Refund (`btnAdjudicateRefund`)**: Refunds consultation fees back to the patient's MFS wallet (`REFUNDED`).
+  - **Disburse payment hold Refund (`btnAdjudicateRefund`)**: Refunds consultation fees back to the patient's MFS wallet (`REFUNDED`).
   - **Issue Disciplinary Warning (`btnAdjudicateWarning`)**: Logs a formal reprimand in the physician's BMDC dossier (`WARNED`).
   - **Dismiss Grievance (`btnAdjudicateResolve`)**: Closes the dispute as resolved when evidence demonstrates compliant care.
 
 ---
 
-### 5.9 Omnichannel Payment & Escrow Master Ledger (`adminPage_finance`)
+### 5.9 Omnichannel Payment & payment hold Master Ledger (Note: 'payment hold' terminology should be confirmed legally; system uses 'payment hold' model) (`adminPage_finance`)
 - **Financial Metric Aggregations**:
   - **Gross Merchandise Value (GMV)**: Total patient inflows across all gateways.
-  - **Escrow Reserves In-Flight**: Funds held pending consultation completion.
+  - **payment hold Reserves In-Flight**: Funds held pending consultation completion.
   - **HeloDoc 20% Net Platform Revenue**: Platform commission from completed consultations.
   - **Disbursed Doctor Payouts**: Net 80% earnings paid out to physicians.
 - **Reconciliation Engine**:
   - Simulates bulk IPN webhook reconciliation (`reconcileAdminMfsWebhooks`) and provides CSV exports for statutory audits (`exportAdminFinanceLedger`).
 - **Transaction Inspector (`#adminTransactionDetailModal`)**:
-  - Provides complete audit logs for individual transactions, detailing gateway payloads, platform deductions, and escrow releases.
+  - Provides complete audit logs for individual transactions, detailing gateway payloads, platform deductions, and payment hold releases.
 
 ---
 
@@ -512,12 +512,12 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 | `view-1` | **Core Services Directory** | Single "Book a Specialist Doctor" Card, Instant Chat, Lab Diagnostics, Home Delivery | Routes patients to specialist booking, lab test orders, and medication refills. |
 | `view-2` | **Floating Reminders & Triggers** | Toast Consultation Reminder, Medicine Notification Card | Alerts patients to upcoming appointments (30-min warning) and medication schedules. |
 | `view-3` | **Find a Specialist Directory** | Modality Selector (`all`, `chat`, `video`), Specialty Filter Chips, Doctor Cards | Filters verified doctors by consultation modality and clinical specialty; displays fees without star ratings. |
-| `view-4` | **Date & Slot Booking Engine** | Calendar Carousel, Time Slot Grid, MFS Payment Selector | Selects appointment slots and secures bookings via MFS escrow payments. |
+| `view-4` | **Date & Slot Booking Engine** | Calendar Carousel, Time Slot Grid, MFS Payment Selector | Selects appointment slots and secures bookings via MFS payment hold payments. |
 | `view-5` | **Patient Health Vault (EMR)** | Prescription History, CBC Lab Reports, Patient Clinical History | Manages past medical records, downloadable prescription PDFs, and diagnostic reports. |
 | `view-6` | **24h Asynchronous Clinical Chat** | Chat Top Bar, Message Feed, Canned Clinical Question Pills | Enables 24-hour post-consultation chat with the consulting doctor for dosage and recovery updates. |
 | `view-7` | **Patient Account & Family Profiles** | Family Member Cards, Language Switcher (`#patientLangMenuItem`), Logout Button | Manages dependent profiles, opens Swahili/English language settings, and displays account details. |
 | `view-8` | **Consult a Doctor Routing Hub** | Primary Service Cards (Specialist, GP On-Call, Chat Triage) | Directs patients to the appropriate consultation format based on clinical urgency. |
-| `view-9` | **Doctor Public Profile** | Doctor Qualifications, BMDC Number, Hospital Affiliation, Availability Tabs | Presents doctor credentials, experience, and consultation options without star ratings. |
+| `view-9` | **Doctor Public Profile** | Doctor Qualifications, Medical License Number (configurable per deployment country), Hospital Affiliation, Availability Tabs | Presents doctor credentials, experience, and consultation options without star ratings. |
 | `view-10` | **Virtual Waiting Room** | Countdown Timer, Multi-Prescription Previewer, Audio/Video Pre-Flight Check | Holds patients before sessions, verifies camera/mic readiness, and displays queue status. |
 | `view-11` | **Post-Consultation Summary** | Prescription Download Button, Follow-Up Date, Hidden Telemetry Record, Grievance Trigger | Summarizes consultation outcomes and provides access to prescriptions and dispute filing. |
 | `view-12` | **Free Health Q&A Community** | Category Filter Chips, Ask Question Form, Answered Forum Feed | Allows patients to ask anonymous questions answered by on-duty medical officers. |
@@ -544,9 +544,9 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 | Section / Component | DOM Element ID | Functional Capabilities |
 |---|---|---|
 | **Top Clinical Command Bar** | `#docWebHeader` | Displays doctor status, hospital affiliation, active date, daily revenue KPI with 20% debarment breakdown, and duty toggle. |
-| **Teleconsultation Video Console** | `#docWebVideoFeed` | High-definition WebRTC video feed with patient picture-in-picture, mute, camera toggle, and session termination controls. |
+| **Teleconsultation Video Console** | `#docWebVideoFeed` | High-definition Agora video feed with patient picture-in-picture, mute, camera toggle, and session termination controls. |
 | **Longitudinal Patient History** | `#docWebPatientHistory` | Split-screen panel displaying patient medical records, chronic conditions, uploaded multi-prescription photos, and past lab reports. |
-| **Cloud E-Prescription Engine** | `#docWebRxComposer` | Generates DGDA-compliant prescriptions with drug auto-completion, dose calculators, and digital signature injection. |
+| **Cloud E-Prescription Engine** | `#docWebRxComposer` | Generates DGDA-compliant prescriptions with drug auto-completion, dose calculators, and integrity verification hash injection. |
 | **Daily Revenue KPI Panel** | `#docWebRevenueWidget` | Shows daily gross revenue, 20% platform deduction, and net final earnings. |
 
 ---
@@ -562,8 +562,8 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 | **Capacity & Slots** | `adminPage_slots` | Platform scheduling manager balancing patient appointment volumes across clinical specialties. |
 | **Clinical Compliance** | `adminPage_compliance` | Monitors consultation protocols, teleconsultation session lengths, and prescription guideline adherence. |
 | **Error Logs & Diagnostics** | `adminPage_logs` | Subsystem error tracker with interactive failure simulation (`#adminSimulateFailureModal`) and recovery triggers. |
-| **Grievance Board** | `adminPage_grievances` | Dispute arbitration desk with session telemetry evidence, escrow refund triggers, and BMDC warning tools. |
-| **Finance & Escrow Ledger** | `adminPage_finance` | Master financial ledger tracking gross GMV, escrow balances, 20% platform revenue, and MFS reconciliations. |
+| **Grievance Board** | `adminPage_grievances` | Dispute arbitration desk with session telemetry evidence, payment hold refund triggers, and BMDC warning tools. |
+| **Finance & payment hold Ledger** | `adminPage_finance` | Master financial ledger tracking gross GMV, payment hold balances, 20% platform revenue, and MFS reconciliations. |
 
 ---
 
@@ -577,10 +577,10 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 | `#languageModal` | `openLanguageModal()` | Provides instant language selection between English and Swahili (Kiswahili). |
 | `#labReportModal` | `openMultiPagePrescriptionViewer(...)` | Multi-page image viewer for inspecting uploaded prescriptions and lab reports (pages 1 to 5). |
 | `#adminDoctorHistoryModal` | `openAdminDoctorHistoryModal(docKey)` | Displays a doctor's full profile: phone number, residence, email, clinical history, and disciplinary warnings. |
-| `#adminGrievanceDetailModal`| `openAdminGrievanceDetail(grvId)` | Forensic investigation console displaying session telemetry, WebRTC metrics, and dispute resolution controls. |
-| `#adminTransactionDetailModal`| `openAdminTransactionModal(txId)` | Displays detailed transaction breakdowns, payment gateway logs, and escrow settlement states. |
+| `#adminGrievanceDetailModal`| `openAdminGrievanceDetail(grvId)` | Forensic investigation console displaying session telemetry, Agora metrics, and dispute resolution controls. |
+| `#adminTransactionDetailModal`| `openAdminTransactionModal(txId)` | Displays detailed transaction breakdowns, payment gateway logs, and payment hold settlement states. |
 | `#adminLogDetailModal` | `openAdminLogDetail(logId)` | Shows subsystem error traces, stack traces, and options to retry failed operations or disburse refunds. |
-| `#adminSimulateFailureModal`| `openAdminSimulateFailureModal()` | Developer/admin tool for simulating payment drops, WebRTC timeouts, and gateway failures. |
+| `#adminSimulateFailureModal`| `openAdminSimulateFailureModal()` | Developer/admin tool for simulating payment drops, Agora timeouts, and gateway failures. |
 | `#offlineActionGuardModal` | Automatic on offline action | Warns users when an action requires an active network connection and prevents out-of-sync operations. |
 
 ---
@@ -632,27 +632,27 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
     callSeconds: 15,
     prematureEnd: true,
     connectionHealth: "Stable 4G (RTT 48ms)",
-    webrtcPacketDetails: "ICE Connected, 0% Packet Loss",
+    AgoraPacketDetails: "Agora Connected, 0% Packet Loss",
     rxVaultStatus: "Not Issued",
-    escrowStatus: "Held (৳800 bKash)"
+    payment holdStatus: "Held (৳ (configurable per deployment country)800 bKash (configurable per deployment country))"
   },
   adjudication: null              // Populated upon Central Board resolution
 }
 ```
 
-### 7.3 Master Transaction & Escrow Record (`adminTransactionStore`)
+### 7.3 Master Transaction & payment hold Record (`adminTransactionStore`)
 ```javascript
 {
   id: "TXN-BK-94812",
   timestamp: "2026-09-30 10:32:15",
-  gateway: "bKash",               // "bKash" | "Nagad" | "Card" | "M-Pesa"
+  gateway: "bKash (configurable per deployment country)",               // "bKash (configurable per deployment country)" | "Nagad" | "Card" | "M-Pesa"
   type: "CONSULTATION_INFLOW",
   grossAmount: 800.00,
   platformFee: 160.00,            // 20% Platform Fee
   netAmount: 640.00,              // 80% to Doctor / Refund
   patientName: "Rafiq Ahmed",
   doctorName: "Dr. Sabrina Akter",
-  status: "ESCROW_HELD",          // "ESCROW_HELD" | "SETTLED" | "REFUNDED"
+  status: "PAYMENT_HELD",          // "PAYMENT_HELD" | "SETTLED" | "REFUNDED"
   gatewayRef: "BK-IPN-994821038"
 }
 ```
@@ -663,7 +663,7 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 
 | Potential Failure Mode | Technical Detection Vector | Automated Mitigation & Clinical Fail-Safe |
 |---|---|---|
-| **Abrupt Call Termination (< 30s)** | WebRTC PeerConnection `connectionState == 'closed'` and `callSeconds < 30` | Auto-flags session as `prematureEnd: true`. Holds escrow payment and prompts patient with free reconnect or dispute filing options. |
+| **Abrupt Call Termination (< 30s)** | Agora RTC SDK `connectionState == 'closed'` and `callSeconds < 30` | Auto-flags session as `prematureEnd: true`. Holds payment hold payment and prompts patient with free reconnect or dispute filing options. |
 | **MFS Payment Debited But Session Unopened** | IPN Webhook received without matching active session in `adminTransactionStore` | Auto-logs incident to `adminAppErrorLogsStore` under `PatientGrievanceIncidentReporter`. Provides one-click refund in the Admin Portal. |
 | **Prescription Photo Upload Overload** | File input selection exceeds `MAX_PRESCRIPTION_IMAGES = 5` | Accepts the first 5 images and ignores remaining files. Displays an explanatory notification toast to prevent memory issues. |
 | **Offline Form Submission** | Action triggered while `navigator.onLine === false` | Blocks submission, displays `#offlineActionGuardModal`, and preserves form input until connection is restored. |

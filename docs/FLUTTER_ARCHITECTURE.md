@@ -28,7 +28,7 @@ lib/
     ├── doctor_discovery/               # Modality filtering, doctor list
     ├── appointment_booking/            # Slot carousel, multi-Rx upload (1-5 photos)
     ├── waiting_room/                   # Countdown, pre-flight checks, Rx viewer
-    ├── consultation/                   # WebRTC video feed, session telemetry
+    ├── consultation/                   # Agora RTC video feed, channel join, token refresh, session telemetry capture from onRtcStats
     ├── clinical_chat/                  # 24h follow-up chat, canned pills
     ├── health_vault/                   # Downloadable prescriptions, CBC reports
     ├── grievance_redressal/            # Star-rating-free dispute filing
@@ -51,7 +51,7 @@ lib/
 | `drift` | ^2.20.0 | Type-safe local SQLite database for offline caching and health records. |
 | `connectivity_plus` | ^6.0.5 | Observes cellular/WiFi network states to trigger offline action guards. |
 | `agora_rtc_engine` | ^6.3.0 | Agora RTC SDK for low-latency adaptive video/audio teleconsultation via SD-RTN. |
-| `cached_network_image` | ^3.4.0 | Efficient bitmap caching for doctor portraits and medical photos. |
+| `cached_network_image` | ^3.4.0 | Efficient bitmap caching for doctor portraits. **PHI Rule:** Medical images and prescriptions must use encrypted storage, NOT `cached_network_image`. |
 | `shimmer` | ^3.0.0 | Hardware-accelerated skeleton shimmer animations matching `view-14`. |
 | `easy_localization` | ^3.0.7 | Runtime localization toggling for English and Swahili without app reboots. |
 

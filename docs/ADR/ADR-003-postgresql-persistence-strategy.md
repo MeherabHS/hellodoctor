@@ -18,8 +18,11 @@ We choose **PostgreSQL 16+** as the central relational database, paired with **`
 
 ## 4. Rationale
 - **Pessimistic Row-Level Locking:** `SELECT ... FOR UPDATE` ensures concurrent booking requests for the identical slot are serialized, preventing overbooking.
-- **CHECK Constraints:** Database-level enforcement of financial mathematics (`gross_amount = platform_fee_amount + net_amount`) guarantees ledger consistency regardless of client bugs.
-- **Relational Integrity:** Foreign keys with `ON DELETE RESTRICT` prevent accidental cascading deletion of medical records and audit trails.
+- **CHECK Constraints:** Database-level enforcement of financial mathematics (`gross_amount = platform_fee_amount + net_amount`) guarantees ledger consistency regardless of client bugs. The ledger/financial event log ensures complete auditability.
+- **Relational Integrity:** Foreign keys with `ON DELETE RESTRICT` prevent accidental cascading deletion to ensure medical record protection and integrity.
+- **Row-Level Security (RLS):** PostgreSQL Row-Level Security provides defense-in-depth for patient-owned tables.
+- **Audit & Idempotency:** The `idempotency_records` and `audit_events` tables provide reliable retry mechanisms and full traceability of all actions.
+- **Exclusion Constraints:** `btree_gist` extension allows for strict slot exclusion constraints (preventing overlapping appointments at the database level).
 
 ## 5. Consequences
 - **Positive:** Complete ACID safety, compile-time SQL verification, robust indexing.

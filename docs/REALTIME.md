@@ -12,7 +12,7 @@ To maintain optimal battery life, rapid time-to-market, and network resilience o
 
 | Clinical Feature | Real-Time Requirement | Selected Protocol | Architectural Justification |
 |---|---|---|---|
-| **Live Telehealth Consultation** | Sub-300ms bidirectional video & audio | **Agora RTC SDK** (`agora_rtc_engine`) | Managed SD-RTN automatically traverses carrier NATs and handles packet loss up to 80% without custom TURN/SFU infrastructure. |
+| **Live Telehealth Consultation** | Sub-300ms bidirectional video & audio | **Agora RTC SDK** (`agora_rtc_engine`) | Managed SD-RTN automatically traverses carrier NATs and handles packet loss up to 80% without custom infrastructure. |
 | **24-Hour Follow-up Chat** | Instant message delivery, typing indicators | **WebSocket** (with REST history fallback) | Low-overhead bidirectional messaging during active clinical consultation sessions. |
 | **Waiting Room Queue Countdown** | Periodic position & status updates | **Server-Sent Events (SSE)** or **Polling** (10s) | Unidirectional server-to-client updates; full duplex WebSockets are unnecessary. |
 | **Upcoming Consultation Alerts** | Time-sensitive reminders (30m before) | **Push Notifications (FCM / APNS)** | Must reach user even when application is terminated or phone is locked. |
@@ -141,7 +141,7 @@ Upon call termination, the client submits the final telemetry record derived fro
 ```json
 {
   "call_duration_seconds": 642,
-  "ice_connection_state": "AGORA_SD_RTN_CONNECTED",
+  "connection_state": "AGORA_SD_RTN_CONNECTED",
   "packet_loss_percent": 0.42,
   "round_trip_time_ms": 38,
   "premature_end": false,

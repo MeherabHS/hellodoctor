@@ -1,6 +1,6 @@
 # Phase 22 — Definition of Done (DoD) Quality Standard
 
-> **Document Version:** 1.0.0  
+> **Document Version:** 1.0.1  
 > **Mandate:** A task, feature, or milestone is strictly INCOMPLETE if any item on this checklist is unsatisfied.  
 > **Target Audience:** Claude Code Autonomous Implementation Agent
 
@@ -8,7 +8,7 @@
 
 ## 1. Feature Completion Checklist
 
-Every feature implemented by Claude Code must satisfy all 12 criteria before being marked complete in `docs/PROGRESS.md`:
+Every feature implemented by Claude Code must satisfy all criteria before being marked complete in `docs/PROGRESS.md`:
 
 - [ ] **1. Architecture Integrity:**
   - Code resides in appropriate layers (Presentation, Domain, Data for Flutter; Handler, Service, Repository for Rust).
@@ -29,7 +29,7 @@ Every feature implemented by Claude Code must satisfy all 12 criteria before bei
 - [ ] **5. Test Coverage:**
   - Unit tests written for all Blocs, domain services, and mappers.
   - Integration tests written for database transactions and API endpoints.
-  - All tests execute and pass with 100% success (`cargo test`, `flutter test`).
+  - All tests execute and pass (`cargo test`, `flutter test`).
 - [ ] **6. Code Quality & Static Analysis:**
   - Flutter: `flutter analyze` reports zero errors and zero warnings.
   - Rust: `cargo clippy --all-targets -- -D warnings` passes cleanly.
@@ -39,7 +39,7 @@ Every feature implemented by Claude Code must satisfy all 12 criteria before bei
 - [ ] **8. Security Audit:**
   - Passwords hashed using Argon2id.
   - No hardcoded API keys, tokens, or private secrets in repository.
-  - Role-based authorization enforced on all endpoints.
+  - Role-based (RBAC) and Attribute-based (ABAC) authorization enforced on all endpoints.
 - [ ] **9. Idempotency & Concurrency:**
   - Booking and payment endpoints support `Idempotency-Key` headers.
   - Slot bookings execute within serializable or row-locked transactions (`FOR UPDATE`).
@@ -51,3 +51,13 @@ Every feature implemented by Claude Code must satisfy all 12 criteria before bei
 - [ ] **12. Documentation & Progress Tracking:**
   - Milestone progress updated in `docs/PROGRESS.md`.
   - Git commit created with descriptive message following conventional commits.
+- [ ] **13. BOLA/IDOR Protection:**
+  - Every endpoint that accesses user-specific resources verifies ownership + relationship + appointment context beyond role check.
+- [ ] **14. File Upload Security:**
+  - All file uploads pass magic-byte validation, malware scanning, and image re-encoding before storage.
+- [ ] **15. Agora Token Security:**
+  - Agora App Certificate exists only on server. RTC tokens are short-lived and bound to specific appointments.
+- [ ] **16. Audit Trail:**
+  - Sensitive actions (record access, payment, prescription, admin actions) are logged to audit_events table.
+- [ ] **17. PHI Protection:**
+  - Push notifications contain no PHI. Error responses contain no internal details. Logs use allow-list field scrubbing.

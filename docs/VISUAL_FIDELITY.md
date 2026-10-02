@@ -1,7 +1,7 @@
 # Phase 19 — Visual Fidelity & Pixel-Precision Audit Checklist
 
-> **Document Version:** 1.0.0  
-> **Mandate:** The Flutter mobile application must reproduce the visual layout, color palette, component geometries, and micro-interactions of the prototype with 100% fidelity.  
+> **Document Version:** 1.0.1  
+> **Mandate:** The Flutter mobile application must reproduce the visual layout, color palette, component geometries, and micro-interactions of the prototype with high fidelity.  
 > **Target Audience:** Claude Code Autonomous Implementation Agent
 
 ---
@@ -26,10 +26,11 @@
 | `HD-PATIENT-ACCOUNT-SETTINGS`| `view-7` | • Profile avatar, phone number, and national ID<br/>• Family profile dependent pills<br/>• **Language menu item displaying "Language (English / Swahili)"**<br/>• **Active badge displaying current selection ("English" or "Swahili")**<br/>• Red logout button | [ ] |
 | `HD-DOC-QUEUE` | `doc-view-0` | • Doctor profile header with on-duty switch<br/>• Patient queue cards with multi-prescription count badges<br/>• Start video consultation CTA | [ ] |
 | `HD-DOC-WALLET-EARNINGS` | `doc-view-3` | • **Hero card with 3-tier breakdown: Gross (৳ 35,562.50) -> 20% Fee (- ৳ 7,112.50) -> Final Net (৳ 28,450.00)**<br/>• **Mandatory italicized note: "Total calculation is based including the platform charge 20%."**<br/>• Itemized consultation ledger rows showing gross, 20% withheld, and net take-home | [ ] |
-| `HD-DOCWEB-WORKSTATION` | `#doctorWebShell` | • Dual-pane desktop layout: Left 1080p WebRTC video, Right EMR / Rx Composer<br/>• Header revenue widget: "Total Gross: ৳ 10,500 \| 20% Fee: - ৳ 2,100 \| Net Final: ৳ 8,400" | [ ] |
+| `HD-DOCWEB-WORKSTATION` | `#doctorWebShell` | • Dual-pane desktop layout: Left 1080p Agora RTC video, Right EMR / Rx Composer<br/>• Header revenue widget: "Total Gross: ৳ 10,500 \| 20% Fee: - ৳ 2,100 \| Net Final: ৳ 8,400" | [ ] |
 | `HD-ADMIN-DOCTORS` | `adminPage_doctors` | • Table columns: BMDC ID, Doctor Name, Verified Phone, Residence, Specialty, Actions<br/>• Modal `#adminDoctorHistoryModal` showing verified phone, residence, and past disciplinary logs | [ ] |
-| `HD-ADMIN-GRIEVANCES` | `adminPage_grievances`| • Grievance docket showing ID, Target, Category, Telemetry Status, Actions<br/>• Adjudication buttons: "Disburse Refund" (Purple) and "Issue Warning" (Amber) | [ ] |
+| `HD-ADMIN-GRIEVANCES` | `adminPage_grievances`| • Grievance docket showing ID, Target, Category, Telemetry Status, Actions<br/>• Adjudication buttons: "Disburse Refund" (Purple) and "Issue Warning" (Amber) (for Internal Platform Compliance) | [ ] |
 | `HD-ADMIN-FINANCE` | `adminPage_finance` | • KPI cards: GMV, Escrow Reserves In-Flight, 20% Platform Revenue, Disbursed Payouts<br/>• Master transaction ledger with filter tabs and CSV export button | [ ] |
+| `HD-ADMIN-LOGS` | `adminPage_logs` | • Diagnostics log viewer. Note: Failure simulator is for dev/staging only. | [ ] |
 | `HD-MODAL-LANGUAGE` | `#languageModal` | • Modal dialog with English (UK flag) and Swahili (Kenya flag) options<br/>• Radio checkmarks and "Apply Language" CTA | [ ] |
 | `HD-MODAL-RX-VIEWER` | `#labReportModal` | • Full-screen document preview with black overlay<br/>• Floating pagination bar at bottom ("Page 1 of 3") with Previous and Next arrows | [ ] |
 | `HD-MODAL-OFFLINE-GUARD` | `#offlineActionGuardModal` | • Alert modal with disconnected WiFi icon<br/>• Explanatory text advising that internet connection is required for payments and bookings | [ ] |

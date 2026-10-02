@@ -21,8 +21,8 @@ This document reverse-engineers the client-side JavaScript execution environment
 | `patientPrescriptionImages` | Global | Array of Objects | Uploaded pre-consultation files (up to 5) | `PrescriptionIntakeBloc.images` |
 | `doctorEarningsStore` | Global | Object | 3-tier doctor earnings & ledger records | `DoctorWalletRepository` / Rust DB |
 | `adminPatientGrievancesStore` | Global | Array of Objects | Central grievance & dispute docket | PostgreSQL `grievance_reports` |
-| `consultationTelemetryStore` | Global | Object | Session metrics (duration, ICE state, Rx) | PostgreSQL `consultation_telemetry` |
-| `adminTransactionStore` | Global | Array of Objects | Master escrow transaction ledger | PostgreSQL `transactions` |
+| `consultationTelemetryStore` | Global | Object | Session metrics (duration, Agora state, Rx) | PostgreSQL `consultation_telemetry` |
+| `adminTransactionStore` | Global | Array of Objects | Master payment hold transaction ledger | PostgreSQL `transactions` |
 | `adminDoctorHistoryStore` | Global | Object | Doctor dossiers (phone, residence, logs) | PostgreSQL `doctor_dossiers` |
 | `adminAppErrorLogsStore` | Global | Array of Objects | System error logs & diagnostics | PostgreSQL `system_error_logs` |
 | `activeDoctorChatPatient` | Global | String | Patient ID in active doctor chat desk | `ChatBloc.activeThread` |
@@ -130,18 +130,18 @@ This document reverse-engineers the client-side JavaScript execution environment
 
 ---
 
-### INT-006: Admin Dispute Adjudication (Escrow Refund Disbursal)
+### INT-006: Admin Dispute Adjudication (payment hold Refund Disbursal)
 - **Trigger:** Admin clicks "Disburse Refund" (`adjudicateGrievanceRefund(grvId)`).
-- **Current State:** Dispute in `PENDING_REVIEW` state; escrow funds in `ESCROW_HELD`.
+- **Current State:** Dispute in `PENDING_REVIEW` state; payment hold funds in `PAYMENT_HELD`.
 - **Action:**
   - Updates grievance status to `REFUNDED`.
-  - Sets board remedy to `Escrow Refund Disbursed (৳800)`.
+  - Sets board remedy to `payment hold Refund Disbursed (৳800)`.
   - Logs audit entry with timestamp and admin identifier.
   - Updates matching transaction in `adminTransactionStore` to `REFUNDED`.
 - **UI Change:**
   - Updates docket row badge to `REFUNDED` (Purple / Blue accent).
   - Displays toast: *"Refund Disbursed: Full fee refunded to patient wallet via bKash."*
-- **Backend Equivalent (Rust):** `POST /api/v1/admin/grievances/{id}/refund` executes transactional escrow release via MFS payment gateway API.
+- **Backend Equivalent (Rust):** `POST /api/v1/admin/grievances/{id}/refund` executes transactional payment hold release via MFS payment gateway API.
 
 ---
 

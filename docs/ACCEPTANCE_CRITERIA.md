@@ -69,7 +69,7 @@ AND the doctor's withdrawable wallet balance is NOT incremented until the consul
 
 ### AC-006: Premature Call Termination Detection
 ```gherkin
-GIVEN an active WebRTC teleconsultation session
+GIVEN an active Agora RTC teleconsultation session
 WHEN the connection disconnects after only 15 seconds (callSeconds < 30)
 THEN the session is marked with status PREMATURE_TERMINATION
 AND the telemetry record stores call_duration_seconds = 15 and premature_end = true
@@ -108,7 +108,7 @@ AND every consultation in the itemized ledger reflects this 3-tier gross, 20% de
 ```gherkin
 GIVEN a patient filing a dispute against a doctor on #patientGrievanceModal
 WHEN the patient submits their statement
-THEN the consultation's forensic telemetry (call duration, WebRTC ICE health, prescription status, payment ID) is silently bound to the dispute payload
+THEN the consultation's forensic telemetry (call duration, Agora RTC connection health, prescription status, payment ID) is silently bound to the dispute payload
 AND raw technical diagnostics remain hidden from the patient UI (aria-hidden="true", display: none)
 AND the grievance is queued in the Admin Portal docket with status PENDING_REVIEW.
 ```
@@ -123,13 +123,13 @@ AND the escrow transaction status updates to REFUNDED_TO_PATIENT
 AND an MFS refund API call is dispatched to the patient's bKash account.
 ```
 
-### AC-011: Grievance Adjudication: BMDC Disciplinary Warning
+### AC-011: Grievance Adjudication: Internal Platform Compliance Warning
 ```gherkin
 GIVEN an administrator reviewing a physician conduct complaint
 WHEN the administrator clicks "Issue Warning" (#btnAdjudicateWarning)
 THEN the grievance status updates to WARNED
-AND the board remedy updates to "BMDC Disciplinary Warning Logged"
-AND an official reprimand record is permanently logged in the doctor's BMDC dossier.
+AND the board remedy updates to "Internal Platform Compliance Warning Logged"
+AND a compliance warning is logged in the doctor's platform dossier.
 ```
 
 ---
@@ -165,4 +165,62 @@ WHEN the user attempts a destructive action (Confirm & Pay, Book Slot, Sign Pres
 THEN the submission is blocked before dispatching network requests
 AND the modal #offlineActionGuardModal is displayed
 AND previously entered form data is preserved until connectivity resumes.
+```
+
+---
+
+## 9. Security, Payments & Session Management
+
+### AC-015: Two-Stage Payment Booking
+```gherkin
+GIVEN a patient confirming an appointment booking with bKash payment
+WHEN the booking request is submitted
+THEN the appointment is created with status PENDING_PAYMENT
+AND the slot transitions to LOCKED_IN_PAYMENT
+AND a payment session is initiated with the MFS provider
+AND the appointment transitions to CONFIRMED only after the payment webhook confirms successful debit.
+```
+
+### AC-016: Auth Session Refresh Token Rotation
+```gherkin
+GIVEN an authenticated user with an expired access token and a valid refresh token
+WHEN the client presents the refresh token to POST /api/v1/auth/refresh
+THEN a new access token and new refresh token are issued
+AND the previous refresh token is invalidated
+AND presenting the old refresh token again triggers session family revocation.
+```
+
+### AC-017: ABAC Authorization Enforcement
+```gherkin
+GIVEN a doctor authenticated with valid JWT credentials
+WHEN the doctor attempts to access appointment records belonging to a different doctor's patient
+THEN the request is denied with 403 Forbidden
+AND the unauthorized access attempt is logged to audit_events.
+```
+
+### AC-018: File Upload Security
+```gherkin
+GIVEN a patient uploading a prescription image
+WHEN the file is received by the server
+THEN the server validates magic bytes match the declared MIME type
+AND the image is re-encoded to strip EXIF metadata
+AND the file is quarantined until malware scan completes
+AND the response returns a document_id, NOT a raw storage URL.
+```
+
+### AC-019: Push Notification PHI Protection
+```gherkin
+GIVEN a patient with an upcoming consultation in 30 minutes
+WHEN the server dispatches a push notification reminder
+THEN the notification payload contains only a generic message like 'You have an upcoming HelloDoctor consultation'
+AND the notification does NOT contain the doctor's name, diagnosis, prescription details, or any PHI.
+```
+
+### AC-020: Consultation Completion Without Prescription
+```gherkin
+GIVEN a doctor in an active consultation where no medication is indicated
+WHEN the doctor selects clinical outcome 'No Prescription Required' and ends the session
+THEN the consultation transitions to COMPLETED with clinical_outcome = COMPLETED_NO_RX
+AND the escrow payment is settled to the doctor
+AND the patient is NOT blocked from proceeding.
 ```

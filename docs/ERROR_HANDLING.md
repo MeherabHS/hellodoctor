@@ -33,14 +33,14 @@ Is this an internal technical error?
 | `FORBIDDEN` | `403 Forbidden` | "You do not have permission to perform this clinical action." | Display access denied dialog. |
 | `CHAT_SESSION_EXPIRED` | `403 Forbidden` | "This 24-hour consultation chat has concluded." / "Mazungumzo haya ya saa 24 yamemalizika." | Lock chat box into read-only state. |
 | `RESOURCE_NOT_FOUND` | `404 Not Found` | "Requested doctor or record could not be found." | Render empty state illustration. |
-| `GATEWAY_TIMEOUT` | `504 Gateway Timeout` | "Payment gateway did not respond. No funds were debited." | Allow retry after 30 seconds. |
+| `GATEWAY_TIMEOUT` | `504 Gateway Timeout` | "We could not confirm the payment status. Please do not pay again while we verify the transaction." | Allow retry after 30 seconds. |
 | `INTERNAL_ERROR` | `500 Server Error` | "A temporary server issue occurred. Reference: {trace_id}" | Provide "Contact Support" button with pre-filled trace ID. |
 
 ---
 
 ## 3. Subsystem Incident Ingestion (Admin Diagnostics)
 
-When unexpected infrastructure failures occur (e.g., MFS IPN webhook failure or WebRTC signaling crash), the system captures the incident into `system_error_logs`:
+When unexpected infrastructure failures occur (e.g., MFS IPN webhook failure or Agora signaling crash), the system captures the incident into `system_error_logs`:
 
 ```json
 {
@@ -48,7 +48,7 @@ When unexpected infrastructure failures occur (e.g., MFS IPN webhook failure or 
   "subsystem": "MFS_BKASH_GATEWAY",
   "component": "BkashWebhookHandler",
   "severity": "CRITICAL",
-  "action_attempted": "EXECUTE_ESCROW_HOLD",
+  "action_attempted": "EXECUTE_payment hold_HOLD",
   "error_message": "IPN Webhook signature validation failed: Connection reset by peer.",
   "stack_trace": "services/backend/src/services/payment_service.rs:184\nservices/backend/src/api/v1/payment_handlers.rs:92",
   "impacted_user_id": "u-c1f7b8a2-9481-4b72-9132-841920842011",
@@ -57,3 +57,8 @@ When unexpected infrastructure failures occur (e.g., MFS IPN webhook failure or 
 }
 ```
 Administrators can inspect these incidents in `adminPage_logs` and use `#adminSimulateFailureModal` to simulate test failures and verify fallback behaviors.
+
+## 4. Logging Rules
+Never dump entire request objects, JWTs, authorization headers, prescription content, uploaded filenames, or PHI. Use allow-list approach for logged fields.
+
+*Note: System error logs are NOT an adequate security/medical audit log. Reference the new audit_events table for healthcare audit trail.*

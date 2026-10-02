@@ -20,12 +20,12 @@ Controls the lifecycle of a patient's booking.
 ```mermaid
 stateDiagram-v2
     [*] --> PENDING_PAYMENT: Slot selected
-    PENDING_PAYMENT --> CONFIRMED: Escrow payment authorized
+    PENDING_PAYMENT --> CONFIRMED: Payment holding authorized
     PENDING_PAYMENT --> EXPIRED: 10-minute payment timeout
     CONFIRMED --> WAITING: Patient enters waiting room
     CONFIRMED --> CANCELLED: Patient cancels > 2h before
     WAITING --> IN_CONSULTATION: Call initiated
-    IN_CONSULTATION --> COMPLETED: Doctor signs prescription
+    IN_CONSULTATION --> COMPLETED: Consultation ends with clinical_outcome
     IN_CONSULTATION --> PREMATURE_TERMINATION: Call dropped (< 30s)
     PREMATURE_TERMINATION --> DISPUTED: Patient files grievance
     PREMATURE_TERMINATION --> COMPLETED: Reconnection succeeds
@@ -40,12 +40,12 @@ stateDiagram-v2
 - **Valid Transitions & Guards:**
   - `PENDING_PAYMENT -> CONFIRMED`: Guarded by verified MFS IPN webhook or gateway token.
   - `PENDING_PAYMENT -> EXPIRED`: Auto-triggered by background job after 600 seconds. Releases slot back to `AVAILABLE`.
-  - `IN_CONSULTATION -> COMPLETED`: Guarded by presence of a signed prescription hash.
+  - `IN_CONSULTATION -> COMPLETED`: Guarded by the presence of a set `clinical_outcome`. Note: A prescription is NOT required to complete an appointment, only an outcome.
   - `CONFIRMED -> CANCELLED`: Guarded by `appointment_time - now() > 2 hours`. Full refund returned to patient.
 
 ---
 
-### 2.2 `PaymentEscrowState`
+### 2.2 `PaymentStatusState`
 Controls financial holding and settlement under the 20% platform charge model.
 
 ```mermaid
@@ -75,8 +75,8 @@ Controls patient dispute resolution and Central Medical Governance Board arbitra
 stateDiagram-v2
     [*] --> PENDING_REVIEW: Patient submits grievance form
     PENDING_REVIEW --> UNDER_INVESTIGATION: Admin opens docket & telemetry
-    UNDER_INVESTIGATION --> REFUNDED: Telemetry proves failure (<30s or WebRTC drop)
-    UNDER_INVESTIGATION --> WARNED: Clinical misconduct confirmed -> Warning logged
+    UNDER_INVESTIGATION --> REFUNDED: Telemetry proves failure (<30s or connection drop)
+    UNDER_INVESTIGATION --> WARNED: Clinical misconduct confirmed -> Internal Platform Compliance Warning logged
     UNDER_INVESTIGATION --> DISMISSED: Claim unsubstantiated -> Telemetry proves full call
     REFUNDED --> [*]
     WARNED --> [*]

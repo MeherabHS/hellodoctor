@@ -40,7 +40,7 @@ flowchart TD
 
 ---
 
-### FLOW-PATIENT-002: Appointment Booking, Multi-Rx Upload (1–5 Photos) & Escrow Payment
+### FLOW-PATIENT-002: Appointment Booking, Multi-Rx Upload (1–5 Photos) & payment hold Payment
 ```mermaid
 flowchart TD
     START([Tap 'Book Appointment' on Doctor Card]) --> A[View-4 Date & Slot Booking Engine]
@@ -57,7 +57,7 @@ flowchart TD
     J --> K
     K --> L[Tap 'Confirm & Pay ৳ 800']
     L --> M{Is Network Online?}
-    M -- Yes --> N[Authorize MFS Escrow Hold & Lock Slot]
+    M -- Yes --> N[Authorize MFS payment hold Hold & Lock Slot]
     M -- No --> O[Trigger #offlineActionGuardModal & Abort]
     N --> RESULT([Redirect to View-10 Waiting Room])
 ```
@@ -65,7 +65,7 @@ flowchart TD
   - Date and time slot selection are mandatory before payment is enabled.
   - Image upload accepts `image/*,application/pdf` with a hard limit of 5 photos (`MAX_PRESCRIPTION_IMAGES = 5`).
   - Excess photos are truncated, and the user receives a warning toast: *"Maximum 5 prescription photos allowed. Extra photos were omitted."*
-- **Payment Escrow Rule:** Funds are placed into `ESCROW_HELD` in `adminTransactionStore`. The consulting doctor does not receive a balance credit until clinical consultation completes without dispute.
+- **Payment payment hold Rule:** Funds are placed into `PAYMENT_HELD` in `adminTransactionStore`. The consulting doctor does not receive a balance credit until clinical consultation completes without dispute.
 
 ---
 
@@ -84,25 +84,25 @@ flowchart TD
     G -- Denied --> I[Display Warning Banner with Permission Guide]
     H --> J{Countdown Reaches Zero?}
     J -- Doctor Connects --> K[Trigger Incoming Call Audio Chime]
-    K --> RESULT([Enter Live WebRTC Consultation])
+    K --> RESULT([Enter Live Agora SDK Consultation])
 ```
 - **Document Review:** Patient can paginate through their uploaded prescriptions (pages 1 to 5) using `#btnPrevRxPage` and `#btnNextRxPage`.
 - **Doctor Delay Handling:** If the physician is delayed by > 5 minutes, an informative status card advises the patient: *"Your doctor is finishing an urgent clinical case. Please stay on this screen."*
 
 ---
 
-### FLOW-PATIENT-004: Live WebRTC Teleconsultation & 24h Follow-up Chat
+### FLOW-PATIENT-004: Live Agora SDK Teleconsultation & 24h Follow-up Chat
 ```mermaid
 flowchart TD
-    START([Incoming Call Accepted]) --> A[Initialize WebRTC PeerConnection]
+    START([Incoming Call Accepted]) --> A[Initialize Agora SDK Agora SDK]
     A --> B[Start Session Telemetry Timer: callSeconds++]
     B --> C[Stream Adaptive 720p/1080p Video & Audio]
     C --> D{Connection Status Check}
     D -- Stable 4G/WiFi --> E[Continue Clinical Assessment]
     D -- Bandwidth Drops < 128kbps --> F[Fallback to Audio-Only Mode]
-    D -- ICE Disconnects --> G[Auto-Reconnect Buffer for 30 Seconds]
+    D -- Agora Disconnects --> G[Auto-Reconnect Buffer for 30 Seconds]
     E --> H[Doctor Concludes Call & Signs Prescription]
-    H --> I[End WebRTC Session & Save Telemetry Record]
+    H --> I[End Agora SDK Session & Save Telemetry Record]
     I --> J[Activate 24-Hour Asynchronous Chat Window]
     J --> K[View-6 Clinical Chat: Dosage Questions & Canned Pills]
     K --> L{24 Hours Elapsed?}
@@ -110,8 +110,8 @@ flowchart TD
     L -- No --> K
     M --> RESULT([View-11 Post-Consultation Summary])
 ```
-- **Telemetry Auto-Capture:** Every session records actual connected duration (`callSeconds`), ICE connection state, and prescription generation state.
-- **Premature Call Drop:** If the call terminates under 30 seconds (`callSeconds < 30`), the session is automatically tagged with `prematureEnd: true`, keeping funds in escrow pending patient reconnection or grievance filing.
+- **Telemetry Auto-Capture:** Every session records actual connected duration (`callSeconds`), Agora connection state, and prescription generation state.
+- **Premature Call Drop:** If the call terminates under 30 seconds (`callSeconds < 30`), the session is automatically tagged with `prematureEnd: true`, keeping funds in payment hold pending patient reconnection or grievance filing.
 
 ---
 
@@ -119,13 +119,13 @@ flowchart TD
 ```mermaid
 flowchart TD
     START([Patient Taps 'Report an Issue' on View-11 or View-7]) --> A[Open #patientGrievanceModal]
-    A --> B[Auto-Populate Doctor Name, BMDC ID, Consult ID, Escrow Fee]
+    A --> B[Auto-Populate Doctor Name, BMDC ID, Consult ID, payment hold Fee]
     B --> C[Silently Bind Auto-Collected Session Telemetry in Background]
     C --> D{Select Incident Target}
     D -- DOCTOR --> E[Render Clinical Conduct Categories]
     D -- SYSTEM --> F[Render Technical Failure Categories]
     E --> G[Select Issue: Rushed Call / No Rx / Abrupt Disconnect]
-    F --> H[Select Issue: WebRTC Video Freeze / MFS Debit Failed]
+    F --> H[Select Issue: Agora SDK Video Freeze / MFS Debit Failed]
     G & H --> I[Enter Statement Details in Textarea]
     I --> J[Tap 'Submit Grievance to Medical Board']
     J --> K[Register Incident in adminPatientGrievancesStore as PENDING_REVIEW]
@@ -184,7 +184,7 @@ flowchart TD
 - **Step 3:** Doctor enters medications using the DGDA-verified drug search field.
 - **Step 4:** Dosage, frequency (`1+0+1`), duration (`5 days`), and instructions (`After meals`) are populated.
 - **Step 5:** Doctor clicks "Digitally Sign & Dispatch".
-- **Result:** The system generates a cryptographically hashed prescription PDF, saves it to the patient's Health Vault (`view-5`), settles the escrow fee to the doctor's wallet, and unlocks the 24-hour follow-up chat window.
+- **Result:** The system generates a cryptographically hashed prescription PDF, saves it to the patient's Health Vault (`view-5`), settles the payment hold fee to the doctor's wallet, and unlocks the 24-hour follow-up chat window.
 
 ---
 
@@ -227,15 +227,15 @@ flowchart TD
     A --> B[Open #adminGrievanceDetailModal]
     B --> C[Compare Patient Statement with Auto-Captured Session Telemetry]
     C --> D[Verify Call Duration: e.g. 0m 08s vs Scheduled 15m]
-    D --> E[Inspect WebRTC Diagnostic Logs: ICE Connection Drop]
+    D --> E[Inspect Agora SDK Diagnostic Logs: Agora Connection Drop]
     E --> F[Inspect Prescription Status: Not Issued]
     F --> G{Board Adjudication Decision}
     G -- Patient Claim Justified --> H[Click 'Disburse Refund' #btnAdjudicateRefund]
     G -- Physician Misconduct --> I[Click 'Issue Warning' #btnAdjudicateWarning]
     G -- Unsubstantiated Claim --> J[Click 'Resolve / Dismiss' #btnAdjudicateResolve]
-    H --> K[Disburse Escrow Refund to Patient bKash -> Status REFUNDED]
+    H --> K[Disburse payment hold Refund to Patient bKash -> Status REFUNDED]
     I --> L[Log Official Warning in Doctor BMDC Dossier -> Status WARNED]
-    J --> M[Release Escrow to Doctor -> Status DISMISSED]
+    J --> M[Release payment hold to Doctor -> Status DISMISSED]
     K & L & M --> RESULT([Update Master Ledger & Notify Both Parties])
 ```
 
@@ -243,7 +243,7 @@ flowchart TD
 
 ### FLOW-ADMIN-003: Subsystem Diagnostics & Failure Simulation
 - **Step 1:** Administrator opens `adminPage_logs`.
-- **Step 2:** Filters logs by subsystem (`MFS_BKASH_GATEWAY`, `WEBRTC_SIGNALING`, `DGDA_EMR_SYNC`).
+- **Step 2:** Filters logs by subsystem (`MFS_BKASH_GATEWAY`, `AGORA_RTC`, `DGDA_EMR_SYNC`).
 - **Step 3:** Clicks trace ID (e.g., `TRC-94812-BKASH`) to inspect error stack trace in `#adminLogDetailModal`.
 - **Step 4:** To test system resilience, clicks "Simulate Failure", opening `#adminSimulateFailureModal`.
 - **Step 5:** Selects scenario (e.g., *bKash IPN Webhook Timeout*), sets severity (*CRITICAL*), and clicks "Execute Simulation".

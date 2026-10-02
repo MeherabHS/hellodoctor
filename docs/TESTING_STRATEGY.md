@@ -1,6 +1,6 @@
 # Phase 17 — Comprehensive Quality Assurance & Testing Strategy
 
-> **Document Version:** 1.0.0  
+> **Document Version:** 1.0.1  
 > **Testing Pyramid:** Unit Tests (70%), Integration Tests (20%), End-to-End System Tests (10%)  
 > **Target Audience:** Claude Code Autonomous Implementation Agent
 
@@ -30,6 +30,7 @@
   4. Attach 3 prescription photos -> Verify thumbnails.
   5. Select bKash -> Confirm booking.
   6. Assert navigation into Waiting Room (`view-10`) with countdown timer active.
+  7. Verify Agora RTC connection health indicator activates upon doctor entry.
 
 ---
 
@@ -60,10 +61,26 @@
   - Seed transaction in `ESCROW_HELD`.
   - Execute `POST /api/v1/admin/grievances/{id}/refund`.
   - Assert transaction updates to `REFUNDED` and patient wallet is credited.
+- **Payment Adversarial Tests:**
+  - Double-submit payments.
+  - Webhook replay attacks.
+  - Timeout handling logic during payment gateway verification.
+- **Idempotency Persistence Tests:**
+  - Verify `Idempotency-Key` headers correctly prevent duplicate transactions and return identical saved responses without executing business logic twice.
 
 ---
 
-## 3. Coverage Targets & Continuous Integration
+## 3. Security Testing
+
+- **BOLA/IDOR Tests:** Verify cross-user access attempts (e.g., Doctor A attempting to access Patient B's records) return 403 Forbidden.
+- **Auth Session Reuse Detection:** Verify that using an invalidated refresh token triggers family revocation.
+- **Agora Token Authorization:** Ensure RTC tokens are strictly bound to specific appointments and only issued to verified participants.
+- **File Upload Adversarial Tests:** Validate malicious MIME types, oversized payloads, and executable uploads are safely rejected or quarantined.
+- **PHI Leakage Tests:** Scan push notifications, error responses, and system logs to confirm they are sanitized of protected health information.
+
+---
+
+## 4. Coverage Targets & Continuous Integration
 
 - **Financial & Escrow Engine:** 100% statement and branch coverage required.
 - **Grievance & Telemetry Capture:** 95%+ coverage required.

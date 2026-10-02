@@ -1,6 +1,6 @@
 # Phase 13 — Asset Specification & Resource Inventory
 
-> **Document Version:** 1.0.0  
+> **Document Version:** 1.0.1  
 > **Source Baseline:** `/scratch/images/` (68 PNG files), `/thumbnail.png`, Inline SVGs in `index.html`  
 > **Target Audience:** Claude Code Autonomous Implementation Agent
 
@@ -11,7 +11,9 @@
 To guarantee high visual fidelity while keeping the Flutter APK and IPA under 35 MB:
 1. **Core UI Icons:** Implemented as vector SVGs (`flutter_svg`) or standard Material/Cupertino icons where 1:1 identical.
 2. **Branding & Static Graphics:** Bundled inside the application package under `assets/images/` and `assets/icons/`.
-3. **Doctor Avatars & Dynamic Clinical Photos:** Stored remotely on encrypted object storage (MinIO / AWS S3) and fetched via `cached_network_image` with local disk caching.
+3. **Public vs PHI Assets:** 
+   - **Public Assets:** Use `cached_network_image` for public assets like doctor portraits (with local disk caching).
+   - **PHI Assets:** Medical images (e.g., patient prescriptions, lab reports) must NOT use generic disk cache. Use encrypted lifecycle-controlled storage exclusively.
 4. **Target Compression:** All raster assets must be converted to **WebP** format at 85% quality, reducing file sizes by up to 65% compared to raw PNGs.
 
 ---

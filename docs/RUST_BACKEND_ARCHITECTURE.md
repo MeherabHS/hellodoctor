@@ -38,14 +38,17 @@ services/backend/
     │
     ├── domain/                         # Domain models, validation & business rules
     │   ├── models/                     # Patient, Doctor, Appointment, Escrow, etc.
-    │   └── validation/                 # Custom phone, BMDC, slot validator rules
+    │   └── validation/                 # Custom phone, Internal Platform Compliance Warning, slot validator rules
     │
     ├── services/                       # Business logic orchestration
-    │   ├── auth_service.rs
+    │   ├── auth_service.rs             # JWTs and auth_sessions management
     │   ├── appointment_service.rs      # Atomic slot locking & escrow hold
-    │   ├── prescription_service.rs     # Multi-image intake (max 5) & PDF signing
-    │   ├── grievance_service.rs        # Telemetry binding & board adjudication
-    │   └── settlement_service.rs       # 20% platform charge debarment calculations
+    │   ├── prescription_service.rs     # Multi-image intake (max 5) & PDF integrity verification hash
+    │   ├── grievance_service.rs        # Telemetry binding & board adjudication (Internal Platform Compliance Warning)
+    │   ├── settlement_service.rs       # 20% platform charge debarment calculations & two-stage payment flow
+    │   ├── agora_token_service.rs      # Agora token minting (manual HMAC token generation)
+    │   ├── audit_service.rs            # Audit event logging service
+    │   └── upload_security_service.rs  # File upload pipeline (magic bytes, malware scan, re-encoding, quarantine)
     │
     ├── repository/                     # Database access layer (SQLx queries)
     │   ├── user_repo.rs
@@ -53,6 +56,7 @@ services/backend/
     │   ├── appointment_repo.rs
     │   ├── prescription_repo.rs
     │   ├── grievance_repo.rs
+    │   ├── session_repo.rs             # auth_sessions tracking
     │   └── transaction_repo.rs
     │
     └── telemetry/                      # Tracing subscriber, Prometheus metrics

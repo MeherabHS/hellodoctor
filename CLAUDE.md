@@ -24,7 +24,10 @@
 7. **Healthcare Security & Privacy**:
    - Never store passwords in plaintext (use Argon2id).
    - Never hardcode secrets, API keys, or tokens in source code or client apps.
+   - DO NOT place the Agora App Certificate in Flutter client code. It must only exist on the Rust backend.
    - Never log sensitive Protected Health Information (PHI), patient medical complaints, or raw national identity credentials.
+   - Push notification payloads must NEVER contain PHI.
+   - Medical images and prescriptions must NOT be cached by generic disk caches. Use encrypted lifecycle-controlled storage with session cleanup.
 8. **Reversible Migrations**: All PostgreSQL schema migrations must include corresponding down-migrations. Never drop production columns destructively without deprecation windows.
 9. **Autonomous Loop**:
    ```
@@ -33,6 +36,7 @@
          ▼                                                    ▼
    UPDATE PROGRESS <── COMMIT <── RUN AUDIT <── FIX <── RUN TESTS <── IMPLEMENT
    ```
+10. **Video Architecture Constraints**: DO NOT implement custom WebRTC signaling, SDP exchange, ICE candidate routing, STUN/TURN servers, coturn, LiveKit, or any custom SFU. All live video/audio uses Agora RTC SDK exclusively.
 
 ---
 
@@ -49,9 +53,13 @@
 3. **Multi-Prescription Upload Cap (1 to 5 Images)**:
    - Patient pre-consultation intake allows uploading between 1 and 5 prescription/lab photos (`MAX_PRESCRIPTION_IMAGES = 5`). Selections beyond 5 must be rejected or capped with user notification.
 4. **Emergency Contact Helpline**:
-   - The Emergency Contact banner (`Call 16263`) must be positioned immediately above the Upcoming Consultation card on the patient home screen. It must never be labeled with the prefix *"24/7"*.
-5. **Bilingual Regional Localization**:
+   - The Emergency Contact banner must be positioned immediately above the Upcoming Consultation card on the patient home screen. It must never be labeled with the prefix *"24/7"*. 
+   - Note it's configurable per country (BD: 16263, KE: local emergency number).
+5. **Bilingual Regional Localization & Future Expansion**:
    - The patient interface must support instantaneous toggling between **English** and **Swahili (Kiswahili)**.
+   - Bangla localization for Bangladesh market should be planned for future milestone.
+6. **Consultation Outcomes**:
+   - Consultation completion does NOT require a prescription. Doctors may complete consultations with clinical outcomes: COMPLETED_WITH_RX, COMPLETED_NO_RX, REFERRED, ESCALATED.
 
 ---
 

@@ -1,6 +1,6 @@
 # Phase 28 — Legacy Prototype to Production Architecture Mapping
 
-> **Document Version:** 1.0.0  
+> **Document Version:** 1.0.1  
 > **Source Baseline:** HTML/CSS/JS Prototype (`index.html`)  
 > **Target Production:** Flutter Mobile (iOS/Android) + Rust Backend (Axum/SQLx) + PostgreSQL  
 > **Target Audience:** Claude Code Autonomous Implementation Agent
@@ -19,11 +19,11 @@
 | Global JS store `doctorEarningsStore` | `DoctorWalletBloc` / `WalletState` | `SettlementService::get_wallet_summary` | `doctor_wallets`, `transactions` |
 | Global JS store `adminTransactionStore` | `AdminFinanceBloc` / `TransactionsState` | `TransactionRepository::list_transactions` | `transactions` table with ACID constraints |
 | Global JS store `adminPatientGrievancesStore` | `GrievanceBloc` / `GrievanceDocketState`| `GrievanceService::list_grievances` | `grievance_reports`, `grievance_adjudications` |
-| File input `#patientPreConsultFileInput` | `image_picker` / `file_picker` plugin | Multipart stream handler in Axum | S3/MinIO bucket + `prescription_intake_documents` |
+| File input `#patientPreConsultFileInput` | `image_picker` / `file_picker` plugin | Multipart stream handler in Axum | S3/MinIO bucket + `prescription_intake_documents` using `object_key` (not raw URLs) |
 | `renderDoctorEarnings()` JS function | `DoctorEarningsHeroCard` widget builder | Computed DTO in `SettlementService` | Query aggregating gross and 20% platform cut |
 | `submitPatientGrievance()` JS function | `GrievanceBloc.add(SubmitGrievanceEvent)` | `POST /api/v1/grievances` handler | Insert into `grievance_reports` |
 | `openMultiPagePrescriptionViewer()` | `PrescriptionViewerModal` with `PageView` | Pre-signed S3 URL generator | Metadata query in `prescription_intake_documents` |
-| Browser `localStorage` | `flutter_secure_storage` & `shared_preferences` | Redis / PostgreSQL user preferences | `users.preferred_language` |
+| Browser `localStorage` | `flutter_secure_storage` & `shared_preferences` (Note: Encrypted storage must be used for PHI) | Redis / PostgreSQL user preferences | `users.preferred_language` |
 | Modal overlay `#offlineActionGuardModal` | `OfflineActionGuardDialog` triggered by connectivity bloc | Rejected via `Idempotency-Key` or network error | Not applicable |
 
 ---
@@ -51,5 +51,5 @@
 - **`doc-view-5` (Q&A Triage):** Translated into `DoctorQnaScreen` for answering community inquiries.
 
 ### 2.3 Doctor Web Workstation & Central Admin
-- **`#doctorWebShell`:** Translated into desktop clinical console (Flutter Web or Next.js) with 1080p WebRTC feed on left, split EMR and prescription authoring on right.
+- **`#doctorWebShell`:** Translated into desktop clinical console (Flutter Web or Next.js) with 1080p Agora RTC feed (via `agora_rtc_engine`) on left, split EMR and prescription authoring on right.
 - **`adminPage_*`:** Translated into Next.js / TypeScript Admin Portal or Flutter Web desktop application with 9 management dashboards.
