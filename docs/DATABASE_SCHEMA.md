@@ -236,28 +236,17 @@ CREATE TABLE prescriptions (
     doctor_id UUID NOT NULL REFERENCES doctor_profiles(id) ON DELETE RESTRICT,
     patient_id UUID NOT NULL REFERENCES patient_profiles(id) ON DELETE RESTRICT,
     rx_number VARCHAR(50) NOT NULL UNIQUE,
-    diagnosis_notes TEXT NOT NULL,
-    investigations_advised TEXT[] DEFAULT '{}',
-    follow_up_date DATE,
-    integrity_verification_hash VARCHAR(128) NOT NULL,
-    pdf_object_bucket VARCHAR(100) NOT NULL,
-    pdf_object_key VARCHAR(500) NOT NULL,
+    integrity_verification_hash VARCHAR(128),
+    rx_image_object_bucket VARCHAR(100),
+    rx_image_object_key VARCHAR(500),
+    doctor_notes TEXT,
+    is_no_rx_required BOOLEAN NOT NULL DEFAULT FALSE,
+    no_rx_reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE prescription_items (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    prescription_id UUID NOT NULL REFERENCES prescriptions(id) ON DELETE CASCADE,
-    brand_name VARCHAR(150) NOT NULL,
-    generic_name VARCHAR(150) NOT NULL,
-    dosage_form VARCHAR(50) NOT NULL, -- Tablet, Syrup, Injection
-    strength VARCHAR(50) NOT NULL,    -- 500mg, 10ml
-    dosage_frequency VARCHAR(30) NOT NULL, -- 1+0+1
-    duration_days SMALLINT NOT NULL CHECK (duration_days > 0),
-    instructions VARCHAR(200) NOT NULL
-);
+-- Note: prescription_items table is removed because prescriptions are photo-based, not digitally composed.
 
-CREATE INDEX idx_rx_items_prescription ON prescription_items(prescription_id);
 
 -- ============================================================================
 -- 9. ASYNCHRONOUS CLINICAL CHATS (24-HOUR WINDOW)
@@ -342,9 +331,41 @@ CREATE TABLE doctor_wallets (
     lifetime_gross NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     lifetime_fee_withheld NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     lifetime_net NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-    current_withdrawable_balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    last_disbursement_at TIMESTAMPTZ,
+    last_disbursement_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE disbursement_batches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_number VARCHAR(50) NOT NULL UNIQUE,
+    initiated_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    total_doctors INT NOT NULL DEFAULT 0,
+    total_gross NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    total_platform_fee NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    total_net_disbursed NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING, PROCESSING, COMPLETED, FAILED
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMPTZ
+);
+
+CREATE TABLE disbursement_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_id UUID NOT NULL REFERENCES disbursement_batches(id) ON DELETE RESTRICT,
+    doctor_id UUID NOT NULL REFERENCES doctor_profiles(id) ON DELETE RESTRICT,
+    gross_amount NUMERIC(10, 2) NOT NULL,
+    platform_fee NUMERIC(10, 2) NOT NULL,
+    net_amount NUMERIC(10, 2) NOT NULL,
+    gateway gateway_enum NOT NULL,
+    gateway_reference VARCHAR(100),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING', -- PENDING, SENT, CONFIRMED, FAILED
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    confirmed_at TIMESTAMPTZ
+);
+CREATE INDEX idx_disbursement_items_batch ON disbursement_items(batch_id);
+CREATE INDEX idx_disbursement_items_doctor ON disbursement_items(doctor_id);
 
 CREATE TABLE payment_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -438,44 +459,171 @@ ON idempotency_records(user_id, route, key_hash);
 -- RLS policies do not encode the entire ABAC engine but must
 -- never contradict it.
 
--- Enable RLS
+-- Enable and FORCE RLS across all sensitive PHI, clinical, and financial tables
 ALTER TABLE patient_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE patient_profiles FORCE ROW LEVEL SECURITY;
 
--- patient_profiles: Users can view their own profiles, or if they are authorized admins, or assigned doctors.
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE prescriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE prescriptions FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE prescription_intake_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE prescription_intake_documents FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE chat_conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_conversations FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE doctor_wallets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE doctor_wallets FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE grievance_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE grievance_reports FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transactions FORCE ROW LEVEL SECURITY;
+
+ALTER TABLE disbursement_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE disbursement_items FORCE ROW LEVEL SECURITY;
+
+-- 1. patient_profiles Policies
 CREATE POLICY patient_profiles_select ON patient_profiles
     FOR SELECT USING (
-        user_id = current_setting('app.current_user_id')::UUID
-        OR current_setting('app.current_role') IN ('CLINICAL_ADMIN', 'COMPLIANCE', 'SECURITY_ADMIN')
+        user_id = current_setting('app.current_user_id', true)::UUID
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE', 'SECURITY_ADMIN')
         OR (
-            current_setting('app.current_role') = 'DOCTOR'
+            current_setting('app.current_role', true) = 'DOCTOR'
             AND id IN (
                 SELECT patient_id FROM appointments
                 WHERE doctor_id = (
                     SELECT id FROM doctor_profiles
-                    WHERE user_id = current_setting('app.current_user_id')::UUID
+                    WHERE user_id = current_setting('app.current_user_id', true)::UUID
                 )
                 AND status IN ('CONFIRMED', 'WAITING', 'IN_CONSULTATION', 'COMPLETED')
             )
         )
     );
 
--- appointments: Patients see their own, Doctors see theirs.
-CREATE POLICY appointments_patient_access ON appointments
-    FOR SELECT
-    USING (patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id')::UUID));
+CREATE POLICY patient_profiles_update ON patient_profiles
+    FOR UPDATE USING (
+        user_id = current_setting('app.current_user_id', true)::UUID
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'SUPPORT')
+    );
 
-CREATE POLICY appointments_doctor_access ON appointments
-    FOR SELECT
-    USING (doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id')::UUID));
+-- 2. appointments Policies
+CREATE POLICY appointments_select ON appointments
+    FOR SELECT USING (
+        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'FINANCE_ADMIN', 'SUPPORT', 'COMPLIANCE', 'SECURITY_ADMIN')
+    );
 
--- prescriptions: Patients see their own, Doctors see theirs.
-CREATE POLICY prescriptions_patient_access ON prescriptions
-    FOR SELECT
-    USING (patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id')::UUID));
+CREATE POLICY appointments_insert ON appointments
+    FOR INSERT WITH CHECK (
+        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'SUPPORT')
+    );
 
-CREATE POLICY prescriptions_doctor_access ON prescriptions
-    FOR SELECT
-    USING (doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id')::UUID));
+-- 3. prescriptions Policies
+CREATE POLICY prescriptions_select ON prescriptions
+    FOR SELECT USING (
+        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE')
+    );
+
+CREATE POLICY prescriptions_insert ON prescriptions
+    FOR INSERT WITH CHECK (
+        doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        AND current_setting('app.current_role', true) = 'DOCTOR'
+    );
+
+-- 4. prescription_intake_documents Policies
+CREATE POLICY prescription_intake_docs_select ON prescription_intake_documents
+    FOR SELECT USING (
+        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR appointment_id IN (
+            SELECT id FROM appointments WHERE doctor_id IN (
+                SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID
+            )
+        )
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE')
+    );
+
+CREATE POLICY prescription_intake_docs_insert ON prescription_intake_documents
+    FOR INSERT WITH CHECK (
+        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+    );
+
+-- 5. chat_conversations & chat_messages Policies
+CREATE POLICY chat_conversations_select ON chat_conversations
+    FOR SELECT USING (
+        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE')
+    );
+
+CREATE POLICY chat_messages_select ON chat_messages
+    FOR SELECT USING (
+        conversation_id IN (
+            SELECT id FROM chat_conversations WHERE
+                patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+                OR doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        )
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE')
+    );
+
+CREATE POLICY chat_messages_insert ON chat_messages
+    FOR INSERT WITH CHECK (
+        sender_id = current_setting('app.current_user_id', true)::UUID
+        AND conversation_id IN (
+            SELECT id FROM chat_conversations WHERE (
+                patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+                OR doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+            )
+            AND is_locked = FALSE
+            AND expires_at > CURRENT_TIMESTAMP
+        )
+    );
+
+-- 6. doctor_wallets Policies
+CREATE POLICY doctor_wallets_select ON doctor_wallets
+    FOR SELECT USING (
+        doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'FINANCE_ADMIN')
+    );
+
+-- 7. grievance_reports Policies
+CREATE POLICY grievance_reports_select ON grievance_reports
+    FOR SELECT USING (
+        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'CLINICAL_ADMIN', 'COMPLIANCE', 'SUPPORT')
+    );
+
+CREATE POLICY grievance_reports_insert ON grievance_reports
+    FOR INSERT WITH CHECK (
+        patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        AND current_setting('app.current_role', true) = 'PATIENT'
+    );
+
+-- 8. transactions & disbursement_items Policies
+CREATE POLICY transactions_select ON transactions
+    FOR SELECT USING (
+        appointment_id IN (
+            SELECT id FROM appointments WHERE
+                patient_id IN (SELECT id FROM patient_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+                OR doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        )
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'FINANCE_ADMIN')
+    );
+
+CREATE POLICY disbursement_items_select ON disbursement_items
+    FOR SELECT USING (
+        doctor_id IN (SELECT id FROM doctor_profiles WHERE user_id = current_setting('app.current_user_id', true)::UUID)
+        OR current_setting('app.current_role', true) IN ('PLATFORM_ADMIN', 'FINANCE_ADMIN')
+    );
 ```

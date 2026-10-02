@@ -43,9 +43,10 @@ services/backend/
     ├── services/                       # Business logic orchestration
     │   ├── auth_service.rs             # JWTs and auth_sessions management
     │   ├── appointment_service.rs      # Atomic slot locking & escrow hold
-    │   ├── prescription_service.rs     # Multi-image intake (max 5) & PDF integrity verification hash
+    │   ├── prescription_service.rs     # Doctor prescription photo upload, patient intake document management & integrity verification
     │   ├── grievance_service.rs        # Telemetry binding & board adjudication (Internal Platform Compliance Warning)
-    │   ├── settlement_service.rs       # 20% platform charge debarment calculations & two-stage payment flow
+    │   ├── settlement_service.rs       # 20% platform charge debarment calculations, two-stage payment flow & monthly batch disbursement orchestration
+    │   ├── disbursement_service.rs     # Monthly batch disbursement orchestration for finance admins
     │   ├── agora_token_service.rs      # Agora token minting (manual HMAC token generation)
     │   ├── audit_service.rs            # Audit event logging service
     │   └── upload_security_service.rs  # File upload pipeline (magic bytes, malware scan, re-encoding, quarantine)

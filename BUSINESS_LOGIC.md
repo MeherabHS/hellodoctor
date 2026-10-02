@@ -235,15 +235,15 @@ flowchart LR
 
 ### 4.6 DGDA-Compliant (configurable per deployment country) E-Prescription & Longitudinal Health Vault
 
-1. **Digital Prescription Authoring (`doc-view-1` / `#doctorWebShell`)**:
-   - Physicians generate prescriptions with integrity verification hash (Note: HMAC-SHA256 provides integrity authentication, not a legally binding integrity verification hash) containing:
-     - Doctor details: Name, Qualifications, Medical License Number (configurable per deployment country), Integrity Verification Hash.
-     - Patient details: Name, Age, Gender, Weight, Blood Pressure, Clinical Complaints.
-     - Rx Drugs: Brand name, generic molecule (DGDA verified), dosage form (tablet, syrup, injection), frequency (`1+0+1`), duration (`5 days`), and instructions (`After meals`).
-     - Diagnostic investigations required (e.g., `CBC with ESR`, `Serum Creatinine`).
+1. **Prescription Photo Upload (`doc-view-1` / `#doctorWebShell`)**:
+   - Physicians write prescriptions by hand (on paper), take a photo of it, and upload the photo to the system.
+   - The photo undergoes the same security pipeline as patient uploads (magic-byte validation, malware scan, EXIF stripping).
+   - Once processed, it's stored in S3 and an integrity verification hash is computed for tamper detection.
+   - Optionally, doctors can add brief digital notes (`doctor_notes`).
+   - If no prescription is needed, the doctor can explicitly complete the consultation with a 'No Prescription Required' reason.
 2. **Health Vault Storage (`view-5`)**:
-   - Issued prescriptions are archived in the patient's encrypted longitudinal Health Vault (`#patientHealthVault`).
-   - Patients can download official PDFs, share records with consulting specialists, or route medications directly to partner pharmacies for home delivery.
+   - Uploaded prescription photos are archived in the patient's encrypted longitudinal Health Vault (`#patientHealthVault`).
+   - Patients can view their prescriptions, share records with consulting specialists, or route medications directly to partner pharmacies for home delivery.
 
 ---
 
@@ -329,8 +329,9 @@ $$\begin{aligned}
 2. **Itemized Transaction Breakdown**:
    - Every row in the physician's ledger (`#docConsultationsLedgerContainer`) reflects this 3-tier formula:
      - Example: `৳ (configurable per deployment country) 800 (Gross) - ৳ (configurable per deployment country) 160 (20% Withheld) = ৳ (configurable per deployment country) 640 (Final Net)`
-3. **Disbursement Channels**:
-   - Net earnings are disbursed directly to the physician's verified MFS account (bKash (configurable per deployment country) Merchant / Personal or Nagad) with zero hidden payout processing fees.
+3. **Monthly Batch Disbursement**:
+   - Doctors CANNOT manually withdraw their earnings. Earnings are **view-only**.
+   - Net earnings are disbursed monthly by the Finance Admin using a batch disbursement orchestrator. Payouts are made directly to the physician's verified MFS account (bKash (configurable per deployment country) Merchant / Personal or Nagad) with zero hidden payout processing fees.
 
 ---
 
@@ -495,7 +496,8 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
   - **payment hold Reserves In-Flight**: Funds held pending consultation completion.
   - **HeloDoc 20% Net Platform Revenue**: Platform commission from completed consultations.
   - **Disbursed Doctor Payouts**: Net 80% earnings paid out to physicians.
-- **Reconciliation Engine**:
+- **Reconciliation & Batch Disbursement Engine**:
+   - Finance Admin initiates **monthly batch disbursements** to pay out all 'SETTLED_TO_DOCTOR' funds to the respective doctors' MFS accounts.
   - Simulates bulk IPN webhook reconciliation (`reconcileAdminMfsWebhooks`) and provides CSV exports for statutory audits (`exportAdminFinanceLedger`).
 - **Transaction Inspector (`#adminTransactionDetailModal`)**:
   - Provides complete audit logs for individual transactions, detailing gateway payloads, platform deductions, and payment hold releases.
@@ -531,9 +533,9 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 | View ID | Title / Purpose | Key Elements & DOM Identifiers | User & System Actions |
 |---|---|---|---|
 | `doc-view-0` | **Doctor Home & Patient Queue** | Duty Toggle (`toggleDoctorDuty`), Patient Queue Tabs (`all`, `upcoming`, `completed`) | Toggles online availability and manages daily patient queues. |
-| `doc-view-1` | **Smart Rx Scanner & Dispatch** | Patient Selector Pills, Camera Scan Capture, E-Prescription Form | Digitize handwritten notes, author digital prescriptions, and dispatch records to patient vaults. |
+| `doc-view-1` | **Prescription Photo Upload** | Patient Selector Pills, Camera Capture | Doctor photographs handwritten prescriptions and uploads them directly to patient vaults. |
 | `doc-view-2` | **Consultation Schedule & Slots** | Date Carousel, Slot Generator (`openSlotGeneratorModal`), Instant Live Triage Toggle | Manages consultation slots, opens emergency appointment windows, and sets availability. |
-| `doc-view-3` | **Doctor Wallet & Earnings** | Gross Earnings Card, 20% Fee Debarment Card, Final Net Take-Home Card, Statement Modal | Displays earnings with the 20% platform charge debarred; initiates MFS wallet withdrawals. |
+| `doc-view-3` | **Doctor Wallet & Earnings** | Gross Earnings Card, 20% Fee Debarment Card, Final Net Take-Home Card, Statement Modal | Displays earnings with the 20% platform charge debarred (view-only); net earnings disbursed monthly by Finance Admin. |
 | `doc-view-4` | **24h Consultation Chat Desk** | Conversation Filter Pills, Message Thread, Quick Response Canned Pills | Manages active 24-hour follow-up chats with patients. |
 | `doc-view-5` | **Open Health Q&A Triage** | Question Filter Tabs (`open`, `answered`), Clinical Reply Textarea | Allows doctors to answer community health questions, improving community reach. |
 

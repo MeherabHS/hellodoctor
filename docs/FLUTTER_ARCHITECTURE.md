@@ -28,12 +28,12 @@ lib/
     ├── doctor_discovery/               # Modality filtering, doctor list
     ├── appointment_booking/            # Slot carousel, multi-Rx upload (1-5 photos)
     ├── waiting_room/                   # Countdown, pre-flight checks, Rx viewer
-    ├── consultation/                   # Agora RTC video feed, channel join, token refresh, session telemetry capture from onRtcStats
+    ├── consultation/                   # Agora RTC video feed, doctor prescription photo upload, telemetry capture
     ├── clinical_chat/                  # 24h follow-up chat, canned pills
-    ├── health_vault/                   # Downloadable prescriptions, CBC reports
+    ├── health_vault/                   # Stores prescription photos uploaded by doctors, CBC reports
     ├── grievance_redressal/            # Star-rating-free dispute filing
     ├── doctor_queue/                   # Physician duty toggle, incoming triage
-    └── doctor_wallet/                  # 3-tier 20% debarred earnings breakdown
+    └── doctor_wallet/                  # 3-tier 20% debarred earnings breakdown, view-only with monthly disbursement display
 ```
 
 ---

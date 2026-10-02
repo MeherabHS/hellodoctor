@@ -178,13 +178,13 @@ flowchart TD
 
 ---
 
-### FLOW-DOC-002: Smart Rx Scanner & E-Prescription Dispatch
-- **Step 1:** In `doc-view-1`, the doctor selects an active patient from queue pills (e.g., "Rafiq Ahmed").
+### FLOW-DOC-002: Prescription Photo Upload & E-Prescription Dispatch
+- **Step 1:** In `doc-view-1`, the doctor selects an active patient from queue pills.
 - **Step 2:** Doctor inspects attached patient documents using the multi-page previewer.
-- **Step 3:** Doctor enters medications using the DGDA-verified drug search field.
-- **Step 4:** Dosage, frequency (`1+0+1`), duration (`5 days`), and instructions (`After meals`) are populated.
-- **Step 5:** Doctor clicks "Digitally Sign & Dispatch".
-- **Result:** The system generates a cryptographically hashed prescription PDF, saves it to the patient's Health Vault (`view-5`), settles the payment hold fee to the doctor's wallet, and unlocks the 24-hour follow-up chat window.
+- **Step 3:** Doctor conducts the consultation, then writes the prescription on paper.
+- **Step 4:** Doctor takes a photo of the handwritten prescription with their phone/webcam and uploads it via the app. (Alternatively, if no prescription is needed, Doctor taps 'Complete Without Prescription', enters a brief reason, and the consultation is marked as COMPLETED_NO_RX).
+- **Step 5:** Doctor clicks "Upload & Dispatch".
+- **Result:** The system processes the photo through the security pipeline (malware scan, EXIF stripping), saves it to S3, computes an integrity hash, and delivers the photo to the patient's Health Vault (`view-5`). This unlocks the 24-hour follow-up chat window.
 
 ---
 
@@ -200,8 +200,8 @@ flowchart TD
     F --> G{Doctor Actions}
     G -- View Monthly Statement --> H[Open #doctorStatementModal]
     G -- View Single Consult Fee --> I[Open #docConsultationFeeModal]
-    G -- Withdraw Earnings --> J[Submit MFS Payout Request to Linked bKash]
-    J --> RESULT([Disburse Net Funds via Bulk MFS API])
+    G -- View Expected Next Disbursement --> J[View Details of Upcoming Payout]
+    J --> RESULT([Note: Earnings are disbursed monthly by Finance Admin])
 ```
 
 ---
@@ -248,3 +248,12 @@ flowchart TD
 - **Step 4:** To test system resilience, clicks "Simulate Failure", opening `#adminSimulateFailureModal`.
 - **Step 5:** Selects scenario (e.g., *bKash IPN Webhook Timeout*), sets severity (*CRITICAL*), and clicks "Execute Simulation".
 - **Result:** System simulates the incident, verifies that user-facing error banners display properly, and logs the incident in the audit trail without disrupting live production traffic.
+
+---
+
+### FLOW-ADMIN-004: Monthly Payment Disbursement
+- **Step 1:** Administrator opens `adminPage_finance`.
+- **Step 2:** Clicks "Initiate Monthly Disbursement".
+- **Step 3:** Selects date range (e.g., Previous Month).
+- **Step 4:** System groups all unsettled `SETTLED_TO_DOCTOR` transactions, calculates totals per doctor.
+- **Step 5:** Admin confirms batch. Payouts are dispatched to doctors' MFS accounts. Doctor wallets are updated with `last_disbursement_at` and `last_disbursement_amount`.

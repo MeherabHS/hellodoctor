@@ -116,7 +116,15 @@ sequenceDiagram
     Doctor->>Agora: joinChannel(token, "rtc_7baf3072_96bd_4fae_a735_e8d2c1f94b3a", 10421)
     Note over Patient,Doctor,Agora: Adaptive 720p/1080p Video via Agora SD-RTN
     Note over Patient: Agora RtcStats tracks callSeconds, packetLoss, RTT
-    Doctor->>Agora: leaveChannel() & Create integrity verification hash for Prescription
+    Doctor->>Agora: leaveChannel()
+    Note over Doctor: Writes prescription on paper & takes photo
+    Doctor->>Axum: POST /api/v1/consultations/{appointment_id}/prescription (multipart photo)
+    Axum->>SecPipe: magic-byte validation, malware scan, EXIF stripping
+    SecPipe->>S3: move to private final object storage with rx_image_object_key
+    SecPipe->>SecPipe: calculate SHA-256 integrity_verification_hash
+    Axum->>DB: INSERT INTO prescriptions (rx_image_object_key, integrity_verification_hash...)
+    Axum-->>Doctor: 201 Created (Photo delivered to Patient Health Vault)
+    
     Patient->>TelemetrySvc: POST /api/v1/consultations/{appointment_id}/telemetry (from onRtcStats)
     Note over TelemetrySvc: Payload: call_duration = 642s, packet_loss = 0.4%, premature_end = false
     TelemetrySvc->>DB: record technical evidence only (INSERT INTO consultation_telemetry)
@@ -128,6 +136,7 @@ sequenceDiagram
     CompSvc->>CompSvc: verify no blocking grievance/dispute
     CompSvc->>SettlementSvc: trigger_settlement()
     SettlementSvc->>DB: UPDATE transactions SET payment_status = 'SETTLED_TO_DOCTOR'
+    Note over SettlementSvc: SETTLED_TO_DOCTOR means earmarked for doctor, pending monthly batch payout
     SettlementSvc->>DB: INSERT INTO payment_events (event_type = 'SETTLED')
     DB-->>Patient: 200 OK -> Navigate to View-11 Post-Consultation
 ```

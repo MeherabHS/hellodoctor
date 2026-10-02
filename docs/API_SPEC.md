@@ -323,13 +323,36 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
   { "success": true, "data": { "telemetry_id": "telem-94812", "recorded": true } }
   ```
 
+### `POST /api/v1/consultations/{appointment_id}/prescription`
+- **Purpose:** Uploads a photo of the handwritten prescription after consultation.
+- **Auth:** `DOCTOR` (must be the assigned doctor for this appointment).
+- **Content-Type:** `multipart/form-data`
+- **Form Fields:**
+  - `rx_image`: Single photo of handwritten prescription (JPEG/PNG, max 10MB)
+  - `doctor_notes`: Optional text notes (max 500 chars)
+- **Response:** `201 Created`
+  ```json
+  { "success": true, "data": { "rx_id": "rx-101", "document_id": "doc-505" } }
+  ```
+
+### `POST /api/v1/consultations/{appointment_id}/complete-no-rx`
+- **Purpose:** Completes a consultation without a prescription.
+- **Auth:** `DOCTOR`
+- **Request Body:**
+  ```json
+  { "reason": "Follow-up consultation — lifestyle advice provided" }
+  ```
+- **Response:** `200 OK`
+  ```json
+  { "success": true, "data": { "status": "COMPLETED_NO_RX" } }
+  ```
+
 ---
 
 ## 6. Doctor Wallet & Transparent 20% Fee Debarment
 
 ### `GET /api/v1/doctor/wallet/summary`
-- **Purpose:** Retrieves doctor's earnings strictly formatted with 20% fee debarment.
-- **Auth:** `DOCTOR`.
+- **Purpose:** Retrieves doctor's earnings strictly formatted with 20% fee debarment. Doctor can only READ their earnings; monthly disbursement is handled by Finance Admin.
 - **Response:** `200 OK`
   ```json
   {
@@ -357,6 +380,30 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
     }
   }
   ```
+
+### `POST /api/v1/admin/disbursements/initiate`
+- **Purpose:** Initiates the monthly batch disbursement of funds to doctors.
+- **Auth:** `FINANCE_ADMIN`
+- **Request Body:**
+  ```json
+  { "period_start": "2026-09-01", "period_end": "2026-09-30" }
+  ```
+- **Response:** `201 Created`
+  ```json
+  {
+    "success": true,
+    "data": {
+      "batch_id": "batch-1234",
+      "total_doctors": 120,
+      "total_amount": 450000.00
+    }
+  }
+  ```
+
+### `GET /api/v1/admin/disbursements/{batch_id}`
+- **Purpose:** Retrieves batch details with per-doctor breakdown.
+- **Auth:** `FINANCE_ADMIN`
+- **Response:** `200 OK`
 
 ---
 
