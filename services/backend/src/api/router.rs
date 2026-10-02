@@ -47,9 +47,24 @@ pub fn create_router(state: AppState) -> Router {
         .route("/grievances", post(grievance_handlers::submit_grievance))
         .route("/admin/grievances/:id/refund", post(grievance_handlers::adjudicate_refund))
         .route("/admin/grievances/:id/warn", post(grievance_handlers::adjudicate_warn))
-        // Admin & Disbursements
+        // Admin & Telemetry & Governance
+        .route("/admin/overview", get(admin_handlers::get_admin_overview))
+        .route("/admin/doctors", get(admin_handlers::list_admin_doctors).post(admin_handlers::create_doctor))
         .route("/admin/doctors/:id/dossier", get(admin_handlers::get_doctor_dossier))
         .route("/admin/disbursements/initiate", post(admin_handlers::initiate_disbursement))
+        .route("/admin/finance/summary", get(admin_handlers::get_finance_summary))
+        .route("/admin/finance/transactions", get(admin_handlers::list_admin_transactions))
+        .route("/admin/command/telemetry", get(admin_handlers::get_command_telemetry))
+        .route("/admin/slots", get(admin_handlers::list_admin_slots).post(admin_handlers::create_or_toggle_slot))
+        .route("/admin/patients", get(admin_handlers::list_admin_patients))
+        .route("/admin/patients/:id/dossier", get(admin_handlers::get_patient_dossier))
+        .route("/admin/bmdc/queue", get(admin_handlers::get_bmdc_queue))
+        .route("/admin/bmdc/:id/verify", post(admin_handlers::verify_bmdc_doctor))
+        .route("/admin/bmdc/:id/reject", post(admin_handlers::reject_bmdc_doctor))
+        .route("/admin/compliance/alerts", get(admin_handlers::get_compliance_alerts))
+        .route("/admin/logs", get(admin_handlers::list_admin_logs))
+        .route("/admin/logs/simulate", post(admin_handlers::simulate_admin_log))
+        .route("/admin/grievances", get(admin_handlers::list_admin_grievances))
         // Payment Webhooks
         .route("/webhooks/payment/:provider", post(webhook_handlers::handle_payment_webhook))
         .layer(from_fn(idempotency_middleware));

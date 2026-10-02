@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = AppConfig::from_env();
     tracing::info!("Initializing HelloDoctor Backend Service (v2.4.0)...");
 
-    let state = AppState::new_with_seeds();
+    let state = AppState::default();
     let app = create_router(state);
 
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
