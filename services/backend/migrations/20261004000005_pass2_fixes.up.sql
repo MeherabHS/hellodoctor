@@ -1,0 +1,13 @@
+-- Pass 2 of the multi-agent security/correctness audit (docs/CHECKPOINT.md):
+-- lets finance-worker-pool operations (grievance adjudication, disbursement)
+-- write their own audit_events row in the SAME transaction as the business
+-- mutation they document, instead of a separate post-commit write via a
+-- different pool — closing the "business mutation succeeded but its audit
+-- row failed, or vice versa" inconsistency window. `audit_events`'s own RLS
+-- policy already says "writable by all five roles" (see
+-- migrations/20261003000001_rls_hardening's comment) — this migration is
+-- what actually makes that true for hellodoctor_finance_worker; the other
+-- three worker roles still have no business reason to write here and are
+-- deliberately left ungranted (narrowest-possible grant, not "all five" by
+-- default).
+GRANT INSERT ON audit_events TO hellodoctor_finance_worker;

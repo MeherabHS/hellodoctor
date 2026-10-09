@@ -1,0 +1,86 @@
+# PRE-PATIENT AZURE 4vCPU/8GiB BENCHMARK — PROFILE B (AZURE_B4LSV2_SUSTAINED_FLOOR)
+# docs/PRE_PATIENT_AZURE_4X8_BENCHMARK.md
+#
+# Standard_B4ls_v2 is burstable with a documented 30% base/sustained CPU
+# performance level once accumulated credits are depleted. This profile is
+# an APPROXIMATION of that credit-depleted floor via a conservative Docker
+# CPU quota — NOT a claim that Docker quotas reproduce Azure's CPU-credit
+# scheduler. Memory caps are unchanged from Profile A (credit depletion is a
+# CPU phenomenon only). Same cpuset "0-3" as Profile A: this models the same
+# 4-vCPU VM running out of burst credit, not a smaller VM.
+#
+# Allocation derived by scaling Profile A's included-service ratio
+# (1.35 : 2.25 : 0.20 = backend : postgres : redis, sum 3.80) down to the
+# requested ~1.20 vCPU total:
+#   backend   0.43 vCPU / 1.50 GiB  (1.35 * 1.20/3.80)
+#   postgres  0.71 vCPU / 3.50 GiB  (2.25 * 1.20/3.80)
+#   redis     0.06 vCPU / 0.40 GiB  (0.20 * 1.20/3.80)
+#   total: 1.20 vCPU (memory unchanged from Profile A, per spec)
+#
+#   docker compose -f docker-compose.benchmark-b.yml -p hellodoctor-bench-b up -d --build
+#   docker compose -f docker-compose.benchmark-b.yml -p hellodoctor-bench-b down -v
+name: hellodoctor-bench-b
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: hellodoctor-bench-b-postgres
+    command: postgres -c jit=off -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c pg_stat_statements.max=200
+    environment:
+      POSTGRES_USER: hellodoctor
+      POSTGRES_PASSWORD: hellodoctor_dev_password
+      POSTGRES_DB: hellodoctor
+    ports:
+      - "5634:5432"
+    volumes:
+      - hellodoctor_bench_b_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hellodoctor -d hellodoctor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    cpus: 0.71
+    cpuset: "0-3"
+    mem_limit: 3.50g
+
+  redis:
+    image: redis:7-alpine
+    container_name: hellodoctor-bench-b-redis
+    ports:
+      - "6580:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    cpus: 0.06
+    cpuset: "0-3"
+    mem_limit: 0.40g
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hellodoctor-bench-b-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://hellodoctor:hellodoctor_dev_password@postgres:5432/hellodoctor
+      APP_DB_HOST: postgres
+      REDIS_URL: redis://redis:6379
+      HOST: 0.0.0.0
+      PORT: 8080
+      GLOBAL_IP_RATE_LIMIT_PER_MIN: "100000"
+    ports:
+      - "8281:8080"
+    cpus: 0.43
+    cpuset: "0-3"
+    mem_limit: 1.50g
+
+volumes:
+  hellodoctor_bench_b_pgdata:

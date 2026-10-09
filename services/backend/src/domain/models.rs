@@ -1,3 +1,4 @@
+use super::ids::{DoctorProfileId, PatientProfileId, UserId};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -31,11 +32,29 @@ impl UserRole {
             UserRole::SecurityAdmin => "SECURITY_ADMIN",
         }
     }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "PATIENT" => Some(UserRole::Patient),
+            "DOCTOR" => Some(UserRole::Doctor),
+            "PLATFORM_ADMIN" => Some(UserRole::PlatformAdmin),
+            "CLINICAL_ADMIN" => Some(UserRole::ClinicalAdmin),
+            "FINANCE_ADMIN" => Some(UserRole::FinanceAdmin),
+            "SUPPORT" => Some(UserRole::Support),
+            "COMPLIANCE" => Some(UserRole::Compliance),
+            "SECURITY_ADMIN" => Some(UserRole::SecurityAdmin),
+            _ => None,
+        }
+    }
+
+    pub fn is_admin(&self) -> bool {
+        !matches!(self, UserRole::Patient | UserRole::Doctor)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct User {
-    pub id: Uuid,
+    pub id: UserId,
     pub phone_number: String,
     pub email: Option<String>,
     pub password_hash: Option<String>,
@@ -51,7 +70,7 @@ pub struct User {
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct AuthSession {
     pub id: Uuid,
-    pub user_id: Uuid,
+    pub user_id: UserId,
     pub token_family_id: Uuid,
     pub refresh_token_hash: String,
     pub device_fingerprint: Option<String>,
@@ -75,7 +94,7 @@ pub enum MfaMethod {
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct MfaCredential {
     pub id: Uuid,
-    pub user_id: Uuid,
+    pub user_id: UserId,
     pub method: MfaMethod,
     pub totp_secret_encrypted: Vec<u8>,
     pub recovery_codes_hash: Option<Vec<String>>,
@@ -97,8 +116,8 @@ pub enum Gender {
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct PatientProfile {
-    pub id: Uuid,
-    pub user_id: Uuid,
+    pub id: PatientProfileId,
+    pub user_id: UserId,
     pub full_name: String,
     pub date_of_birth: NaiveDate,
     pub gender: Gender,
@@ -110,10 +129,24 @@ pub struct PatientProfile {
     pub updated_at: DateTime<Utc>,
 }
 
+/// HelloDoctor's manual registration review; independent of account suspension,
+/// annual practice licensure, MFA, duty and payout readiness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "professional_verification_status_enum",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
+pub enum ProfessionalVerificationStatus {
+    Pending,
+    Verified,
+    Rejected,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DoctorProfile {
-    pub id: Uuid,
-    pub user_id: Uuid,
+    pub id: DoctorProfileId,
+    pub user_id: UserId,
     pub full_name: String,
     pub license_number: String,
     pub license_authority: String,
@@ -127,10 +160,89 @@ pub struct DoctorProfile {
     pub residential_address: String,
     pub verified_phone: String,
     pub is_on_duty: bool,
+    /// Legacy response compatibility only; database-derived from explicit status.
     pub is_verified: bool,
+    pub professional_verification_status: ProfessionalVerificationStatus,
+    pub professional_verification_reviewed_at: Option<DateTime<Utc>>,
+    pub professional_verification_reviewed_by: Option<UserId>,
+    pub professional_verification_note: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub deleted_at: Option<DateTime<Utc>>,
+}
+
+impl DoctorProfile {
+    pub fn is_professionally_verified(&self) -> bool {
+        self.professional_verification_status == ProfessionalVerificationStatus::Verified
+    }
+}
+
+/// The five documents a Doctor can acknowledge at registration. The first
+/// four are mandatory; `MarketingCommunications` is the one optional,
+/// independently revocable acknowledgement. See
+/// docs/ADR/ADR-011-legal-consent-ledger.md.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "legal_document_type_enum",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
+pub enum LegalDocumentType {
+    DoctorTerms,
+    PrivacyNotice,
+    ProfessionalVerificationDeclaration,
+    TelemedicinePractitionerPolicy,
+    MarketingCommunications,
+}
+
+impl LegalDocumentType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LegalDocumentType::DoctorTerms => "DOCTOR_TERMS",
+            LegalDocumentType::PrivacyNotice => "PRIVACY_NOTICE",
+            LegalDocumentType::ProfessionalVerificationDeclaration => {
+                "PROFESSIONAL_VERIFICATION_DECLARATION"
+            }
+            LegalDocumentType::TelemedicinePractitionerPolicy => "TELEMEDICINE_PRACTITIONER_POLICY",
+            LegalDocumentType::MarketingCommunications => "MARKETING_COMMUNICATIONS",
+        }
+    }
+}
+
+/// A server-owned registry row: the single source of truth for the text and
+/// version currently required. `document_hash` is computed by Postgres from
+/// `body` (a generated column) — never supplied by application code.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct LegalDocument {
+    pub id: Uuid,
+    pub document_type: LegalDocumentType,
+    pub version: String,
+    pub title: String,
+    pub body: String,
+    pub document_hash: String,
+    pub required: bool,
+    pub is_current: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+/// One immutable, append-only acceptance record. Rows are never updated or
+/// deleted (no role has those privileges on `legal_acceptances`); a changed
+/// document version produces a new row, not a mutation of an old one.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct LegalAcceptance {
+    pub id: Uuid,
+    pub user_id: UserId,
+    pub document_type: LegalDocumentType,
+    pub document_version: String,
+    pub document_hash: String,
+    pub accepted_at: DateTime<Utc>,
+    pub request_id: Option<String>,
+    pub session_id: Option<Uuid>,
+    pub ip_hash: Option<String>,
+    pub app_version: Option<String>,
+    pub platform: Option<String>,
+    pub locale: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
@@ -138,6 +250,7 @@ pub struct DoctorProfile {
 #[sqlx(type_name = "slot_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SlotStatus {
     Available,
+    Blocked,
     LockedInPayment,
     Booked,
     Cancelled,
@@ -146,7 +259,7 @@ pub enum SlotStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ScheduleSlot {
     pub id: Uuid,
-    pub doctor_id: Uuid,
+    pub doctor_id: DoctorProfileId,
     pub start_time: DateTime<Utc>,
     pub end_time: DateTime<Utc>,
     pub status: SlotStatus,
@@ -155,7 +268,41 @@ pub struct ScheduleSlot {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-#[sqlx(type_name = "appointment_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "payout_method_type_enum",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
+pub enum PayoutMethodType {
+    Mpesa,
+    Bkash,
+    BankCard,
+    BankTransfer,
+}
+
+/// Where Finance should send a doctor's scheduled disbursement. Setting or
+/// updating this never moves money or calls an external payment provider —
+/// see the migration comment (DEFERRED_EXTERNAL_PAYMENT_INTEGRATION is
+/// unaffected). `account_identifier_encrypted` is only ever decrypted by
+/// Finance tooling that actually processes a payout, never by the doctor-facing
+/// read path, which uses `account_identifier_last4` instead.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DoctorPayoutMethod {
+    pub doctor_id: DoctorProfileId,
+    pub method_type: PayoutMethodType,
+    pub display_label: String,
+    #[serde(skip_serializing)]
+    pub account_identifier_encrypted: Vec<u8>,
+    pub account_identifier_last4: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "appointment_status_enum",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum AppointmentStatus {
     PendingPayment,
     Confirmed,
@@ -213,8 +360,8 @@ impl ClinicalOutcome {
 pub struct Appointment {
     pub id: Uuid,
     pub appointment_number: String,
-    pub patient_id: Uuid,
-    pub doctor_id: Uuid,
+    pub patient_id: PatientProfileId,
+    pub doctor_id: DoctorProfileId,
     pub slot_id: Uuid,
     pub modality: Modality,
     pub status: AppointmentStatus,
@@ -228,7 +375,7 @@ pub struct Appointment {
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct AppointmentClinicalIntake {
     pub appointment_id: Uuid,
-    pub patient_id: Uuid,
+    pub patient_id: PatientProfileId,
     pub chief_complaint: Option<String>,
     pub clinical_notes: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -239,13 +386,14 @@ pub struct AppointmentClinicalIntake {
 pub struct PrescriptionIntakeDocument {
     pub id: Uuid,
     pub appointment_id: Uuid,
-    pub patient_id: Uuid,
+    pub patient_id: PatientProfileId,
     pub page_number: i16,
     pub object_bucket: String,
     pub object_key: String,
     pub content_hash: Option<String>,
     pub file_size_bytes: i64,
     pub mime_type: String,
+    pub security_status: String,
     pub created_at: DateTime<Utc>,
 }
 
@@ -283,12 +431,28 @@ pub struct ConsultationTelemetry {
     pub captured_at: DateTime<Utc>,
 }
 
+/// Detailed, ordered, per-perspective supplement to the single aggregate
+/// `ConsultationTelemetry` row above — see migrations/20261004000002 and
+/// `ConsultationService::record_telemetry_events`/`get_session_timeline`.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ConsultationTelemetryEvent {
+    pub id: Uuid,
+    pub ingest_seq: i64,
+    pub session_id: Uuid,
+    pub event_type: String,
+    pub actor_perspective: String,
+    pub rtt_ms: Option<i32>,
+    pub packet_loss_percent: Option<BigDecimal>,
+    pub occurred_at: DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Prescription {
     pub id: Uuid,
     pub appointment_id: Uuid,
-    pub doctor_id: Uuid,
-    pub patient_id: Uuid,
+    pub doctor_id: DoctorProfileId,
+    pub patient_id: PatientProfileId,
     pub rx_number: String,
     pub integrity_verification_hash: Option<String>,
     pub rx_image_object_bucket: Option<String>,
@@ -296,15 +460,18 @@ pub struct Prescription {
     pub doctor_notes: Option<String>,
     pub is_no_rx_required: bool,
     pub no_rx_reason: Option<String>,
+    pub security_status: String,
     pub created_at: DateTime<Utc>,
+    pub page_number: i16,
+    pub mime_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ChatConversation {
     pub id: Uuid,
     pub appointment_id: Uuid,
-    pub patient_id: Uuid,
-    pub doctor_id: Uuid,
+    pub patient_id: PatientProfileId,
+    pub doctor_id: DoctorProfileId,
     pub expires_at: DateTime<Utc>,
     pub is_locked: bool,
     pub created_at: DateTime<Utc>,
@@ -314,7 +481,7 @@ pub struct ChatConversation {
 pub struct ChatMessage {
     pub id: Uuid,
     pub conversation_id: Uuid,
-    pub sender_id: Uuid,
+    pub sender_id: UserId,
     pub content: String,
     pub attachment_bucket: Option<String>,
     pub attachment_object_key: Option<String>,
@@ -327,7 +494,10 @@ pub struct ChatMessage {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-#[sqlx(type_name = "grievance_target_enum", rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "grievance_target_enum",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum GrievanceTarget {
     Doctor,
     System,
@@ -335,10 +505,14 @@ pub enum GrievanceTarget {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-#[sqlx(type_name = "grievance_status_enum", rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "grievance_status_enum",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 pub enum GrievanceStatus {
     PendingReview,
     UnderInvestigation,
+    RefundApproved,
     Refunded,
     Warned,
     Dismissed,
@@ -348,7 +522,7 @@ pub enum GrievanceStatus {
 pub struct GrievanceReport {
     pub id: Uuid,
     pub grievance_number: String,
-    pub patient_id: Uuid,
+    pub patient_id: PatientProfileId,
     pub consultation_id: Uuid,
     pub target_type: GrievanceTarget,
     pub category: String,
@@ -368,6 +542,25 @@ pub struct GrievanceAdjudication {
     pub adjudicated_at: DateTime<Utc>,
 }
 
+/// A refund approved by `GrievanceService::adjudicate_refund` but not yet
+/// (necessarily) resolved — `status` tracks the actual provider-side outcome
+/// so Finance has a visible, transitionable lifecycle instead of the request
+/// going silently unresolved forever once approved (GAP-C03).
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct FinancialRefundRequest {
+    pub id: Uuid,
+    pub grievance_id: Uuid,
+    pub transaction_id: Uuid,
+    pub approved_by: Uuid,
+    pub approved_at: DateTime<Utc>,
+    pub currency: String,
+    pub amount: BigDecimal,
+    pub previous_payment_status: String,
+    pub status: String,
+    pub provider_reference: Option<String>,
+    pub refunded_at: Option<DateTime<Utc>>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[sqlx(type_name = "gateway_enum", rename_all = "SCREAMING_SNAKE_CASE")]
@@ -376,6 +569,7 @@ pub enum Gateway {
     Nagad,
     Card,
     Mpesa,
+    BankTransfer,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
@@ -387,6 +581,7 @@ pub enum PaymentStatus {
     SettledToDoctor,
     Disbursed,
     RefundedToPatient,
+    RefundPending,
     Failed,
 }
 
@@ -404,11 +599,13 @@ pub struct Transaction {
     pub payment_status: PaymentStatus,
     pub created_at: DateTime<Utc>,
     pub settled_at: Option<DateTime<Utc>>,
+    pub currency: String,
+    pub disbursement_item_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DoctorWallet {
-    pub doctor_id: Uuid,
+    pub doctor_id: DoctorProfileId,
     pub lifetime_gross: BigDecimal,
     pub lifetime_fee_withheld: BigDecimal,
     pub lifetime_net: BigDecimal,
@@ -438,7 +635,7 @@ pub struct DisbursementBatch {
 pub struct DisbursementItem {
     pub id: Uuid,
     pub batch_id: Uuid,
-    pub doctor_id: Uuid,
+    pub doctor_id: DoctorProfileId,
     pub gross_amount: BigDecimal,
     pub platform_fee: BigDecimal,
     pub net_amount: BigDecimal,
@@ -447,12 +644,40 @@ pub struct DisbursementItem {
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub confirmed_at: Option<DateTime<Utc>>,
+    pub payout_destination_id: Option<Uuid>,
+    pub currency: String,
+    pub provider_reference_snapshot: Option<String>,
+    pub masked_destination_snapshot: Option<String>,
+    pub approved_by: Option<Uuid>,
+    pub approved_at: Option<DateTime<Utc>>,
+    pub paid_at: Option<DateTime<Utc>>,
+    pub reconciliation_state: String,
+    pub statement_id: Option<Uuid>,
+    pub adjustments: BigDecimal,
+    pub provider_code: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct DoctorPayoutDestination {
+    pub id: Uuid,
+    pub doctor_id: DoctorProfileId,
+    pub provider_code: String,
+    pub method_type: String,
+    pub currency: String,
+    pub provider_reference: String,
+    pub masked_destination: String,
+    pub binding_status: String,
+    pub verification_status: String,
+    pub payout_capable: bool,
+    pub is_primary: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct AuditEvent {
     pub id: Uuid,
-    pub actor_id: Option<Uuid>,
+    pub actor_id: Option<UserId>,
     pub actor_role: UserRole,
     pub action: String,
     pub resource_type: String,
@@ -462,6 +687,18 @@ pub struct AuditEvent {
     pub ip_hash: Option<String>,
     pub result: String,
     pub reason: Option<String>,
+    /// Snapshot of the resource immediately before the mutation, or `None`
+    /// when the action has no meaningful "before" (e.g. creation). Only
+    /// operational/professional/financial data goes in here — never patient
+    /// clinical content — so no PHI-redaction pass is needed on this path
+    /// (contrast `system_error.rs`'s free-text redaction, which exists
+    /// precisely because that path *can* carry arbitrary error text).
+    pub before_data: Option<serde_json::Value>,
+    pub after_data: Option<serde_json::Value>,
+    /// Top-level keys that differ between `before_data`/`after_data`, computed
+    /// once at write time so an admin reading the trail doesn't have to diff
+    /// two JSON blobs by eye. `None` when either snapshot is absent.
+    pub changed_fields: Option<Vec<String>>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -469,7 +706,7 @@ pub struct AuditEvent {
 pub struct IdempotencyRecord {
     pub id: Uuid,
     pub key_hash: String,
-    pub user_id: Option<Uuid>,
+    pub user_id: Option<UserId>,
     pub route: String,
     pub request_hash: String,
     pub response_status: i16,
@@ -482,10 +719,12 @@ pub struct IdempotencyRecord {
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct PendingMfaChallenge {
     pub token: String,
-    pub user_id: Uuid,
+    pub user_id: UserId,
     pub code_hash: String,
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
+    pub attempt_count: i16,
+    pub max_attempts: i16,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -495,4 +734,76 @@ pub struct PhoneOtp {
     pub attempts: i16,
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ErrorSeverity {
+    Info,
+    Warning,
+    Error,
+    Critical,
+}
+
+impl ErrorSeverity {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ErrorSeverity::Info => "INFO",
+            ErrorSeverity::Warning => "WARNING",
+            ErrorSeverity::Error => "ERROR",
+            ErrorSeverity::Critical => "CRITICAL",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct SystemErrorLog {
+    pub id: Uuid,
+    pub trace_id: String,
+    pub subsystem: String,
+    pub component: String,
+    pub severity: String,
+    pub action_attempted: String,
+    pub error_message: String,
+    pub stack_trace: Option<String>,
+    pub impacted_user_id: Option<UserId>,
+    pub error_code: Option<String>,
+    pub fingerprint: Option<String>,
+    pub http_status: Option<i16>,
+    pub endpoint: Option<String>,
+    pub occurrence_count: i32,
+    pub first_seen_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+    pub status: String,
+    pub acknowledged_by: Option<UserId>,
+    pub acknowledged_at: Option<DateTime<Utc>>,
+    pub resolved_by: Option<UserId>,
+    pub resolved_at: Option<DateTime<Utc>>,
+    pub resolution_note: Option<String>,
+    pub logged_at: DateTime<Utc>,
+    pub client_context: Option<serde_json::Value>,
+}
+
+/// Doctor Engagement extension: one row in a user's in-app notification
+/// inbox. Deliberately never carries PHI — `title`/`body` are short,
+/// backend-constructed strings (see `services::notification_service`'s copy
+/// templates), never symptoms/diagnosis/prescription/patient-clinical
+/// content.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Notification {
+    pub id: Uuid,
+    pub user_id: UserId,
+    #[sqlx(rename = "type")]
+    pub notification_type: String,
+    pub title: String,
+    pub body: String,
+    pub related_entity_type: Option<String>,
+    pub related_entity_id: Option<Uuid>,
+    pub scheduled_for: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub delivered_at: Option<DateTime<Utc>>,
+    pub read_at: Option<DateTime<Utc>>,
+    pub delivery_status: String,
+    pub dedup_key: String,
+    pub metadata: Option<serde_json::Value>,
 }

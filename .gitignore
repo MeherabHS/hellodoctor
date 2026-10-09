@@ -24,3 +24,17 @@ node_modules/
 out/
 .env*.local
 *.tsbuildinfo
+
+# Local credentials and exported bearer-token artifacts must never be committed.
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.local.example
+*_token.txt
+*_tokens.json
+*.jwt
+
+# Local signing/credential files are never deployment build inputs.
+*.pem
+*.key
+*.der

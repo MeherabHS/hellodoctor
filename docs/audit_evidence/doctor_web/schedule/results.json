@@ -1,0 +1,19 @@
+{
+  "checks": {
+    "available_clock_icon_replaces_question_avatar": "PASS",
+    "blocked_card_has_neutral_status_and_restore_action": "PASS",
+    "payment_lock_and_cancelled_cards_have_no_destructive_actions": "PASS",
+    "booked_patient_identity_and_clinical_actions_only": "PASS",
+    "real_block_api_and_available_count_excludes_blocked": "PASS",
+    "blocked_filter_uses_real_state": "PASS",
+    "real_unblock_restores_available_and_count": "PASS",
+    "two_doctor_bff_block_unblock_cancel_denied_without_mutation": "PASS",
+    "real_conflict_closes_stale_confirmation_and_refreshes": "PASS",
+    "block_and_cancel_distinct_with_no_cancelled_reopening": "PASS",
+    "unambiguous_eat_dates_and_empty_input_safety": "PASS",
+    "four_responsive_widths_without_overflow": "PASS"
+  },
+  "console_errors": [],
+  "unexpected_network": [],
+  "build_id": "vROyHPJLjR3IY3OKge4Ib"
+}

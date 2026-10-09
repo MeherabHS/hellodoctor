@@ -11,7 +11,7 @@
 | Prototype Feature | Req ID | Screen ID | Flutter Feature Module | API Endpoint | Rust Service | DB Entity | Test Suite | Acceptance Criteria |
 |---|---|---|---|---|---|---|---|---|
 | **Specialist Discovery & Modality Tabs** | REQ-001 | `HD-PATIENT-FIND-SPECIALIST` (`view-3`) | `doctor_discovery` | `GET /api/v1/doctors` | `DoctorService::list_doctors` | `DoctorProfile` | `test_doctor_directory_suite.dart` | `AC-001` |
-| **Star Rating Elimination & BMDC Display** | REQ-002 | `HD-PATIENT-FIND-SPECIALIST` (`view-3`) | `doctor_discovery` | `GET /api/v1/doctors` | `DoctorService::get_doctor` | `DoctorProfile` | `test_grievance_suite.dart` | `AC-001` |
+| **Star Rating Elimination & KMPDC Display** | REQ-002 | `HD-PATIENT-FIND-SPECIALIST` (`view-3`) | `doctor_discovery` | `GET /api/v1/doctors` | `DoctorService::get_doctor` | `DoctorProfile` | `test_grievance_suite.dart` | `AC-001` |
 | **Multi-Prescription Upload (1-5 Photos)** | REQ-003 | `HD-PATIENT-BOOK-SLOT` (`view-4`) | `appointment_booking` | `POST /api/v1/appointments/{id}/prescriptions` | `PrescriptionService::upload_intake` | `PrescriptionIntakeDocument` | `test_multi_rx_upload_suite.dart` | `AC-002` |
 | **Multi-Page Prescription Viewer** | REQ-004 | `HD-MODAL-RX-VIEWER` (`#labReportModal`) | `waiting_room` | Pre-signed S3 URLs | `PrescriptionService::get_images` | `PrescriptionIntakeDocument` | `test_multi_rx_upload_suite.dart` | `AC-003` |
 | **Atomic Slot Booking & Payment Hold** | REQ-005 | `HD-PATIENT-BOOK-SLOT` (`view-4`) | `appointment_booking` | `POST /appointments/book` | `AppointmentService::book_atomic` | `DoctorScheduleSlot`, `Transaction` | `test_admin_finance_suite.rs` | `AC-004`, `AC-005` |

@@ -1,0 +1,182 @@
+{
+  "console_errors": [],
+  "unexpected_requests": [],
+  "checks": {
+    "login_mfa": "PASS",
+    "tokens_not_js_cookies": "PASS",
+    "queue_1440": "RENDERED",
+    "chat_1440": "RENDERED",
+    "rx_1440": "RENDERED",
+    "schedule_1440": "RENDERED",
+    "wallet_1440": "RENDERED",
+    "queue_1280": "RENDERED",
+    "chat_1280": "RENDERED",
+    "rx_1280": "RENDERED",
+    "schedule_1280": "RENDERED",
+    "wallet_1280": "RENDERED",
+    "queue_1024": "RENDERED",
+    "chat_1024": "RENDERED",
+    "rx_1024": "RENDERED",
+    "schedule_1024": "RENDERED",
+    "wallet_1024": "RENDERED",
+    "queue_768": "RENDERED",
+    "chat_768": "RENDERED",
+    "rx_768": "RENDERED",
+    "schedule_768": "RENDERED",
+    "wallet_768": "RENDERED",
+    "queue_390": "RENDERED",
+    "chat_390": "RENDERED",
+    "rx_390": "RENDERED",
+    "schedule_390": "RENDERED",
+    "wallet_390": "RENDERED",
+    "session_reload": "PASS",
+    "logout": "PASS"
+  },
+  "network": [
+    {
+      "path": "/api/proxy/doctor/chats",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/ledger",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/qna/questions",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/ledger",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/qna/questions",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/ledger",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/qna/questions",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/ledger",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/qna/questions",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/ledger",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/qna/questions",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/profile",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "status": 200,
+      "method": "GET"
+    },
+    {
+      "path": "/api/auth/logout",
+      "status": 200,
+      "method": "POST"
+    }
+  ]
+}

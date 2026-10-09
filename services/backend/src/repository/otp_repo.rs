@@ -22,16 +22,23 @@ pub async fn upsert<'e, E: PgExecutor<'e>>(
     Ok(())
 }
 
-pub async fn find<'e, E: PgExecutor<'e>>(executor: E, phone_number: &str) -> Result<Option<PhoneOtp>, sqlx::Error> {
+/// Hold this row lock through verification, attempt updates, and consumption.
+pub async fn find_for_update(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    phone_number: &str,
+) -> Result<Option<PhoneOtp>, sqlx::Error> {
     sqlx::query_as::<_, PhoneOtp>(
-        "SELECT phone_number, code_hash, attempts, expires_at, created_at FROM phone_otps WHERE phone_number = $1",
+        "SELECT phone_number, code_hash, attempts, expires_at, created_at FROM phone_otps WHERE phone_number = $1 FOR UPDATE",
     )
     .bind(phone_number)
-    .fetch_optional(executor)
+    .fetch_optional(&mut **tx)
     .await
 }
 
-pub async fn increment_attempts<'e, E: PgExecutor<'e>>(executor: E, phone_number: &str) -> Result<(), sqlx::Error> {
+pub async fn increment_attempts<'e, E: PgExecutor<'e>>(
+    executor: E,
+    phone_number: &str,
+) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE phone_otps SET attempts = attempts + 1 WHERE phone_number = $1")
         .bind(phone_number)
         .execute(executor)
@@ -39,7 +46,10 @@ pub async fn increment_attempts<'e, E: PgExecutor<'e>>(executor: E, phone_number
     Ok(())
 }
 
-pub async fn delete<'e, E: PgExecutor<'e>>(executor: E, phone_number: &str) -> Result<(), sqlx::Error> {
+pub async fn delete<'e, E: PgExecutor<'e>>(
+    executor: E,
+    phone_number: &str,
+) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM phone_otps WHERE phone_number = $1")
         .bind(phone_number)
         .execute(executor)

@@ -1,0 +1,166 @@
+{
+  "date": "2026-10-08",
+  "scope": "Kenya manual professional-registration correction",
+  "rust_sequential_checks": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.49
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 10.33
+    },
+    "lib-tests": {
+      "command": [
+        "cargo",
+        "test",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "seconds": 121.53,
+      "passed": 50,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    "api-tests": {
+      "command": [
+        "cargo",
+        "test",
+        "--test",
+        "api_tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 810.08,
+      "passed": 113,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  },
+  "clients": {
+    "doctor_web": {
+      "typecheck": "PASS",
+      "tests": {
+        "passed": 33,
+        "failed": 0
+      },
+      "source_guard": "PASS",
+      "production_build": "PASS"
+    },
+    "admin_web": {
+      "admin-web-typecheck": {
+        "exit_code": 0
+      },
+      "admin-web-tests": {
+        "exit_code": 0,
+        "tests": 4,
+        "pass": 4,
+        "fail": 0
+      },
+      "production_build": "PASS"
+    },
+    "flutter": {
+      "analyze": "No issues found",
+      "analyze_command": "flutter analyze --no-pub",
+      "tests": {
+        "passed": 74,
+        "failed": 0
+      },
+      "test_command": "flutter test --no-pub"
+    }
+  },
+  "live_walkthrough": {
+    "nonce": "47278ee148",
+    "checks": {
+      "admin_generic_verification_navigation": "PASS",
+      "Reject_registration_pending_kmpdc_ke": "PASS",
+      "Reject_doctor_pending_screen": "PASS",
+      "Reject_included_in_admin_pending_queue": "PASS",
+      "Reject_admin_ui_terminal_transition": "PASS",
+      "Reject_persisted_terminal_status_and_queue_exclusion_after_refresh": "PASS",
+      "Reject_doctor_web_current_kenya_status_display": "PASS",
+      "Approve_registration_pending_kmpdc_ke": "PASS",
+      "Approve_doctor_pending_screen": "PASS",
+      "Approve_included_in_admin_pending_queue": "PASS",
+      "Approve_admin_ui_terminal_transition": "PASS",
+      "Approve_persisted_terminal_status_and_queue_exclusion_after_refresh": "PASS",
+      "Approve_doctor_web_current_kenya_status_display": "PASS",
+      "admin_refreshed_queue_excludes_both_terminal_fixtures": "PASS"
+    },
+    "fixtures": {
+      "Reject": {
+        "doctor_id": "27eafc90-9559-47d0-8595-d5a2542c45c4",
+        "initial_status": "PENDING"
+      },
+      "Approve": {
+        "doctor_id": "cb304c29-c919-42e5-8e46-6469ea94b949",
+        "initial_status": "PENDING"
+      }
+    },
+    "persisted_fixtures": [
+      {
+        "id": "27eafc90-9559-47d0-8595-d5a2542c45c4",
+        "status": "REJECTED",
+        "authority": "KMPDC",
+        "country": "KE",
+        "is_verified": false,
+        "slots": 0
+      },
+      {
+        "id": "cb304c29-c919-42e5-8e46-6469ea94b949",
+        "status": "VERIFIED",
+        "authority": "KMPDC",
+        "country": "KE",
+        "is_verified": true,
+        "slots": 0
+      }
+    ],
+    "browser_exceptions": [],
+    "verdict": "PASS"
+  },
+  "known_seed_fixture_correction": [
+    {
+      "doctor_profiles_updated": 2,
+      "doctor_ids": [
+        "da000001-0000-0000-0000-000000000001",
+        "da000002-0000-0000-0000-000000000002"
+      ]
+    },
+    {
+      "doctor_user_phones_updated": 2
+    },
+    {
+      "admin_patient_seed_phones_updated": 2
+    }
+  ],
+  "migration": {
+    "source": 20261024000001,
+    "binary": 20261024000001,
+    "database": 20261024000001,
+    "pre_existing_sql_files_hash_verified": 62
+  },
+  "host_software_installed": "NONE",
+  "verification_notes": [
+    "Full live walkthrough passed 14 checks with zero browser exceptions.",
+    "A subsequent rebuild removed two inert generated-template attributes; its source guard, 33 tests, typecheck and build passed.",
+    "An optional repeat reached the existing shared-IP Doctor-login ceiling (429); the guard was not changed or cleared."
+  ]
+}

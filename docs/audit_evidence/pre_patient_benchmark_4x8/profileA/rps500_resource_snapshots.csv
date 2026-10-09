@@ -1,0 +1,10 @@
+sample,container,cpu_percent,mem_usage
+1,hellodoctor-bench-a-backend,100.22,144.8MiB
+1,hellodoctor-bench-a-postgres,56.33,324.1MiB
+1,hellodoctor-bench-a-redis,9.88,5.184MiB
+2,hellodoctor-bench-a-backend,98.77,145.6MiB
+2,hellodoctor-bench-a-postgres,60.80,335.2MiB
+2,hellodoctor-bench-a-redis,8.61,5.012MiB
+3,hellodoctor-bench-a-backend,99.96,146.5MiB
+3,hellodoctor-bench-a-postgres,58.32,335.2MiB
+3,hellodoctor-bench-a-redis,10.27,5.109MiB

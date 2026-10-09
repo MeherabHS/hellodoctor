@@ -1,0 +1,686 @@
+{
+  "queue_360": [
+    {
+      "selector": "doc-header-card",
+      "width": 360,
+      "height": 69,
+      "padding": "14px 18px 12px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "chat_360": [
+    {
+      "selector": "dir-header",
+      "width": 360,
+      "height": 67,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 328,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 328,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 328,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 328,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "smart_rx_360": [
+    {
+      "selector": "dir-header",
+      "width": 360,
+      "height": 140,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "rx-scan-hero-card",
+      "width": 324,
+      "height": 881.328125,
+      "padding": "16px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "20px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "schedule_360": [
+    {
+      "selector": "dir-header",
+      "width": 360,
+      "height": 67,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item booked",
+      "width": 324,
+      "height": 170,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item booked",
+      "width": 324,
+      "height": 170,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item booked",
+      "width": 324,
+      "height": 170,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item available",
+      "width": 324,
+      "height": 144,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item available",
+      "width": 324,
+      "height": 144,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item available",
+      "width": 324,
+      "height": 144,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "wallet_360": [
+    {
+      "selector": "dir-header",
+      "width": 360,
+      "height": 82,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-earnings-breakdown-card",
+      "width": 324,
+      "height": 532.5625,
+      "padding": "16px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "18px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "qna_360": [
+    {
+      "selector": "flow-top",
+      "width": 360,
+      "height": 97.5,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "queue_390": [
+    {
+      "selector": "doc-header-card",
+      "width": 390,
+      "height": 69,
+      "padding": "14px 18px 12px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "chat_390": [
+    {
+      "selector": "dir-header",
+      "width": 390,
+      "height": 67,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 358,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 358,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 358,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 358,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "smart_rx_390": [
+    {
+      "selector": "dir-header",
+      "width": 390,
+      "height": 140,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "rx-scan-hero-card",
+      "width": 354,
+      "height": 799.140625,
+      "padding": "16px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "20px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "schedule_390": [
+    {
+      "selector": "dir-header",
+      "width": 390,
+      "height": 67,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item booked",
+      "width": 354,
+      "height": 170,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item booked",
+      "width": 354,
+      "height": 170,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item booked",
+      "width": 354,
+      "height": 170,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item available",
+      "width": 354,
+      "height": 131,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item available",
+      "width": 354,
+      "height": 131,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item available",
+      "width": 354,
+      "height": 131,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "wallet_390": [
+    {
+      "selector": "dir-header",
+      "width": 390,
+      "height": 82,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-earnings-breakdown-card",
+      "width": 354,
+      "height": 506.5625,
+      "padding": "16px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "18px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "qna_390": [
+    {
+      "selector": "flow-top",
+      "width": 390,
+      "height": 97.5,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "queue_412": [
+    {
+      "selector": "doc-header-card",
+      "width": 412,
+      "height": 69,
+      "padding": "14px 18px 12px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "chat_412": [
+    {
+      "selector": "dir-header",
+      "width": 412,
+      "height": 67,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 380,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 380,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 380,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "conv-card",
+      "width": 380,
+      "height": 68,
+      "padding": "12px 14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "smart_rx_412": [
+    {
+      "selector": "dir-header",
+      "width": 412,
+      "height": 140,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "rx-scan-hero-card",
+      "width": 376,
+      "height": 766.953125,
+      "padding": "16px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "20px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "schedule_412": [
+    {
+      "selector": "dir-header",
+      "width": 412,
+      "height": 67,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item booked",
+      "width": 376,
+      "height": 170,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item booked",
+      "width": 376,
+      "height": 170,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item booked",
+      "width": 376,
+      "height": 164,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item available",
+      "width": 376,
+      "height": 131,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item available",
+      "width": 376,
+      "height": 131,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-slot-card slot-item available",
+      "width": 376,
+      "height": 131,
+      "padding": "14px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "16px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "wallet_412": [
+    {
+      "selector": "dir-header",
+      "width": 412,
+      "height": 82,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    },
+    {
+      "selector": "doc-earnings-breakdown-card",
+      "width": 376,
+      "height": 490.625,
+      "padding": "16px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "18px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ],
+  "qna_412": [
+    {
+      "selector": "flow-top",
+      "width": 412,
+      "height": 75,
+      "padding": "14px 18px 10px",
+      "fontSize": "16px",
+      "fontFamily": "\"Plus Jakarta Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif",
+      "fontWeight": "400",
+      "radius": "0px",
+      "color": "rgb(30, 41, 59)",
+      "background": "rgb(255, 255, 255)"
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+{
+  "verified_at_utc": "2026-10-08T15:41:28.245552+00:00",
+  "scope": "Canonical user ownership, DB isolation/audited trace, Doctor Flutter Q&A only",
+  "statuses": {
+    "CANONICAL_USER_IDENTITY": "users.id",
+    "PATIENT_USER_MAPPING": "ENFORCED",
+    "DOCTOR_USER_MAPPING": "ENFORCED",
+    "PATIENT_DOCTOR_PROFILE_MIXUP": "PREVENTED",
+    "SENSITIVE_TABLE_OWNERSHIP_INVENTORY": "COMPLETE",
+    "OWNERSHIP_CHAIN_GAPS": 0,
+    "FORCE_RLS_SENSITIVE_TABLES": "VERIFIED",
+    "CROSS_PATIENT_DB_ISOLATION": "PASS",
+    "CROSS_DOCTOR_DB_ISOLATION": "PASS",
+    "CROSS_DOCTOR_PATIENT_CONTEXT": "PASS",
+    "CONNECTION_POOL_IDENTITY_LEAK": "PREVENTED",
+    "AUTHORIZED_TRACE_LOOKUP": "VERIFIED",
+    "TRACE_LOOKUP_AUDITED": "PASS",
+    "UNRESTRICTED_ADMIN_BACKDOOR": "NO",
+    "LEGAL_AUTHORITY_DIRECT_DB_ACCESS": "NO",
+    "FORMAL_LEGAL_EXPORT_WORKFLOW": "NOT_IMPLEMENTED",
+    "QNA_RENDERING_ROOT_CAUSE": "Unconstrained registration badge/title, height-limited second sheet, and editor state lost when retry banners changed list indices",
+    "QNA_GENERIC_HEADER_MISUSE": "NOT_APPLICABLE",
+    "QNA_HORIZONTAL_OVERFLOW": "PASS",
+    "QNA_VERTICAL_OVERFLOW": "PASS",
+    "QNA_KEYBOARD_LAYOUT": "PASS",
+    "QNA_LONG_QUESTION": "PASS",
+    "QNA_409_RENDER_STATE": "PASS",
+    "QNA_ANSWERED_LIST": "WIRED",
+    "QNA_REAL_DEVICE_RENDER": "PENDING_NO_DEVICE",
+    "FLUTTER_ANALYZE": "PASS",
+    "FLUTTER_TESTS": "98/98",
+    "RUST_LIB": "50/50",
+    "API_TESTS": "139/139",
+    "MIGRATION_SCHEMA_VERIFIED": "YES",
+    "HOST_SOFTWARE_INSTALLED": "NONE"
+  },
+  "task_a_verdict": "USER_LEVEL_DB_ISOLATION_VERIFIED",
+  "task_b_verdict": "DOCTOR_QNA_CODE_FIXED_REAL_DEVICE_PENDING",
+  "backend_regression": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.55
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 18.83
+    },
+    "lib": {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "seconds": 129.62,
+      "passed": 50,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    "api": {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--test",
+        "api_tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 1005.41,
+      "passed": 139,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  },
+  "flutter_regression": {
+    "format": {
+      "command": [
+        "powershell",
+        "-NoProfile",
+        "-File",
+        "C:\\Users\\CUBE\\Desktop\\helodoc old site\\services\\backend\\target\\user-isolation\\flutter_format.ps1"
+      ],
+      "exit_code": 0,
+      "seconds": 1.6,
+      "tail": "Formatted 32 files (0 changed) in 0.59 seconds.\n"
+    },
+    "analyze": {
+      "command": [
+        "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+        "analyze",
+        "--no-pub"
+      ],
+      "exit_code": 0,
+      "seconds": 6.68,
+      "tail": "Analyzing mobile...                                             \nNo issues found! (ran in 4.3s)\n"
+    },
+    "test": {
+      "command": [
+        "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+        "test",
+        "--no-pub"
+      ],
+      "exit_code": 0,
+      "seconds": 9.04,
+      "tail": "fline startup keeps a secure session for cached read-only data\n00:04 +90: C:/Users/CUBE/Desktop/helodoc old site/apps/mobile/test/auth_security_test.dart: offline startup keeps a secure session for cached read-only data\n00:04 +91: C:/Users/CUBE/Desktop/helodoc old site/apps/mobile/test/qna_rendering_test.dart: Q&A unanswered rendered state\n00:04 +92: C:/Users/CUBE/Desktop/helodoc old site/apps/mobile/test/qna_rendering_test.dart: Q&A long-question rendered state\n00:04 +93: C:/Users/CUBE/Desktop/helodoc old site/apps/mobile/test/qna_rendering_test.dart: Q&A answered rendered state\n00:04 +94: C:/Users/CUBE/Desktop/helodoc old site/apps/mobile/test/qna_rendering_test.dart: Q&A loading rendered state\n00:04 +95: C:/Users/CUBE/Desktop/helodoc old site/apps/mobile/test/qna_rendering_test.dart: Q&A empty rendered state\n00:04 +96: C:/Users/CUBE/Desktop/helodoc old site/apps/mobile/test/qna_rendering_test.dart: Q&A error rendered state\n00:04 +97: C:/Users/CUBE/Desktop/helodoc old site/apps/mobile/test/qna_rendering_test.dart: Q&A offline-cache rendered state\n00:04 +98: C:/Users/CUBE/Desktop/helodoc old site/apps/mobile/test/qna_rendering_test.dart: (tearDownAll)\n00:04 +98: All tests passed!\n"
+    }
+  },
+  "live_verification": {
+    "checks": {
+      "source_binary_database_agree": "PASS",
+      "normal_admin_doctor_patient_login": "PASS",
+      "doctor_canonical_profile_and_kenya_fields": "PASS",
+      "public_doctor_projection_excludes_private_identity": "PASS",
+      "authorized_trace_canonical_linkage_and_session_request_audit": "PASS",
+      "doctor_patient_trace_denied_and_audited": "PASS",
+      "live_direct_patient_doctor_rls": "PASS",
+      "live_catalog_isolation_and_append_only_audit": "PASS",
+      "legacy_unused_bootstrap_profile_repair": "PASS",
+      "probe_sessions_logged_out": "PASS"
+    },
+    "migration": {
+      "source": 20261026000001,
+      "binary": "20261026000001",
+      "database": "20261026000001"
+    },
+    "trace_access_audit_id": "2367191e-5c91-4684-8b79-1c99d1085d63",
+    "trace_resource_count": 5,
+    "database_catalog": {
+      "table_count": 40,
+      "forced_rls_count": 35,
+      "capability_count": 5,
+      "unsafe_roles": 0,
+      "application_owned_tables": 0,
+      "role_mismatches": 0,
+      "mutable_audit_grants": 0
+    },
+    "unused_bootstrap_profile_repair": {
+      "artifacts_removed": 1,
+      "doctor_account": 1,
+      "doctor_profile": 1,
+      "extra_patient_profile": 0
+    }
+  },
+  "migration_history": {
+    "historical_files_checked": 62,
+    "changed": [],
+    "database_applied_up_files_checked": 33,
+    "checksum_mismatches": [],
+    "post_startup_applied_up_checksums_verified": 34
+  },
+  "ownership_inventory": {
+    "public_tables": 40,
+    "force_rls_tables": 35,
+    "documented_non_rls_exceptions": [
+      "_sqlx_migrations",
+      "auth_sessions",
+      "mfa_credentials",
+      "pending_mfa_challenges",
+      "phone_otps"
+    ],
+    "path": "docs/USER_OWNERSHIP_INVENTORY.md"
+  },
+  "new_tests": {
+    "api_grouped_tests": 10,
+    "flutter_qna_tests": 17,
+    "goldens": 8,
+    "layout_widths": [
+      360,
+      390,
+      412,
+      480
+    ],
+    "text_scale": 2
+  },
+  "qna_before_fix": "Four reproduced RenderFlex overflow failures; target/user-isolation/qna-before.log",
+  "device_probe": "List of devices attached",
+  "test_logs": "services/backend/target/user-isolation/",
+  "format_workaround": "Temporarily moved/restored generated mobile/build inside repository because Windows Dart directory walker failed on deep Gradle paths; required format command passed with zero changes",
+  "existing_infrastructure_started": "NONE; existing approved PostgreSQL/Redis containers already running",
+  "backend_restarted": true,
+  "web_processes_restarted": false,
+  "software_installed": "NONE",
+  "new_infrastructure": "NONE",
+  "limitations": [
+    "No Android device connected: widget/golden renders are not actual phone verification",
+    "Existing installed APK was not replaced by this correction",
+    "Formal legal export workflow is not implemented",
+    "Regression tests do not constitute penetration testing or production certification"
+  ]
+}

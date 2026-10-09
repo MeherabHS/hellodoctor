@@ -1,0 +1,101 @@
+{
+  "checks": {
+    "four_supported_summaries_and_redundant_widgets_removed": "PASS",
+    "operational_queue_uses_backend_order_and_kes_earnings": "PASS",
+    "account_menu_keyboard_escape_focus_and_no_old_modal": "PASS",
+    "settings_full_workspace_sidebar_identity_static": "PASS",
+    "real_profile_save_local_confirmation_and_restore": "PASS",
+    "profile_field_validation": "PASS",
+    "verified_fields_read_only_and_backend_rejects_mass_assignment": "PASS",
+    "availability_duty_server_confirmed_and_restored": "PASS",
+    "masked_payout_state_external_deferral_and_contextual_wallet_link": "PASS",
+    "security_session_actions_separate_from_profile": "PASS",
+    "settings_four_viewports_no_horizontal_overflow": "PASS",
+    "actual_login_mfa_one_empty_queue_four_dashboard_viewports": "PASS",
+    "account_profile_notification_and_real_logout": "PASS"
+  },
+  "console_errors": [],
+  "network": [
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/notifications/unread-count",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/qna/questions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "PATCH",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "PATCH",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/payout-methods",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/ledger",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/payout-methods",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "build_id": "NSx9VY1Mkxp3QUUfkUpDg"
+}

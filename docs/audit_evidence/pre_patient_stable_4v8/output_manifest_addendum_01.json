@@ -1,0 +1,26 @@
+{
+  "recorded_at_utc": "2026-10-09T04:39:35.799716+00:00",
+  "scope": "Documentation addendum only; original output_manifest.json retained as the initial snapshot. This addendum supplies updated report/generator hashes. Charts and original evidence unchanged.",
+  "previous_hashes": {
+    "docs/PRE_PATIENT_STABLE_4VCPU_8GB_EVIDENCE_REPORT.md": "e1cf2ccd28edd7bd5692f0ef0e435b9091e3eb63cb5b7680281c1b86635b2148",
+    "docs/audit_evidence/pre_patient_stable_4v8/generate_report.py": "5b81b46363e08a65fa2aa0f314dae61d3b517e6a83ff3cbb489be12d0ecb1253"
+  },
+  "files": [
+    {
+      "path": "docs/PRE_PATIENT_STABLE_4VCPU_8GB_EVIDENCE_REPORT.md",
+      "sha256": "247c3b1c99b06555fcbfc7f62eb1f96c7b275004b8789af4b4c81ede7947ae33",
+      "size_bytes": 41188
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/generate_report.py",
+      "sha256": "861774c246813a9a032896a10be9d41f6fe8a2a36aff0f6747a47fcf567e45aa",
+      "size_bytes": 50411
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/concurrent_grievance_verification_addendum.json",
+      "sha256": "f08cee4ee4144579394734963f9b76560d9a7251da580f4430408b099507dcd5",
+      "size_bytes": 4970
+    }
+  ],
+  "checks": "Supplied paragraph preserved exactly; parameters preserved; all report links resolve; no tests or load run for addendum."
+}

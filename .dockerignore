@@ -1,0 +1,24 @@
+.git
+**/.git
+.env
+.env.*
+**/.env
+**/.env.*
+*_token.txt
+**/*_token.txt
+*_tokens.json
+**/*_tokens.json
+*.jwt
+**/*.jwt
+target
+**/target
+node_modules
+**/node_modules
+
+# Local signing/credential files are never deployment build inputs.
+*.pem
+*.key
+*.der
+**/*.pem
+**/*.key
+**/*.der

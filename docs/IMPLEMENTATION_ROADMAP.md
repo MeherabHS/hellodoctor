@@ -71,14 +71,14 @@ M18: Production Sign-off
 - **Expected Artifacts:**
   - `apps/mobile/lib/features/doctor_discovery/`.
   - Rust endpoints: `GET /api/v1/doctors`, `GET /api/v1/doctors/{id}`.
-- **Deliverables:** Modality tabs, specialty filter carousel, doctor cards with BMDC badges and fees (zero star ratings).
+- **Deliverables:** Modality tabs, specialty filter carousel, doctor cards with KMPDC badges and fees (zero star ratings).
 - **Tests:** Assert zero star widgets rendered.
 
 ### Milestone M6: Emergency Contact Helpline & Patient Home
 - **Prerequisites:** M5.
 - **Expected Artifacts:**
   - `apps/mobile/lib/features/home/presentation/widgets/emergency_helpline_strip.dart`.
-- **Deliverables:** Emergency Contact banner positioned directly above Upcoming Appointments with one-tap dialing (configurable per country, e.g. `16263` for BD).
+- **Deliverables:** Emergency Contact banner positioned directly above Upcoming Appointments with one-tap dialing (Kenya deployment contact).
 - **Tests:** Widget test asserting DOM position and native dialer trigger.
 
 ### Milestone M7: Atomic Slot Booking & Payment Hold
@@ -135,12 +135,12 @@ M18: Production Sign-off
 ### Milestone M15: Central Admin Consoles & Doctor Dossiers
 - **Prerequisites:** M14.
 - **Expected Artifacts:**
-  - Admin Portal with 9 specialized views (`command`, `doctors`, `patients`, `bmdc`, `slots`, `compliance`, `logs`, `grievances`, `finance`).
+  - Admin Portal with 9 specialized views (`command`, `doctors`, `patients`, `verification`, `slots`, `compliance`, `logs`, `grievances`, `finance`).
 - **Deliverables:** Doctor dossiers with verified phone and residence, error log diagnostics, payment and settlement ledger.
 
 ### Milestone M16: Bilingual Localization & Future Expansion
 - **Deliverables:** In-memory language toggle with badge update.
-- **Note:** Bangla localization for Bangladesh market should be planned for future milestone.
+- **Scope:** Kenya only; English and Swahili. No other-country launch is approved.
 
 ### Milestone M17: Offline Guards
 - **Deliverables:** Offline action interceptor modal (`#offlineActionGuardModal`), shimmer loading states.

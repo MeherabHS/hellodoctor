@@ -1,0 +1,25 @@
+{
+  "timestamp_utc": "2026-10-09T02:30:00Z",
+  "host": {
+    "cpu_model": "AMD Ryzen 5 5600 6-Core Processor",
+    "physical_cores": 6,
+    "logical_cores": 12,
+    "total_ram_gb": 23.92,
+    "free_ram_gb_at_start": 8.94,
+    "disk_free_gb_at_start": 65.65,
+    "os": "Windows 11 Pro 10.0.26200"
+  },
+  "docker": {
+    "docker_version": "29.7.2",
+    "docker_desktop_visible_cpus": 12,
+    "docker_desktop_visible_mem_bytes": 12499693568,
+    "wsl_distro": "docker-desktop (running)"
+  },
+  "toolchain": {
+    "rustc_version": "1.99.0 (b940084d7 2026-09-28)",
+    "cargo_version": "1.99.0 (5f94df478 2026-08-27)",
+    "postgres_image_version": "postgres:16 -> PostgreSQL 16.15 (Debian 16.15-1.pgdg13+2)",
+    "redis_image_version": "redis:7-alpine -> 7.4.11"
+  },
+  "note": "Free RAM/disk are a snapshot at benchmark start, not re-measured per stage unless called out in the stage's own evidence file."
+}

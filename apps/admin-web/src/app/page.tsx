@@ -1,22 +1,32 @@
-'use client';
+﻿'use client';
 
-import React, { useState } from 'react';
-import { useBackendSync } from '@/lib/useBackendSync';
+import React, { useState, useEffect } from 'react';
+import { useBackendSync, ModalitySplit } from '@/lib/useBackendSync';
+import { useSlotSync } from '@/lib/useSlotSync';
+import { scheduleDay, scheduleLabel } from '@/lib/schedule';
 import {
   initiateDisbursement,
-  verifyBmdcDoctor,
-  rejectBmdcDoctor,
-  simulateAdminLog,
+  approveDisbursementItem,
+  finalizeFinancialPeriod,
+  verifyDoctorProfessionalRegistration,
+  rejectDoctorProfessionalRegistration,
+  simulateSystemError,
+  acknowledgeSystemError,
+  resolveSystemError,
   adjudicateGrievanceRefund,
   adjudicateGrievanceWarn,
   adjudicateGrievanceDismiss,
+  transitionRefundRequest,
+  AdminOverview,
+  FinanceSummary,
+  CommandTelemetry,
+  PendingDoctorVerification,
+  AdminSlot,
+  ComplianceAlert,
+  FinancialRefundRequest,
+  toggleSlot,
 } from '@/lib/api';
 import {
-  ADMIN_DOCTORS_STORE,
-  ADMIN_PATIENT_STORE,
-  INITIAL_ERROR_LOGS,
-  INITIAL_GRIEVANCES,
-  INITIAL_TRANSACTIONS,
   DoctorHistoryItem,
   PatientRecordItem,
   AppErrorLogItem,
@@ -30,7 +40,7 @@ type AdminPageId =
   | 'command'
   | 'slots'
   | 'patients'
-  | 'bmdc'
+  | 'verification'
   | 'compliance'
   | 'logs'
   | 'grievances';
@@ -44,20 +54,46 @@ interface ToastNotice {
 }
 
 export default function AdminPortalPage() {
+  const [simulationsAllowed, setSimulationsAllowed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetch('/api/runtime', { cache: 'no-store' }).then(res => res.ok ? res.json() : null)
+      .then(data => { if (active) setSimulationsAllowed(data?.simulations === true); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   // Navigation State
   const [activeAdminPage, setActiveAdminPage] = useState<AdminPageId>('doctors');
 
   // Interactive Data Stores
-  const [doctorStore, setDoctorStore] = useState<Record<string, DoctorHistoryItem>>(ADMIN_DOCTORS_STORE);
-  const [patientStore, setPatientStore] = useState<Record<string, PatientRecordItem>>(ADMIN_PATIENT_STORE);
-  const [errorLogs, setErrorLogs] = useState<AppErrorLogItem[]>(INITIAL_ERROR_LOGS);
-  const [grievances, setGrievances] = useState<GrievanceItem[]>(INITIAL_GRIEVANCES);
-  const [transactions, setTransactions] = useState<TransactionItem[]>(INITIAL_TRANSACTIONS);
+  const [doctorStore, setDoctorStore] = useState<Record<string, DoctorHistoryItem>>({});
+  const [patientStore, setPatientStore] = useState<Record<string, PatientRecordItem>>({});
+  const [errorLogs, setErrorLogs] = useState<AppErrorLogItem[]>([]);
+  const [grievances, setGrievances] = useState<GrievanceItem[]>([]);
+  const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+  const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
+  const [commandTelemetry, setCommandTelemetry] = useState<CommandTelemetry | null>(null);
+  const [verificationQueue, setVerificationQueue] = useState<PendingDoctorVerification[]>([]);
+  const [modalitySplit, setModalitySplit] = useState<ModalitySplit>({ videoRevenue: 0, chatRevenue: 0, videoCount: 0, chatCount: 0 });
+  const [adminSlots, setAdminSlots] = useState<AdminSlot[]>([]);
+  const slotSync = useSlotSync(setAdminSlots);
+  const [slotDate, setSlotDate] = useState(() => scheduleDay(new Date().toISOString()));
+  const visibleSlots = adminSlots.filter(slot => !slotDate || scheduleDay(slot.start_time) === slotDate);
+  const [complianceAlerts, setComplianceAlerts] = useState<ComplianceAlert[]>([]);
+  const [refundRequests, setRefundRequests] = useState<FinancialRefundRequest[]>([]);
+  const [refundBusy, setRefundBusy] = useState<string | null>(null);
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [slotBusy, setSlotBusy] = useState<string | null>(null);
+  const [simulateBusy, setSimulateBusy] = useState(false);
+  const [logActionBusy, setLogActionBusy] = useState<string | null>(null);
+  const [selectedVerificationId, setSelectedVerificationId] = useState<string | null>(null);
+  const [financeMonth, setFinanceMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [financeBusy, setFinanceBusy] = useState(false);
 
   // Live Backend Synchronization Hook
   // Once the backend has answered at least once, its data is the source of truth —
-  // including a correctly-empty result — and fully replaces the initial mock seed data.
-  useBackendSync({
+  // including a correctly-empty result. No frontend fixture records are loaded.
+  const refreshBackend = useBackendSync({
     onDoctorsUpdate: (backendDocs) => {
       setDoctorStore(backendDocs);
     },
@@ -73,11 +109,20 @@ export default function AdminPortalPage() {
     onTransactionsUpdate: (backendTxs) => {
       setTransactions(backendTxs);
     },
-  });
+    onOverviewUpdate: setOverview,
+    onFinanceSummaryUpdate: setFinanceSummary,
+    onCommandTelemetryUpdate: setCommandTelemetry,
+    onVerificationQueueUpdate: (doctors) => {
+      setVerificationQueue(doctors);
+      setSelectedVerificationId((prev) => (prev && doctors.some((d) => d.id === prev) ? prev : doctors[0]?.id ?? null));
+    },
+    onModalitySplitUpdate: setModalitySplit,
+    onComplianceAlertsUpdate: setComplianceAlerts,
+    onRefundRequestsUpdate: setRefundRequests,
+  }, financeMonth);
 
-  // Escrow / Payout State
-  const [payoutsSettled, setPayoutsSettled] = useState(false);
-  const [escrowTotal, setEscrowTotal] = useState('৳ 890,000');
+  // Formats a numeric-string amount from the backend as "KES  12,345".
+  const money = (value: string | number | null | undefined) => `KES  ${Number(value || 0).toLocaleString()}`;
 
   // Filter States
   const [doctorStatusFilter, setDoctorStatusFilter] = useState<'all' | 'pending' | 'settled'>('all');
@@ -106,8 +151,7 @@ export default function AdminPortalPage() {
   const [simulateModalOpen, setSimulateModalOpen] = useState(false);
 
   // Simulation Form State
-  const [simUser, setSimUser] = useState('sarah');
-  const [simScenario, setSimScenario] = useState('bkash_timeout');
+  const [simScenario, setSimScenario] = useState('mpesa_timeout');
   const [simSeverity, setSimSeverity] = useState('CRITICAL');
   const [simCustomNote, setSimCustomNote] = useState('');
 
@@ -130,7 +174,7 @@ export default function AdminPortalPage() {
     },
     finance: {
       title: 'Omnichannel Payment & Escrow Master Ledger',
-      breadcrumb: 'Real-time bKash, Nagad & Card Inflows • 20% Platform Commission Splits • Escrow Release Audit',
+      breadcrumb: 'Real-time M-Pesa, Kenyan bank & card Inflows • 20% Platform Commission Splits • Escrow Release Audit',
     },
     command: {
       title: 'Operations & Live Command Center',
@@ -144,13 +188,13 @@ export default function AdminPortalPage() {
       title: 'Patients Directory & Medical Vaults',
       breadcrumb: 'Central Electronic Health Records • Longitudinal Patient Surveillance',
     },
-    bmdc: {
-      title: 'Doctor Credentialing & BMDC KYC Hub',
-      breadcrumb: 'Physician Regulatory KYC • NID & Certificate OCR Match',
+    verification: {
+      title: 'Doctor Verification',
+      breadcrumb: 'Review KMPDC professional registration details • Manual HelloDoctor review',
     },
     compliance: {
       title: 'Clinical e-Prescription & Q&A Audit',
-      breadcrumb: 'DGDA Antibiotic Stewardship & Narcotic Schedule H Compliance',
+      breadcrumb: 'Clinical prescribing and platform compliance review',
     },
     logs: {
       title: 'App Failure Diagnostics & User Incident Logs',
@@ -162,161 +206,228 @@ export default function AdminPortalPage() {
     },
   };
 
-  // 1. Batch Payout Action
-  function handleExecuteBatchPayout() {
-    setPayoutsSettled(true);
-    setEscrowTotal('৳ 0 (Disbursed)');
-    showToast('Payout Batch Disbursed! ৳ 890,000', 'Successfully disbursed settlements to 6 active physicians via bKash & Nagad APIs.', '💸', 'success');
-
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const end = now.toISOString().split('T')[0];
-    initiateDisbursement(start, end).catch((e) => console.warn('Disbursement API notice:', e));
+  // 1. Batch Payout Action — reports the real batch result, not an optimistic guess.
+  async function handleExecuteBatchPayout() {
+    if (financeBusy) return;
+    const [year, month] = financeMonth.split('-').map(Number);
+    const start = `${financeMonth}-01`;
+    const end = `${financeMonth}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}`;
+    setFinanceBusy(true);
+    try {
+      const batch = await initiateDisbursement(start, end);
+      if (batch.total_doctors > 0) {
+        showToast(
+          `Disbursement Batch Prepared: ${money(batch.total_net_disbursed)}`,
+          `${batch.total_doctors} Doctor${batch.total_doctors === 1 ? '' : 's'} routed for Finance approval. No money moved.`,
+          '🧾',
+          'info'
+        );
+      } else {
+        showToast('No Eligible Unassigned Statements', 'Review payout setup and existing allocations for the selected month. No money moved.', 'ℹ️', 'info');
+      }
+      await refreshBackend();
+    } catch (e) {
+      showToast('Batch Not Prepared', 'The month must be finalized and destinations eligible. The backend did not prepare a batch.', '⚠️', 'warning');
+      console.warn('Disbursement API notice:', e);
+    } finally { setFinanceBusy(false); }
   }
 
-  // 2. BMDC Approval
-  function handleBmdcAction(action: 'approve' | 'clarify' | 'reject') {
-    if (action === 'approve') {
-      showToast('BMDC Reg A-48291 Approved ✓', 'Dr. Sarah Rahman credentialed & scheduled for live teleconsults.', '✓', 'success');
-      verifyBmdcDoctor('da000001-0000-0000-0000-000000000001', 'BMDC Reg A-48291 Approved').catch((e) =>
-        console.warn('BMDC verify API notice:', e)
-      );
-    } else if (action === 'clarify') {
-      showToast('Clarification Sent to Physician', 'Requested higher-resolution scan of Bangladesh Medical & Dental Council certificate.', '⚠️', 'info');
-    } else {
-      showToast('Application Declined', 'Physician notification dispatched with rejection grounds.', '✕', 'warning');
-      rejectBmdcDoctor('da000001-0000-0000-0000-000000000001', 'Application Declined').catch((e) =>
-        console.warn('BMDC reject API notice:', e)
-      );
+  async function handleFinalizePeriod() {
+    if (financeBusy) return;
+    setFinanceBusy(true);
+    try {
+      await finalizeFinancialPeriod(financeMonth);
+      showToast('Accounting Month Finalized', `${financeMonth} statement amounts are frozen. This does not approve or pay any payout.`, '🧾', 'info');
+      await refreshBackend();
+    } catch {
+      showToast('Month Not Finalized', 'Check whether the month is already finalized or in the future. The backend did not close it.', '⚠️', 'warning');
+    } finally { setFinanceBusy(false); }
+  }
+
+  async function handleApproveDoctorDisbursement(itemId: string) {
+    if (financeBusy) return;
+    setFinanceBusy(true);
+    try {
+      await approveDisbursementItem(itemId);
+      setDoctorStore((prev) => {
+        const current = selectedDoctorKey ? prev[selectedDoctorKey] : undefined;
+        if (!current?.payoutRouting) return prev;
+        return {
+          ...prev,
+          [current.key]: {
+            ...current,
+            payoutRouting: { ...current.payoutRouting, disbursementStatus: 'APPROVED' },
+          },
+        };
+      });
+      showToast('Disbursement Approved', 'Finance approval recorded. No provider payment has been confirmed.', '✓', 'info');
+      await refreshBackend();
+    } catch (e) {
+      showToast('Approval Failed', 'The backend did not approve this disbursement item.', '⚠️', 'warning');
+      console.warn('Disbursement approval API notice:', e);
+    } finally { setFinanceBusy(false); }
+  }
+
+  // 2. Professional registration Approval — operates on whichever real pending doctor is selected, not a fixed id.
+  async function handleVerificationAction(action: 'approve' | 'reject') {
+    if (verificationBusy) return;
+    const candidate = verificationQueue.find((d) => d.id === selectedVerificationId);
+    if (!candidate) {
+      showToast('No Application Selected', 'Select a doctor from the vetting queue first.', 'ℹ️', 'info');
+      return;
+    }
+
+    setVerificationBusy(true);
+    try {
+      if (action === 'approve') {
+        try {
+          await verifyDoctorProfessionalRegistration(candidate.id, `${candidate.license_number} approved by admin`);
+          showToast(`${candidate.full_name} Approved ✓`, `${candidate.license_number} credentialed by the backend.`, '✓', 'success');
+          await refreshBackend();
+        } catch (e) {
+          showToast('Approval Failed', 'The backend did not verify this Doctor.', '⚠️', 'warning');
+          console.warn('Professional registration verify API notice:', e);
+        }
+      } else {
+        try {
+          await rejectDoctorProfessionalRegistration(candidate.id, 'Application declined by admin');
+          showToast('Application Declined', `${candidate.full_name}'s application was rejected.`, '✕', 'warning');
+          await refreshBackend();
+        } catch (e) {
+          showToast('Rejection Failed', 'The backend did not reject this application.', '⚠️', 'warning');
+          console.warn('Professional registration reject API notice:', e);
+        }
+      }
+    } finally {
+      setVerificationBusy(false);
     }
   }
 
-  // 3. Log Simulation
-  function handleExecuteSimulateFailure() {
-    const newId = 'ERR-' + Date.now().toString().slice(-8);
-    const traceNum = Math.floor(10000 + Math.random() * 90000);
-    const traceId = `TRC-${traceNum}-FAIL`;
+  // Slot availability (Available <-> Blocked) against the real backend. Guarded
+  // while a mutation is pending, so duplicate clicks cannot submit stale intent.
+  async function handleToggleSlot(slotId: string, action: "BLOCK" | "UNBLOCK") {
+    if (slotBusy) return;
+    setSlotBusy(slotId);
+    try {
+      const result = await toggleSlot(slotId, action);
+      setAdminSlots(rows => rows.map(slot => slot.id === result.slot_id ? { ...slot, status: result.status } : slot));
+      await slotSync.refresh();
+    } catch (e) {
+      showToast('Slot Update Failed', 'The backend did not toggle this slot.', '⚠️', 'warning');
+      console.warn('Slot toggle API notice:', e);
+    } finally {
+      setSlotBusy(null);
+    }
+  }
 
-    const userMap: Record<string, any> = {
-      sarah: { id: 'USR-8921', name: 'Sarah Khan', role: 'Patient', phone: '+880 1711-234567', avatar: 'SK', avatarBg: '#059669', device: 'Samsung Galaxy S24', appVersion: 'v2.4.1', network: 'GP 4G', ip: '103.114.98.24' },
-      sabrina: { id: 'DOC-45821', name: 'Dr. Sabrina Akter', role: 'Doctor', phone: '+880 1819-334455', avatar: 'SA', avatarBg: '#2563EB', device: 'MacBook Pro M3', appVersion: 'Web v2.4.0', network: 'Hospital Fiber', ip: '103.205.71.18' },
-      rafiq: { id: 'USR-7410', name: 'Rafiq Ahmed', role: 'Patient', phone: '+880 1819-987654', avatar: 'RA', avatarBg: '#059669', device: 'Xiaomi Redmi 13', appVersion: 'v2.4.1', network: 'Robi 3G', ip: '119.30.38.102' },
-      anika: { id: 'DOC-74921', name: 'Dr. Anika Rahman', role: 'Doctor', phone: '+880 1712-445566', avatar: 'AR', avatarBg: '#D97706', device: 'iPhone 15 Pro', appVersion: 'v2.3.9', network: 'Banglalink 4G', ip: '103.88.232.14' },
-    };
-
-    const targetUser = userMap[simUser] || userMap.sarah;
-
-    const newLog: AppErrorLogItem = {
-      id: newId,
-      traceId,
-      timestamp: new Date().toISOString(),
-      timeFormatted: 'Just now, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      relativeTime: 'Just now',
-      user: { ...targetUser, ageGender: targetUser.role === 'Doctor' ? 'Specialist' : '30+' },
-      severity: simSeverity as any,
-      subsystem: simScenario === 'bkash_timeout' ? 'Payment Gateway' : 'Agora WebRTC',
-      component: simScenario === 'bkash_timeout' ? '/api/v2/payment/bkash/execute-agreement' : "agora.joinChannel('room_hd_9104')",
-      actionAttempted: 'Simulated Diagnostic Action',
-      failedPart: simScenario === 'bkash_timeout' ? 'bKash Callback Handshake' : 'Agora ICE Pairing',
-      errorCode: simScenario === 'bkash_timeout' ? 'HTTP 504 GATEWAY_TIMEOUT' : 'ICE_FAILED (702)',
-      errorMessage: 'Artificial incident injected by QA console.' + (simCustomNote ? ` [${simCustomNote}]` : ''),
-      stackTrace: 'Error: SimulatedException [500]\n    at IngestionWorker (test.rs:42:10)',
-      status: 'UNRESOLVED',
-      resolvedAt: null,
-      resolutionNote: null,
-    };
-
-    setErrorLogs((prev) => [newLog, ...prev]);
-    setSimulateModalOpen(false);
-    showToast('⚡ Failure Incident Injected', `${newLog.failedPart} failure logged against ${targetUser.name}.`, '⚡', 'urgent');
-
-    simulateAdminLog({
-      action: newLog.actionAttempted,
-      subsystem: newLog.subsystem,
-      severity: newLog.severity,
-      error_summary: newLog.errorMessage,
-      stack_trace: newLog.stackTrace,
-    }).catch((e) => console.warn('Log simulate API notice:', e));
+  // 3. Log Simulation — writes a real row into the backend's dedicated
+  // `system_error_logs` table (dev/staging only; the backend itself rejects
+  // this in production) and refreshes from the server, rather than
+  // fabricating a client-only row.
+  async function handleExecuteSimulateFailure() {
+    if (!simulationsAllowed) return;
+    if (simulateBusy) return;
+    setSimulateBusy(true);
+    try {
+      const created = await simulateSystemError({
+        scenario: simScenario,
+        severity: simSeverity,
+        custom_note: simCustomNote.slice(0, 300) || undefined,
+      });
+      setSimulateModalOpen(false);
+      setSimCustomNote('');
+      await refreshBackend();
+      showToast('⚡ Failure Incident Injected', `${created.component} failure logged under ${created.trace_id}.`, '⚡', 'urgent');
+    } catch (e) {
+      showToast('Simulation Failed', e instanceof Error ? e.message : 'The backend rejected the simulated incident.', '⚠️', 'warning');
+    } finally {
+      setSimulateBusy(false);
+    }
   }
 
   // 4. Grievance Adjudication
-  function handleAdjudicateGrievance(grvId: string, action: 'REFUND' | 'WARN' | 'RESOLVE') {
-    setGrievances((prev) =>
-      prev.map((g) => {
-        if (g.id !== grvId) return g;
-        if (action === 'REFUND') {
-          return {
-            ...g,
-            status: 'REFUNDED',
-            boardRemedy: 'Escrow Refund Disbursed (৳800)',
-            adjudication: {
-              action: 'REFUNDED',
-              date: 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              admin: 'Central Escrow Adjudication',
-              notes: 'Full consultation fee refunded to patient mobile financial wallet via automated escrow reversal.',
-            },
-          };
-        } else if (action === 'WARN') {
-          return {
-            ...g,
-            status: 'WARNED',
-            boardRemedy: 'BMDC Disciplinary Warning Logged',
-            adjudication: {
-              action: 'DOCTOR_WARNED',
-              date: 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              admin: 'Central Clinical Governance Board',
-              notes: 'Formal ethics and conduct warning issued under BMDC Code of Ethics Sec 4.',
-            },
-          };
-        } else {
-          return {
-            ...g,
-            status: 'DISMISSED',
-            boardRemedy: 'Claim Reviewed and Dismissed — No Compliance Action Warranted',
-            adjudication: {
-              action: 'DISMISS',
-              date: 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              admin: 'Central Medical Operations',
-              notes: 'Dispute review concluded. Telemetry evidence did not substantiate the claim.',
-            },
-          };
-        }
-      })
-    );
-
-    if (action === 'REFUND') {
-      showToast('Refund Disbursed 💳', 'Full fee refunded to patient wallet via bKash.', '💳', 'success');
-      adjudicateGrievanceRefund(grvId, 'Central Escrow Adjudication refund').catch((e) =>
-        console.warn('Grievance refund API notice:', e)
-      );
-    } else if (action === 'WARN') {
-      showToast('Doctor Warned ⚠️', 'Formal clinical misconduct warning registered in compliance dossier.', '⚠️', 'warning');
-      adjudicateGrievanceWarn(grvId, 'Central Clinical Governance warning').catch((e) =>
-        console.warn('Grievance warn API notice:', e)
-      );
-    } else {
-      showToast('Grievance Dismissed ✓', 'Dispute claim reviewed and dismissed — no compliance action warranted.', '✓', 'success');
-      adjudicateGrievanceDismiss(grvId, 'Telemetry evidence did not substantiate the claim').catch((e) =>
-        console.warn('Grievance dismiss API notice:', e)
-      );
+  async function handleAdjudicateGrievance(grvId: string, action: 'REFUND' | 'WARN' | 'RESOLVE') {
+    if (financeBusy) return;
+    setFinanceBusy(true);
+    try {
+      if (action === 'REFUND') {
+        await adjudicateGrievanceRefund(grvId, 'Board-approved refund; provider execution pending');
+      } else if (action === 'WARN') {
+        await adjudicateGrievanceWarn(grvId, 'Clinical Governance warning');
+      } else {
+        await adjudicateGrievanceDismiss(grvId, 'Telemetry evidence did not substantiate the claim');
+      }
+      await refreshBackend();
+      showToast(action === 'REFUND' ? 'Refund approved' : 'Decision recorded',
+        action === 'REFUND' ? 'Provider execution is pending. No money has been returned.' : 'The backend confirmed the decision.', '?', 'success');
+    } catch (error) {
+      showToast('Decision not confirmed', error instanceof Error ? error.message : 'Retry after checking the server state.', '!', 'warning');
+    } finally {
+      setFinanceBusy(false);
     }
   }
 
-  // Log resolve toggle
-  function handleToggleLogResolve(logId: string) {
-    setErrorLogs((prev) =>
-      prev.map((l) => {
-        if (l.id !== logId) return l;
-        const isResolved = l.status === 'RESOLVED';
-        return {
-          ...l,
-          status: isResolved ? 'UNRESOLVED' : 'RESOLVED',
-          resolvedAt: isResolved ? null : 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          resolutionNote: isResolved ? null : 'Administrative resolution signed off by Clinical Ops Director.',
-        };
-      })
-    );
-    showToast('Log Status Updated', 'Telemetry exception status toggled.', '🔄', 'info');
+  // Finance refund-request resolution — the lifecycle step after a
+  // grievance adjudication approves a refund (above). REFUNDED requires a
+  // provider_reference, prompted for here since the backend 422s without one.
+  async function handleTransitionRefund(
+    requestId: string,
+    status: 'PROCESSING' | 'REFUNDED' | 'FAILED' | 'RECONCILIATION_REQUIRED'
+  ) {
+    if (refundBusy) return;
+    let providerReference: string | undefined;
+    if (status === 'REFUNDED') {
+      const entered = window.prompt('Provider reference for this refund (required, max 300 characters):');
+      if (!entered || !entered.trim()) return;
+      const trimmed = entered.trim();
+      if (trimmed.length > 300) {
+        showToast('Reference Too Long', 'Provider reference must be 300 characters or fewer.', '⚠️', 'warning');
+        return;
+      }
+      providerReference = trimmed;
+    }
+    setRefundBusy(requestId);
+    try {
+      await transitionRefundRequest(requestId, status, providerReference);
+      await refreshBackend();
+      showToast('Refund Request Updated', `Status set to ${status.replace(/_/g, ' ')}.`, '✓', 'success');
+    } catch (error) {
+      showToast('Update Failed', error instanceof Error ? error.message : 'The backend rejected this transition.', '⚠️', 'warning');
+    } finally {
+      setRefundBusy(null);
+    }
+  }
+
+  // System-error lifecycle actions — real backend calls against
+  // `/admin/system-errors/:id/{acknowledge,resolve}`, then refetch, instead
+  // of a client-only status flip. There is no "reopen" capability on the
+  // backend, so a RESOLVED incident has no corresponding undo here either.
+  async function handleAcknowledgeLog(logId: string) {
+    if (logActionBusy) return;
+    setLogActionBusy(logId);
+    try {
+      await acknowledgeSystemError(logId);
+      await refreshBackend();
+      showToast('Incident Acknowledged', 'Marked as under investigation.', '🔍', 'info');
+    } catch (e) {
+      showToast('Update Failed', e instanceof Error ? e.message : 'The backend did not accept this change.', '⚠️', 'warning');
+    } finally {
+      setLogActionBusy(null);
+    }
+  }
+
+  async function handleResolveLog(logId: string) {
+    if (logActionBusy) return;
+    setLogActionBusy(logId);
+    try {
+      await resolveSystemError(logId, 'Administrative resolution signed off by Clinical Ops Director.');
+      await refreshBackend();
+      showToast('Incident Resolved', 'Telemetry exception marked resolved.', '✓', 'success');
+    } catch (e) {
+      showToast('Update Failed', e instanceof Error ? e.message : 'The backend did not accept this change.', '⚠️', 'warning');
+    } finally {
+      setLogActionBusy(null);
+    }
   }
 
   // Counters
@@ -325,13 +436,15 @@ export default function AdminPortalPage() {
 
   // Filtered lists
   const filteredDoctors = Object.values(doctorStore).filter((doc) => {
-    const text = (doc.name + ' ' + doc.bmdc + ' ' + doc.meta).toLowerCase();
+    const text = (doc.name + ' ' + doc.registrationNumber + ' ' + doc.meta).toLowerCase();
     const matchesSearch = !doctorSearchQuery || text.includes(doctorSearchQuery.toLowerCase());
-    const isSettled = payoutsSettled || doc.key === 'farhana' || doc.key === 'tariqul';
+    const isSettled = (doc.pendingDisbursement ?? 0) === 0;
     const matchesStatus =
       doctorStatusFilter === 'all' ? true : doctorStatusFilter === 'settled' ? isSettled : !isSettled;
     return matchesSearch && matchesStatus;
   });
+  const doctorsAwaitingCount = Object.values(doctorStore).filter((d) => (d.pendingDisbursement ?? 0) > 0).length;
+  const doctorsSettledCount = Object.values(doctorStore).length - doctorsAwaitingCount;
 
   const filteredPatients = Object.values(patientStore).filter((pt) => {
     const text = (pt.name + ' ' + pt.id + ' ' + pt.meta + ' ' + pt.cohort).toLowerCase();
@@ -349,9 +462,9 @@ export default function AdminPortalPage() {
 
   const filteredLogs = errorLogs.filter((log) => {
     if (logQuickFilter === 'critical' && log.severity !== 'CRITICAL') return false;
-    if (logQuickFilter === 'payment' && log.subsystem !== 'Payment Gateway') return false;
-    if (logQuickFilter === 'webrtc' && log.subsystem !== 'Agora WebRTC') return false;
-    if (logQuickFilter === 'offline' && log.subsystem !== 'Sync & Offline Cache') return false;
+    if (logQuickFilter === 'payment' && log.subsystem !== 'PAYMENT_GATEWAY') return false;
+    if (logQuickFilter === 'webrtc' && log.subsystem !== 'AGORA_RTC') return false;
+    if (logQuickFilter === 'offline' && log.subsystem !== 'SYNC_OFFLINE_CACHE') return false;
     if (logQuickFilter === 'unresolved' && log.status === 'RESOLVED') return false;
 
     if (logSeverityFilter !== 'ALL' && log.severity !== logSeverityFilter) return false;
@@ -452,7 +565,11 @@ export default function AdminPortalPage() {
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
             <span>Settlements &amp; Payouts</span>
-            <span className="admin-nav-badge amber">{payoutsSettled ? 'Settled' : '4 Pending'}</span>
+            {doctorsAwaitingCount > 0 ? (
+              <span className="admin-nav-badge amber">{doctorsAwaitingCount} Pending</span>
+            ) : (
+              <span className="admin-nav-badge green" style={{ background: '#DCFCE7', color: '#166534' }}>Settled</span>
+            )}
           </div>
 
           <div
@@ -494,13 +611,13 @@ export default function AdminPortalPage() {
           </div>
 
           <div
-            className={`admin-nav-item ${activeAdminPage === 'bmdc' ? 'active' : ''}`}
-            id="adminNav-bmdc"
-            onClick={() => setActiveAdminPage('bmdc')}
+            className={`admin-nav-item ${activeAdminPage === 'verification' ? 'active' : ''}`}
+            id="adminNav-verification"
+            onClick={() => setActiveAdminPage('verification')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
-            <span>BMDC Credentialing</span>
-            <span className="admin-nav-badge blue">3</span>
+            <span>Doctor Verification</span>
+            {verificationQueue.length > 0 && <span className="admin-nav-badge blue">{verificationQueue.length}</span>}
           </div>
 
           <div
@@ -564,7 +681,8 @@ export default function AdminPortalPage() {
               <input
                 type="text"
                 id="adminGlobalSearchInput"
-                placeholder="Search doctor, BMDC #, patient ID, TxID..."
+                maxLength={150}
+                placeholder="Search doctor, Professional registration #, patient ID, TxID..."
                 onChange={(e) => {
                   const val = e.target.value;
                   setDoctorSearchQuery(val);
@@ -577,16 +695,16 @@ export default function AdminPortalPage() {
 
             <button
               className="admin-16263-btn"
-              onClick={() => showToast('16263 Emergency Bridge Active 🚨', 'Direct audio interconnect routed to DGHS National Health Call Center.', '🚨', 'urgent')}
+              onClick={() => showToast('Emergency Bridge', 'The Kenya emergency contact is configured by deployment.', '🚨', 'info')}
             >
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#DC2626' }}></span>
-              <span>🚨 16263 Helpline Bridge</span>
+              <span>🚨 Emergency Helpline Bridge</span>
             </button>
 
             <div
               className="admin-top-icon-btn"
               title="Pending Notifications"
-              onClick={() => showToast('Central Notifications', '3 BMDC physician applications pending review.', '🔔', 'info')}
+              onClick={() => showToast('Central Notifications', '3 Professional registration physician applications pending review.', '🔔', 'info')}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span className="badge-dot"></span>
@@ -598,6 +716,20 @@ export default function AdminPortalPage() {
                 <span className="admin-user-name">Amina Rashid</span>
                 <span className="admin-user-role">Clinical Ops Director</span>
               </div>
+            </div>
+
+            <div
+              className="admin-top-icon-btn"
+              title="Sign out"
+              onClick={async () => {
+                try {
+                  const result = await fetch('/api/logout', { method: 'POST' });
+                  if (!result.ok) window.alert('Signed out locally. Server revocation could not be confirmed.');
+                } catch { window.alert('Unable to reach the server. Server sign-out could not be confirmed.'); }
+                window.location.href = '/login';
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </div>
           </div>
         </header>
@@ -627,15 +759,20 @@ export default function AdminPortalPage() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
                     <span>Master Payment Ledger →</span>
                   </button>
-                  <button className="admin-batch-payout-btn" onClick={handleExecuteBatchPayout}>
+                  <label style={{ fontSize: '12px', marginRight: '8px' }}>Statement month <input aria-label="Statement month" type="month" value={financeMonth} max={new Date().toISOString().slice(0, 7)} onChange={(e) => {
+                    if (!e.target.value || financeBusy) return;
+                    setFinanceMonth(e.target.value);
+                    setDoctorStore((previous) => Object.fromEntries(Object.entries(previous).map(([key, doc]) => [key, { ...doc, payoutRouting: undefined }])));
+                  }} /></label>
+                  <button className="admin-btn-sec" disabled={financeBusy} onClick={handleFinalizePeriod}>Finalize Month</button>
+                  <button className="admin-batch-payout-btn" disabled={financeBusy} onClick={handleExecuteBatchPayout}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    <span>Process Batch Payout</span>
-                    <span style={{ background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '6px', fontSize: '10.5px', marginLeft: '4px' }}>bKash + Nagad</span>
+                    <span>Prepare Batch</span>
                   </button>
                 </div>
               </div>
 
-              {/* 4 Metric Cards with Micro-Charts */}
+              {/* 4 Metric Cards — all computed from live backend data */}
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
@@ -644,46 +781,22 @@ export default function AdminPortalPage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val">৳ 2,450,000</div>
-                  <span className="admin-kpi-delta up">↗ +8.5% this month</span>
-                  <div className="kpi-micro-chart kpi-sparkline">
-                    <svg viewBox="0 0 200 36" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="sparkGradRev" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#059669" stopOpacity="0.2"/>
-                          <stop offset="100%" stopColor="#059669" stopOpacity="0"/>
-                        </linearGradient>
-                      </defs>
-                      <path d="M0 30 L33 26 L66 28 L100 20 L133 16 L166 12 L200 4 L200 36 L0 36 Z" fill="url(#sparkGradRev)"/>
-                      <polyline points="0,30 33,26 66,28 100,20 133,16 166,12 200,4" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round"/>
-                      <circle cx="200" cy="4" r="2.5" fill="#059669" stroke="#fff" strokeWidth="1.5"/>
-                    </svg>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#94A3B8', padding: '0 2px', marginTop: '1px' }}>
-                      <span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span style={{ color: '#059669', fontWeight: 700 }}>Oct</span>
-                    </div>
-                  </div>
+                  <div className="admin-kpi-val">{money(overview?.gross_volume)}</div>
+                  <span className="admin-kpi-delta neutral">Across {transactions.length} transaction{transactions.length === 1 ? '' : 's'}</span>
                 </div>
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">24h Chat Revenue (৳ 300 tier)</span>
+                    <span className="admin-kpi-sub">24h Chat Revenue</span>
                     <div className="admin-kpi-icon-circle blue" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val">৳ 380,000</div>
+                  <div className="admin-kpi-val">{money(modalitySplit.chatRevenue)}</div>
                   <div className="kpi-micro-chart">
-                    <div className="kpi-donut-wrap">
-                      <svg viewBox="0 0 42 42">
-                        <circle cx="21" cy="21" r="16" fill="none" stroke="#E2E8F0" strokeWidth="5"/>
-                        <circle cx="21" cy="21" r="16" fill="none" stroke="#2563EB" strokeWidth="5" strokeDasharray="62 38.5" strokeDashoffset="25" strokeLinecap="round"/>
-                        <text x="21" y="23" textAnchor="middle" fontSize="9" fontWeight="800" fill="#2563EB">62%</text>
-                      </svg>
-                      <div className="kpi-donut-legend">
-                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#2563EB' }}></span> 784 New Users</div>
-                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#E2E8F0' }}></span> 483 Returning</div>
-                        <div className="kpi-donut-legend-item" style={{ fontWeight: 700, color: '#0F172A', marginTop: '1px' }}>1,267 total sessions</div>
-                      </div>
+                    <div className="kpi-donut-legend">
+                      <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#2563EB' }}></span> {modalitySplit.videoCount} video consultation{modalitySplit.videoCount === 1 ? '' : 's'}</div>
+                      <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#E2E8F0' }}></span> {modalitySplit.chatCount} chat session{modalitySplit.chatCount === 1 ? '' : 's'}</div>
                     </div>
                   </div>
                 </div>
@@ -695,47 +808,46 @@ export default function AdminPortalPage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val">৳ 490,000</div>
+                  <div className="admin-kpi-val">{money(overview?.platform_fees)}</div>
                   <span className="admin-kpi-delta neutral">Automated commission cut</span>
-                  <div className="kpi-micro-chart kpi-stacked-bar">
-                    <div className="kpi-bar-row">
-                      <span className="kpi-bar-label">Video</span>
-                      <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: '78%', background: 'linear-gradient(90deg,#0D9488,#5EEAD4)' }}></div></div>
-                      <span className="kpi-bar-value">৳ 382k</span>
+                  {(modalitySplit.videoRevenue + modalitySplit.chatRevenue) > 0 && (
+                    <div className="kpi-micro-chart kpi-stacked-bar">
+                      <div className="kpi-bar-row">
+                        <span className="kpi-bar-label">Video</span>
+                        <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: `${Math.round((modalitySplit.videoRevenue / (modalitySplit.videoRevenue + modalitySplit.chatRevenue)) * 100)}%`, background: 'linear-gradient(90deg,#0D9488,#5EEAD4)' }}></div></div>
+                        <span className="kpi-bar-value">{money(modalitySplit.videoRevenue)}</span>
+                      </div>
+                      <div className="kpi-bar-row">
+                        <span className="kpi-bar-label">Chat</span>
+                        <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: `${Math.round((modalitySplit.chatRevenue / (modalitySplit.videoRevenue + modalitySplit.chatRevenue)) * 100)}%`, background: 'linear-gradient(90deg,#14B8A6,#99F6E4)' }}></div></div>
+                        <span className="kpi-bar-value">{money(modalitySplit.chatRevenue)}</span>
+                      </div>
                     </div>
-                    <div className="kpi-bar-row">
-                      <span className="kpi-bar-label">Chat</span>
-                      <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: '22%', background: 'linear-gradient(90deg,#14B8A6,#99F6E4)' }}></div></div>
-                      <span className="kpi-bar-value">৳ 108k</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="admin-kpi-card" style={{ borderColor: '#FCD34D' }}>
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Pending Doctor Wallet Escrow</span>
+                    <span className="admin-kpi-sub">Unpaid Doctor Earnings</span>
                     <div className="admin-kpi-icon-circle amber" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </div>
                   </div>
                   <div className="admin-kpi-val" id="adminEscrowDisplay">
-                    {payoutsSettled ? (
-                      <span style={{ color: '#059669', fontSize: '20px' }}>৳ 0 (Disbursed)</span>
+                    {doctorsAwaitingCount === 0 ? (
+                      <span style={{ color: '#059669', fontSize: '20px' }}>{money(overview?.pending_disbursement)}</span>
                     ) : (
-                      escrowTotal
+                      money(overview?.pending_disbursement)
                     )}
                   </div>
                   <div className="kpi-micro-chart">
                     <div className="kpi-pulse-indicator" style={{ marginBottom: '4px' }}>
-                      <div className="kpi-pulse-dot" style={{ background: '#D97706' }}></div>
-                      <span className="kpi-pulse-text" style={{ color: '#D97706' }}>
-                        {payoutsSettled ? 'All 14 doctors settled' : '14 doctors awaiting disbursement'}
+                      <div className="kpi-pulse-dot" style={{ background: doctorsAwaitingCount === 0 ? '#059669' : '#D97706' }}></div>
+                      <span className="kpi-pulse-text" style={{ color: doctorsAwaitingCount === 0 ? '#059669' : '#D97706' }}>
+                        {doctorsAwaitingCount === 0
+                          ? 'No pending earning balance'
+                          : `${doctorsAwaitingCount} doctor${doctorsAwaitingCount === 1 ? '' : 's'} awaiting disbursement`}
                       </span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <span style={{ fontSize: '9.5px', background: '#FEF3C7', color: '#92400E', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>bKash × 8</span>
-                      <span style={{ fontSize: '9.5px', background: '#FEF3C7', color: '#92400E', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>Nagad × 4</span>
-                      <span style={{ fontSize: '9.5px', background: '#FEF3C7', color: '#92400E', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>BEFTN × 2</span>
                     </div>
                   </div>
                 </div>
@@ -751,7 +863,7 @@ export default function AdminPortalPage() {
                 <div className="admin-card-header" style={{ flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
                   <div>
                     <div className="admin-card-title">Physician Directory &amp; Wallet Payout Database</div>
-                    <div className="admin-card-subtitle">Search, filter &amp; audit BMDC specialists, consultation loads, and payment settlements</div>
+                    <div className="admin-card-subtitle">Search, filter &amp; audit Professional registration specialists, consultation loads, and payment settlements</div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -759,7 +871,8 @@ export default function AdminPortalPage() {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                       <input
                         type="text"
-                        placeholder="Search doctor, BMDC #, specialty, method..."
+                        maxLength={150}
+                        placeholder="Search doctor, Professional registration #, specialty, method..."
                         value={doctorSearchQuery}
                         onChange={(e) => setDoctorSearchQuery(e.target.value)}
                         style={{ width: '100%', padding: '7px 12px 7px 30px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', outline: 'none' }}
@@ -767,9 +880,9 @@ export default function AdminPortalPage() {
                     </div>
 
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className={`admin-filter-pill ${doctorStatusFilter === 'all' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('all')}>All (6)</button>
-                      <button className={`admin-filter-pill ${doctorStatusFilter === 'pending' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('pending')}>Pending (4)</button>
-                      <button className={`admin-filter-pill ${doctorStatusFilter === 'settled' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('settled')}>Settled (2)</button>
+                      <button className={`admin-filter-pill ${doctorStatusFilter === 'all' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('all')}>All ({Object.keys(doctorStore).length})</button>
+                      <button className={`admin-filter-pill ${doctorStatusFilter === 'pending' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('pending')}>Pending ({doctorsAwaitingCount})</button>
+                      <button className={`admin-filter-pill ${doctorStatusFilter === 'settled' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('settled')}>Settled ({doctorsSettledCount})</button>
                     </div>
                   </div>
                 </div>
@@ -779,12 +892,12 @@ export default function AdminPortalPage() {
                     <thead>
                       <tr>
                         <th>Doctor Name</th>
-                        <th>BMDC Reg</th>
+                        <th>Professional registration Reg</th>
                         <th>Completed Visits</th>
                         <th>24h Chat Sessions</th>
-                        <th>Gross Earnings</th>
-                        <th>Platform Cut</th>
-                        <th>Net Payout (৳)</th>
+                        <th>Monthly Gross</th>
+                        <th>Monthly Platform Charge</th>
+                        <th>Monthly Payable / Estimate</th>
                         <th>Payout Method</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -792,7 +905,7 @@ export default function AdminPortalPage() {
                     </thead>
                     <tbody>
                       {filteredDoctors.map((doc) => {
-                        const isSettled = payoutsSettled || doc.key === 'farhana' || doc.key === 'tariqul';
+                        const isSettled = (doc.pendingDisbursement ?? 0) === 0;
                         return (
                           <tr
                             key={doc.key}
@@ -811,21 +924,24 @@ export default function AdminPortalPage() {
                                 </div>
                               </div>
                             </td>
-                            <td><span className="badge badge-slate" style={{ fontWeight: 750 }}>{doc.bmdc}</span></td>
+                            <td><span className="badge badge-slate" style={{ fontWeight: 750 }}>{doc.registrationNumber}</span><div>{doc.professionalVerificationStatus}</div></td>
                             <td><b>{doc.kpiVisits}</b></td>
                             <td>{doc.kpiChats}</td>
-                            <td>{doc.kpiGross}</td>
-                            <td style={{ color: '#64748B' }}>৳ 15,720</td>
-                            <td style={{ fontWeight: 850, color: '#059669' }}>{doc.kpiDisbursed}</td>
+                            <td>{doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.gross || 0).toLocaleString()}` : 'Unavailable'}</td>
+                            <td style={{ color: '#64748B' }}>{doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.platformCharge || 0).toLocaleString()}` : 'Unavailable'}</td>
+                            <td style={{ fontWeight: 850, color: '#059669' }}>{doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.finalPayable).toLocaleString()}` : 'Unavailable'}</td>
                             <td>
-                              <span className="payout-method-badge bkash">
-                                {doc.disbursements[0]?.method || 'bKash Merchant'}
+                              <span className="payout-method-badge bank">
+                                {doc.payoutRouting?.provider
+                                  ? `${doc.payoutRouting.provider} ${doc.payoutRouting.maskedDestination || ''}`
+                                  : 'Payout setup required'}
                               </span>
                             </td>
                             <td>
-                              <span className={`badge ${isSettled ? 'badge-green' : 'badge-amber'} doc-payout-status`}>
-                                {isSettled ? 'Settled ✓' : 'Pending Settlement'}
+                              <span className={`badge ${doc.payoutRouting?.readiness === 'ACTIVE' ? 'badge-green' : 'badge-amber'} doc-payout-status`}>
+                                {doc.payoutRouting?.disbursementStatus || doc.payoutRouting?.readiness || 'Payout setup required'}
                               </span>
+                              <div style={{ fontSize: '10px' }}>{doc.payoutRouting?.statementStatus || 'Not loaded'} · {doc.payoutRouting?.readiness || 'Unknown'}</div>
                             </td>
                             <td>
                               <button
@@ -848,35 +964,18 @@ export default function AdminPortalPage() {
             </div>
           )}
 
-          {/* PAGE 2: EXECUTIVE COMMAND CENTER */}
+          {/* PAGE 2: EXECUTIVE COMMAND CENTER — all values are live from /admin/command/telemetry */}
           {activeAdminPage === 'command' && (
             <div className="admin-page-view active" id="adminPage_command">
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Total Consultations Today</span>
+                    <span className="admin-kpi-sub">Consultations Completed Today</span>
                     <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val">1,480</div>
-                  <span className="admin-kpi-delta up">↗ +12.5% vs yesterday</span>
-                  <div className="kpi-micro-chart kpi-sparkline">
-                    <svg viewBox="0 0 200 40" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="sparkGrad1" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#059669" stopOpacity="0.25"/>
-                          <stop offset="100%" stopColor="#059669" stopOpacity="0"/>
-                        </linearGradient>
-                      </defs>
-                      <path d="M0 32 L28 28 L56 22 L84 25 L112 18 L140 14 L168 10 L200 6 L200 40 L0 40 Z" fill="url(#sparkGrad1)"/>
-                      <polyline points="0,32 28,28 56,22 84,25 112,18 140,14 168,10 200,6" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <circle cx="200" cy="6" r="3" fill="#059669" stroke="#fff" strokeWidth="1.5"/>
-                    </svg>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#94A3B8', marginTop: '2px', padding: '0 2px' }}>
-                      <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span style={{ color: '#059669', fontWeight: 700 }}>Today</span>
-                    </div>
-                  </div>
+                  <div className="admin-kpi-val">{commandTelemetry?.completed_today ?? 0}</div>
                 </div>
 
                 <div className="admin-kpi-card">
@@ -886,228 +985,128 @@ export default function AdminPortalPage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val">142</div>
-                  <div className="kpi-micro-chart">
-                    <div className="kpi-donut-wrap">
-                      <svg viewBox="0 0 42 42">
-                        <circle cx="21" cy="21" r="16" fill="none" stroke="#E2E8F0" strokeWidth="5"/>
-                        <circle cx="21" cy="21" r="16" fill="none" stroke="#2563EB" strokeWidth="5" strokeDasharray="94.4 6.1" strokeDashoffset="25" strokeLinecap="round"/>
-                        <text x="21" y="23" textAnchor="middle" fontSize="10" fontWeight="800" fill="#2563EB">94%</text>
-                      </svg>
-                      <div className="kpi-donut-legend">
-                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#2563EB' }}></span> 134 On-Duty</div>
-                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#F59E0B' }}></span> 22 On Break</div>
-                        <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#E2E8F0' }}></span> 8 Offline</div>
-                      </div>
-                    </div>
-                  </div>
+                  <div className="admin-kpi-val">{commandTelemetry?.active_specialists ?? 0}</div>
+                  <span className="admin-kpi-delta neutral">of {Object.keys(doctorStore).length} total registered</span>
                 </div>
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">24h Paid Chats Active</span>
+                    <span className="admin-kpi-sub">Live Consultation Sessions</span>
                     <div className="admin-kpi-icon-circle purple" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val">380</div>
-                  <span className="admin-kpi-delta neutral">1,500 live messages</span>
-                  <div className="kpi-micro-chart kpi-stacked-bar">
-                    <div className="kpi-bar-row">
-                      <span className="kpi-bar-label">Video</span>
-                      <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: '72%', background: 'linear-gradient(90deg,#7E22CE,#A855F7)' }}></div></div>
-                      <span className="kpi-bar-value">274</span>
-                    </div>
-                    <div className="kpi-bar-row">
-                      <span className="kpi-bar-label">Chat</span>
-                      <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: '28%', background: 'linear-gradient(90deg,#C084FC,#E9D5FF)' }}></div></div>
-                      <span className="kpi-bar-value">106</span>
-                    </div>
-                  </div>
+                  <div className="admin-kpi-val">{commandTelemetry?.active_sessions_count ?? 0}</div>
+                  <span className="admin-kpi-delta neutral">Video + 24h chat combined</span>
                 </div>
 
-                <div className="admin-kpi-card" style={{ borderColor: '#FCA5A5' }}>
+                <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Emergency 16263 Escalations</span>
+                    <span className="admin-kpi-sub">Emergency Helpline</span>
                     <div className="admin-kpi-icon-circle red" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val" style={{ color: '#DC2626' }}>16,263</div>
-                  <div className="kpi-micro-chart">
-                    <div className="kpi-pulse-indicator">
-                      <div className="kpi-pulse-dot"></div>
-                      <span className="kpi-pulse-text">3 red-flag alerts in last 30 min</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                      <span style={{ fontSize: '9.5px', background: '#FEF2F2', color: '#DC2626', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>🚨 Chest Pain × 1</span>
-                      <span style={{ fontSize: '9.5px', background: '#FEF2F2', color: '#DC2626', padding: '3px 8px', borderRadius: '6px', fontWeight: 700 }}>🚨 Seizure × 2</span>
-                    </div>
-                  </div>
+                  <div className="admin-kpi-val" style={{ color: '#DC2626' }}>Configured</div>
+                  <span className="admin-kpi-delta neutral">Kenya emergency contact is configured per deployment.</span>
                 </div>
               </div>
 
-              {/* 2-Column Command Layout */}
-              <div className="command-dashboard-grid">
-                <div className="admin-card">
-                  <div className="admin-card-header">
-                    <div>
-                      <div className="admin-card-title">Hourly Consultation Volume &amp; Load</div>
-                      <div className="admin-card-subtitle">Peak shifts: Morning 08:00–12:00 AM &amp; Evening 05:00–10:00 PM</div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className="admin-filter-pill active" style={{ padding: '4px 10px', fontSize: '11px' }}>Today</button>
-                      <button className="admin-filter-pill" style={{ padding: '4px 10px', fontSize: '11px' }}>7 Days</button>
-                    </div>
-                  </div>
-
-                  <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '16px 12px', border: '1px solid #E2E8F0' }}>
-                    <svg viewBox="0 0 540 180" style={{ width: '100%', height: '160px', overflow: 'visible' }}>
-                      <defs>
-                        <linearGradient id="chartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                          <stop offset="0%" stopColor="#059669" stopOpacity="0.3"/>
-                          <stop offset="100%" stopColor="#059669" stopOpacity="0.0"/>
-                        </linearGradient>
-                      </defs>
-                      <line x1="30" y1="30" x2="520" y2="30" stroke="#E2E8F0" strokeDasharray="3,3"/>
-                      <line x1="30" y1="75" x2="520" y2="75" stroke="#E2E8F0" strokeDasharray="3,3"/>
-                      <line x1="30" y1="120" x2="520" y2="120" stroke="#E2E8F0" strokeDasharray="3,3"/>
-                      <path d="M 40 150 C 90 145, 120 70, 160 85 C 200 100, 240 135, 280 115 C 320 95, 360 40, 400 50 C 440 60, 480 130, 510 150 L 510 150 L 40 150 Z" fill="url(#chartGrad)"/>
-                      <path d="M 40 150 C 90 145, 120 70, 160 85 C 200 100, 240 135, 280 115 C 320 95, 360 40, 400 50 C 440 60, 480 130, 510 150" fill="none" stroke="#059669" strokeWidth="3"/>
-                    </svg>
+              {/* Live WebRTC Stream Monitor — real consultation_sessions + telemetry */}
+              <div className="admin-card">
+                <div className="admin-card-header">
+                  <div>
+                    <div className="admin-card-title">Live WebRTC Stream Monitor</div>
+                    <div className="admin-card-subtitle">Real-time Agora RTC sessions currently in progress</div>
                   </div>
                 </div>
 
-                <div className="admin-card">
-                  <div className="admin-card-header">
-                    <div>
-                      <div className="admin-card-title">Live WebRTC Stream Monitor</div>
-                      <div className="admin-card-subtitle">Real-time Agora RTC bitrate &amp; packet latency monitoring</div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div className="webrtc-stream-card">
-                      <div>
-                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>Call #897103 • Dr. Anisul Haque (BMDC 74902)</strong>
-                        <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>Patient: P-ANON-A03 (Dhaka) • Elapsed: <b>08:45 / 10:00</b></div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {(commandTelemetry?.active_streams ?? []).length === 0 ? (
+                    <div style={{ padding: '24px', textAlign: 'center', color: '#64748B', fontSize: '12.5px' }}>No consultations are currently in progress.</div>
+                  ) : (
+                    commandTelemetry!.active_streams.map((s) => (
+                      <div className="webrtc-stream-card" key={s.session_id}>
+                        <div>
+                          <strong style={{ fontSize: '12px', color: '#0F172A' }}>{s.channel_name} • {s.doctor_name}</strong>
+                          <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>
+                            Patient: {s.patient_name} • Started: <b>{s.started_at ? new Date(s.started_at).toLocaleTimeString() : 'Unknown'}</b>
+                          </div>
+                        </div>
+                        <span className={`webrtc-ping-badge ${s.rtt_ms != null && s.rtt_ms < 60 ? 'good' : 'moderate'}`}>{s.rtt_ms == null ? 'Unmeasured RTT' : `${s.rtt_ms}ms`} • {s.connection_state}</span>
                       </div>
-                      <span className="webrtc-ping-badge good">34ms • HD Audio/Video</span>
-                    </div>
-
-                    <div className="webrtc-stream-card">
-                      <div>
-                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>Call #897104 • Dr. Sabrina Akter (BMDC 45821)</strong>
-                        <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>Patient: P-ANON-D91 (Dhanmondi) • Elapsed: <b>05:12 / 10:00</b></div>
-                      </div>
-                      <span className="webrtc-ping-badge good">42ms • HD Audio/Video</span>
-                    </div>
-
-                    <div className="webrtc-stream-card">
-                      <div>
-                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>Call #897105 • Dr. Karim Hossain (BMDC 81551)</strong>
-                        <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>Patient: P-ANON-K12 (Sylhet) • Elapsed: <b>09:03 / 10:00</b></div>
-                      </div>
-                      <span className="webrtc-ping-badge moderate">86ms (3G Adaptive)</span>
-                    </div>
-
-                    <div className="webrtc-stream-card">
-                      <div>
-                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>Call #897106 • Dr. Sadik Al-Amin (BMDC 68192)</strong>
-                        <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>Patient: P-ANON-M22 (Chittagong) • Elapsed: <b>02:18 / 10:00</b></div>
-                      </div>
-                      <span className="webrtc-ping-badge good">29ms • HD Audio/Video</span>
-                    </div>
-                  </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* PAGE 3: SLOT MATRIX & LOCKS */}
+          {/* PAGE 3: SLOT MATRIX & LOCKS — real schedule_slots data, grouped by doctor */}
           {activeAdminPage === 'slots' && (
             <div className="admin-page-view active" id="adminPage_slots">
               <div className="admin-card">
                 <div className="admin-card-header">
                   <div>
-                    <div className="admin-card-title">Timetable 10-Minute Micro-Slot Grid &amp; 1-Hour Lock Governance</div>
-                    <div className="admin-card-subtitle">Slots within &lt;60 minutes of start are strictly locked to prevent patient abandonment</div>
+                    <div className="admin-card-title">Doctor Schedule Slots</div>
+                    <div className="admin-card-subtitle">Click an available slot to block it, or a blocked slot to make it available. Booked, payment-locked and cancelled slots cannot be changed here.</div>
+                    <div className="admin-card-subtitle">All schedule times use East Africa Time (UTC+3), matching Doctor Web. Available means open for booking; it is not a patient booking.</div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="slot-chip available" style={{ padding: '4px 8px', fontSize: '10px' }}>Available</span>
-                    <span className="slot-chip booked" style={{ padding: '4px 8px', fontSize: '10px' }}>Booked (10m)</span>
-                    <span className="slot-chip locked" style={{ padding: '4px 8px', fontSize: '10px' }}>🔒 &lt;1h Locked</span>
-                    <span className="slot-chip chat-only" style={{ padding: '4px 8px', fontSize: '10px' }}>💬 24h Chat</span>
+                    <span className="slot-chip blocked" style={{ padding: '4px 8px', fontSize: '10px' }}>Blocked</span>
+                    <span className="slot-chip booked" style={{ padding: '4px 8px', fontSize: '10px' }}>Booked</span>
+                    <span className="slot-chip locked" style={{ padding: '4px 8px', fontSize: '10px' }}>🔒 Locked in Payment</span>
                   </div>
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="admin-slot-grid-table">
-                    <thead>
-                      <tr>
-                        <th style={{ width: '200px' }}>Specialist</th>
-                        <th>10:30 AM</th>
-                        <th>10:40 AM</th>
-                        <th>10:50 AM</th>
-                        <th>11:00 AM</th>
-                        <th>11:10 AM</th>
-                        <th>11:20 AM</th>
-                        <th>11:30 AM</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#FEF3C7', color: '#B45309', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '10.5px' }}>SA</div>
-                            <div>
-                              <strong style={{ fontSize: '12px', color: '#0F172A' }}>Dr. Sabrina Akter</strong>
-                              <div style={{ fontSize: '10px', color: '#64748B' }}>Internal Medicine</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td><div className="slot-chip locked" onClick={() => showToast('Slot Locked 🔒', 'Rafiq Ahmed (10:30 AM) consultation cannot be cancelled within 1 hour.', '🔒', 'warning')}><span>10:30 • Rafiq A.</span><span style={{ fontSize: '9.5px', opacity: 0.85 }}>🔒 Locked</span></div></td>
-                        <td><div className="slot-chip locked" onClick={() => showToast('Slot Locked 🔒', 'Nusrat Jahan (10:40 AM) locked under 1h policy.', '🔒', 'warning')}><span>10:40 • Nusrat J.</span><span style={{ fontSize: '9.5px', opacity: 0.85 }}>🔒 Locked</span></div></td>
-                        <td><div className="slot-chip chat-only" onClick={() => showToast('Chat Consultation', 'Kamal Uddin subscribed for 24h dedicated chat only.', '💬', 'info')}><span>10:50 • Kamal U.</span><span style={{ fontSize: '9.5px' }}>💬 24h Chat</span></div></td>
-                        <td><div className="slot-chip available" onClick={() => showToast('Open Slot', '11:00 AM available for patient booking.', '✓', 'success')}><span>11:00 • Available</span></div></td>
-                        <td><div className="slot-chip available" onClick={() => showToast('Open Slot', '11:10 AM available for patient booking.', '✓', 'success')}><span>11:10 • Available</span></div></td>
-                        <td><div className="slot-chip booked"><span>11:20 • Tanvir C.</span><span style={{ fontSize: '9.5px' }}>Booked (10m)</span></div></td>
-                        <td><div className="slot-chip available"><span>11:30 • Available</span></div></td>
-                      </tr>
-                      <tr>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#EFF6FF', color: '#1D4ED8', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '10.5px' }}>KH</div>
-                            <div>
-                              <strong style={{ fontSize: '12px', color: '#0F172A' }}>Dr. Karim Hossain</strong>
-                              <div style={{ fontSize: '10px', color: '#64748B' }}>Cardiology</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td><div className="slot-chip available"><span>10:30 • Available</span></div></td>
-                        <td><div className="slot-chip locked"><span>10:40 • T. Hasan</span><span style={{ fontSize: '9.5px', opacity: 0.85 }}>🔒 Locked</span></div></td>
-                        <td><div className="slot-chip available"><span>10:50 • Available</span></div></td>
-                        <td><div className="slot-chip available"><span>11:00 • Available</span></div></td>
-                        <td><div className="slot-chip booked"><span>11:10 • Farzana H.</span><span style={{ fontSize: '9.5px' }}>Booked (10m)</span></div></td>
-                        <td><div className="slot-chip available"><span>11:20 • Available</span></div></td>
-                        <td><div className="slot-chip available"><span>11:30 • Available</span></div></td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '12px 20px' }}>
+                  <label>Schedule date <input type="date" aria-label="Schedule date" value={slotDate} onChange={event => setSlotDate(event.target.value)} /></label>
+                  <button onClick={() => setSlotDate('')}>All dates</button>
+                  <button disabled={slotSync.loading || !!slotBusy} onClick={() => void slotSync.refresh()}>Refresh schedule</button>
+                  <span role="status" aria-live="polite">{slotSync.loading ? 'Refreshing schedule…' : slotSync.updatedAt ? `Last synced ${scheduleLabel(slotSync.updatedAt)} EAT` : 'Schedule not loaded'}</span>
                 </div>
-
-                <div className="emergency-dispatch-card">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <div style={{ fontSize: '24px' }}>🚨</div>
-                    <div>
-                      <strong style={{ fontSize: '13px', color: '#991B1B' }}>Emergency Patient Re-assignment Dispatch</strong>
-                      <div style={{ fontSize: '11.5px', color: '#B91C1C', marginTop: '2px' }}>Override 1-hour cancellation lock for verified doctor emergency and re-route waiting patients without re-billing.</div>
-                    </div>
+                {slotSync.error && <div role="alert" style={{ padding: '12px 20px', color: '#B45309' }}>{slotSync.error}</div>}
+                {visibleSlots.length === 0 ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#64748B', fontSize: '12.5px' }}>{slotSync.loading ? 'Loading schedule…' : slotSync.error ? 'Schedule unavailable.' : slotDate ? 'No schedule slots for this date.' : 'No schedule slots exist yet.'}</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {Object.entries(
+                      visibleSlots.reduce((groups: Record<string, typeof adminSlots>, slot) => {
+                        (groups[slot.doctor_id] ??= []).push(slot);
+                        return groups;
+                      }, {})
+                    ).map(([doctorId, slots]) => (
+                      <div key={doctorId}>
+                        <strong style={{ fontSize: '12.5px', color: '#0F172A' }}>{slots[0].doctor_name}</strong>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                          {slots
+                            .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+                            .map((slot) => {
+                              const chipCls = slot.status === 'AVAILABLE' ? 'available' : slot.status === 'BLOCKED' ? 'blocked' : slot.status === 'BOOKED' ? 'booked' : slot.status === 'LOCKED_IN_PAYMENT' ? 'locked' : 'cancelled';
+                              const canToggle = (slot.status === 'AVAILABLE' || slot.status === 'BLOCKED') && !slotBusy && !slotSync.error;
+                              return (
+                                <div
+                                  key={slot.id}
+                                  data-slot-id={slot.id}
+                                  data-slot-status={slot.status}
+                                  className={`slot-chip ${chipCls}`}
+                                  title={`${slot.status === 'AVAILABLE' ? 'Block slot' : slot.status === 'BLOCKED' ? 'Make slot available' : slot.status}. Created ${scheduleLabel(slot.created_at)} EAT. Slot ${slot.id}`}
+                                  style={{ cursor: canToggle ? 'pointer' : 'default', opacity: slot.status === 'CANCELLED' ? 0.5 : slotBusy === slot.id ? 0.6 : 1 }}
+                                  onClick={() => canToggle && handleToggleSlot(slot.id, slot.status === 'AVAILABLE' ? 'BLOCK' : 'UNBLOCK')}
+                                >
+                                  <span>{scheduleLabel(slot.start_time)} – {new Date(slot.end_time).toLocaleTimeString('en-KE', { timeZone: 'Africa/Nairobi', hour: '2-digit', minute: '2-digit' })} EAT</span>
+                                  <span style={{ fontSize: '9.5px', opacity: 0.85 }}>
+                                    {slot.status === 'LOCKED_IN_PAYMENT' ? '🔒 Locked' : slot.status.replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <button className="emergency-dispatch-btn" onClick={() => showToast('Emergency Re-assignment Dispatched', 'Patient Rafiq Ahmed re-routed to Dr. Tanvir Hossain without re-billing.', '⚡', 'urgent')}>
-                    <span>Execute Emergency Override ⚡</span>
-                  </button>
-                </div>
+                )}
               </div>
             </div>
           )}
@@ -1119,8 +1118,7 @@ export default function AdminPortalPage() {
                 <div className="admin-kpi-card">
                   <div>
                     <span className="admin-kpi-sub">Total Registered Patients</span>
-                    <div className="admin-kpi-val">28,450</div>
-                    <div style={{ fontSize: '11px', color: '#059669', fontWeight: 750 }}>+14.2% YoY growth</div>
+                    <div className="admin-kpi-val">{Object.keys(patientStore).length}</div>
                   </div>
                   <div className="admin-kpi-icon-circle green">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
@@ -1129,9 +1127,8 @@ export default function AdminPortalPage() {
 
                 <div className="admin-kpi-card">
                   <div>
-                    <span className="admin-kpi-sub">Active 24h Chat Subscribers</span>
-                    <div className="admin-kpi-val">1,267</div>
-                    <div style={{ fontSize: '11px', color: '#2563EB', fontWeight: 700 }}>+8.5% growth</div>
+                    <span className="admin-kpi-sub">Patients With 24h Chat History</span>
+                    <div className="admin-kpi-val">{Object.values(patientStore).filter((p) => (p.chatSessions ?? 0) > 0).length}</div>
                   </div>
                   <div className="admin-kpi-icon-circle blue">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -1140,9 +1137,8 @@ export default function AdminPortalPage() {
 
                 <div className="admin-kpi-card">
                   <div>
-                    <span className="admin-kpi-sub">Chronic Care Cohort</span>
-                    <div className="admin-kpi-val">6,820</div>
-                    <div style={{ fontSize: '11px', color: '#D97706', fontWeight: 700 }}>Hypertension &amp; T2DM</div>
+                    <span className="admin-kpi-sub">Total Consultations Logged</span>
+                    <div className="admin-kpi-val">{Object.values(patientStore).reduce((s, p) => s + p.encounters.length, 0)}</div>
                   </div>
                   <div className="admin-kpi-icon-circle amber">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
@@ -1152,8 +1148,7 @@ export default function AdminPortalPage() {
                 <div className="admin-kpi-card">
                   <div>
                     <span className="admin-kpi-sub">Total Patient Health Spend</span>
-                    <div className="admin-kpi-val">৳ 4,890,000</div>
-                    <div style={{ fontSize: '11px', color: '#059669', fontWeight: 750 }}>+18.1% turnover</div>
+                    <div className="admin-kpi-val">{money(overview?.gross_volume)}</div>
                   </div>
                   <div className="admin-kpi-icon-circle teal">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
@@ -1172,6 +1167,7 @@ export default function AdminPortalPage() {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                       <input
                         type="text"
+                        maxLength={150}
                         placeholder="Search patient name, #PT ID, phone, dx..."
                         value={patientSearchQuery}
                         onChange={(e) => setPatientSearchQuery(e.target.value)}
@@ -1180,7 +1176,7 @@ export default function AdminPortalPage() {
                     </div>
 
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className={`admin-filter-pill ${patientFilterCategory === 'all' ? 'active' : ''}`} onClick={() => setPatientFilterCategory('all')}>All (6)</button>
+                      <button className={`admin-filter-pill ${patientFilterCategory === 'all' ? 'active' : ''}`} onClick={() => setPatientFilterCategory('all')}>All ({Object.keys(patientStore).length})</button>
                       <button className={`admin-filter-pill ${patientFilterCategory === 'chronic' ? 'active' : ''}`} onClick={() => setPatientFilterCategory('chronic')}>Chronic Care</button>
                       <button className={`admin-filter-pill ${patientFilterCategory === 'chat' ? 'active' : ''}`} onClick={() => setPatientFilterCategory('chat')}>Active 24h Chat</button>
                       <button className={`admin-filter-pill ${patientFilterCategory === 'pediatric' ? 'active' : ''}`} onClick={() => setPatientFilterCategory('pediatric')}>Pediatric</button>
@@ -1197,8 +1193,8 @@ export default function AdminPortalPage() {
                         <th>Demographics</th>
                         <th>Completed Video Visits</th>
                         <th>24h Chat Sessions</th>
-                        <th>Total Spend (৳)</th>
-                        <th>Chronic Condition</th>
+                        <th>Total Spend (KES )</th>
+                        <th>Blood Group / Cohort</th>
                         <th>Last Consultation</th>
                         <th>Actions</th>
                       </tr>
@@ -1223,13 +1219,13 @@ export default function AdminPortalPage() {
                           </td>
                           <td><span className="badge badge-slate" style={{ fontWeight: 750 }}>{pt.id}</span></td>
                           <td>{pt.meta.split('•')[0]}</td>
-                          <td><b>{pt.encounters.length * 4}</b></td>
-                          <td>{pt.chatActive ? 45 : 18}</td>
-                          <td><b style={{ color: '#0F172A', fontSize: '13px' }}>৳ 75,000</b></td>
+                          <td><b>{pt.videoVisits ?? 0}</b></td>
+                          <td>{pt.chatSessions ?? 0}</td>
+                          <td><b style={{ color: '#0F172A', fontSize: '13px' }}>{money(pt.totalSpend)}</b></td>
                           <td>
                             <span className="badge" style={{ background: '#FEE2E2', color: '#DC2626', fontSize: '9.5px', fontWeight: 750 }}>{pt.cohort}</span>
                           </td>
-                          <td>{pt.encounters[0]?.date || 'Recent'}<div style={{ fontSize: '10px', color: '#64748B' }}>by {pt.encounters[0]?.doctor || 'Dr. Sabrina'}</div></td>
+                          <td>{pt.encounters[0]?.date || 'No encounters yet'}{pt.encounters[0] && <div style={{ fontSize: '10px', color: '#64748B' }}>by {pt.encounters[0].doctor}</div>}</td>
                           <td>
                             <button
                               className="admin-btn-sec"
@@ -1250,150 +1246,122 @@ export default function AdminPortalPage() {
             </div>
           )}
 
-          {/* PAGE 5: BMDC CREDENTIALING */}
-          {activeAdminPage === 'bmdc' && (
-            <div className="admin-page-view active" id="adminPage_bmdc">
+          {/* PAGE 5: Professional registration CREDENTIALING — genuinely PENDING Doctors from /admin/doctors/pending-verification */}
+          {activeAdminPage === 'verification' && (
+            <div className="admin-page-view active" id="adminPage_verification">
               <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '18px' }}>
                 <div className="admin-card" style={{ padding: '16px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '12px' }}>Doctor Vetting Queue (3 Pending)</div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', marginBottom: '12px' }}>Doctor Verification Queue ({verificationQueue.length} Pending)</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ padding: '12px', background: '#ECFDF5', border: '1px solid #10B981', borderRadius: '12px', cursor: 'pointer' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: '12.5px', color: '#065F46' }}>Dr. Sarah Rahman</strong>
-                        <span className="badge badge-green">98% Match</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#047857', marginTop: '2px' }}>BMDC #A-48291 • Internal Medicine</div>
-                      <div style={{ fontSize: '10px', color: '#64748B', marginTop: '4px' }}>Applied 2 hrs ago • NID Verified</div>
-                    </div>
-
-                    <div style={{ padding: '12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', cursor: 'pointer' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ fontSize: '12.5px', color: '#0F172A' }}>Dr. Ahmed Khan</strong>
-                        <span className="badge badge-blue">95% Match</span>
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>BMDC #A-55102 • Cardiology</div>
-                      <div style={{ fontSize: '10px', color: '#64748B', marginTop: '4px' }}>Applied 5 hrs ago • Renewal Check</div>
-                    </div>
+                    {verificationQueue.length === 0 ? (
+                      <div style={{ padding: '16px', textAlign: 'center', color: '#64748B', fontSize: '12.5px' }}>No Doctors are awaiting professional registration review.</div>
+                    ) : (
+                      verificationQueue.map((d) => (
+                        <div
+                          key={d.id}
+                          onClick={() => setSelectedVerificationId(d.id)}
+                          style={{
+                            padding: '12px',
+                            background: d.id === selectedVerificationId ? '#ECFDF5' : '#F8FAFC',
+                            border: `1px solid ${d.id === selectedVerificationId ? '#10B981' : '#E2E8F0'}`,
+                            borderRadius: '12px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <strong style={{ fontSize: '12.5px', color: d.id === selectedVerificationId ? '#065F46' : '#0F172A' }}>{d.full_name}</strong>
+                          <div style={{ fontSize: '11px', color: d.id === selectedVerificationId ? '#047857' : '#475569', marginTop: '2px' }}>{d.license_number} • {d.primary_specialty}</div>
+                          <div style={{ fontSize: '10px', color: '#64748B', marginTop: '4px' }}>Applied {new Date(d.created_at).toLocaleDateString()}</div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
 
                 <div className="admin-card">
-                  <div className="admin-card-header">
-                    <div>
-                      <div className="admin-card-title">In Review: Dr. Sarah Rahman (A-48291)</div>
-                      <div style={{ fontSize: '12px', color: '#059669', fontWeight: 750, marginTop: '2px' }}>Govt BMDC Directory Match: 99.1% High Confidence</div>
-                    </div>
-                    <span className="badge badge-amber">Pending Final Approval</span>
-                  </div>
+                  {(() => {
+                    const candidate = verificationQueue.find((d) => d.id === selectedVerificationId);
+                    if (!candidate) {
+                      return <div style={{ padding: '24px', textAlign: 'center', color: '#64748B', fontSize: '12.5px' }}>Select an application from the queue to review it.</div>;
+                    }
+                    return (
+                      <>
+                        <div className="admin-card-header">
+                          <div>
+                            <div className="admin-card-title">In Review: {candidate.full_name} ({candidate.license_number})</div>
+                          </div>
+                          <span className="badge badge-amber">Pending review</span>
+                        </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '18px' }}>
-                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px' }}>
-                      <div style={{ fontSize: '11.5px', fontWeight: 750, color: '#475569', marginBottom: '10px' }}>ORIGINAL UPLOADED SCANS</div>
-                      <div style={{ background: '#fff', border: '1px dashed #CBD5E1', padding: '14px', borderRadius: '10px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '26px', marginBottom: '4px' }}>📜</div>
-                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>BMDC Registration Certificate (A-48291)</strong>
-                        <div style={{ fontSize: '10px', color: '#64748B' }}>Issued: 15 Oct 2022 • Bangladesh Medical Council</div>
-                      </div>
-                      <div style={{ background: '#fff', border: '1px dashed #CBD5E1', padding: '14px', borderRadius: '10px', textAlign: 'center', marginTop: '10px' }}>
-                        <div style={{ fontSize: '26px', marginBottom: '4px' }}>🪪</div>
-                        <strong style={{ fontSize: '12px', color: '#0F172A' }}>National ID (NID #7849120356)</strong>
-                        <div style={{ fontSize: '10px', color: '#64748B' }}>Match Verified with Election Commission</div>
-                      </div>
-                    </div>
+                        <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px', marginBottom: '18px' }}>
+                          <div style={{ fontSize: '11.5px', fontWeight: 750, color: '#475569', marginBottom: '10px' }}>APPLICATION DETAILS</div>
+                          <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div><b>Full Name:</b> {candidate.full_name}</div>
+                            <div><b>KMPDC Registration Number:</b> {candidate.license_number}</div>
+                            <div><b>Regulatory Authority:</b> Kenya Medical Practitioners and Dentists Council ({candidate.license_authority})</div>
+                            <div><b>Country:</b> {candidate.license_country}</div>
+                            <div><b>Status:</b> Pending review</div>
+                            <div><b>Qualifications:</b> {candidate.qualifications.join(', ') || 'Not provided'}</div>
+                            <div><b>Specialty:</b> {candidate.primary_specialty}</div>
+                            <div><b>Experience:</b> {candidate.experience_years} years</div>
+                            <div><b>Current Hospital:</b> {candidate.current_hospital}</div>
+                            <div><b>Verified Phone:</b> {candidate.verified_phone}</div>
+                          </div>
+                        </div>
 
-                    <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px' }}>
-                      <div style={{ fontSize: '11.5px', fontWeight: 750, color: '#475569', marginBottom: '10px' }}>VERIFIED OCR DIGITAL DATA</div>
-                      <div style={{ fontSize: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        <div><b>Full Name:</b> SARAH RAHMAN</div>
-                        <div><b>BMDC Reg Number:</b> A-48291 <span className="badge badge-green" style={{ fontSize: '9.5px' }}>Active</span></div>
-                        <div><b>NID Number:</b> 7849120356 (Matched 100%)</div>
-                        <div><b>Degrees:</b> MBBS (Dhaka Med. Col., 2013), FCPS (BCPS, 2019)</div>
-                        <div><b>Affiliated Hospital:</b> Apollo Hospitals Dhaka</div>
-                        <div><b>Specialty:</b> Internal Medicine Consultant</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
-                    <button className="slot-subtle-btn" style={{ background: '#FEE2E2', color: '#DC2626', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 750, cursor: 'pointer' }} onClick={() => handleBmdcAction('reject')}>
-                      ✕ Reject Application
-                    </button>
-                    <button className="slot-subtle-btn" style={{ background: '#FEF3C7', color: '#B45309', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 750, cursor: 'pointer' }} onClick={() => handleBmdcAction('clarify')}>
-                      ⚠️ Request Clarification
-                    </button>
-                    <button className="admin-btn-pri" style={{ padding: '8px 16px', fontSize: '12px' }} onClick={() => handleBmdcAction('approve')}>
-                      ✓ Approve &amp; Activate Doctor
-                    </button>
-                  </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
+                          <button disabled={verificationBusy} className="slot-subtle-btn" style={{ background: '#FEE2E2', color: '#DC2626', border: 'none', padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 750, cursor: 'pointer' }} onClick={() => handleVerificationAction('reject')}>
+                            ✕ Reject Application
+                          </button>
+                          <button disabled={verificationBusy} className="admin-btn-pri" style={{ padding: '8px 16px', fontSize: '12px' }} onClick={() => handleVerificationAction('approve')}>
+                            ✓ Verify Registration
+                          </button>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
           )}
 
-          {/* PAGE 6: CLINICAL PRESCRIPTION & Q&A AUDIT */}
+          {/* PAGE 6: CLINICAL PRESCRIPTION AUDIT — real alerts from /admin/compliance/alerts */}
           {activeAdminPage === 'compliance' && (
             <div className="admin-page-view active" id="adminPage_compliance">
               <div className="admin-card">
                 <div className="admin-card-header">
                   <div>
-                    <div className="admin-card-title">Clinical e-Prescription Audit &amp; DGDA Compliance</div>
-                    <div className="admin-card-subtitle">AI-assisted antimicrobial stewardship &amp; narcotic Schedule H compliance surveillance</div>
+                    <div className="admin-card-title">Clinical e-Prescription Audit</div>
+                    <div className="admin-card-subtitle">Prescriptions automatically flagged for controlled-substance keywords requiring counter-signature</div>
                   </div>
-                  <span className="badge badge-amber" style={{ fontWeight: 800 }}>1 Flagged for Review</span>
+                  <span className={`badge ${complianceAlerts.length > 0 ? 'badge-amber' : 'badge-green'}`} style={{ fontWeight: 800 }}>
+                    {complianceAlerts.length > 0 ? `${complianceAlerts.length} Flagged for Review` : 'All Clear'}
+                  </span>
                 </div>
 
-                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '14px', padding: '18px', marginBottom: '18px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '20px' }}>⚠️</span>
-                      <div>
-                        <strong style={{ color: '#991B1B', fontSize: '13.5px' }}>Schedule H Controlled Substance Alert — Rx #HD-891042</strong>
-                        <div style={{ fontSize: '11px', color: '#B91C1C', marginTop: '2px' }}>Issued today by Dr. Sabrina Akter (BMDC #45821) • Patient: Sarah Khan (29F)</div>
+                {complianceAlerts.length === 0 ? (
+                  <div style={{ padding: '24px', textAlign: 'center', color: '#64748B', fontSize: '12.5px' }}>No prescriptions are currently flagged.</div>
+                ) : (
+                  complianceAlerts.map((alert) => (
+                    <div key={alert.id} style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '14px', padding: '18px', marginBottom: '14px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '20px' }}>⚠️</span>
+                          <div>
+                            <strong style={{ color: '#991B1B', fontSize: '13.5px' }}>{alert.category} — {alert.rx_number}</strong>
+                            <div style={{ fontSize: '11px', color: '#B91C1C', marginTop: '2px' }}>Issued by {alert.doctor_name} • Patient: {alert.patient_name}</div>
+                          </div>
+                        </div>
+                        <span className="badge" style={{ background: '#FEE2E2', color: '#991B1B', fontWeight: 800 }}>{alert.status}</span>
+                      </div>
+
+                      <div style={{ marginTop: '14px', background: '#fff', borderRadius: '10px', padding: '14px', border: '1px solid #FCA5A5' }}>
+                        <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>DOCTOR NOTES</div>
+                        <div style={{ fontSize: '12px', color: '#0F172A', marginTop: '4px' }}>{alert.doctor_notes}</div>
+                        <div style={{ fontSize: '11px', color: '#7F1D1D', marginTop: '10px' }}>{alert.flag_reason}</div>
                       </div>
                     </div>
-                    <span className="badge" style={{ background: '#FEE2E2', color: '#991B1B', fontWeight: 800 }}>High Risk</span>
-                  </div>
-
-                  <div style={{ marginTop: '14px', background: '#fff', borderRadius: '10px', padding: '14px', border: '1px solid #FCA5A5', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                    <div>
-                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>PRESCRIBED MEDICATIONS</div>
-                      <div style={{ fontSize: '12px', color: '#0F172A', marginTop: '4px' }}>
-                        1. <b>Tab. Azithromycin 500mg</b> — 1 daily x 3 days (Broad spectrum)<br/>
-                        2. <b style={{ color: '#DC2626' }}>Inj. Morphine Sulphate 10mg/mL</b> — SOS for severe trauma pain (Schedule H)
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>COMPLIANCE AUDIT RATIONALE</div>
-                      <div style={{ fontSize: '11.5px', color: '#7F1D1D', marginTop: '4px' }}>
-                        Narcotic Schedule H analgesics require physical triage verification under DGDA Telemedicine circular 2024. Audit flag requires clinical ops counter-signature.
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
-                    <button className="slot-subtle-btn" style={{ background: '#FEE2E2', color: '#DC2626', border: 'none', padding: '7px 14px', borderRadius: '8px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer' }} onClick={() => showToast('Prescription Flagged', 'Doctor notified to revise Schedule H dosage.', '⚠️', 'warning')}>
-                      Request Revision from Doctor
-                    </button>
-                    <button className="admin-btn-pri" onClick={() => showToast('Prescription Approved ✓', 'Archived into Sarah Khan Health Vault with audit signature.', '✓', 'success')}>
-                      Counter-Sign &amp; Release Rx ✓
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '16px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>Automated DGDA Safety Checks (Passing)</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                    <div style={{ padding: '10px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', fontSize: '11px', color: '#065F46' }}>
-                      <b>DDI Drug-Drug Interactions:</b> Passed ✓ No severe interactions detected.
-                    </div>
-                    <div style={{ padding: '10px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', fontSize: '11px', color: '#1D4ED8' }}>
-                      <b>Antibiotic Stewardship:</b> Standard 3-day course validated.
-                    </div>
-                    <div style={{ padding: '10px', background: '#ECFDF5', border: '1px solid #A7F3D0', borderRadius: '8px', fontSize: '11px', color: '#065F46' }}>
-                      <b>BMDC Digital Signature:</b> SHA-256 authenticated against physician key.
-                    </div>
-                  </div>
-                </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -1413,13 +1381,13 @@ export default function AdminPortalPage() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button className="slot-subtle-btn" style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '7px 12px', borderRadius: '9px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }} onClick={() => setSimulateModalOpen(true)}>
+                  {simulationsAllowed && <button className="slot-subtle-btn" style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '7px 12px', borderRadius: '9px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }} onClick={() => setSimulateModalOpen(true)}>
                     <span>⚡ Simulate App Failure</span>
-                  </button>
+                  </button>}
                   <button className="slot-subtle-btn" style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', padding: '7px 12px', borderRadius: '9px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }} onClick={() => showToast('Logs Exported 📥', `${errorLogs.length} incidents exported as JSON file.`, '📥', 'success')}>
                     <span>📥 Export Logs (.JSON)</span>
                   </button>
-                  <button className="admin-btn-pri" onClick={() => showToast('Telemetry Synced 🔄', 'Refreshed latest error streams from mobile clusters.', '🔄', 'info')} style={{ padding: '7px 14px', fontSize: '11.5px' }}>
+                  <button className="admin-btn-pri" onClick={() => { refreshBackend(); showToast('Telemetry Synced 🔄', 'Refreshed latest error streams from the backend.', '🔄', 'info'); }} style={{ padding: '7px 14px', fontSize: '11.5px' }}>
                     <span>🔄 Refresh Feed</span>
                   </button>
                 </div>
@@ -1444,8 +1412,17 @@ export default function AdminPortalPage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val" style={{ fontSize: '19px', color: '#BE123C' }}>bKash PGW (38%)</div>
-                  <span className="admin-kpi-delta" style={{ color: '#B45309', fontSize: '11px', fontWeight: 700 }}>Callback timeout &gt; 15,000ms</span>
+                  {(() => {
+                    const counts: Record<string, number> = {};
+                    errorLogs.forEach((l) => { counts[l.subsystem] = (counts[l.subsystem] ?? 0) + 1; });
+                    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+                    return (
+                      <>
+                        <div className="admin-kpi-val" style={{ fontSize: '19px', color: '#BE123C' }}>{top ? top[0] : 'No Incidents'}</div>
+                        <span className="admin-kpi-delta" style={{ color: '#B45309', fontSize: '11px', fontWeight: 700 }}>{top ? `${top[1]} of ${errorLogs.length} incidents` : 'Nothing logged yet'}</span>
+                      </>
+                    );
+                  })()}
                 </div>
 
                 <div className="admin-kpi-card">
@@ -1455,19 +1432,17 @@ export default function AdminPortalPage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val">12 Users</div>
-                  <span className="admin-kpi-delta" style={{ color: '#2563EB', fontSize: '11px', fontWeight: 700 }}>7 Patients • 4 Doctors</span>
+                  <div className="admin-kpi-val">{new Set(errorLogs.map((l) => l.user.id)).size} Users</div>
                 </div>
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Mean Time to Resolution</span>
+                    <span className="admin-kpi-sub">Critical Incidents</span>
                     <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#ECFDF5', color: '#059669', display: 'grid', placeItems: 'center' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val" style={{ color: '#047857' }}>4.2 mins</div>
-                  <span className="admin-kpi-delta up">↗ -1.8 mins vs yesterday</span>
+                  <div className="admin-kpi-val" style={{ color: '#047857' }}>{errorLogs.filter((l) => l.severity === 'CRITICAL').length}</div>
                 </div>
               </div>
 
@@ -1478,6 +1453,7 @@ export default function AdminPortalPage() {
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                       <input
                         type="text"
+                        maxLength={150}
                         placeholder="Filter by User, Trace ID, Subsystem, Error Code..."
                         value={logSearchQuery}
                         onChange={(e) => setLogSearchQuery(e.target.value)}
@@ -1491,20 +1467,27 @@ export default function AdminPortalPage() {
                         <option value="CRITICAL">🔴 Critical (Fatal)</option>
                         <option value="ERROR">🟠 Error</option>
                         <option value="WARNING">🟡 Warning</option>
-                        <option value="DEGRADED">🔵 Degraded</option>
                       </select>
 
                       <select value={logSubsystemFilter} onChange={(e) => setLogSubsystemFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', color: '#334155', fontWeight: 600 }}>
                         <option value="ALL">All Subsystems</option>
-                        <option value="Payment Gateway">💳 Payment Gateway</option>
-                        <option value="Agora WebRTC">📹 Agora WebRTC</option>
-                        <option value="DGDA Clinical Engine">💊 DGDA Clinical Rx</option>
-                        <option value="Sync & Offline Cache">📶 Sync & Offline</option>
+                        <option value="PAYMENT_GATEWAY">💳 Payment Gateway</option>
+                        <option value="AGORA_RTC">📹 Agora WebRTC</option>
+                        <option value="DATABASE">🗄️ Database</option>
+                        <option value="DOCTOR_FLUTTER">Doctor Flutter</option>
+                        <option value="DOCTOR_WEB">Doctor Web</option>
+                        <option value="INTERNAL">⚙️ Internal</option>
+                        <option value="DEPENDENCY">🔌 Dependency</option>
+                        <option value="CLINICAL_RX_ENGINE">💊 Clinical Rx Engine</option>
+                        <option value="SYNC_OFFLINE_CACHE">📶 Sync &amp; Offline</option>
+                        <option value="PROFESSIONAL_KYC_HUB">🏛️ Professional KYC Hub</option>
+                        <option value="AUTH_OTP_GATEWAY">📱 Auth / OTP Gateway</option>
                       </select>
 
                       <select value={logStatusFilter} onChange={(e) => setLogStatusFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', color: '#334155', fontWeight: 600 }}>
                         <option value="ALL">All Statuses</option>
                         <option value="UNRESOLVED">⚠️ Unresolved</option>
+                        <option value="INVESTIGATING">🔍 Investigating</option>
                         <option value="RESOLVED">✓ Resolved</option>
                       </select>
                     </div>
@@ -1514,7 +1497,7 @@ export default function AdminPortalPage() {
                     <span style={{ color: '#64748B', fontWeight: 700, marginRight: '4px' }}>Quick Filters:</span>
                     <button className={`log-quick-pill ${logQuickFilter === 'all' ? 'active' : ''}`} onClick={() => setLogQuickFilter('all')}>All Logs ({errorLogs.length})</button>
                     <button className={`log-quick-pill ${logQuickFilter === 'critical' ? 'active' : ''}`} onClick={() => setLogQuickFilter('critical')}>🔴 Critical</button>
-                    <button className={`log-quick-pill ${logQuickFilter === 'payment' ? 'active' : ''}`} onClick={() => setLogQuickFilter('payment')}>💳 bKash PGW</button>
+                    <button className={`log-quick-pill ${logQuickFilter === 'payment' ? 'active' : ''}`} onClick={() => setLogQuickFilter('payment')}>💳 M-Pesa provider</button>
                     <button className={`log-quick-pill ${logQuickFilter === 'webrtc' ? 'active' : ''}`} onClick={() => setLogQuickFilter('webrtc')}>📹 WebRTC</button>
                     <button className={`log-quick-pill ${logQuickFilter === 'unresolved' ? 'active' : ''}`} onClick={() => setLogQuickFilter('unresolved')}>⚠️ Unresolved</button>
                   </div>
@@ -1562,16 +1545,18 @@ export default function AdminPortalPage() {
                             <span className={`badge ${log.severity === 'CRITICAL' ? 'badge-rose' : 'badge-amber'}`}>{log.severity}</span>
                           </td>
                           <td>
-                            <span className={`badge ${log.status === 'RESOLVED' ? 'badge-green' : 'badge-rose'}`}>
-                              {log.status === 'RESOLVED' ? '✓ Resolved' : '⚠️ Unresolved'}
+                            <span className={`badge ${log.status === 'RESOLVED' ? 'badge-green' : log.status === 'INVESTIGATING' ? 'badge-blue' : 'badge-rose'}`}>
+                              {log.status === 'RESOLVED' ? '✓ Resolved' : log.status === 'INVESTIGATING' ? '🔍 Investigating' : '⚠️ Unresolved'}
                             </span>
                           </td>
                           <td style={{ textAlign: 'right' }}>
                             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', alignItems: 'center' }}>
                               <button className="admin-btn-sec" onClick={(e) => { e.stopPropagation(); setSelectedLogId(log.id); }} style={{ padding: '4px 8px', fontSize: '11px' }}>Inspect 🔍</button>
-                              <button className="slot-subtle-btn" onClick={(e) => { e.stopPropagation(); handleToggleLogResolve(log.id); }} style={{ padding: '4px 7px', fontSize: '11px' }}>
-                                {log.status === 'RESOLVED' ? '↩' : '✓'}
-                              </button>
+                              {log.status !== 'RESOLVED' && (
+                                <button disabled={logActionBusy === log.id} className="slot-subtle-btn" onClick={(e) => { e.stopPropagation(); handleResolveLog(log.id); }} style={{ padding: '4px 7px', fontSize: '11px' }} title="Mark as Resolved">
+                                  ✓
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1594,18 +1579,18 @@ export default function AdminPortalPage() {
                 </div>
                 <div className="admin-kpi-card">
                   <span className="admin-kpi-sub">Claims Against Doctors</span>
-                  <span className="admin-kpi-val" style={{ color: '#DC2626' }}>2</span>
-                  <span className="admin-kpi-delta down">⚠️ Conduct / Rushed Call</span>
+                  <span className="admin-kpi-val" style={{ color: '#DC2626' }}>{grievances.filter((g) => g.target === 'DOCTOR').length}</span>
                 </div>
                 <div className="admin-kpi-card">
                   <span className="admin-kpi-sub">Claims Against System</span>
-                  <span className="admin-kpi-val" style={{ color: '#2563EB' }}>2</span>
-                  <span className="admin-kpi-delta neutral">⚙️ PGW / ICE Glitches</span>
+                  <span className="admin-kpi-val" style={{ color: '#2563EB' }}>{grievances.filter((g) => g.target === 'SYSTEM').length}</span>
                 </div>
                 <div className="admin-kpi-card">
-                  <span className="admin-kpi-sub">Resolution &amp; Refund Rate</span>
-                  <span className="admin-kpi-val" style={{ color: '#059669' }}>100%</span>
-                  <span className="admin-kpi-delta up">⚡ Avg. Adjudication &lt; 28 mins</span>
+                  <span className="admin-kpi-sub">Adjudicated Rate</span>
+                  <span className="admin-kpi-val" style={{ color: '#059669' }}>
+                    {grievances.length === 0 ? '—' : `${Math.round(((grievances.length - pendingGrievancesCount) / grievances.length) * 100)}%`}
+                  </span>
+                  <span className="admin-kpi-delta neutral">{grievances.length - pendingGrievancesCount} of {grievances.length} resolved</span>
                 </div>
               </div>
 
@@ -1616,7 +1601,8 @@ export default function AdminPortalPage() {
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                       <input
                         type="text"
-                        placeholder="Filter by Patient, Doctor, BMDC #, Dispute ID, Category..."
+                        maxLength={150}
+                        placeholder="Filter by Patient, Doctor, Professional registration #, Dispute ID, Category..."
                         value={grievanceSearchQuery}
                         onChange={(e) => setGrievanceSearchQuery(e.target.value)}
                         style={{ width: '100%', padding: '8px 12px 8px 34px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}
@@ -1685,7 +1671,7 @@ export default function AdminPortalPage() {
                           </td>
                           <td>
                             <div style={{ fontWeight: 800, fontSize: '12px', color: '#0F172A' }}>{grv.doctor.name}</div>
-                            <div style={{ fontSize: '10.5px', color: '#64748B' }}>{grv.doctor.bmdc}</div>
+                            <div style={{ fontSize: '10.5px', color: '#64748B' }}>{grv.doctor.registrationNumber}</div>
                           </td>
                           <td>
                             <span className={`badge ${grv.target === 'DOCTOR' ? 'badge-rose' : 'badge-blue'}`}>
@@ -1736,7 +1722,7 @@ export default function AdminPortalPage() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
                     <span>Doctor Payouts Hub →</span>
                   </button>
-                  <button className="admin-action-btn" onClick={() => showToast('MFS Webhooks Reconciled', '0 discrepancies detected across bKash and Nagad payment gateways.', '✓', 'success')} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <button className="admin-action-btn" onClick={() => showToast('MFS Webhooks Reconciled', '0 discrepancies detected across Kenyan payment rails payment gateways.', '✓', 'success')} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <span>Reconcile MFS Webhooks</span>
                   </button>
                   <button className="admin-action-btn" onClick={() => showToast('Ledger CSV Exported', 'Full financial audit export downloaded.', '📄', 'success')} style={{ background: '#0F172A', border: '1px solid #0F172A', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
@@ -1753,8 +1739,8 @@ export default function AdminPortalPage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val">৳ 3,245,000</div>
-                  <span className="admin-kpi-delta up">↗ +18.4% MoM • 1,864 Transactions</span>
+                  <div className="admin-kpi-val">{money(financeSummary?.total_gross)}</div>
+                  <span className="admin-kpi-delta neutral">{transactions.length} transaction{transactions.length === 1 ? '' : 's'}</span>
                 </div>
 
                 <div className="admin-kpi-card">
@@ -1764,7 +1750,7 @@ export default function AdminPortalPage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val" style={{ color: '#2563EB' }}>৳ 890,800</div>
+                  <div className="admin-kpi-val" style={{ color: '#2563EB' }}>{money(transactions.filter((t) => t.escrowStatus === 'ESCROW_LOCKED').reduce((s, t) => s + t.grossAmount, 0))}</div>
                   <span className="admin-kpi-delta" style={{ color: '#64748B' }}>Held securely pending doctor sign-off</span>
                 </div>
 
@@ -1775,19 +1761,19 @@ export default function AdminPortalPage() {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val" style={{ color: '#059669' }}>৳ 568,400</div>
-                  <span className="admin-kpi-delta up">↗ Net Platform Operating Revenue</span>
+                  <div className="admin-kpi-val" style={{ color: '#059669' }}>{money(financeSummary?.total_platform_fee)}</div>
+                  <span className="admin-kpi-delta up">Net Platform Operating Revenue</span>
                 </div>
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Total Disbursed Outflows</span>
+                    <span className="admin-kpi-sub">Total Net Payable to Doctors</span>
                     <div className="admin-kpi-icon-circle purple" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#F5F3FF', color: '#7C3AED' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
                     </div>
                   </div>
-                  <div className="admin-kpi-val">৳ 2,676,600</div>
-                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>Doctor Wallets + Disputed Refunds</span>
+                  <div className="admin-kpi-val">{money(financeSummary?.total_net)}</div>
+                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>Settled + pending, across all doctors</span>
                 </div>
               </div>
 
@@ -1807,6 +1793,7 @@ export default function AdminPortalPage() {
                     <div style={{ position: 'relative', width: '260px' }}>
                       <input
                         type="text"
+                        maxLength={150}
                         placeholder="Search TxID, Patient, Doctor, Ref..."
                         value={financeSearchQuery}
                         onChange={(e) => setFinanceSearchQuery(e.target.value)}
@@ -1816,10 +1803,10 @@ export default function AdminPortalPage() {
 
                     <select value={financeGatewayFilter} onChange={(e) => setFinanceGatewayFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#FFFFFF', color: '#334155', outline: 'none' }}>
                       <option value="ALL">All Gateways</option>
-                      <option value="bKash">bKash Merchant Pay</option>
-                      <option value="Nagad">Nagad Business Pay</option>
-                      <option value="Card">Visa / Mastercard (SSLCommerz)</option>
-                      <option value="MFS Bulk API">MFS Bulk Payout API</option>
+                      <option value="MPESA">M-Pesa</option>
+                      <option value="BANK_TRANSFER">Kenyan bank transfer</option>
+                      <option value="CARD">Card (if payout-capable)</option>
+                      <option value="ALL">All configured providers</option>
                     </select>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#F1F5F9', padding: '3px', borderRadius: '8px' }}>
@@ -1841,9 +1828,9 @@ export default function AdminPortalPage() {
                         <th>Channel &amp; Type</th>
                         <th>Consultation / Case</th>
                         <th>Parties (Patient / Doctor)</th>
-                        <th style={{ textAlign: 'right' }}>Gross (৳)</th>
+                        <th style={{ textAlign: 'right' }}>Gross (KES )</th>
                         <th style={{ textAlign: 'right' }}>HeloDoc Cut</th>
-                        <th style={{ textAlign: 'right' }}>Net (৳)</th>
+                        <th style={{ textAlign: 'right' }}>Net (KES )</th>
                         <th>Gateway &amp; Escrow State</th>
                         <th style={{ textAlign: 'center' }}>Action</th>
                       </tr>
@@ -1857,7 +1844,7 @@ export default function AdminPortalPage() {
                           </td>
                           <td style={{ fontSize: '11.5px', color: '#334155', whiteSpace: 'nowrap' }}>{tx.timestamp}</td>
                           <td>
-                            <span className={`payout-method-badge ${tx.gateway === 'bKash' ? 'bkash' : tx.gateway === 'Nagad' ? 'nagad' : 'bank'}`}>
+                            <span className={`payout-method-badge ${tx.gateway === 'MFS Bulk API' ? 'mpesa' : tx.gateway === 'Card' ? 'card' : 'bank'}`}>
                               {tx.gatewayLabel}
                             </span>
                             <div style={{ fontSize: '10px', color: '#64748B', marginTop: '2px' }}>{tx.typeLabel}</div>
@@ -1872,11 +1859,11 @@ export default function AdminPortalPage() {
                               <span style={{ color: '#94A3B8' }}>→</span>
                               <span style={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>{tx.doctor.name}</span>
                             </div>
-                            <div style={{ fontSize: '10px', color: '#64748B' }}>{tx.patient.phone} • {tx.doctor.bmdc}</div>
+                            <div style={{ fontSize: '10px', color: '#64748B' }}>{tx.patient.phone} • {tx.doctor.registrationNumber}</div>
                           </td>
-                          <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A', fontSize: '13px' }}>৳ {tx.grossAmount.toLocaleString()}</td>
-                          <td style={{ textAlign: 'right', fontSize: '12px', color: '#059669', fontWeight: 700 }}>৳ {tx.platformFeeAmount.toLocaleString()} <span style={{ fontSize: '9.5px', color: '#64748B' }}>({tx.platformFeePercent}%)</span></td>
-                          <td style={{ textAlign: 'right', fontWeight: 850, color: '#2563EB', fontSize: '13.5px' }}>৳ {tx.netAmount.toLocaleString()}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A', fontSize: '13px' }}>KES  {tx.grossAmount.toLocaleString()}</td>
+                          <td style={{ textAlign: 'right', fontSize: '12px', color: '#059669', fontWeight: 700 }}>KES  {tx.platformFeeAmount.toLocaleString()} <span style={{ fontSize: '9.5px', color: '#64748B' }}>({tx.platformFeePercent}%)</span></td>
+                          <td style={{ textAlign: 'right', fontWeight: 850, color: '#2563EB', fontSize: '13.5px' }}>KES  {tx.netAmount.toLocaleString()}</td>
                           <td>
                             <span className={`badge ${tx.statusBadgeCls}`}>{tx.escrowStatusLabel}</span>
                           </td>
@@ -1887,6 +1874,64 @@ export default function AdminPortalPage() {
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="admin-card">
+                <div className="admin-card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <div className="admin-card-title">Refund Request Resolution</div>
+                    <div className="admin-card-subtitle">Board-approved refunds awaiting Finance execution against the payment provider — distinct from grievance adjudication, which only approves the refund</div>
+                  </div>
+                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>{refundRequests.filter((r) => r.status !== 'REFUNDED').length} pending of {refundRequests.length}</span>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Approved</th>
+                        <th>Grievance / Transaction</th>
+                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th>Previous Payment Status</th>
+                        <th>Provider Reference</th>
+                        <th>Status</th>
+                        <th style={{ textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {refundRequests.length === 0 && (
+                        <tr><td colSpan={7} style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: '12px' }}>No refund requests. These appear once a grievance refund is board-approved.</td></tr>
+                      )}
+                      {refundRequests.map((r) => {
+                        const busy = refundBusy === r.id;
+                        const terminal = r.status === 'REFUNDED';
+                        const statusCls = r.status === 'REFUNDED' ? 'badge-green' : r.status === 'FAILED' || r.status === 'RECONCILIATION_REQUIRED' ? 'badge-rose' : r.status === 'PROCESSING' ? 'badge-blue' : 'badge-amber';
+                        return (
+                          <tr key={r.id}>
+                            <td style={{ fontSize: '11.5px', color: '#334155', whiteSpace: 'nowrap' }}>{new Date(r.approved_at).toLocaleString()}</td>
+                            <td style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748B' }}>{r.grievance_id.slice(0, 8)} / {r.transaction_id.slice(0, 8)}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 800, color: '#0F172A', fontSize: '13px' }}>{r.currency} {Number(r.amount).toLocaleString()}</td>
+                            <td style={{ fontSize: '11px', color: '#64748B' }}>{r.previous_payment_status}</td>
+                            <td style={{ fontSize: '11px', color: '#0F172A' }}>{r.provider_reference || '—'}</td>
+                            <td><span className={`badge ${statusCls}`}>{r.status.replace(/_/g, ' ')}</span></td>
+                            <td style={{ textAlign: 'right' }}>
+                              {terminal ? (
+                                <span style={{ fontSize: '11px', color: '#94A3B8' }}>Finalized</span>
+                              ) : (
+                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'PROCESSING')} style={{ padding: '4px 8px', border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#1D4ED8', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>Processing</button>
+                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'REFUNDED')} style={{ padding: '4px 8px', border: '1px solid #86EFAC', background: '#F0FDF4', color: '#166534', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>Refunded</button>
+                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'FAILED')} style={{ padding: '4px 8px', border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>Failed</button>
+                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'RECONCILIATION_REQUIRED')} style={{ padding: '4px 8px', border: '1px solid #FDE68A', background: '#FFFBEB', color: '#B45309', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>Needs Reconciliation</button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1909,7 +1954,7 @@ export default function AdminPortalPage() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '16.5px', fontWeight: 800, color: '#FFFFFF' }}>{selectedDocObj.name}</span>
-                    <span className="badge badge-green">{selectedDocObj.bmdc}</span>
+                    <span className="badge badge-green">{selectedDocObj.registrationNumber}</span>
                     <span className="badge badge-blue">Verified Specialist</span>
                     <span className="badge" style={{ background: 'rgba(255,255,255,0.12)', color: '#E2E8F0', fontSize: '10px' }}>Active Practitioner</span>
                   </div>
@@ -1956,6 +2001,15 @@ export default function AdminPortalPage() {
             </div>
 
             <div style={{ padding: '18px 22px', overflowY: 'auto', flex: 1 }}>
+              {selectedDocObj.payoutRouting?.disbursementItemId && selectedDocObj.payoutRouting.disbursementStatus === 'PENDING_APPROVAL' && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', marginBottom: '16px', border: '1px solid #FCD34D', borderRadius: '10px', background: '#FFFBEB' }}>
+                  <div>
+                    <strong style={{ fontSize: '12px', color: '#92400E' }}>KES disbursement awaiting Finance approval</strong>
+                    <div style={{ fontSize: '10.5px', color: '#78350F', marginTop: '2px' }}>Approval records authorization only; payment remains unconfirmed until a provider integration reports success.</div>
+                  </div>
+                  <button className="admin-btn-pri" disabled={financeBusy} onClick={() => handleApproveDoctorDisbursement(selectedDocObj.payoutRouting!.disbursementItemId!)}>Approve</button>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>Recent Consultation Encounters &amp; Issued Prescriptions</strong>
                 <span style={{ fontSize: '11px', color: '#64748B' }}>Archived across all patient encounters</span>
@@ -1967,7 +2021,7 @@ export default function AdminPortalPage() {
                     <th>Date &amp; Time</th>
                     <th>Patient Name</th>
                     <th>Consultation Mode</th>
-                    <th>Fee (৳)</th>
+                    <th>Fee (KES )</th>
                     <th>Clinical Diagnosis</th>
                     <th>Rx Issued</th>
                   </tr>
@@ -1992,7 +2046,7 @@ export default function AdminPortalPage() {
                   {selectedDocObj.disbursements.map((dsb, idx) => (
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '11.5px' }}>
                       <div>
-                        <b>{dsb.date}: {dsb.amount}</b> Disbursed via <span className="badge" style={{ background: '#FCE7F3', color: '#DB2777', fontWeight: 800 }}>{dsb.method}</span>
+                        <b>{dsb.date}: {dsb.amount}</b> Assigned destination <span className="badge" style={{ background: '#FCE7F3', color: '#DB2777', fontWeight: 800 }}>{dsb.method}</span>
                         <div style={{ fontSize: '10px', color: '#64748B' }}>TxID: {dsb.txId} • Commission Deducted: {dsb.commission}</div>
                       </div>
                       <span className="badge badge-green">{dsb.status}</span>
@@ -2003,7 +2057,7 @@ export default function AdminPortalPage() {
             </div>
 
             <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', color: '#64748B' }}>BMDC Verified Credential Ledger • HelloDoctor Bangladesh</span>
+              <span style={{ fontSize: '11px', color: '#64748B' }}>Professional registration Verified Credential Ledger • HelloDoctor Kenya</span>
               <button className="admin-btn-sec" onClick={() => setSelectedDoctorKey(null)}>Close Dossier</button>
             </div>
           </div>
@@ -2033,15 +2087,15 @@ export default function AdminPortalPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: '#E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Latest Blood Pressure</div>
-                <div style={{ fontSize: '16px', fontWeight: 800, color: '#DC2626', marginTop: '2px' }}>{selectedPatObj.bp}</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Video Visits</div>
+                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', marginTop: '2px' }}>{selectedPatObj.videoVisits ?? 0}</div>
               </div>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Resting Pulse</div>
-                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', marginTop: '2px' }}>{selectedPatObj.pulse}</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>24h Chat Sessions</div>
+                <div style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A', marginTop: '2px' }}>{selectedPatObj.chatSessions ?? 0}</div>
               </div>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Chronic Care Cohort</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Blood Group / Cohort</div>
                 <div style={{ fontSize: '13px', fontWeight: 800, color: '#2563EB', marginTop: '4px' }}>{selectedPatObj.cohort}</div>
               </div>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
@@ -2151,6 +2205,7 @@ export default function AdminPortalPage() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11.5px' }}>
                     <div><b style={{ color: '#475569' }}>Device:</b> <span style={{ color: '#0F172A' }}>{selectedLogObj.user.device}</span></div>
+                    <div><b style={{ color: '#475569' }}>App build:</b> <span style={{ color: '#0F172A' }}>{selectedLogObj.user.appVersion}</span></div>
                     <div><b style={{ color: '#475569' }}>Network:</b> <span style={{ color: '#0F172A' }}>{selectedLogObj.user.network}</span></div>
                   </div>
                 </div>
@@ -2162,12 +2217,24 @@ export default function AdminPortalPage() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                   <div>
-                    <div style={{ fontSize: '10.5px', color: '#881337', fontWeight: 700 }}>FAILED SUBSYSTEM</div>
-                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#9F1239', marginTop: '2px' }}>{selectedLogObj.subsystem}</div>
+                    <div style={{ fontSize: '10.5px', color: '#881337', fontWeight: 700 }}>SUBSYSTEM CODENAME</div>
+                    <div style={{ fontSize: '13px', fontWeight: 800, color: '#9F1239', marginTop: '2px', fontFamily: 'monospace' }}>{selectedLogObj.subsystem}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize: '10.5px', color: '#881337', fontWeight: 700 }}>COMPONENT / ENDPOINT</div>
+                    <div style={{ fontSize: '10.5px', color: '#881337', fontWeight: 700 }}>COMPONENT CODENAME</div>
                     <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#9F1239', marginTop: '2px' }}>{selectedLogObj.component}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10.5px', color: '#881337', fontWeight: 700 }}>ERROR CODE / HTTP STATUS</div>
+                    <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#9F1239', marginTop: '2px' }}>{selectedLogObj.errorCode}{selectedLogObj.httpStatus ? ` (HTTP ${selectedLogObj.httpStatus})` : ''}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10.5px', color: '#881337', fontWeight: 700 }}>ENDPOINT / OCCURRENCES</div>
+                    <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#9F1239', marginTop: '2px', wordBreak: 'break-all' }}>{selectedLogObj.endpoint || '—'} • seen {selectedLogObj.occurrenceCount}×</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10.5px', color: '#881337', fontWeight: 700 }}>SCREEN / OPERATION</div>
+                    <div style={{ fontSize: '12px', fontFamily: 'monospace', fontWeight: 700, color: '#9F1239', marginTop: '2px' }}>{selectedLogObj.failedPart}</div>
                   </div>
                 </div>
                 <div style={{ background: '#fff', border: '1px solid #FDA4AF', borderRadius: '10px', padding: '12px' }}>
@@ -2177,6 +2244,9 @@ export default function AdminPortalPage() {
               </div>
 
               <div style={{ background: '#0F172A', borderRadius: '14px', padding: '16px', color: '#E2E8F0' }}>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                  3. SOURCE CODE SNIPPET / STACK TRACE
+                </div>
                 <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '11px', lineHeight: 1.55, color: '#38BDF8', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: '180px', overflowY: 'auto' }}>
                   {selectedLogObj.stackTrace}
                 </pre>
@@ -2186,12 +2256,18 @@ export default function AdminPortalPage() {
             <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button className="admin-btn-sec" onClick={() => setSelectedLogId(null)}>Close Dossier</button>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="slot-subtle-btn" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '8px 14px', borderRadius: '8px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer' }} onClick={() => showToast('Handshake Replayed ✓', `Upstream gateway accepted retry for ${selectedLogObj.user.name}.`, '✓', 'success')}>
-                  Retry Webhook / Handshake 🔁
-                </button>
-                <button className="admin-btn-pri" onClick={() => handleToggleLogResolve(selectedLogObj.id)} style={{ padding: '8px 16px', fontSize: '11.5px' }}>
-                  {selectedLogObj.status === 'RESOLVED' ? 'Re-open Incident ↩' : 'Mark as Resolved ✓'}
-                </button>
+                {selectedLogObj.status === 'UNRESOLVED' && (
+                  <button disabled={logActionBusy === selectedLogObj.id} className="slot-subtle-btn" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '8px 14px', borderRadius: '8px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer' }} onClick={() => handleAcknowledgeLog(selectedLogObj.id)}>
+                    Acknowledge / Investigate 🔍
+                  </button>
+                )}
+                {selectedLogObj.status !== 'RESOLVED' ? (
+                  <button disabled={logActionBusy === selectedLogObj.id} className="admin-btn-pri" onClick={() => handleResolveLog(selectedLogObj.id)} style={{ padding: '8px 16px', fontSize: '11.5px' }}>
+                    Mark as Resolved ✓
+                  </button>
+                ) : (
+                  <span className="badge badge-green" style={{ padding: '8px 16px', fontSize: '11.5px' }}>✓ Resolved{selectedLogObj.resolutionNote ? `: ${selectedLogObj.resolutionNote}` : ''}</span>
+                )}
               </div>
             </div>
           </div>
@@ -2199,7 +2275,7 @@ export default function AdminPortalPage() {
       )}
 
       {/* ── MODAL 4: SIMULATE FAILURE MODAL ── */}
-      {simulateModalOpen && (
+      {simulationsAllowed && simulateModalOpen && (
         <div className="admin-modal-backdrop" id="adminSimulateFailureModal" style={{ display: 'flex' }} onClick={(e) => { if (e.target === e.currentTarget) setSimulateModalOpen(false); }}>
           <div className="admin-modal-card" style={{ maxWidth: '620px' }}>
             <div style={{ background: '#0F172A', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -2214,21 +2290,19 @@ export default function AdminPortalPage() {
             </div>
 
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Target Impacted User</label>
-                <select value={simUser} onChange={(e) => setSimUser(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}>
-                  <option value="sarah">Sarah Khan (Patient • +880 1711-234567)</option>
-                  <option value="sabrina">Dr. Sabrina Akter (Doctor Web • BMDC #45821)</option>
-                  <option value="rafiq">Rafiq Ahmed (Patient • +880 1819-987654)</option>
-                  <option value="anika">Dr. Anika Rahman (Doctor Mobile • BMDC #A-74921)</option>
-                </select>
+              <div style={{ fontSize: '11px', color: '#64748B', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 10px' }}>
+                This writes a real row into the backend&apos;s system-error log (dev/staging only — the backend refuses this in production) so the dedicated incident pipeline can be exercised end to end.
               </div>
 
               <div>
                 <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Failure Scenario Preset</label>
                 <select value={simScenario} onChange={(e) => setSimScenario(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}>
-                  <option value="bkash_timeout">💳 bKash PGW: HTTP 504 Gateway Callback Timeout</option>
+                  <option value="mpesa_timeout">💳 M-Pesa provider: HTTP 504 Gateway Callback Timeout</option>
                   <option value="webrtc_ice">📹 Agora WebRTC: ICE Candidate Relay Failed (Code 702)</option>
+                  <option value="clinical_triage">💊 Clinical Rx Engine: Controlled-substance triage violation</option>
+                  <option value="offline_sync">📶 Offline Cache: Mutation sync conflict</option>
+                  <option value="kyc_hub_down">🏛️ Professional Registry: KYC hub maintenance</option>
+                  <option value="sms_otp">📱 Auth Gateway: SMS OTP carrier rate limit</option>
                 </select>
               </div>
 
@@ -2243,14 +2317,14 @@ export default function AdminPortalPage() {
                 </div>
                 <div>
                   <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Custom Note</label>
-                  <input type="text" placeholder="e.g. Stress test injection" value={simCustomNote} onChange={(e) => setSimCustomNote(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none' }} />
+                  <input type="text" maxLength={300} placeholder="e.g. Stress test injection" value={simCustomNote} onChange={(e) => setSimCustomNote(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none' }} />
                 </div>
               </div>
             </div>
 
             <div style={{ padding: '14px 20px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button className="admin-btn-sec" onClick={() => setSimulateModalOpen(false)}>Cancel</button>
-              <button className="admin-btn-pri" onClick={handleExecuteSimulateFailure} style={{ background: '#DC2626', borderColor: '#DC2626' }}>
+              <button disabled={simulateBusy} className="admin-btn-sec" onClick={() => setSimulateModalOpen(false)}>Cancel</button>
+              <button disabled={simulateBusy} className="admin-btn-pri" onClick={handleExecuteSimulateFailure} style={{ background: '#DC2626', borderColor: '#DC2626' }}>
                 <span>⚡ Inject Failure Incident</span>
               </button>
             </div>
@@ -2288,14 +2362,14 @@ export default function AdminPortalPage() {
                 <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', background: '#F8FAFC' }}>
                   <div style={{ fontSize: '10.5px', fontWeight: 750, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>🩺 Accused Physician</div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{selectedGrvObj.doctor.name}</div>
-                  <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>{selectedGrvObj.doctor.bmdc} • Fee: {selectedGrvObj.doctor.fee}</div>
+                  <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>{selectedGrvObj.doctor.registrationNumber} • Fee: {selectedGrvObj.doctor.fee}</div>
                 </div>
               </div>
 
               <div style={{ border: '1.5px solid #FCA5A5', borderRadius: '12px', background: '#FFF5F5', padding: '14px 16px' }}>
                 <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#991B1B' }}>{selectedGrvObj.category}</div>
                 <div style={{ fontSize: '12px', lineHeight: 1.5, color: '#450A0A', background: '#FFFFFF', border: '1px solid #FECACA', borderRadius: '8px', padding: '10px 12px', fontStyle: 'italic', marginTop: '6px' }}>
-                  "{selectedGrvObj.patientStatement}"
+                  &quot;{selectedGrvObj.patientStatement}&quot;
                 </div>
               </div>
 
@@ -2332,13 +2406,13 @@ export default function AdminPortalPage() {
             <div style={{ padding: '14px 20px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button className="admin-btn-sec" onClick={() => setSelectedGrievanceId(null)}>Close</button>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'REFUND')} style={{ background: '#059669', borderColor: '#059669' }}>
-                  <span>💳 Disburse Instant bKash Refund</span>
+                <button disabled={financeBusy} className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'REFUND')} style={{ background: '#059669', borderColor: '#059669' }}>
+                  <span>💳 Record Finance Refund</span>
                 </button>
-                <button className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'WARN')} style={{ background: '#DC2626', borderColor: '#DC2626' }}>
-                  <span>⚠️ Issue Doctor BMDC Warning</span>
+                <button disabled={financeBusy} className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'WARN')} style={{ background: '#DC2626', borderColor: '#DC2626' }}>
+                  <span>⚠️ Issue Doctor Professional registration Warning</span>
                 </button>
-                <button className="admin-btn-sec" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'RESOLVE')}>
+                <button disabled={financeBusy} className="admin-btn-sec" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'RESOLVE')}>
                   <span>✓ Mark Resolved</span>
                 </button>
               </div>
@@ -2371,17 +2445,17 @@ export default function AdminPortalPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: '#E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
               <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
                 <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>Gross Inflow (Fee)</div>
-                <div style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', marginTop: '4px' }}>৳ {selectedTxObj.grossAmount}</div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', marginTop: '4px' }}>KES  {selectedTxObj.grossAmount}</div>
                 <div style={{ fontSize: '10.5px', color: '#10B981', fontWeight: 700 }}>Debited from MFS Wallet</div>
               </div>
               <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
                 <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>HeloDoc Platform Fee (20%)</div>
-                <div style={{ fontSize: '20px', fontWeight: 900, color: '#059669', marginTop: '4px' }}>৳ {selectedTxObj.platformFeeAmount} ({selectedTxObj.platformFeePercent}%)</div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#059669', marginTop: '4px' }}>KES  {selectedTxObj.platformFeeAmount} ({selectedTxObj.platformFeePercent}%)</div>
                 <div style={{ fontSize: '10.5px', color: '#64748B' }}>Platform Commission Cut</div>
               </div>
               <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
                 <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>Doctor Net / Refund</div>
-                <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563EB', marginTop: '4px' }}>৳ {selectedTxObj.netAmount}</div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563EB', marginTop: '4px' }}>KES  {selectedTxObj.netAmount}</div>
                 <div style={{ fontSize: '10.5px', color: '#64748B' }}>Payable to Physician Wallet</div>
               </div>
             </div>
@@ -2401,7 +2475,7 @@ export default function AdminPortalPage() {
                 <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px' }}>
                   <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>Recipient (Doctor / System)</div>
                   <strong style={{ fontSize: '13px', color: '#0F172A' }}>{selectedTxObj.doctor.name}</strong>
-                  <div style={{ fontSize: '11px', color: '#64748B' }}>{selectedTxObj.doctor.bmdc} • {selectedTxObj.doctor.specialty}</div>
+                  <div style={{ fontSize: '11px', color: '#64748B' }}>{selectedTxObj.doctor.registrationNumber} • {selectedTxObj.doctor.specialty}</div>
                 </div>
               </div>
 

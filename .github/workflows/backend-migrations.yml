@@ -1,0 +1,84 @@
+name: Backend migration integrity
+
+# Proves the one invariant B-01 (docs/DOCTOR_SYSTEM_FINAL_MULTI_AGENT_AUDIT.md
+# §3) showed was never actually checked anywhere: that every migration in
+# services/backend/migrations applies cleanly, in order, against a genuinely
+# fresh PostgreSQL 16 instance, and that the resulting schema is one the
+# backend can actually serve real requests against. `cargo test --test
+# api_tests` already proves this on every run via `#[sqlx::test(migrations =
+# "./migrations")]` (each test gets its own freshly-migrated throwaway
+# database) — this workflow is what makes that guarantee a CI gate instead of
+# something only visible when a developer happens to run the suite locally.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/backend/**"
+      - ".github/workflows/backend-migrations.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "services/backend/**"
+      - ".github/workflows/backend-migrations.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-and-test:
+    name: Apply migrations to a fresh Postgres and run the backend test suite
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # Matches services/backend/docker-compose.yml exactly, so this job
+        # exercises the same version/credentials shape local dev does.
+        image: postgres:16
+        env:
+          POSTGRES_USER: hellodoctor
+          POSTGRES_PASSWORD: hellodoctor_dev_password
+          POSTGRES_DB: hellodoctor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hellodoctor -d hellodoctor"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # `#[sqlx::test]` connects with this as the superuser/template
+      # connection it uses to create a fresh throwaway database per test (and
+      # to run `ALTER ROLE` against the cluster-wide capability roles) — it
+      # is not a real backend runtime config, just what the test harness
+      # needs. See tests/api_tests.rs's own `test_config()` doc comments for
+      # why nothing else from .env.example is required here.
+      DATABASE_URL: postgres://hellodoctor:hellodoctor_dev_password@localhost:5432/hellodoctor
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: cargo test --lib (unit tests, no database)
+        working-directory: services/backend
+        run: cargo test --lib
+
+      - name: cargo test --test api_tests (every migration applied fresh, real HTTP against it)
+        working-directory: services/backend
+        # Single-threaded — see the warning comment at the top of
+        # tests/api_tests.rs: the five capability roles are cluster-wide
+        # Postgres objects, so parallel test threads race on shared
+        # pg_authid catalog rows across the one Postgres service container.
+        run: cargo test --test api_tests -- --test-threads=1

@@ -941,3 +941,9 @@ body {
   z-index: 1 !important;
   display: flex !important;
 }
+
+.slot-chip.blocked {
+  background: #F1F5F9;
+  color: #475569;
+  border-color: #94A3B8;
+}

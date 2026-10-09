@@ -1,0 +1,64 @@
+{
+  "web": {
+    "unit_tests_passed": 8,
+    "typecheck": "PASS",
+    "lint": "PASS",
+    "format": "PASS",
+    "production_build": "PASS",
+    "next": "15.5.24",
+    "react": "18.3.1"
+  },
+  "flutter": {
+    "source_modified": false,
+    "analyze": "PASS",
+    "tests_passed": 50
+  },
+  "rust": {
+    "format": "PASS",
+    "clippy_all_targets": "PASS",
+    "library_tests_passed": 29,
+    "first_full_api_run": {
+      "passed": 52,
+      "failed": 1,
+      "failure": "no-Rx retry with early fixture"
+    },
+    "second_full_api_run": {
+      "passed": 52,
+      "failed": 1,
+      "failure": "historical completion fixture scheduled too early"
+    },
+    "targeted_no_rx": "PASS",
+    "targeted_history_after_fixture_correction": "PASS",
+    "distinct_api_tests_passed_across_runs": 53,
+    "single_full_run_after_final_fixture_correction": "PENDING"
+  },
+  "visual": {
+    "canonical_references": 55,
+    "widths": [
+      1440,
+      1280,
+      1024,
+      768,
+      390
+    ],
+    "matched_screens": 0,
+    "accepted": false
+  },
+  "host_installation": "NONE",
+  "backend_ready": "HELLODOCTOR_BACKEND_READY",
+  "schema_versions": {
+    "source": "20261019000001",
+    "binary": "20261019000001",
+    "database": "20261019000001"
+  },
+  "latest_browser": {
+    "fixture": "Existing synthetic Doctor/appointment; development claims, not MFA evidence",
+    "checks": {
+      "ui_success_matches_authoritative_completion": "PASS",
+      "same_reason_retry_no_double_credit": "PASS",
+      "statement_canonical_dialog_current_build": "PASS",
+      "slot_generator_keyboard_dismissal": "PASS"
+    },
+    "console_errors": []
+  }
+}

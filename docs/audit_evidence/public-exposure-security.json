@@ -1,0 +1,278 @@
+{
+  "generated_at": "2026-10-08T14:07:06.069388+00:00",
+  "fields": {
+    "ACCESS_TOKEN_INVALID_AFTER_LOGOUT": "PASS",
+    "SESSION_REVOCATION_MECHANISM": "Required JWT sid identifies existing auth_sessions refresh family; authoritative DB check on every protected request; current-family logout; DB failure 503",
+    "ENVIRONMENT_EXPLICIT": "PASS",
+    "PRODUCTION_SEED_GUARD": "PASS",
+    "PRODUCTION_TEST_OTP_GUARD": "PASS",
+    "PRODUCTION_MFA_BYPASS_GUARD": "PASS (no separate bypass flag exists; development MFA OTP cannot enable in production)",
+    "LAN_HTTP": "DEVELOPMENT_ONLY",
+    "PRODUCTION_HTTPS_APPLICATION_GUARD": "PASS",
+    "EXTERNAL_TLS_TERMINATION_REQUIRED": "YES",
+    "METRICS_PUBLIC_ANONYMOUS": "NO (production; explicit development/test anonymous scrape remains defined)",
+    "ADMIN_LOG_SIMULATION_PRODUCTION": "BLOCKED",
+    "RATE_LIMITER_REDIS_FAILURE": "FAIL_CLOSED",
+    "PUBLIC_AUTH_ABUSE_CONTROLS": "VERIFIED (defined regression coverage; not a penetration test)",
+    "STEP_UP_AUTH": "STILL_OPEN",
+    "SLOT_APPROVAL_WORKFLOW": "NOT_IMPLEMENTED_BY_PRODUCT_DESIGN",
+    "CREDENTIAL_FILE_HYGIENE": "PASS (scoped repository/worktree scan; no key rotation performed)",
+    "RUST_LIB": "50/50",
+    "API_TESTS": "129/129",
+    "DOCTOR_WEB_TESTS": "44/44",
+    "ADMIN_WEB_TESTS": "13/13",
+    "FLUTTER_TESTS": "81/81",
+    "FLUTTER_ANALYZE": "PASS",
+    "DOCTOR_WEB_BUILD": "PASS",
+    "ADMIN_BUILD": "PASS",
+    "DOCTOR_ARTICLES": "DIRECT_DOCTOR_PUBLICATION_NO_ADMIN_REVIEW",
+    "PATIENT_CLIENT_COMPLETE_JOURNEY": "NOT_VERIFIED_NO_PATIENT_CLIENT_IN_REPOSITORY",
+    "MIGRATION_SCHEMA_VERIFIED": "YES",
+    "HOST_SOFTWARE_INSTALLED": "NONE",
+    "NEW_INFRASTRUCTURE_INSTALLED": "NONE",
+    "EXISTING_INFRASTRUCTURE_STARTED": "NONE (existing PostgreSQL/Redis already running)",
+    "SECURITY_REGRESSION": "SECURITY_REGRESSION_GREEN",
+    "VERDICT": "PUBLIC_EXPOSURE_SECURITY_GATES_PARTIAL"
+  },
+  "ordered_backend_verification": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "fmt",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.53
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 15.92
+    },
+    "lib": {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "seconds": 115.77,
+      "passed": 50,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    },
+    "api": {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--test",
+        "api_tests",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "seconds": 923.05,
+      "passed": 129,
+      "failed": 0,
+      "ignored": 0,
+      "measured": 0,
+      "filtered": 0
+    }
+  },
+  "client_verification": {
+    "doctor-web-typecheck": {
+      "exit_code": 0
+    },
+    "doctor-web-tests": {
+      "exit_code": 0,
+      "passed": 44
+    },
+    "doctor-web-source-check": {
+      "exit_code": 0
+    },
+    "admin-web-typecheck": {
+      "exit_code": 0
+    },
+    "admin-web-tests": {
+      "exit_code": 0,
+      "passed": 13
+    },
+    "flutter-analyze": {
+      "exit_code": 0
+    },
+    "flutter-tests": {
+      "exit_code": 0,
+      "passed": 81
+    }
+  },
+  "production_web_builds": {
+    "doctor-web": {
+      "command": "npm run build",
+      "exit_code": 0
+    },
+    "admin-web": {
+      "command": "npm run build",
+      "exit_code": 0
+    }
+  },
+  "isolated_executable_startup_matrix": {
+    "missing_environment": {
+      "exit_code": 101,
+      "expected_validation_rejection": true,
+      "database_initialization_reached": false
+    },
+    "unknown_environment": {
+      "exit_code": 101,
+      "expected_validation_rejection": true,
+      "database_initialization_reached": false
+    },
+    "production_seed": {
+      "exit_code": 101,
+      "expected_validation_rejection": true,
+      "database_initialization_reached": false
+    },
+    "production_debug_otp": {
+      "exit_code": 101,
+      "expected_validation_rejection": true,
+      "database_initialization_reached": false
+    },
+    "production_simulation": {
+      "exit_code": 101,
+      "expected_validation_rejection": true,
+      "database_initialization_reached": false
+    },
+    "production_no_trusted_proxy": {
+      "exit_code": 101,
+      "expected_validation_rejection": true,
+      "database_initialization_reached": false
+    },
+    "production_http_api": {
+      "exit_code": 101,
+      "expected_validation_rejection": true,
+      "database_initialization_reached": false
+    },
+    "production_http_web": {
+      "exit_code": 101,
+      "expected_validation_rejection": true,
+      "database_initialization_reached": false
+    },
+    "production_missing_metrics": {
+      "exit_code": 101,
+      "expected_validation_rejection": true,
+      "database_initialization_reached": false
+    }
+  },
+  "isolated_built_web_ingress": {
+    "doctor-web": {
+      "anonymous_http_denied": true,
+      "spoofed_proto_denied": true,
+      "authenticated_ingress_accepted": true,
+      "production_simulation_control_hidden": "NOT_APPLICABLE_NO_DOCTOR_SIMULATION_UI"
+    },
+    "admin-web": {
+      "anonymous_http_denied": true,
+      "spoofed_proto_denied": true,
+      "authenticated_ingress_accepted": true,
+      "production_simulation_control_hidden": true
+    }
+  },
+  "live_development": {
+    "checks": {
+      "doctor_login_and_protected_profile": "PASS",
+      "article_editor_not_clipped": "PASS",
+      "doctor_web_structured_direct_publication_no_admin_review": "PASS",
+      "patient_authenticated_published_article_read": "PASS",
+      "doctor_archive_removes_patient_article_and_persists_history": "PASS",
+      "doctor_web_logout_immediate_access_and_refresh_rejection": "PASS",
+      "patient_logout_immediate_access_and_refresh_rejection": "PASS",
+      "admin_web_actual_server_logout_and_immediate_rejection": "PASS",
+      "live_article_fixture_final_state": "ARCHIVED",
+      "web_uncaught_javascript_errors": "PASS"
+    },
+    "article_id": "2b5e4e2a-7fd3-4eba-9f54-33dc177af405",
+    "mutations": [
+      {
+        "method": "POST",
+        "path": "auth/login"
+      },
+      {
+        "method": "POST",
+        "path": "auth/verify"
+      },
+      {
+        "method": "POST",
+        "path": "proxy/doctor/articles"
+      },
+      {
+        "method": "POST",
+        "path": "proxy/doctor/articles/2b5e4e2a-7fd3-4eba-9f54-33dc177af405/publish"
+      },
+      {
+        "method": "POST",
+        "path": "proxy/doctor/articles/2b5e4e2a-7fd3-4eba-9f54-33dc177af405/archive"
+      },
+      {
+        "method": "POST",
+        "path": "auth/logout"
+      }
+    ],
+    "browser_uncaught_error_count": 0
+  },
+  "migration": {
+    "source_latest_migration": "20261025000001",
+    "healthz": {
+      "binary_latest_migration": "20261025000001",
+      "database": "ready",
+      "database_latest_migration": "20261025000001",
+      "migrations": "current",
+      "status": "ready"
+    },
+    "historical_files": {
+      "previously_applied_files_checked": 62,
+      "changed": []
+    }
+  },
+  "credential_artifact_scan": [],
+  "development_android_artifact": {
+    "apk": "apps\\mobile\\build\\app\\outputs\\flutter-apk\\HelloDoctor-security-articles-phone-test.apk",
+    "bytes": 19348233,
+    "sha256": "058ec14310c5c207c4181da9f48564e995a41425227848398242b2d46d852a85",
+    "environment": "development",
+    "api_base_url": "http://192.168.0.103:8080/api/v1",
+    "gradle_offline": true,
+    "sdk_download_disabled": true,
+    "installed_on_device": false
+  },
+  "limitations": [
+    "External TLS termination is required and was not installed. Current environment remains development and must not be internet-exposed.",
+    "Sensitive Admin step-up authentication remains open.",
+    "The new development APK was built but not installed or accepted on a phone. Earlier user-confirmed app acceptance is preserved.",
+    "Synthetic patient API journey is tested; no patient client or live external provider/money acceptance was claimed.",
+    "Automated regression tests are not penetration testing or overall production readiness."
+  ],
+  "doctor_web_layout_followup": {
+    "change": "Prevent Articles flex children shrinking and clipping the structured editor",
+    "commands": [
+      "npm run typecheck",
+      "npm test",
+      "npm run lint",
+      "npm run build"
+    ],
+    "exit_code": 0,
+    "tests_passed": 44,
+    "built_web_id": "3RiEGawDB8tpbFaMmfWX4",
+    "live_editor_not_clipped": "PASS"
+  }
+}

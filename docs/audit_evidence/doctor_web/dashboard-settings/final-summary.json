@@ -1,0 +1,12 @@
+{
+  "build_id": "NSx9VY1Mkxp3QUUfkUpDg",
+  "source_changes_outside_doctor_web_docs": [],
+  "doctor_mobile_files_changed": "NONE",
+  "backend_files_changed": "NONE",
+  "unit_tests": 11,
+  "browser_checks": {
+    "rx-upload": 7,
+    "dashboard-settings": 13,
+    "patient-chats": 10
+  }
+}

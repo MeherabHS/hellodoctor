@@ -17,5 +17,21 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    container_name: hellodoctor-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - hellodoctor_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
 volumes:
   hellodoctor_pgdata:
+  hellodoctor_redisdata:

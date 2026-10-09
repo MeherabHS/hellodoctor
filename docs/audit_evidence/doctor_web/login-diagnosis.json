@@ -1,0 +1,44 @@
+[
+  {
+    "origin": "http://127.0.0.1:3001",
+    "console_errors": [],
+    "responses": [
+      {
+        "action": "login",
+        "status": 500,
+        "error": "INTERNAL_SERVER_ERROR"
+      }
+    ],
+    "buttons": [
+      "Doctor Sign In",
+      "Apply to Join",
+      "Doctor Secure Sign In \u2192"
+    ],
+    "signed_in": false,
+    "alerts": [
+      "\u26a0\ufe0fUnable to complete this request. Use the reference ID when contacting support. Reference: 7b27dd71-b673-4494-937d-67db8178c41e",
+      ""
+    ]
+  },
+  {
+    "origin": "http://localhost:3001",
+    "console_errors": [],
+    "responses": [
+      {
+        "action": "login",
+        "status": 403,
+        "error": "CSRF_REJECTED"
+      }
+    ],
+    "buttons": [
+      "Doctor Sign In",
+      "Apply to Join",
+      "Doctor Secure Sign In \u2192"
+    ],
+    "signed_in": false,
+    "alerts": [
+      "\u26a0\ufe0fRequest origin is not permitted. Reference: 2e9ff794-cb16-4f2e-ad85-0ed637df8b15",
+      ""
+    ]
+  }
+]

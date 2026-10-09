@@ -1,3 +1,5 @@
+> Kenya correction, 2026-10-08: [current professional-registration contract](KENYA_PROFESSIONAL_VERIFICATION.md) supersedes legacy regulator/status terminology below. Original dated/prototype evidence is retained as history. The user confirms the Doctor app is verified.
+
 # Phase 1 — Complete Prototype Inventory
 
 > **Document Version:** 1.0.0  

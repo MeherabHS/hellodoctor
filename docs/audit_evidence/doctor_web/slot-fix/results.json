@@ -1,0 +1,130 @@
+{
+  "checks": {
+    "dashboard_resume_call_removed": "PASS",
+    "inside_click_keeps_dialog_open_and_close_button_works": "PASS",
+    "single_slot_post_201_correct_eat_time_and_visible_schedule": "PASS",
+    "server_overlap_conflict_keeps_form_editable": "PASS",
+    "batch_two_real_slots_exactly_two_posts": "PASS",
+    "all_created_slots_persist_after_browser_reload": "PASS",
+    "past_time_validation_without_freezing_or_request": "PASS"
+  },
+  "console_errors": [],
+  "network": [
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/notifications/unread-count",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "method": "POST",
+      "status": 409
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/notifications/unread-count",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "created_slot_ids": [
+    "5d51eecc-8ba8-4124-b563-313b88c01884",
+    "2a250890-3f5f-43e1-b2dc-a608b97cafc5",
+    "2725119d-1042-4581-80b3-9f3723af2194"
+  ],
+  "cleanup": [
+    {
+      "slot_id": "5d51eecc-8ba8-4124-b563-313b88c01884",
+      "status": 200
+    },
+    {
+      "slot_id": "2a250890-3f5f-43e1-b2dc-a608b97cafc5",
+      "status": 200
+    },
+    {
+      "slot_id": "2725119d-1042-4581-80b3-9f3723af2194",
+      "status": 200
+    }
+  ],
+  "auth_scope": "Existing synthetic Doctor signed development claims; not a new MFA test.",
+  "build_id": "hCP4P6h566jU4qNYVP249"
+}

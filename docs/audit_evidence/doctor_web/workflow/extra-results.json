@@ -1,0 +1,5 @@
+{
+  "checks": {},
+  "auth_fixture": "Signed development test claims for previously API-created synthetic Doctors; not MFA acceptance evidence",
+  "console_errors": []
+}

@@ -1,3 +1,9 @@
+> Current canonical ownership / Doctor Q&A correction (2026-10-08): [identity enforcement, audited Compliance trace and Q&A rendering evidence](USER_ISOLATION_AND_QNA.md); [all-table ownership inventory](USER_OWNERSHIP_INVENTORY.md). Migration 20261026000001 adds the database guards. Q&A real-device inspection remains pending until a device is connected; widget/golden renders are separate evidence. Earlier verification counts below are historical.
+
+> Current implemented session boundary (2026-10-08): access tokens require `sid` and an authoritative active refresh-family/account check on every protected request. Logout immediately revokes that family; unrelated devices remain valid. Redis and session-store failure fail closed. Development OTP is explicit and prohibited in production. Sensitive Admin step-up remains **STILL_OPEN**, and external TLS is required. Broader enrollment, KMS and pinning descriptions below are design requirements, not acceptance evidence. [Current controls and evidence](PUBLIC_EXPOSURE_HARDENING.md).
+
+> Current professional-registration authorization: ClinicalAdmin/PlatformAdmin alone may consume PENDING into VERIFIED or REJECTED. New Doctors cannot assign review state/metadata. Professional state is independent of account activation, suspension, deletion, MFA, duty and payout readiness. The compatibility Doctor boolean never authorizes clinical work. See [Kenya correction](KENYA_PROFESSIONAL_VERIFICATION.md) and [session hardening](../services/backend/SECURITY_HARDENING.md).
+
 # Phase 8 — Authentication, Authorization & Security Architecture
 
 > **Document Version:** 1.0.0  
@@ -9,7 +15,7 @@
 ## 1. Authentication Lifecycle
 
 ### 1.1 Mobile OTP Authentication Flow (Patients)
-HelloDoctor uses **Phone Number + OTP** as primary authentication for patients. For physicians, it uses **Medical license credentials (BMDC in Bangladesh) + Password + OTP** (which constitutes a true Multi-Factor Authentication flow).
+HelloDoctor uses **Phone Number + OTP** as primary authentication for patients. For physicians, it uses **Registered email + Password + OTP** (which constitutes a true Multi-Factor Authentication flow).
 
 ```mermaid
 sequenceDiagram
@@ -17,19 +23,20 @@ sequenceDiagram
     actor User as Patient
     participant App as Flutter Mobile App
     participant API as Rust Backend (Axum)
-    participant Redis as Session Store
+    participant DB as PostgreSQL Auth Store
     participant SMS as Telco SMS Gateway
 
-    User->>App: Enter Phone Number (+88017... / +2547...)
+    User->>App: Enter Phone Number (+2547...)
     App->>API: POST /api/v1/auth/register-otp
     API->>API: Rate limit check (max 3 OTPs / 10 mins)
-    API->>Redis: Store OTP Hash (6 digits, TTL 120s)
-    API->>SMS: Dispatch SMS with Verification Code
-    SMS-->>User: Deliver SMS OTP ("Your HeloDoc code is 584920")
+    API->>DB: Store hashed expiring OTP
+    Note over API,SMS: SMS delivery integration remains open; production refuses unavailable delivery
+    Note over API,App: Explicit development flag may return a random test OTP
     User->>App: Input 6-Digit OTP Code
     App->>API: POST /api/v1/auth/verify-otp-and-login
-    API->>Redis: Compare constant-time OTP hash
-    API->>API: Generate Access Token (JWT, 15m) & Refresh Token
+    API->>DB: Lock OTP, enforce attempts/expiry, verify hash and consume once
+    API->>DB: Atomically create refresh family/session
+    API->>API: Generate Access Token (JWT sid, 15m) & Refresh Token
     API-->>App: Return Tokens + User Profile
     App->>App: Store Tokens in secure storage
 ```
@@ -42,13 +49,15 @@ sequenceDiagram
 - **Algorithm:** Ed25519 (Asymmetric public/private key signing).
 - **Key Generation:** Generated via the `ed25519-dalek` crate.
 - **Key Storage:** Must be stored in KMS (Key Management Service) or secure environment variables.
-- **Key Rotation:** Managed using the `kid` (Key ID) header with an overlap period for graceful transitions.
-- **Verification:** Public key is cached by downstream microservices for stateless validation.
+- **Key Rotation:** Multi-key `kid` rollover is a deployment/design requirement; the current signer/verifier uses the configured Ed25519 key pair. No automatic key rotation occurred in this pass.
+- **Verification:** Validate Ed25519 signature, issuer, audience, expiry and matching subject/user ID, then require the active account/current role and an unrevoked, unexpired active `auth_sessions` leaf in the JWT `sid` family. Database unavailability returns 503. Validation is server enforced on every protected request.
 - **Lifespan:** 15 minutes.
 - **Payload Schema:**
   ```json
   {
     "sub": "u-c1f7b8a2-9481-4b72-9132-841920842011",
+    "user_id": "u-c1f7b8a2-9481-4b72-9132-841920842011",
+    "sid": "9f16e123-b787-4896-8492-1d294e381a4b",
     "role": "PATIENT",
     "permissions": ["appointments:book", "records:read_own", "grievances:create"],
     "iss": "https://api.hellodoctor.asia", // The iss claim must exactly match the production API domain. For staging, use the staging domain.
@@ -65,7 +74,7 @@ sequenceDiagram
 - **Storage:** Only the cryptographic hash of the refresh token is stored in the database, never plaintext.
 - **Rotation & Reuse Detection:**
   - Refresh tokens are strictly single-use.
-  - When a refresh token is used, it is rotated (a new one is issued) and the old one is invalidated.
+  - Under a family lock, consume the old row and insert a valid successor in the same transaction. Preserve consumed token hashes to detect replay; successor insertion failure rolls back consumption.
   - **Security Rule:** If a previously used (rotated) refresh token is presented, this triggers reuse detection. The system will immediately revoke the entire token family, terminating all active sessions for that device and forcing a re-authentication.
 
 ### 2.3 Password Security (Physicians & Administrators)
@@ -85,8 +94,9 @@ sequenceDiagram
 - **Lost Device:** If all recovery codes are exhausted, a PLATFORM_ADMIN must
   manually reset the admin's MFA, which requires re-enrollment and generates new codes.
 - **Re-authentication:** Administrative actions on sensitive resources (e.g., initiating
-  disbursement, resetting another admin's MFA) require TOTP re-verification within
-  the current session, even if the session is still valid.
+  disbursement, resetting another admin's MFA) are intended to require recent TOTP
+  re-verification. **STEP_UP_AUTH_REMAINS_OPEN**: current routes use ordinary authorized
+  sessions; this requirement has not been implemented or verified.
 
 ---
 
@@ -106,8 +116,19 @@ Authorization relies on Attribute-Based Access Control (ABAC). Beyond standard r
 | Adjudicate Payment Refund | DENIED | DENIED | WRITE (`FINANCE_ADMIN`, `PLATFORM_ADMIN`) |
 | Issue Internal Platform Compliance Warning | DENIED | DENIED | WRITE (`CLINICAL_ADMIN`, `COMPLIANCE`) |
 | Subsystem Log Diagnostics | DENIED | DENIED | READ (`SECURITY_ADMIN`, `PLATFORM_ADMIN`) |
+| Read Current Legal/Professional Documents | PUBLIC (no auth) | PUBLIC (no auth) | PUBLIC (no auth) |
+| View Own Legal Acceptance History | DENIED | READ (Own) | DENIED |
+| View Legal Acceptance Evidence (any user) | DENIED | DENIED | READ (`COMPLIANCE`, `PLATFORM_ADMIN`, `CLINICAL_ADMIN`) |
 
 *(Note: The 'Subsystem Failure Simulator' is strictly for dev/staging environments and must be stripped from production builds).*
+
+Doctor registration (`POST /api/v1/auth/doctor/register`) additionally requires
+a server-independently-validated `accepted_documents` array covering every
+CURRENTLY required legal/professional document — see
+[ADR-011](ADR/ADR-011-legal-consent-ledger.md) and
+[API_SPEC.md](API_SPEC.md#legal--professional-agreements-consent-gate-2026-10-27).
+`legal_acceptances` is append-only: no role is ever granted `UPDATE` or
+`DELETE` on it.
 
 ---
 
@@ -293,3 +314,7 @@ To ensure defense-in-depth even if an application-level query omits an ownership
    The schema defines separate, non-login capability roles for API reads/ordinary inserts, payment state transitions, timed system transitions, and finance/disbursements. They have no `BYPASSRLS`; application workers use the narrowest role and transaction-local identity context required for the operation. The ordinary API role cannot update payment, appointment, wallet, grievance, or chat lifecycle state.
 4. **Defense-in-Depth Principle:**
    Application ABAC is authoritative; database RLS ensures that any accidental query flaw or compromised route handler physically cannot select, update, or delete rows outside the caller's tenancy.
+
+## PUBLIC INTERNET EXPOSURE REQUIREMENTS
+
+Development must not be internet-exposed. Production requires HTTPS termination, explicit safe environment configuration, no development OTP/seed fixtures, protected metrics, blocked simulation endpoints, fail-closed rate limiting and immediate session invalidation. The implemented application guards and exact proxy/client configuration are documented in [Public exposure hardening](PUBLIC_EXPOSURE_HARDENING.md). External TLS infrastructure is required and was not installed. Sensitive Admin step-up authentication remains open; these checks do not declare general production readiness.

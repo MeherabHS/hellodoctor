@@ -1,0 +1,25 @@
+{
+  "build_id": "vBxYbGtSpLPl4rQ_7Fvhi",
+  "baseline_files_checked": 209,
+  "mobile_changed": [],
+  "backend_changed_against_baseline": [
+    "services\\backend\\src\\repository\\notification_repo.rs",
+    "services\\backend\\src\\services\\notification_service.rs",
+    "services\\backend\\tests\\api_tests.rs"
+  ],
+  "backend_edits_by_this_correction": [],
+  "backend_preservation_note": "Notification repository/service and API tests changed separately during this pass. This correction did not edit them; changes are preserved and not attributed to this UI work.",
+  "screen_viewport_checks": 45,
+  "populated_workflow_checks": 14,
+  "ui_auth_checks": {
+    "ui_login_mfa": "PASS",
+    "slot_dialog_escape": "PASS",
+    "session_reload": "PASS",
+    "ui_logout": "PASS"
+  },
+  "console_exceptions": 0,
+  "host_software_installed": "NONE",
+  "browser_installed_or_downloaded": false,
+  "verdict": "DOCTOR_WEB_PARTIAL",
+  "visual_parity": "PARTIAL"
+}

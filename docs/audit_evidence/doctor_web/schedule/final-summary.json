@@ -1,0 +1,31 @@
+{
+  "build_id": "vROyHPJLjR3IY3OKge4Ib",
+  "branch": "main",
+  "starting_sha": "e3739ae555f198c537dfa7f505fe506b0cd62df2",
+  "source_latest_migration": "20261021000001",
+  "binary_latest_migration": "20261021000001",
+  "database_latest_migration": "20261021000001",
+  "cargo_fmt": "PASS",
+  "cargo_clippy_all_targets": "PASS",
+  "rust_library_tests": "43/43",
+  "rust_api_tests": "75/75",
+  "new_blocking_api_tests": "13/13",
+  "web_unit_tests": "21/21",
+  "browser_checks": "12/12",
+  "flutter_analyze": "PASS",
+  "flutter_tests": "51/51",
+  "changed_protected_files": [
+    "services/backend/src/api/router.rs",
+    "services/backend/src/domain/models.rs",
+    "services/backend/src/repository/doctor_repo.rs",
+    "services/backend/src/api/v1/doctor_handlers.rs",
+    "services/backend/tests/api_tests.rs",
+    "apps/mobile/lib/features/doctor/doctor_pages.dart",
+    "apps/mobile/test/doctor_widgets_test.dart"
+  ],
+  "new_migrations": [
+    "services/backend/migrations/20261021000001_doctor_slot_blocking.down.sql",
+    "services/backend/migrations/20261021000001_doctor_slot_blocking.up.sql"
+  ],
+  "host_software_installed": "NONE"
+}

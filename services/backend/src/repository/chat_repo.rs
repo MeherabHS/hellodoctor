@@ -2,7 +2,10 @@ use crate::domain::models::{ChatConversation, ChatMessage};
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-pub async fn insert_conversation<'e, E: PgExecutor<'e>>(executor: E, conv: &ChatConversation) -> Result<(), sqlx::Error> {
+pub async fn insert_conversation<'e, E: PgExecutor<'e>>(
+    executor: E,
+    conv: &ChatConversation,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO chat_conversations (id, appointment_id, patient_id, doctor_id, expires_at, is_locked, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
     )
@@ -18,7 +21,10 @@ pub async fn insert_conversation<'e, E: PgExecutor<'e>>(executor: E, conv: &Chat
     Ok(())
 }
 
-pub async fn find_conversation<'e, E: PgExecutor<'e>>(executor: E, id: Uuid) -> Result<Option<ChatConversation>, sqlx::Error> {
+pub async fn find_conversation<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+) -> Result<Option<ChatConversation>, sqlx::Error> {
     sqlx::query_as::<_, ChatConversation>(
         "SELECT id, appointment_id, patient_id, doctor_id, expires_at, is_locked, created_at FROM chat_conversations WHERE id = $1",
     )
@@ -27,7 +33,22 @@ pub async fn find_conversation<'e, E: PgExecutor<'e>>(executor: E, id: Uuid) -> 
     .await
 }
 
-pub async fn lock_conversation<'e, E: PgExecutor<'e>>(executor: E, id: Uuid) -> Result<(), sqlx::Error> {
+pub async fn find_conversation_by_appointment<'e, E: PgExecutor<'e>>(
+    executor: E,
+    appointment_id: Uuid,
+) -> Result<Option<ChatConversation>, sqlx::Error> {
+    sqlx::query_as::<_, ChatConversation>(
+        "SELECT id, appointment_id, patient_id, doctor_id, expires_at, is_locked, created_at FROM chat_conversations WHERE appointment_id = $1",
+    )
+    .bind(appointment_id)
+    .fetch_optional(executor)
+    .await
+}
+
+pub async fn lock_conversation<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE chat_conversations SET is_locked = TRUE WHERE id = $1")
         .bind(id)
         .execute(executor)
@@ -35,7 +56,10 @@ pub async fn lock_conversation<'e, E: PgExecutor<'e>>(executor: E, id: Uuid) -> 
     Ok(())
 }
 
-pub async fn insert_message<'e, E: PgExecutor<'e>>(executor: E, msg: &ChatMessage) -> Result<(), sqlx::Error> {
+pub async fn insert_message<'e, E: PgExecutor<'e>>(
+    executor: E,
+    msg: &ChatMessage,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO chat_messages (id, conversation_id, sender_id, content, attachment_bucket, attachment_object_key, attachment_mime, attachment_size, attachment_hash, is_read, sent_at) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
@@ -56,7 +80,10 @@ pub async fn insert_message<'e, E: PgExecutor<'e>>(executor: E, msg: &ChatMessag
     Ok(())
 }
 
-pub async fn list_messages<'e, E: PgExecutor<'e>>(executor: E, conversation_id: Uuid) -> Result<Vec<ChatMessage>, sqlx::Error> {
+pub async fn list_messages<'e, E: PgExecutor<'e>>(
+    executor: E,
+    conversation_id: Uuid,
+) -> Result<Vec<ChatMessage>, sqlx::Error> {
     sqlx::query_as::<_, ChatMessage>(
         "SELECT id, conversation_id, sender_id, content, attachment_bucket, attachment_object_key, attachment_mime, attachment_size, attachment_hash, is_read, sent_at \
          FROM chat_messages WHERE conversation_id = $1 ORDER BY sent_at",

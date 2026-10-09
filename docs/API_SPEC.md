@@ -62,7 +62,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
 - **Auth:** Public.
 - **Request Body:**
   ```json
-  { "phone_number": "+8801712345678", "role": "PATIENT" }
+  { "phone_number": "+254700000002", "role": "PATIENT" }
   ```
 - **Response:** `200 OK`
   ```json
@@ -85,7 +85,7 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
       "refresh_token": "a8f4c2e1b9d7...",
       "user": {
         "id": "u-9481",
-        "phone_number": "+8801712345678",
+        "phone_number": "+254700000002",
         "role": "PATIENT",
         "preferred_language": "en"
       }
@@ -94,11 +94,11 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
   ```
 
 ### `POST /api/v1/auth/doctor/login`
-- **Purpose:** Initiates doctor login. Medical license credentials (BMDC in Bangladesh, Kenya Medical Board in Kenya) + password. (Step 1 of MFA).
+- **Purpose:** Initiates doctor login. Registered email address + password. Professional registration is reviewed separately. (Step 1 of MFA).
 - **Auth:** Public.
 - **Request Body:**
   ```json
-  { "license_number": "BMDC #45821", "password": "SecurePassword123!" }
+  { "email": "synthetic.doctor@example.test", "password": "SecurePassword123!" }
   ```
 - **Response:** `200 OK`
   ```json
@@ -188,11 +188,11 @@ Admin TOTP is backed by the encrypted `mfa_credentials` model in `DATABASE_SCHEM
     "data": [
       {
         "id": "doc-sabrina",
-        "name": "Dr. Sabrina Akter",
-        "license_number": "BMDC #45821",
+        "name": "Dr. Synthetic Doctor One",
+        "license_number": "SYNTH-KE-0001",
         "specialty": "Internal Medicine",
         "experience_years": 12,
-        "current_hospital": "Dhaka Medical College Hospital",
+        "current_hospital": "Synthetic Nairobi Clinic",
         "qualifications": ["MBBS", "FCPS", "MD"],
         "fee_video": 800.00,
         "fee_chat": 500.00,
@@ -362,8 +362,8 @@ Admin TOTP is backed by the encrypted `mfa_credentials` model in `DATABASE_SCHEM
   {
     "success": true,
     "data": {
-      "doctor_name": "Dr. Sabrina Akter",
-      "license_number": "BMDC #45821",
+      "doctor_name": "Dr. Synthetic Doctor One",
+      "license_number": "SYNTH-KE-0001",
       "total_gross": 35562.50,
       "platform_charge_percent": 20.0,
       "withheld_fee": 7112.50,
@@ -465,7 +465,7 @@ Admin TOTP is backed by the encrypted `mfa_credentials` model in `DATABASE_SCHEM
       "grievance_id": "GRV-20261001-73",
       "status": "WARNED",
       "board_remedy": "Internal Platform Compliance Warning Logged",
-      "doctor_license": "BMDC #45821"
+      "doctor_license": "SYNTH-KE-0001"
     }
   }
   ```
@@ -483,14 +483,71 @@ Admin TOTP is backed by the encrypted `mfa_credentials` model in `DATABASE_SCHEM
     "success": true,
     "data": {
       "id": "doc-anika",
-      "name": "Dr. Anika Rahman",
-      "license_number": "BMDC #52891",
-      "phone": "+880 1711-884920",
-      "residence": "Dhanmondi, Dhaka (House 42, Road 7A)",
+      "name": "Dr. Synthetic Doctor Two",
+      "license_number": "SYNTH-KE-0002",
+      "phone": "+254700000101",
+      "residence": "Synthetic Nairobi, Kenya",
       "email": "dr.anika.dmch@helodoc.com",
-      "hospital": "Dhaka Medical College Hospital",
+      "hospital": "Synthetic Nairobi Clinic",
       "lifetime_consultations": 342,
       "disciplinary_warnings": []
     }
   }
   ```
+
+
+## Current Kenya professional-registration API (2026-10-08)
+
+Manual HelloDoctor review of submitted KMPDC registration; not an external registry
+or annual practice-licence integration. Existing `license_number` is the submitted
+registration number. New public/Admin-created Doctors are PENDING, off duty,
+`license_authority=KMPDC`, `license_country=KE`. Public registration rejects
+unknown/privileged fields rather than accepting client verification state.
+
+All routes require JWT authentication except public registration/login:
+
+| Route | Allowed reviewers | Contract |
+| --- | --- | --- |
+| `GET /api/v1/admin/doctors/pending-verification` | ClinicalAdmin, PlatformAdmin | Only PENDING profiles; VERIFIED and REJECTED excluded |
+| `POST /api/v1/admin/doctors/{doctor_id}/verify` | Same | Optional note; PENDING → VERIFIED |
+| `POST /api/v1/admin/doctors/{doctor_id}/reject` | Same | Optional note; PENDING → REJECTED |
+
+Mutation response: `{ "success": true, "data": { "doctor_id": "...",
+"professional_verification_status": "VERIFIED", "status": "VERIFIED",
+"is_verified": true } }`. Rejection returns REJECTED and false. Concurrent/repeated
+terminal review returns 409 for the loser. Audit, metadata and notification share
+the status transaction. The own profile includes the explicit status, review note,
+review timestamp and reviewer; public directory records omit internal review metadata.
+The overview count is `pending_professional_verification`. No old-country route alias
+remains. See [schema/backfill and client mappings](KENYA_PROFESSIONAL_VERIFICATION.md).
+
+## Doctor Articles ? current direct-publication contract
+
+[Doctor Articles](DOCTOR_ARTICLES.md) defines the implemented `DRAFT / PUBLISHED / ARCHIVED` lifecycle, structured fields, APIs, optimistic versions, forced ownership/publication RLS and migration `20261025000001`. Doctors publish directly; no Admin review state or queue exists. Professional verification remains its separate existing state machine. [Session hardening](PUBLIC_EXPOSURE_HARDENING.md) requires an active JWT `sid` family on protected reads/writes.
+
+## Legal & Professional Agreements consent gate (2026-10-27)
+
+`POST /api/v1/auth/doctor/register` now additionally requires a non-empty
+`accepted_documents` array, each entry `{ "type": "<DOCUMENT_TYPE>", "version": "<string>" }`.
+The server independently re-checks this against its own current-documents
+registry — the client supplies only a type and version, never a hash — and
+rejects (422) if any CURRENTLY required document is missing or any submitted
+document is not the current version. Required types: `DOCTOR_TERMS`,
+`PRIVACY_NOTICE`, `PROFESSIONAL_VERIFICATION_DECLARATION`,
+`TELEMEDICINE_PRACTITIONER_POLICY`. Optional: `MARKETING_COMMUNICATIONS`.
+Acceptance rows are written in the same transaction as the `users`/
+`doctor_profiles`/`doctor_wallets` inserts, so the account and its
+acknowledgements land atomically or not at all. See
+[ADR-011](ADR/ADR-011-legal-consent-ledger.md).
+
+| Route | Auth | Contract |
+| --- | --- | --- |
+| `GET /api/v1/legal/documents` | Public | Returns all current documents: `[{ "document_type", "version", "title", "body", "required" }]`. Backs the mobile Legal & Consent screen — body text is always fetched from here, never duplicated as static strings client-side. |
+| `GET /api/v1/doctor/legal/acceptances` | Doctor (own) | That Doctor's own immutable acceptance history. |
+| `GET /api/v1/admin/legal/acceptances/{user_id}` | Compliance, PlatformAdmin, ClinicalAdmin | Evidence view of a specific user's acceptance history (`abac::Action::ViewLegalAcceptances`). |
+
+No role is ever granted `UPDATE`/`DELETE` on `legal_acceptances` — a changed
+document version produces a new row, never a mutation of an old one. Forcing
+re-consent at next login when a document version is bumped, and a dedicated
+marketing-consent revoke endpoint, are both out of scope for this pass (the
+data model supports detecting staleness; no login-time gate/UI is built yet).

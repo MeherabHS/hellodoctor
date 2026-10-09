@@ -14,7 +14,8 @@ export interface DoctorProfile {
   residential_address: string;
   verified_phone: string;
   is_on_duty: boolean;
-  is_verified: boolean;
+  is_verified: boolean; // compatibility only
+  professional_verification_status: "PENDING" | "VERIFIED" | "REJECTED";
   disciplinary_warnings?: string[];
 }
 
@@ -37,7 +38,7 @@ export interface GrievanceReport {
   target_type: 'DOCTOR' | 'SYSTEM';
   category: string;
   claim_summary: string;
-  status: 'PENDING_REVIEW' | 'UNDER_INVESTIGATION' | 'REFUNDED' | 'WARNED' | 'DISMISSED';
+  status: 'PENDING_REVIEW' | 'UNDER_INVESTIGATION' | 'REFUND_APPROVED' | 'REFUNDED' | 'WARNED' | 'DISMISSED';
   created_at: string;
   telemetry?: {
     call_duration_seconds: number;
@@ -51,12 +52,12 @@ export interface TransactionItem {
   transaction_number: string;
   appointment_id: string;
   payment_session_id: string;
-  gateway: 'BKASH' | 'NAGAD' | 'CARD' | 'MPESA';
+  gateway: 'BKASH' | 'NAGAD' | 'CARD' | 'MPESA' | 'BANK_TRANSFER';
   gateway_reference?: string;
   gross_amount: string;
   platform_fee_amount: string;
   net_amount: string;
-  payment_status: 'INITIATED' | 'PAYMENT_HELD' | 'SETTLED_TO_DOCTOR' | 'DISBURSED' | 'REFUNDED_TO_PATIENT' | 'FAILED';
+  payment_status: 'INITIATED' | 'PAYMENT_HELD' | 'SETTLED_TO_DOCTOR' | 'DISBURSED' | 'REFUND_PENDING' | 'REFUNDED_TO_PATIENT' | 'FAILED';
   created_at: string;
 }
 

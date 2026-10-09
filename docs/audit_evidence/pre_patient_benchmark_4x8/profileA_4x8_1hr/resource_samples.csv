@@ -1,0 +1,22 @@
+timestamp_utc,container,cpu_percent,mem_usage
+2026-10-09T02:45:21Z,hellodoctor-capacity-backend,17.56%,5.68MiB / 1.5GiB
+2026-10-09T02:45:21Z,hellodoctor-capacity-postgres,10.06%,172.6MiB / 3.5GiB
+2026-10-09T02:45:21Z,hellodoctor-capacity-redis,2.69%,6.09MiB / 400MiB
+2026-10-09T02:45:27Z,hellodoctor-capacity-backend,16.17%,6.402MiB / 1.5GiB
+2026-10-09T02:45:27Z,hellodoctor-capacity-postgres,10.64%,179.4MiB / 3.5GiB
+2026-10-09T02:45:27Z,hellodoctor-capacity-redis,5.07%,5.977MiB / 400MiB
+2026-10-09T02:45:38Z,hellodoctor-capacity-backend,13.46%,6.668MiB / 1.5GiB
+2026-10-09T02:45:38Z,hellodoctor-capacity-postgres,7.18%,184.1MiB / 3.5GiB
+2026-10-09T02:45:38Z,hellodoctor-capacity-redis,2.12%,5.934MiB / 400MiB
+2026-10-09T02:45:44Z,hellodoctor-capacity-backend,16.48%,6.582MiB / 1.5GiB
+2026-10-09T02:45:44Z,hellodoctor-capacity-postgres,15.43%,200.3MiB / 3.5GiB
+2026-10-09T02:45:44Z,hellodoctor-capacity-redis,2.35%,6.148MiB / 400MiB
+2026-10-09T02:45:55Z,hellodoctor-capacity-backend,14.97%,6.188MiB / 1.5GiB
+2026-10-09T02:45:55Z,hellodoctor-capacity-postgres,10.32%,208.2MiB / 3.5GiB
+2026-10-09T02:45:55Z,hellodoctor-capacity-redis,2.39%,6.387MiB / 400MiB
+2026-10-09T02:46:01Z,hellodoctor-capacity-backend,13.48%,6.375MiB / 1.5GiB
+2026-10-09T02:46:01Z,hellodoctor-capacity-postgres,9.65%,211.8MiB / 3.5GiB
+2026-10-09T02:46:01Z,hellodoctor-capacity-redis,2.12%,6.453MiB / 400MiB
+2026-10-09T02:46:12Z,hellodoctor-capacity-backend,14.17%,6.266MiB / 1.5GiB
+2026-10-09T02:46:12Z,hellodoctor-capacity-postgres,9.31%,219.1MiB / 3.5GiB
+2026-10-09T02:46:12Z,hellodoctor-capacity-redis,4.80%,5.953MiB / 400MiB

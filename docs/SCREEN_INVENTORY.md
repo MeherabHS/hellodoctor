@@ -45,7 +45,7 @@ Labels used:
       ├── Label "Emergency Contact" (Strictly without "24/7" prefix)
       └── One-Tap Dialing CTA "Call 16263"
   └── Upcoming Consultation Section
-      └── Active Consultation Card (Dr. Sabrina Akter, Video, Countdown Timer)
+      └── Active Consultation Card (Dr. Synthetic Doctor One, Video, Countdown Timer)
   └── Bottom Navigation Bar (Queue/Home, Services, Schedule, Blogs, Account)
   ```
 - **Components:** Top header, 2x2 grid cards, emergency helpline banner, upcoming appointment hero card, bottom nav bar.
@@ -104,7 +104,7 @@ Labels used:
 ### HD-PATIENT-FIND-SPECIALIST (`view-3`)
 - **Screen Name:** Specialist Discovery & Directory
 - **User Role:** `patient`
-- **Purpose:** Allows patients to browse and filter BMDC-verified specialist physicians without commercial star ratings.
+- **Purpose:** Allows patients to browse and filter KMPDC-verified specialist physicians without commercial star ratings.
 - **Entry Points:** Home card "Find Doctor", Services tab "Book Specialist".
 - **Exit Points:** 
   - `switchScreen(9)`: Doctor Public Profile & Credentials
@@ -126,10 +126,10 @@ Labels used:
       └── "Pediatrics"
   └── Verified Doctor Card List:
       ├── Doctor Portrait Avatar
-      ├── Doctor Name (e.g., "Dr. Sabrina Akter")
-      ├── BMDC Registration ID (e.g., "BMDC #45821")
+      ├── Doctor Name (e.g., "Dr. Synthetic Doctor One")
+      ├── KMPDC Registration ID (e.g., "SYNTH-KE-0001")
       ├── Clinical Experience Badge (e.g., "12 Years Exp")
-      ├── Hospital Affiliation (e.g., "Dhaka Medical College Hospital")
+      ├── Hospital Affiliation (e.g., "Synthetic Nairobi Clinic")
       ├── Consultation Fee (e.g., "৳ 800")
       └── Action Button "Book Appointment"
   ```
@@ -143,7 +143,7 @@ Labels used:
   - `populated`: Displays list of matching physicians.
   - `empty`: "No specialists available for the selected criteria."
   - `loading`: Animated shimmer cards (`.sk-shimmer`).
-- **Data Requirements:** Doctor ID, name, BMDC number, specialty, experience years, hospital, fee, modality flags.
+- **Data Requirements:** Doctor ID, name, KMPDC number, specialty, experience years, hospital, fee, modality flags.
 - **Backend Requirements (Rust):** `GET /api/v1/doctors?modality=video&specialty=Internal+Medicine&page=1&limit=20`.
 - **Prototype Reference:** `index.html` lines containing `id="view-3"`.
 
@@ -161,7 +161,7 @@ Labels used:
   ```
   HD-PATIENT-BOOK-SLOT
   └── Top App Bar (Back Arrow, Title "Select Date & Time")
-  └── Selected Doctor Summary Header (Avatar, Name, BMDC, Fee)
+  └── Selected Doctor Summary Header (Avatar, Name, KMPDC, Fee)
   └── Calendar Date Carousel (Today, Tomorrow, Day + 2, Day + 3)
   └── Time Slot Grid (Morning, Afternoon, Evening 15-min chips)
   └── Multi-Prescription Upload Dropzone (#patientUploadDropzone)
@@ -176,8 +176,13 @@ Labels used:
 - **Interactions:**
   - Tapping date chip updates available slot chips.
   - Selecting file invokes `handlePatientFileSelection(e)`:
-    - Enforces `MAX_PRESCRIPTION_IMAGES = 5`.
-    - Triggers warning toast if user selects > 5 files.
+    - Enforces `MAX_PRESCRIPTION_IMAGES = 5` **as literally coded in the `index.html` prototype
+      source**, retained here as historical/original reference. **Production correction:** the
+      actual backend/Doctor-Web cap is now 20 images per consultation at 40 KB each
+      (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`, `MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024`) —
+      see docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md. The prototype file itself was not
+      changed by that update.
+    - Triggers warning toast if user selects > the cap.
     - Appends valid files to `patientPrescriptionImages` array and updates preview gallery.
   - Tapping thumbnail trash icon invokes `removePatientPrescriptionImage(index)`.
   - Tapping "Confirm & Pay" locks the slot, creates an `INITIATED` payment attempt, and transitions to the Waiting Room only after verified payment confirmation.
@@ -206,7 +211,7 @@ Labels used:
   HD-PATIENT-WAITING-ROOM
   └── Top Status Bar (Queue Position "You are #1 in line", Scheduled Time)
   └── Live Countdown Timer Card (e.g., "Consultation starts in 04:32")
-  └── Doctor Information Card (Dr. Sabrina Akter, BMDC #45821)
+  └── Doctor Information Card (Dr. Synthetic Doctor One, SYNTH-KE-0001)
   └── Uploaded Prescriptions Strip (#waitingRoomPrescriptionCard)
       ├── Badge (#wrPrescriptionCountBadge "3 Photos Attached")
       └── Horizontal Thumbnail Strip (#wrPrescriptionThumbnailsStrip)
@@ -243,7 +248,7 @@ Labels used:
   HD-PATIENT-POST-CONSULT
   └── Completion Hero Icon (Emerald Checkmark)
   └── Title "Consultation Completed Successfully"
-  └── Doctor Summary (Dr. Sabrina Akter, Internal Medicine)
+  └── Doctor Summary (Dr. Synthetic Doctor One, Internal Medicine)
    └── Handwritten Prescription Photo Card:
        ├── Prescription Reference ID ("RX-20260930-841")
        └── CTA "View Secure Prescription Photo"
@@ -273,7 +278,7 @@ Labels used:
 - **UI Hierarchy:**
   ```
   HD-PATIENT-ACCOUNT-SETTINGS
-  └── Profile Card (Patient Name "Rafiq Ahmed", Phone "+880 1712-345678", National ID)
+  └── Profile Card (Patient Name "Rafiq Ahmed", Phone "+254700000002", National ID)
   └── Family Profiles Section ("Add Dependent: Spouse, Children, Parents")
   └── Settings Menu:
       ├── Language Selector Item (#patientLangMenuItem)
@@ -298,7 +303,7 @@ Labels used:
 - **HD-PATIENT-HEALTH-VAULT (`view-5`):** Longitudinal electronic medical record repository archiving past prescriptions, CBC lab reports, and clinical notes.
 - **HD-PATIENT-CONSULT-CHAT (`view-6`):** 24-hour asynchronous clinical messaging console with canned medical queries and auto-expiry countdown.
 - **HD-PATIENT-CONSULT-ROUTING (`view-8`):** Urgency triage screen directing patients to emergency helpline, urgent GP on-call, or scheduled specialist care.
-- **HD-PATIENT-DOCTOR-PROFILE (`view-9`):** Full credentials view displaying BMDC registration, degrees, clinical experience, and hospital appointments without star ratings.
+- **HD-PATIENT-DOCTOR-PROFILE (`view-9`):** Full credentials view displaying KMPDC registration, degrees, clinical experience, and hospital appointments without star ratings.
 - **HD-PATIENT-FREE-QNA (`view-12`):** Community medical Q&A forum where patients post anonymous health questions answered by on-duty medical officers.
 - **HD-PATIENT-BLOGS (`view-13`):** Health education feed offering preventative lifestyle, diabetes care, and epidemic guidance articles.
 - **HD-PATIENT-LOADING-SHIMMER (`view-14`):** Global skeleton loader preventing layout shifts during high-latency network queries.
@@ -322,7 +327,7 @@ Labels used:
   ```
   HD-DOC-QUEUE
   └── Doctor Top Profile Bar:
-      ├── Avatar & Name (Dr. Sabrina Akter, BMDC #45821)
+      ├── Avatar & Name (Dr. Synthetic Doctor One, SYNTH-KE-0001)
       └── Instant Duty Toggle Switch (`toggleDoctorDuty()`)
   └── Queue Search & Filter Bar
   └── Queue Filter Tabs: "All Patients", "Upcoming (8)", "Completed (14)"
@@ -391,7 +396,7 @@ Labels used:
   ```
   HD-DOCWEB-WORKSTATION
   └── Top Command Bar (#docWebHeader):
-      ├── Doctor Credentials (Dr. Sabrina Akter, MBBS, FCPS)
+      ├── Doctor Credentials (Dr. Synthetic Doctor One, MBBS, FCPS)
       ├── Daily Revenue Widget:
           "Total Gross: ৳ 10,500 | 20% Fee: - ৳ 2,100 | Net Final: ৳ 8,400"
       └── Duty Toggle Switch
@@ -436,11 +441,11 @@ Labels used:
 - **Purpose:** Complete database of registered patients with consultation counts, lifetime value, and dispute flags.
 - **Backend Requirements (Rust):** `GET /api/v1/admin/patients`.
 
-### HD-ADMIN-BMDC (`adminPage_bmdc`)
-- **Screen Name:** BMDC Medical Credentialing Engine
+### HD-ADMIN-VERIFICATION (`adminPage_verification`)
+- **Screen Name:** KMPDC Medical Credentialing Engine
 - **User Role:** `admin`
 - **Purpose:** Automated and manual verification of medical council licenses, credential renewal monitoring, and practice suspension controls.
-- **Backend Requirements (Rust):** `GET /api/v1/admin/bmdc/verifications`, `POST /api/v1/admin/bmdc/verify`.
+- **Backend Requirements (Rust):** `GET /api/v1/admin/doctors/pending-verification`, `POST /api/v1/admin/doctors/{doctor_id}/verify`.
 
 ### HD-ADMIN-SLOTS (`adminPage_slots`)
 - **Screen Name:** Telehealth Capacity & Slot Management

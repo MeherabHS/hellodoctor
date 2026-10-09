@@ -1,0 +1,2 @@
+-- PostgreSQL enum values cannot be removed safely after deployment. The value
+-- remains harmless and is not exposed by the Kenya-only payout API.

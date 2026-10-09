@@ -1,0 +1,116 @@
+{
+  "checks": {
+    "corrupt_photo_rejected_without_discarding_valid_pages": "PASS",
+    "source_10mb_limit_prevents_decode_without_rejecting_compressible_photos": "PASS",
+    "progress_visible_at_desktop_tablet_narrow_widths_without_overflow": "PASS",
+    "real_jpeg_png_webp_automatically_compress_to_400kb_hard_cap": "PASS",
+    "real_progress_and_actual_backend_failure_never_claim_persistence": "PASS",
+    "retry_preserves_compressed_bytes_key_notes_and_other_pages": "PASS",
+    "account_boundary_aborts_pending_xhr_and_clears_photos": "PASS",
+    "failed_or_aborted_transfers_create_no_prescription_record": "PASS"
+  },
+  "console_errors": [],
+  "uploads": [
+    {
+      "bytes": 332702,
+      "mime": "image/jpeg",
+      "hash": "08e04328796a16e2053a4f47268f720fb73ed1bcefecab9162fc8f2c6490ae42",
+      "idempotency_key": "fabf7a19-ca7d-43df-bfa6-e9d08e99f918",
+      "notes": "Synthetic compression regression advice."
+    },
+    {
+      "bytes": 399379,
+      "mime": "image/png",
+      "hash": "754010a4d246789440587caa40a5da930b79378251f5637a77218cee13449911",
+      "idempotency_key": "65ede8fe-ea8f-4fed-a663-bd40cac4d853",
+      "notes": "Synthetic compression regression advice."
+    },
+    {
+      "bytes": 332359,
+      "mime": "image/jpeg",
+      "hash": "3fbbb5b04eaec4ef852643bd7c7394463c3d9a7784c730dd442a1e55260d6b1a",
+      "idempotency_key": "1eecc0e1-6f94-47c1-ba0a-fa07e2db90a2",
+      "notes": "Synthetic compression regression advice."
+    },
+    {
+      "bytes": 332702,
+      "mime": "image/jpeg",
+      "hash": "08e04328796a16e2053a4f47268f720fb73ed1bcefecab9162fc8f2c6490ae42",
+      "idempotency_key": "fabf7a19-ca7d-43df-bfa6-e9d08e99f918",
+      "notes": "Synthetic compression regression advice."
+    },
+    {
+      "bytes": 332702,
+      "mime": "image/jpeg",
+      "hash": "08e04328796a16e2053a4f47268f720fb73ed1bcefecab9162fc8f2c6490ae42",
+      "idempotency_key": "fabf7a19-ca7d-43df-bfa6-e9d08e99f918",
+      "notes": "Synthetic compression regression advice."
+    }
+  ],
+  "progress_samples": [
+    3.6925351471469843,
+    3.6925351471469843,
+    7.3850702942939686
+  ],
+  "backend_responses": [
+    {
+      "status": 429,
+      "code": "RATE_LIMIT_EXCEEDED"
+    },
+    {
+      "status": 429,
+      "code": "RATE_LIMIT_EXCEEDED"
+    },
+    {
+      "status": 429,
+      "code": "RATE_LIMIT_EXCEEDED"
+    },
+    {
+      "status": 429,
+      "code": "RATE_LIMIT_EXCEEDED"
+    }
+  ],
+  "source_images": [
+    {
+      "mime": "image/jpeg",
+      "bytes": 2333787
+    },
+    {
+      "mime": "image/png",
+      "bytes": 6606572
+    },
+    {
+      "mime": "image/webp",
+      "bytes": 2030406
+    }
+  ],
+  "preview_dimensions": [
+    {
+      "width": 1600,
+      "height": 1200
+    },
+    {
+      "width": 400,
+      "height": 300
+    },
+    {
+      "width": 1600,
+      "height": 1200
+    }
+  ],
+  "compressed_images": [
+    {
+      "bytes": 332702,
+      "mime": "image/jpeg"
+    },
+    {
+      "bytes": 399379,
+      "mime": "image/png"
+    },
+    {
+      "bytes": 332359,
+      "mime": "image/jpeg"
+    }
+  ],
+  "build_id": "6MUCqdkhsIXrtOLwiipGX"
+}

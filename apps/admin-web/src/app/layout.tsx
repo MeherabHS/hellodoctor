@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+// Every HTML response must use the nonce set by middleware, including login.
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'HelloDoctor — Central Hospital & Operations Command Portal',

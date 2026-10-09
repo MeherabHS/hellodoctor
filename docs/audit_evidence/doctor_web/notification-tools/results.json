@@ -1,0 +1,74 @@
+{
+  "checks": {
+    "real_server_notification_inboxes_are_separate": "PASS",
+    "foreign_notification_mark_is_noop_and_owner_state_unchanged": "PASS",
+    "recipient_query_injection_rejected": "PASS",
+    "bell_opens_real_inbox_without_schedule_navigation": "PASS",
+    "read_all_and_authoritative_unread_count": "PASS",
+    "daily_summary_deep_link_opens_queue": "PASS",
+    "patient_registration_control_removed": "PASS",
+    "rx_vitals_and_lab_controls_removed": "PASS",
+    "separate_chat_list_from_feature_menu": "PASS",
+    "separate_schedule_from_feature_menu": "PASS",
+    "telehealth_lab_actions_removed": "PASS",
+    "feature_menu_four_viewports_and_escape": "PASS",
+    "loading_ring_respects_reduced_motion": "PASS",
+    "prototype_icons_served_locally": "PASS",
+    "actual_login_mfa_notification_reload_logout": "PASS"
+  },
+  "console_errors": [],
+  "network": [
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/notifications/unread-count",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/notifications",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/notifications",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/notifications/unread-count",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "fixture_scope": "Previously API-created synthetic Doctors; separate real UI login/MFA below.",
+  "build_id": "hCP4P6h566jU4qNYVP249"
+}
