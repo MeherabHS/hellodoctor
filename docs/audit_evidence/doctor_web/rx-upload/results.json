@@ -1,0 +1,21 @@
+{
+  "checks": {
+    "doctor_camera_capture_removed": "PASS",
+    "file_button_opens_picker_and_two_local_previews": "PASS",
+    "real_storage_rejection_visible_without_false_success": "PASS",
+    "failed_page_retry_and_removal_preserve_other_page": "PASS",
+    "failed_upload_creates_no_prescription_record": "PASS",
+    "file_only_workspace_three_responsive_widths": "PASS",
+    "actual_login_mfa_no_context_free_prescription_action": "PASS"
+  },
+  "console_errors": [],
+  "upload_responses": [
+    {
+      "status": 409,
+      "code": "RESOURCE_CONFLICT",
+      "message": "Document storage is not configured. Upload is unavailable."
+    }
+  ],
+  "scope": "Existing synthetic fixtures for file upload; actual seed login/MFA for empty consultation state.",
+  "build_id": "6MUCqdkhsIXrtOLwiipGX"
+}

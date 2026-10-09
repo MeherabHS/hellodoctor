@@ -1,0 +1,46 @@
+use crate::domain::models::*;
+use crate::error::AppError;
+use crate::repository::{consultation_repo, grievance_repo, transaction_repo, AppState};
+use chrono::Utc;
+use uuid::Uuid;
+
+pub struct GrievanceService;
+
+impl GrievanceService {
+    /// Patient files formal medical grievance (Star-Rating-Free). `consultation_id` must be
+    /// a real `consultation_sessions.id` â€” the FK constraint enforces this at the DB level.
+    pub async fn submit_grievance(
+        state: &AppState,
+        patient_id: Uuid,
+        consultation_id: Uuid,
+        target_type: GrievanceTarget,
+        category: String,
+        claim_summary: String,
+    ) -> Result<GrievanceReport, AppError> {
+        consultation_repo::find_by_id(&state.db, consultation_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Consultation session not found.".into()))?;
+
+        let grv_id = Uuid::new_v4();
+        let grv_num = format!("GRV-{}-{}", Utc::now().format("%Y%m%d"), grv_id.to_string()[0..4].to_uppercase());
+
+        let report = GrievanceReport {
+            id: grv_id,
+            grievance_number: grv_num,
+            patient_id,
+            consultation_id,
+            target_type,
+            category,
+            claim_summary,
+            status: GrievanceStatus::PendingReview,
+            created_at: Utc::now(),
+        };
+
+        grievance_repo::insert(&state.db, &report).await?;
+        Ok(report)
+    }
+
+    /// Admin Medical Board Adjudicates: Disburse Refund
+    pub async fn adjudicate_refund(state: &AppState, grievance_id: Uuid, admin_id: Uuid, audit_notes: String) -> Result<GrievanceReport, AppError> {
+        let mut tx = state.db.begin().await?;
+

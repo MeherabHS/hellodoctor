@@ -1,0 +1,106 @@
+# PRE-PATIENT AZURE 4vCPU/8GiB BENCHMARK — PROFILE A (AZURE_B4LSV2_BURST_4X8)
+# docs/PRE_PATIENT_AZURE_4X8_BENCHMARK.md
+#
+# Standalone stack, own project/volumes/ports — never touches the dev stack
+# (docker-compose.yml) or the prior 2-vCPU capacity stack
+# (docker-compose.capacity.yml), which is preserved unchanged as historical
+# evidence. Same isolation pattern that file already established.
+#
+#   docker compose -f docker-compose.benchmark-a.yml -p hellodoctor-bench-a up -d --build
+#   docker compose -f docker-compose.benchmark-a.yml -p hellodoctor-bench-a down -v
+#
+# Target: Standard_B4ls_v2 burst ceiling — 4 real vCPUs, 8 GiB RAM.
+# CPU quotas sum to exactly 4.00 and every included service shares
+# cpuset "0-3" so four real host cores are the maximum execution surface
+# (a bare --cpus quota alone doesn't stop a multi-threaded container from
+# bursting across several *different* idle host cores at once — pinning
+# forces genuine shared-core contention, same reasoning as the prior
+# 2-vCPU rebalanced profile in docker-compose.capacity.yml).
+#
+# Allocation (spec-assigned, not derived):
+#   backend   1.35 vCPU / 1.50 GiB
+#   postgres  2.25 vCPU / 3.50 GiB
+#   redis     0.20 vCPU / 0.40 GiB
+#   web/BFF   0.20 vCPU / 0.60 GiB  -- NOT run in this stack (no Doctor/Admin
+#     Web BFF process is part of this backend-focused benchmark; Next.js
+#     apps would need `npm install`/build, which the host-safety rule
+#     forbids installing). Its 0.20 vCPU / 0.60 GiB is explicit SYSTEM
+#     RESERVE below, not silently handed to another component.
+#   ---------------------------------------------------------------
+#   included total: 3.80 vCPU / 5.40 GiB
+#   system reserve (web/BFF, unused): 0.20 vCPU / 0.60 GiB
+#   spec total: 4.00 vCPU
+#
+# jit=off and pg_stat_statements: reused from the prior constrained-capacity
+# pass (docs/CONSTRAINED_CAPACITY_TEST.md §12.2) — a proven, already-verified
+# query-execution-strategy fix (RLS-policy JIT false positive), not a new
+# change for this pass. Not a security change: RLS/ABAC/results unaffected.
+name: hellodoctor-bench-a
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: hellodoctor-bench-a-postgres
+    command: postgres -c jit=off -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c pg_stat_statements.max=200
+    environment:
+      POSTGRES_USER: hellodoctor
+      POSTGRES_PASSWORD: hellodoctor_dev_password
+      POSTGRES_DB: hellodoctor
+    ports:
+      - "5633:5432"
+    volumes:
+      - hellodoctor_bench_a_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hellodoctor -d hellodoctor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    cpus: 2.25
+    cpuset: "0-3"
+    mem_limit: 3.50g
+
+  redis:
+    image: redis:7-alpine
+    container_name: hellodoctor-bench-a-redis
+    ports:
+      - "6579:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    cpus: 0.20
+    cpuset: "0-3"
+    mem_limit: 0.40g
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hellodoctor-bench-a-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://hellodoctor:hellodoctor_dev_password@postgres:5432/hellodoctor
+      APP_DB_HOST: postgres
+      REDIS_URL: redis://redis:6379
+      HOST: 0.0.0.0
+      PORT: 8080
+      # The ONE documented exception (same as docker-compose.capacity.yml):
+      # every synthetic request in this benchmark originates from the one
+      # real IP of the machine running the load generator. Never set in the
+      # real .env/production config. No other security control is touched.
+      GLOBAL_IP_RATE_LIMIT_PER_MIN: "100000"
+    ports:
+      - "8280:8080"
+    cpus: 1.35
+    cpuset: "0-3"
+    mem_limit: 1.50g
+
+volumes:
+  hellodoctor_bench_a_pgdata:

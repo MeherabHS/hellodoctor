@@ -1,0 +1,66 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Catches newly-disclosed advisories against dependencies that haven't
+    # changed — cargo-audit's DB updates independently of our commits.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  cargo-audit:
+    name: Rust dependency vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit (prebuilt binary, not compiled from source)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: Generate Cargo.lock
+        # Cargo.lock is gitignored for this application (see
+        # services/backend/.gitignore) — cargo-audit needs one to know exact
+        # resolved versions, so CI resolves its own rather than relying on a
+        # committed lockfile.
+        working-directory: services/backend
+        run: cargo generate-lockfile
+
+      - name: cargo audit
+        working-directory: services/backend
+        # RUSTSEC-2023-0071 (rsa: Marvin Attack timing sidechannel, no fixed
+        # upstream release) is ignored deliberately: it reaches Cargo.lock
+        # only via sqlx's optional `mysql` feature (sqlx-mysql -> rsa), which
+        # this backend does not enable (Cargo.toml only enables `postgres`).
+        # Confirmed via `cargo tree -i rsa` returning zero matches — `rsa` is
+        # not part of the actual compiled dependency graph. Verified
+        # 2026-10-04; re-check if sqlx's `mysql` feature is ever enabled, or
+        # if a fixed `rsa` release ships.
+        run: cargo audit --deny warnings --ignore RUSTSEC-2023-0071
+
+  secret-scan:
+    name: Secret scanning (git history + working tree)
+    runs-on: ubuntu-latest
+    # trufflehog's action needs a push/PR commit range to diff against; the
+    # weekly cron re-run only makes sense for cargo-audit (whose advisory DB
+    # updates independently of our commits), so skip this job on that trigger
+    # rather than giving it a meaningless range.
+    if: github.event_name != 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified

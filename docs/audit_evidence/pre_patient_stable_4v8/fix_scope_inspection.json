@@ -1,0 +1,69 @@
+{
+  "captured_at_utc": "2026-10-09T04:09:23.633836+00:00",
+  "scope": "Read-only post-benchmark verification; no workload or sequence advancement",
+  "queries": {
+    "padding_behavior": {
+      "exit_code": 0,
+      "value": {
+        "suffix_99999999": "99999999",
+        "suffix_100000000": "10000000",
+        "suffix_100000001": "10000000"
+      }
+    },
+    "number_pattern_counts": {
+      "exit_code": 0,
+      "value": {
+        "legacy_4hex": 3354,
+        "sequence_8digit": 1200,
+        "sequence_earliest": "2026-10-09T04:07:33.286203+00:00",
+        "sequence_latest": "2026-10-09T04:08:31.47906+00:00"
+      }
+    },
+    "migration_checksum": {
+      "exit_code": 0,
+      "value": {
+        "version": 20261028000001,
+        "description": "grievance number sequence",
+        "success": true,
+        "installed_on": "2026-10-09T04:05:44.136242+00:00",
+        "checksum_sha384": "969413cdf401dc76f0d92ccb2c43182f6ab9172ca292fc308d8e45145701ca7aaeb27440863f4fd5499bba58d65ac861"
+      }
+    },
+    "rls_roles": {
+      "exit_code": 0,
+      "value": {
+        "grievance_rls": {
+          "enabled": true,
+          "forced": true
+        },
+        "capability_roles": [
+          {
+            "name": "hellodoctor_api",
+            "superuser": false,
+            "bypassrls": false
+          },
+          {
+            "name": "hellodoctor_auth_worker",
+            "superuser": false,
+            "bypassrls": false
+          },
+          {
+            "name": "hellodoctor_payment_worker",
+            "superuser": false,
+            "bypassrls": false
+          },
+          {
+            "name": "hellodoctor_system_worker",
+            "superuser": false,
+            "bypassrls": false
+          },
+          {
+            "name": "hellodoctor_finance_worker",
+            "superuser": false,
+            "bypassrls": false
+          }
+        ]
+      }
+    }
+  }
+}

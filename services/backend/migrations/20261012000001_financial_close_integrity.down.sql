@@ -1,0 +1,16 @@
+DROP TRIGGER IF EXISTS immutable_disbursement_snapshot ON disbursement_items;
+DROP FUNCTION IF EXISTS protect_disbursement_snapshot();
+DROP TRIGGER IF EXISTS adjustment_open_period ON financial_adjustments;
+DROP FUNCTION IF EXISTS protect_closed_adjustment_period();
+DROP TRIGGER IF EXISTS immutable_finalized_statement ON monthly_payout_statements;
+DROP FUNCTION IF EXISTS protect_finalized_statement();
+DROP INDEX IF EXISTS uq_active_statement_disbursement;
+ALTER TABLE disbursement_items DROP CONSTRAINT IF EXISTS statement_destination_ownership;
+ALTER TABLE disbursement_items DROP COLUMN IF EXISTS statement_id, DROP COLUMN IF EXISTS adjustments, DROP COLUMN IF EXISTS provider_code;
+DROP TABLE IF EXISTS monthly_statement_transactions;
+DROP POLICY IF EXISTS periods_doctor_read ON financial_periods;
+DROP POLICY IF EXISTS periods_finance_write ON financial_periods;
+DROP POLICY IF EXISTS statements_finance_write ON monthly_payout_statements;
+DROP POLICY IF EXISTS adjustments_doctor_read ON financial_adjustments;
+DROP POLICY IF EXISTS adjustments_finance_insert ON financial_adjustments;
+REVOKE SELECT ON financial_adjustments FROM hellodoctor_api;

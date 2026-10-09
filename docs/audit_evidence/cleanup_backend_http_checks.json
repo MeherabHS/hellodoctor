@@ -1,0 +1,87 @@
+{
+  "environment": "local development fixture over existing LAN interface; MFA bypass only",
+  "checks": [
+    {
+      "check": "development Doctor login",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "approved development MFA bypass",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "Doctor profile",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "queue",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "duty read",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "schedule",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "chat list",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "Q&A",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "wallet summary",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "wallet ledger",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "current monthly statement",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "previous monthly statement",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "refresh token rotation",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "restored session",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "logout",
+      "status": 200,
+      "passed": true
+    },
+    {
+      "check": "refresh denied after logout",
+      "status": 401,
+      "passed": true
+    }
+  ],
+  "result": "PASS",
+  "device_runtime_verified": false
+}

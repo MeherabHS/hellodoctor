@@ -1,0 +1,667 @@
+[
+  {
+    "line": 8999,
+    "screen": "shell",
+    "locator": "#dwGlobalSearchInput",
+    "handlers": {
+      "oninput": "handleDoctorWebGlobalSearch(this.value)"
+    }
+  },
+  {
+    "line": 9004,
+    "screen": "shell",
+    "locator": "div.dw-icon-btn",
+    "handlers": {
+      "onclick": "showAppToast('Shift Active \u23f1\ufe0f', 'Dr. Sabrina: 08:00 - 18:00 (14 consults completed today).', 'info', '\ud83d\udcc5')"
+    }
+  },
+  {
+    "line": 9007,
+    "screen": "shell",
+    "locator": "div.dw-icon-btn",
+    "handlers": {
+      "onclick": "showAppToast('EMR Sync \ud83d\udd14', 'Patient case history & laboratory panels synchronized.', 'info', '\ud83d\udd14')"
+    }
+  },
+  {
+    "line": 9040,
+    "screen": "shell",
+    "locator": "div.dw-nav-item",
+    "handlers": {
+      "onclick": "switchDoctorWebPage('dashboard')"
+    }
+  },
+  {
+    "line": 9044,
+    "screen": "shell",
+    "locator": "div.dw-nav-item",
+    "handlers": {
+      "onclick": "switchDoctorWebPage('appointments')"
+    }
+  },
+  {
+    "line": 9049,
+    "screen": "shell",
+    "locator": "div.dw-nav-item",
+    "handlers": {
+      "onclick": "switchDoctorWebPage('patients')"
+    }
+  },
+  {
+    "line": 9053,
+    "screen": "shell",
+    "locator": "div.dw-nav-item.active",
+    "handlers": {
+      "onclick": "switchDoctorWebPage('telehealth')"
+    }
+  },
+  {
+    "line": 9057,
+    "screen": "shell",
+    "locator": "div.dw-nav-item",
+    "handlers": {
+      "onclick": "switchDoctorWebPage('qna')"
+    }
+  },
+  {
+    "line": 9062,
+    "screen": "shell",
+    "locator": "div.dw-nav-item",
+    "handlers": {
+      "onclick": "showAppToast('Station Settings', 'Paired to iPhone 15 Pro. Camera sync on 5G.', 'info', '\u2699\ufe0f')"
+    }
+  },
+  {
+    "line": 9072,
+    "screen": "shell",
+    "locator": "#dwSidePtRafiq",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('rafiq'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9073,
+    "screen": "shell",
+    "locator": "#dwSidePtNusrat",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('nusrat'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9074,
+    "screen": "shell",
+    "locator": "#dwSidePtKamal",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('kamal'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9131,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwMeetMicBtn",
+    "handlers": {
+      "onclick": "toggleDoctorWebMic()"
+    }
+  },
+  {
+    "line": 9135,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwMeetCamBtn",
+    "handlers": {
+      "onclick": "toggleDoctorWebCamera()"
+    }
+  },
+  {
+    "line": 9139,
+    "screen": "dwPage_telehealth",
+    "locator": "button.dw-meet-ctl-btn",
+    "handlers": {
+      "onclick": "showAppToast('Screen Shared', 'Presenting lab results and clinical findings.', 'info', '\ud83d\udda5\ufe0f')"
+    }
+  },
+  {
+    "line": 9143,
+    "screen": "dwPage_telehealth",
+    "locator": "button.dw-meet-ctl-btn",
+    "handlers": {
+      "onclick": "showAppToast('Quick Clinical Emoji', 'Patient reassurance emoji sent to stream.', 'info', '\ud83d\udc4d')"
+    }
+  },
+  {
+    "line": 9147,
+    "screen": "dwPage_telehealth",
+    "locator": "button.dw-meet-ctl-btn",
+    "handlers": {
+      "onclick": "triggerDoctorWebQuickRx()"
+    }
+  },
+  {
+    "line": 9151,
+    "screen": "dwPage_telehealth",
+    "locator": "button.dw-meet-ctl-btn.end-call",
+    "handlers": {
+      "onclick": "showAppToast('Consultation Saved', 'Encounter and clinical notes filed into EMR.', 'info', '\ud83d\udcde')"
+    }
+  },
+  {
+    "line": 9159,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwMeetToggleHistBtn",
+    "handlers": {
+      "onclick": "toggleDoctorWebDrawer('history')"
+    }
+  },
+  {
+    "line": 9164,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwMeetToggleChatBtn",
+    "handlers": {
+      "onclick": "toggleDoctorWebDrawer('chat')"
+    }
+  },
+  {
+    "line": 9170,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwMeetFullscreenBtn",
+    "handlers": {
+      "onclick": "toggleDoctorWebFullscreen()"
+    }
+  },
+  {
+    "line": 9184,
+    "screen": "dwPage_telehealth",
+    "locator": "button.dw-side-panel-close-btn",
+    "handlers": {
+      "onclick": "toggleDoctorWebDrawer('close')"
+    }
+  },
+  {
+    "line": 9189,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwMeetSwapTabHist",
+    "handlers": {
+      "onclick": "setDoctorWebSideView('history')"
+    }
+  },
+  {
+    "line": 9193,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwMeetSwapTabChat",
+    "handlers": {
+      "onclick": "setDoctorWebSideView('chat')"
+    }
+  },
+  {
+    "line": 9217,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwHistLabBtn",
+    "handlers": {
+      "onclick": "openLabReportModal(patientHistoryData[activeDoctorWebPatient]?.labReportKey || 'cbc', patientHistoryData[activeDoctorWebPatient]?.name || 'Patient')"
+    }
+  },
+  {
+    "line": 9253,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwHistTabEncounters",
+    "handlers": {
+      "onclick": "setDoctorWebHistView('encounters')"
+    }
+  },
+  {
+    "line": 9256,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwHistTabMeds",
+    "handlers": {
+      "onclick": "setDoctorWebHistView('meds')"
+    }
+  },
+  {
+    "line": 9259,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwHistTabLabs",
+    "handlers": {
+      "onclick": "setDoctorWebHistView('labs')"
+    }
+  },
+  {
+    "line": 9262,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwHistTabNotes",
+    "handlers": {
+      "onclick": "setDoctorWebHistView('notes')"
+    }
+  },
+  {
+    "line": 9274,
+    "screen": "dwPage_telehealth",
+    "locator": "button.dw-btn-outline",
+    "handlers": {
+      "onclick": "openPatientHistoryModal(activeDoctorWebPatient)"
+    }
+  },
+  {
+    "line": 9278,
+    "screen": "dwPage_telehealth",
+    "locator": "button.dw-btn-outline",
+    "handlers": {
+      "onclick": "triggerDoctorWebLabOrder()"
+    }
+  },
+  {
+    "line": 9282,
+    "screen": "dwPage_telehealth",
+    "locator": "#btnDwSendRx",
+    "handlers": {
+      "onclick": "triggerDoctorWebQuickRx()"
+    }
+  },
+  {
+    "line": 9305,
+    "screen": "dwPage_telehealth",
+    "locator": "span.",
+    "handlers": {
+      "onclick": "showAppToast('Quick Emoji', 'Emoji selector.', 'info', '\ud83d\ude0a')"
+    }
+  },
+  {
+    "line": 9306,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwChatInputField",
+    "handlers": {
+      "onkeypress": "if(event.key==='Enter') sendDoctorWebChatMessage()"
+    }
+  },
+  {
+    "line": 9307,
+    "screen": "dwPage_telehealth",
+    "locator": "span.",
+    "handlers": {
+      "onclick": "showAppToast('Attach File', 'Select lab result or clinical document.', 'info', '\ud83d\udcce')"
+    }
+  },
+  {
+    "line": 9309,
+    "screen": "dwPage_telehealth",
+    "locator": "#dwChatSendBtn",
+    "handlers": {
+      "onclick": "sendDoctorWebChatMessage()"
+    }
+  },
+  {
+    "line": 9326,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-outline",
+    "handlers": {
+      "onclick": "triggerDoctorWebLabOrder()"
+    }
+  },
+  {
+    "line": 9330,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-outline",
+    "handlers": {
+      "onclick": "triggerDoctorWebQuickRx()"
+    }
+  },
+  {
+    "line": 9334,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-primary",
+    "handlers": {
+      "onclick": "switchDoctorWebPage('telehealth')"
+    }
+  },
+  {
+    "line": 9367,
+    "screen": "dwPage_dashboard",
+    "locator": "div.dw-kpi-card",
+    "handlers": {
+      "onclick": "openDoctorStatementModal()"
+    }
+  },
+  {
+    "line": 9389,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-outline-sm",
+    "handlers": {
+      "onclick": "switchDoctorWebPage('appointments')"
+    }
+  },
+  {
+    "line": 9405,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-primary",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('rafiq'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9423,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-outline",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('nusrat'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9441,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-primary",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('kamal'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9471,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "triggerDoctorWebQuickRx()"
+    }
+  },
+  {
+    "line": 9478,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "triggerDoctorWebQuickRx()"
+    }
+  },
+  {
+    "line": 9485,
+    "screen": "dwPage_dashboard",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "triggerDoctorWebQuickRx()"
+    }
+  },
+  {
+    "line": 9560,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-btn-outline",
+    "handlers": {
+      "onclick": "showAppToast('Calendar View', 'Syncing Google Calendar & Clinic Scheduler.', 'info', '\ud83d\udcc5')"
+    }
+  },
+  {
+    "line": 9564,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-btn-primary",
+    "handlers": {
+      "onclick": "showAppToast('New Appointment', 'Opening appointment booking modal.', 'info', '\u2795')"
+    }
+  },
+  {
+    "line": 9572,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-filter-pill.active",
+    "handlers": {
+      "onclick": "filterDoctorWebAppts('all', this)"
+    }
+  },
+  {
+    "line": 9573,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-filter-pill",
+    "handlers": {
+      "onclick": "filterDoctorWebAppts('queue', this)"
+    }
+  },
+  {
+    "line": 9574,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-filter-pill",
+    "handlers": {
+      "onclick": "filterDoctorWebAppts('upcoming', this)"
+    }
+  },
+  {
+    "line": 9575,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-filter-pill",
+    "handlers": {
+      "onclick": "filterDoctorWebAppts('completed', this)"
+    }
+  },
+  {
+    "line": 9599,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-btn-primary",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('rafiq'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9622,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-btn-primary",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('nusrat'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9645,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-btn-primary",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('kamal'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9667,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-btn-outline",
+    "handlers": {
+      "onclick": "openPatientHistoryModal('rafiq')"
+    }
+  },
+  {
+    "line": 9689,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-btn-outline",
+    "handlers": {
+      "onclick": "showAppToast('Appointment Rescheduled', 'Notification sent to patient.', 'info', '\u23f1\ufe0f')"
+    }
+  },
+  {
+    "line": 9711,
+    "screen": "dwPage_appointments",
+    "locator": "button.dw-btn-outline-sm",
+    "handlers": {
+      "onclick": "triggerDoctorWebQuickRx()"
+    }
+  },
+  {
+    "line": 9728,
+    "screen": "dwPage_patients",
+    "locator": "#dwPatientSearchInput",
+    "handlers": {
+      "oninput": "filterDoctorWebPatientsList(this.value)",
+      "onkeyup": "filterDoctorWebPatientsList(this.value)"
+    }
+  },
+  {
+    "line": 9730,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-primary",
+    "handlers": {
+      "onclick": "showAppToast('Patient Registration', 'Open new patient dossier form.', 'info', '\ud83d\udc64')"
+    }
+  },
+  {
+    "line": 9738,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-filter-pill.active",
+    "handlers": {
+      "onclick": "filterDoctorWebPatientsCategory('all', this)"
+    }
+  },
+  {
+    "line": 9739,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-filter-pill",
+    "handlers": {
+      "onclick": "filterDoctorWebPatientsCategory('allergy', this)"
+    }
+  },
+  {
+    "line": 9740,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-filter-pill",
+    "handlers": {
+      "onclick": "filterDoctorWebPatientsCategory('chronic', this)"
+    }
+  },
+  {
+    "line": 9741,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-filter-pill",
+    "handlers": {
+      "onclick": "filterDoctorWebPatientsCategory('recent', this)"
+    }
+  },
+  {
+    "line": 9777,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('rafiq'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9778,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openPatientHistoryModal('rafiq')"
+    }
+  },
+  {
+    "line": 9779,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openLabReportModal('cbc', 'Rafiq Ahmed')"
+    }
+  },
+  {
+    "line": 9801,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('nusrat'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9802,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openPatientHistoryModal('nusrat')"
+    }
+  },
+  {
+    "line": 9803,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openLabReportModal('thyroid', 'Nusrat Jahan')"
+    }
+  },
+  {
+    "line": 9825,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "selectDoctorWebPatient('kamal'); switchDoctorWebPage('telehealth');"
+    }
+  },
+  {
+    "line": 9826,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openPatientHistoryModal('kamal')"
+    }
+  },
+  {
+    "line": 9827,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openLabReportModal('lipid', 'Kamal Uddin')"
+    }
+  },
+  {
+    "line": 9849,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openPatientHistoryModal('nusrat')"
+    }
+  },
+  {
+    "line": 9850,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openLabReportModal('thyroid', 'Shamima Nasrin')"
+    }
+  },
+  {
+    "line": 9872,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openPatientHistoryModal('rafiq')"
+    }
+  },
+  {
+    "line": 9873,
+    "screen": "dwPage_patients",
+    "locator": "button.dw-btn-mini",
+    "handlers": {
+      "onclick": "openLabReportModal('lipid', 'Tariqul Islam')"
+    }
+  },
+  {
+    "line": 9893,
+    "screen": "dwPage_qna",
+    "locator": "button.dw-btn-outline",
+    "handlers": {
+      "onclick": "renderDoctorWebQnaList(); showAppToast('Feed Refreshed \ud83d\udd04', 'Loaded latest patient inquiries from live database.', 'info', '\ud83d\udd04')"
+    }
+  },
+  {
+    "line": 9931,
+    "screen": "dwPage_qna",
+    "locator": "#dwQnaTabAll",
+    "handlers": {
+      "onclick": "filterDoctorWebQna('all', this)"
+    }
+  },
+  {
+    "line": 9932,
+    "screen": "dwPage_qna",
+    "locator": "#dwQnaTabOpen",
+    "handlers": {
+      "onclick": "filterDoctorWebQna('open', this)"
+    }
+  },
+  {
+    "line": 9933,
+    "screen": "dwPage_qna",
+    "locator": "#dwQnaTabAnswered",
+    "handlers": {
+      "onclick": "filterDoctorWebQna('answered', this)"
+    }
+  },
+  {
+    "line": 9937,
+    "screen": "dwPage_qna",
+    "locator": "#dwQnaSearchInput",
+    "handlers": {
+      "oninput": "handleDoctorWebQnaSearch(this.value)"
+    }
+  }
+]

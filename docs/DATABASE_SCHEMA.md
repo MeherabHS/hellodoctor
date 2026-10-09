@@ -1,3 +1,5 @@
+> Current canonical ownership / Doctor Q&A correction (2026-10-08): [identity enforcement, audited Compliance trace and Q&A rendering evidence](USER_ISOLATION_AND_QNA.md); [all-table ownership inventory](USER_OWNERSHIP_INVENTORY.md). Migration 20261026000001 adds the database guards. Q&A real-device inspection remains pending until a device is connected; widget/golden renders are separate evidence. Earlier verification counts below are historical.
+
 # Phase 6 — PostgreSQL Database Schema & Relational Design
 
 > **Document Version:** 1.0.0  
@@ -141,13 +143,14 @@ CREATE INDEX idx_patient_profiles_user ON patient_profiles(user_id);
 -- ============================================================================
 -- 3. DOCTOR PROFILES & DOSSIERS
 -- ============================================================================
+CREATE TYPE professional_verification_status_enum AS ENUM ('PENDING','VERIFIED','REJECTED');
 CREATE TABLE doctor_profiles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT,
     full_name VARCHAR(120) NOT NULL,
     license_number VARCHAR(50) NOT NULL UNIQUE,
-    license_authority VARCHAR(50) NOT NULL,
-    license_country VARCHAR(3) NOT NULL DEFAULT 'BD',
+    license_authority VARCHAR(50) NOT NULL DEFAULT 'KMPDC',
+    license_country VARCHAR(3) NOT NULL DEFAULT 'KE',
     primary_specialty VARCHAR(80) NOT NULL,
     experience_years SMALLINT NOT NULL CHECK (experience_years >= 0),
     current_hospital VARCHAR(200) NOT NULL,
@@ -157,7 +160,13 @@ CREATE TABLE doctor_profiles (
     residential_address TEXT NOT NULL,
     verified_phone VARCHAR(20) NOT NULL,
     is_on_duty BOOLEAN NOT NULL DEFAULT FALSE,
+    -- Compatibility value maintained by the professional verification trigger.
     is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+    professional_verification_status professional_verification_status_enum NOT NULL DEFAULT 'PENDING',
+    professional_verification_reviewed_at TIMESTAMPTZ,
+    professional_verification_reviewed_by UUID REFERENCES users(id),
+    professional_verification_note TEXT,
+    CHECK (is_verified = (professional_verification_status = 'VERIFIED')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ
@@ -166,6 +175,69 @@ CREATE TABLE doctor_profiles (
 CREATE INDEX idx_doctor_specialty ON doctor_profiles(primary_specialty);
 CREATE INDEX idx_doctor_license ON doctor_profiles(license_number);
 CREATE INDEX idx_doctor_duty ON doctor_profiles(is_on_duty) WHERE is_on_duty = TRUE;
+
+-- ============================================================================
+-- 3a. LEGAL & PROFESSIONAL AGREEMENTS CONSENT GATE
+-- See docs/ADR/ADR-011-legal-consent-ledger.md and migration
+-- 20261027000001_legal_acceptances.
+-- ============================================================================
+CREATE TYPE legal_document_type_enum AS ENUM (
+    'DOCTOR_TERMS','PRIVACY_NOTICE','PROFESSIONAL_VERIFICATION_DECLARATION',
+    'TELEMEDICINE_PRACTITIONER_POLICY','MARKETING_COMMUNICATIONS'
+);
+
+-- Server-owned registry: the single source of truth for the text/version
+-- currently required. document_hash is recomputed by a BEFORE trigger from
+-- `body` on every insert/update (Postgres generated columns must be strictly
+-- IMMUTABLE, and convert_to() is only STABLE, so a trigger stands in for a
+-- generated column here) — no application code ever supplies the hash.
+CREATE TABLE legal_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_type legal_document_type_enum NOT NULL,
+    version TEXT NOT NULL CHECK (char_length(version) BETWEEN 1 AND 20),
+    title TEXT NOT NULL CHECK (char_length(title) BETWEEN 1 AND 200),
+    body TEXT NOT NULL CHECK (char_length(body) BETWEEN 1 AND 20000),
+    document_hash TEXT NOT NULL DEFAULT '',
+    required BOOLEAN NOT NULL,
+    is_current BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (document_type, version)
+);
+-- At most one current version per document type.
+CREATE UNIQUE INDEX legal_documents_one_current ON legal_documents(document_type) WHERE is_current;
+
+-- Immutable, append-only acceptance ledger — canonical users.id is the
+-- accepting identity. No role is ever granted UPDATE or DELETE on this
+-- table: a changed document version produces a new row, never a mutation of
+-- an old one. A BEFORE INSERT trigger rejects any version that isn't
+-- currently `is_current` and overwrites document_hash from `legal_documents`
+-- regardless of what the inserting statement supplied.
+CREATE TABLE legal_acceptances (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    document_type legal_document_type_enum NOT NULL,
+    document_version TEXT NOT NULL,
+    document_hash TEXT NOT NULL,
+    accepted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    request_id TEXT,
+    session_id UUID,
+    ip_hash TEXT,
+    app_version TEXT,
+    platform TEXT,
+    locale TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    FOREIGN KEY (document_type, document_version) REFERENCES legal_documents(document_type, version)
+);
+CREATE INDEX legal_acceptances_user ON legal_acceptances(user_id, document_type, accepted_at DESC);
+
+-- RLS: a Doctor reads only their own rows; Compliance/PlatformAdmin/
+-- ClinicalAdmin read any Doctor's as evidence. Only hellodoctor_auth_worker
+-- may INSERT, and only for the authenticating subject itself (checked
+-- during the same transaction as the doctor_profiles/doctor_wallets inserts
+-- in auth_handlers::doctor_register, so the account and its
+-- acknowledgements land atomically or not at all).
+ALTER TABLE legal_acceptances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE legal_acceptances FORCE ROW LEVEL SECURITY;
 
 -- ============================================================================
 -- 4. DOCTOR SCHEDULE SLOTS
@@ -950,3 +1022,68 @@ CREATE POLICY disbursement_items_finance_worker_update ON disbursement_items
 ```
 
 The API role cannot perform workflow state transitions. Booking/payment code uses the payment-worker connection, timed lifecycle jobs use the system-worker connection, and adjudication/disbursement code uses the finance-worker connection. No ordinary API or administrator session receives `BYPASSRLS`; admin JWT roles remain subject to the same ABAC and RLS rules.
+
+## Doctor Articles ? current direct-publication contract
+
+[Doctor Articles](DOCTOR_ARTICLES.md) defines the implemented `DRAFT / PUBLISHED / ARCHIVED` lifecycle, structured fields, APIs, optimistic versions, forced ownership/publication RLS and migration `20261025000001`. Doctors publish directly; no Admin review state or queue exists. Professional verification remains its separate existing state machine. [Session hardening](PUBLIC_EXPOSURE_HARDENING.md) requires an active JWT `sid` family on protected reads/writes.
+
+## Notifications — Doctor Engagement extension
+
+Implemented by `migrations/20261020000001_doctor_engagement_notifications` (plus the Finance Worker insert grant added by `migrations/20261029000001_notification_finance_worker_insert`). One coherent in-app inbox + delivery-intent model, not scattered ad-hoc per-feature tables. `notifications` is never a PHI store: `title`/`body` are short, backend-constructed, non-clinical strings (counts, amounts, currencies) — never symptoms, diagnosis, prescription detail, or patient-identifying clinical content, and push payloads built from these rows must never carry PHI either (see `AUTH_SECURITY.md`/CLAUDE.md §2.7).
+
+```sql
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    type VARCHAR(40) NOT NULL CHECK (type IN (
+        'DAILY_CONSULTATION_SUMMARY',
+        'CONSULTATION_REMINDER_15M',
+        'EARNING_CREDITED',
+        'PAYOUT_PAID',
+        'REGISTRATION_VERIFIED',
+        'REGISTRATION_REJECTED',
+        'ARTICLE_STATUS_CHANGED'
+    )),
+    title VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    related_entity_type VARCHAR(50),
+    related_entity_id UUID,
+    scheduled_for TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    delivered_at TIMESTAMPTZ,
+    read_at TIMESTAMPTZ,
+    delivery_status VARCHAR(20) NOT NULL DEFAULT 'CREATED' CHECK (delivery_status IN (
+        'CREATED', 'DUE', 'SENT_TO_PROVIDER', 'DELIVERED', 'FAILED', 'READ'
+    )),
+    dedup_key VARCHAR(200) NOT NULL,
+    metadata JSONB,
+    CONSTRAINT notifications_dedup_key_unique UNIQUE (dedup_key)
+);
+CREATE INDEX idx_notifications_user_created ON notifications(user_id, created_at DESC);
+CREATE INDEX idx_notifications_due ON notifications(delivery_status, scheduled_for)
+    WHERE delivery_status IN ('CREATED', 'DUE');
+
+CREATE TABLE notification_device_tokens (
+    device_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    platform VARCHAR(10) NOT NULL CHECK (platform IN ('ANDROID', 'IOS', 'WEB')),
+    push_token TEXT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT notification_device_tokens_unique UNIQUE (user_id, push_token)
+);
+```
+
+`dedup_key` (globally `UNIQUE`) is how every creation path — admin verify/reject, consultation-completion earning credit, disbursement payout confirmation, and the daily-summary/T-15-reminder scheduler — gets "exactly one notification per real event" for free via `notification_repo::insert_if_new`'s `INSERT ... ON CONFLICT (dedup_key) DO NOTHING` (run inside its own savepoint so a 23505 unique-violation never poisons the caller's outer transaction), rather than each call site re-implementing its own duplicate check. Dedup key shapes in use: `registration-verified:{doctor_profile_id}`, `registration-rejected:{doctor_profile_id}`, `earning-credited:{appointment_id}`, `payout-paid:{disbursement_item_id}`, `daily-consultation-summary:{doctor_profile_id}:{local_date}`, `consultation-reminder-15m:{appointment_id}:{start_time_rfc3339}`, `article:{article_id}:{version}`.
+
+RLS (`FORCE ROW LEVEL SECURITY` on both tables):
+- `notifications_owner_select` / `notifications_owner_mark_read`: a user reads and marks-read only their own rows (`user_id = app.current_user_id`); only `read_at` is ever client-writable, enforced by `notification_repo`'s narrow `UPDATE ... SET read_at`, not a general row update.
+- `notifications_backend_insert`: `hellodoctor_api`, `hellodoctor_system_worker`, and (as of `20261029000001`) `hellodoctor_finance_worker` may insert a notification addressed to *any* user — this is the system telling user X something happened (an admin action, the scheduler, or a Finance payout confirmation), not user X writing their own row, so creation is gated by role, trusting the Rust call sites (which never take a client-supplied recipient) rather than RLS to pick the recipient. The Finance Worker grant exists specifically so `DisbursementService::confirm_disbursement_item_paid` can fire `PAYOUT_PAID` in the same transaction as the disbursement item's `PAID` transition (that transition itself only runs under `hellodoctor_finance_worker`, per `migrations/20261003000001_rls_hardening`).
+- `notifications_system_update` / `notifications_system_worker_select`: the scheduler's own unrestricted update (delivery status) and dedup pre-check reads, scoped to `hellodoctor_system_worker` only — never `hellodoctor_api`, so a doctor/patient's own `GET /notifications` is still governed solely by the owner-only `SELECT` policy.
+- `notification_device_tokens_owner_*`: a device token is owned exclusively by the user who registered it (no cross-account read/write); `notification_device_tokens_backend_disable` gives `hellodoctor_api` unrestricted `UPDATE` for the one backend-trusted case — logout disabling a token by the `user_id` resolved from the presented refresh token, before any `app.current_user_id` session exists.
+
+Push delivery: no real push provider (FCM/APNs) is configured anywhere in this codebase — `notification_transport.rs`'s only implementation, `NoopTransport`, always returns `PushOutcome::NoProviderConfigured`. Treat push as `PUSH_PROVIDER_CONFIGURATION_REQUIRED`; only the in-app inbox (`GET /api/v1/notifications`, `GET /api/v1/notifications/unread-count`, `POST /api/v1/notifications/:id/read`, `POST /api/v1/notifications/read-all`) is live today. See `docs/DOCTOR_MOBILE_PROFILE_NOTIFICATIONS_VERIFICATION.md` for the full per-event verification record.
+
+The daily-summary scheduler pass runs against Africa/Nairobi local time via a fixed `UTC+3` offset (`notification_service::nairobi_offset`) — Kenya does not observe daylight saving, so a fixed offset is exact, not an approximation, for this deployment; it never needs `chrono_tz`/IANA tzdata. Its trigger time is configurable via `DOCTOR_DAILY_SUMMARY_TIME_LOCAL` (`AppConfig::doctor_daily_summary_time_local`, default `07:00`; see `.env.example`).

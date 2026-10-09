@@ -1,0 +1,20 @@
+{
+  "git": {
+    "branch": "main",
+    "commit": "e3739ae555f198c537dfa7f505fe506b0cd62df2",
+    "dirty_working_tree": true,
+    "dirty_file_count": 234,
+    "note": "Working tree has substantial pre-existing uncommitted work (Kenya/KMPDC market pivot, canonical UserId newtype refactor, the legal-consent-gate feature added this session, etc.) predating this benchmark. Benchmark runs against this exact working-tree state, not a clean commit."
+  },
+  "migration_source_version": "20261027000001",
+  "harness_source_sha256": {
+    "examples/capacity_test.rs": "0b27b954f7fd0f589d6ee9c19531377132e7b97ba1e769a325fccbdbf868035a",
+    "scripts/seed_capacity_dataset.sql": "5566d3245054f2b2e8768e71c8d535a4e01b8954cc33e421dfafaeb5e675e9d8"
+  },
+  "quality_gates": {
+    "cargo_fmt_check": "PASS (clean, zero diffs)",
+    "cargo_clippy_all_targets_deny_warnings": "PASS (zero warnings)",
+    "cargo_test_lib": "PASS 50/50",
+    "cargo_test_api_tests_serialized": "PASS 142/142, finished in 1014.38s"
+  }
+}

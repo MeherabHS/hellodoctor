@@ -14,18 +14,18 @@
   - `AppointmentBookingBloc`: Test slot selection, gateway choice, and validation failures.
   - `DoctorWalletBloc`: Test 3-tier math calculation ($G \to C \to N$).
 - **Mappers & Validators:**
-  - Phone number regex verification for Bangladesh (`+880`) and Kenya (`+254`).
+  - Kenyan phone-number validation (`+254`), including rejection of legacy foreign-country inputs.
   - Fee formatters and currency symbol localization (`৳` vs. `KES`).
 
 ### 1.2 Widget Tests (Flutter `flutter_test`)
 - **Emergency Helpline Strip:** Verify that `#patientEmergencyHelplineStrip` renders directly above Upcoming Appointments and strictly omits any *"24/7"* prefix.
-- **Doctor Card:** Verify that doctor credentials and BMDC numbers are displayed and that **zero star rating icons (`⭐`, `★`)** exist in the widget tree.
+- **Doctor Card:** Verify that doctor credentials and KMPDC numbers are displayed and that **zero star rating icons (`⭐`, `★`)** exist in the widget tree.
 - **Doctor Earnings Card:** Verify that rows for Gross, 20% Platform Charge, and Net Final Earning are rendered alongside the mandatory basis note: *"Total calculation is based including the platform charge 20%."*
 
 ### 1.3 Integration Tests (`integration_test/`)
 - **Full Booking & Waiting Room Loop:**
   1. Launch app -> Home (`view-0`).
-  2. Tap "Doctor Consultation" -> Select Dr. Sabrina Akter.
+  2. Tap "Doctor Consultation" -> Select Dr. Synthetic Doctor One.
   3. Select tomorrow's 10:00 AM slot.
   4. Attach 3 prescription photos -> Verify thumbnails.
   5. Select bKash -> Confirm booking.
@@ -50,7 +50,7 @@
       assert_eq!(net, BigDecimal::from_str("28450.00").unwrap());
   }
   ```
-- **Validation Rules:** Test BMDC number validation, slot time boundary enforcement, and photo upload limits.
+- **Validation Rules:** Test KMPDC number validation, slot time boundary enforcement, and photo upload limits.
 
 ### 2.2 Integration Tests (SQLx + PostgreSQL Testcontainers)
 - **Concurrent Slot Double-Booking Prevention:**

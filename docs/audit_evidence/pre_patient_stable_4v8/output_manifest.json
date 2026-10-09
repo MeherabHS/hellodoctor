@@ -1,0 +1,146 @@
+{
+  "verified_at_utc": "2026-10-09T04:17:30.019480+00:00",
+  "verification": "Raw stage reconciliation, 96-error three-way match, output link/image validation, original source/evidence hash preservation",
+  "files": [
+    {
+      "path": "docs/PRE_PATIENT_STABLE_4VCPU_8GB_EVIDENCE_REPORT.md",
+      "size_bytes": 37589,
+      "sha256": "e1cf2ccd28edd7bd5692f0ef0e435b9091e3eb63cb5b7680281c1b86635b2148"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/01-throughput.png",
+      "size_bytes": 54924,
+      "sha256": "c826f22ed8ca6748d833bfb8270616239739945deff84629937e293f49c5a7ca"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/01-throughput.svg",
+      "size_bytes": 6017,
+      "sha256": "d17abbc8a72cdff7dc7cd7b1367ccf2c06c4727bc784ad2f6e82c4fc264a564e"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/02-latency.png",
+      "size_bytes": 54462,
+      "sha256": "4801d31de8b76938a4e3c98daa933ab5603dbe1698066e17a758576a40b272a7"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/02-latency.svg",
+      "size_bytes": 8186,
+      "sha256": "65b4e5883850854e0596982cc8be8e4c449a7a35c3f48d9487c1eb74ceb8d458"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/03-system-errors.png",
+      "size_bytes": 49973,
+      "sha256": "140119720a5a1529c505f16d2ea74b5d3d1c4165e129262b27f47008c01ee7ad"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/03-system-errors.svg",
+      "size_bytes": 5589,
+      "sha256": "ac847d1e9048e2cd236cbd24f815a926ed093f66126716c55663295a68af76eb"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/04-p95-upper-load.png",
+      "size_bytes": 52452,
+      "sha256": "8b734bffff39ff1dff8b4f9cfd06d24642af0d4af5c79c758ee845f3a370c01e"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/04-p95-upper-load.svg",
+      "size_bytes": 4271,
+      "sha256": "a095544a5c2a87a5b4a629111527706ebdfe1cc579f9bc8f670e13b5d807a55b"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/05-resource-cpu-timeline.png",
+      "size_bytes": 67708,
+      "sha256": "1d928abab909b37685f0b89906a54401b91beba1b75498b4c6ea440d39e6e701"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/05-resource-cpu-timeline.svg",
+      "size_bytes": 17829,
+      "sha256": "01539852a4abd4ccef855e0ed3559789ff7830e221e618ce14208fb33ee96db7"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/06-resource-memory-timeline.png",
+      "size_bytes": 62012,
+      "sha256": "9fc117e139d28c20662b54c795cb2b4f35efd33f89617f168a02eaeb8dead934"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/06-resource-memory-timeline.svg",
+      "size_bytes": 17980,
+      "sha256": "f3763309918a60c595502a797e1bd603e42a7266cb946e2dd2a371f9297eab71"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/authoritative_results.csv",
+      "size_bytes": 409,
+      "sha256": "2a7bad7d480119e925fae233a996b9522f278448c519553c46a1a337fb55624b"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/backend_constraint_log_excerpt.txt",
+      "size_bytes": 2,
+      "sha256": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/consolidation_validation.json",
+      "size_bytes": 537,
+      "sha256": "be0993237d5f6ac3773a9bda949d838ae89630764b8e06235f659aa1d6a7adc8"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/current_container_inspection.json",
+      "size_bytes": 2582,
+      "sha256": "6e1dbf6baa7f9557ffe90e2af928253419add844144d0cd03add48f561883fda"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/current_database_inspection.json",
+      "size_bytes": 3185,
+      "sha256": "e76216bac89742923122986479b395b79413e61bbeafd4f03641ca9988b953de"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/current_health.json",
+      "size_bytes": 365,
+      "sha256": "c730cab1890e3b3c176bb1773c62a57106c170f6c16adde68355d13e05a6932a"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/fix_scope_inspection.json",
+      "size_bytes": 1965,
+      "sha256": "682fb2836e80f70ab0ab699899225dcf54a5579d372ce74f69a1b3ae94aaf19d"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/generate_report.py",
+      "size_bytes": 46812,
+      "sha256": "5b81b46363e08a65fa2aa0f314dae61d3b517e6a83ff3cbb489be12d0ecb1253"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/input_manifest.json",
+      "size_bytes": 13107,
+      "sha256": "43975ef09c6a0e0f5140fa871f61da16041c4347fb4968591f272bf4aab7e92d"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/legacy_grievance_service_excerpt.txt",
+      "size_bytes": 1728,
+      "sha256": "c61f1bde1b219692ed1495264a16a9624e36918f285f9cfb263ed9914da40fd3"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/postgres_constraint_log_excerpt.txt",
+      "size_bytes": 15578,
+      "sha256": "a479dc73c1dc3e8749ec704ef51760cb20b252b4e1b75af16eaa8619ce8623f5"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/resource_association_inferred.json",
+      "size_bytes": 10460,
+      "sha256": "493eac387e2dd68f8aaf11f670f862aa2da1f7029775d2d585c945006117bdad"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/source_evidence.json",
+      "size_bytes": 5535,
+      "sha256": "a52d7c63670103465bd0f42f7c2f113e4ce50d5b2955b27c269e46acffbeb409"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/stage_audit.json",
+      "size_bytes": 45409,
+      "sha256": "485461fb61beed81ef908d703f729b96364cac6942a2143adad5a0ace900eddd"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_stable_4v8/system_error_evidence.json",
+      "size_bytes": 742,
+      "sha256": "4bcf24ba981315d97c9d247d9b913201a944f2d80ddd6ff1e8dc5fcb43ba01dd"
+    }
+  ]
+}

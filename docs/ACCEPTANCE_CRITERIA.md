@@ -12,7 +12,7 @@
 ```gherkin
 GIVEN an authenticated or guest patient on HD-PATIENT-FIND-SPECIALIST (view-3)
 WHEN the patient views the doctor list
-THEN each doctor card displays the physician's verified name, BMDC number, clinical experience, hospital affiliation, and consultation fees
+THEN each doctor card displays the physician's verified name, KMPDC number, clinical experience, hospital affiliation, and consultation fees
 AND zero star rating icons (⭐/★) or vanity review counts are displayed
 AND doctor cards can be filtered by modality ('all', 'video', 'chat') and specialty.
 ```

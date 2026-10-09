@@ -150,3 +150,19 @@ class DoctorEarningsHeroCard extends StatelessWidget {
   }
 }
 ```
+
+---
+
+## 5. Network Call Discipline
+
+**Rule:** no request reaches the backend unless a screen currently on-screen needs it to render, or the user has explicitly triggered an action. There is no idle polling, no speculative prefetching, and no background sync for their own sake.
+
+- **Mutating requests** (book, pay, upload prescription, submit grievance, adjudicate, toggle duty status, etc.) fire **only** on a direct user action (a tap, a confirmed dialog) — never automatically, never on app launch, never retried silently without the user re-initiating.
+- **Read requests** fire when a screen that needs that data is actually being shown (e.g. the home screen's `GET` for the upcoming consultation) — this is normal and expected, not "unnecessary traffic." The rule is about *idle/speculative* calls, not about screens needing real data to render.
+- **Documented, narrow polling exceptions** (and only these — do not add others without updating this rule):
+  - Waiting-room queue countdown, 10s interval — `docs/REALTIME.md` — active only while the waiting-room screen is open, i.e. the user is already mid-flow toward a consultation they initiated.
+  - Doctor on-duty presence refresh — `docs/REALTIME.md` — active only while the doctor-directory/detail screen is open.
+  - Missed-push-notification foreground fallback poll — `docs/RISKS.md` — runs once on foreground transition, not continuously.
+  - Payment-status reconciliation poll (`docs/ERROR_HANDLING.md`'s `GATEWAY_TIMEOUT` protocol) is **backend-to-gateway**, not client-to-backend — the app only ever polls *for* status when its own payment-pending screen is still open, mirroring the waiting-room case above.
+- **The one legitimate automatic background call**: silent JWT refresh via the `dio` auth interceptor (`core/network/`) — this exists to keep an already-active session alive, not to fetch data the user hasn't asked for, and only fires when an actual API call needs a token (never on a standalone timer).
+- Any new polling/prefetch/background-sync behavior proposed during implementation must be added to the exception list above explicitly, with its scope stated (which screen, what interval, when it stops) — not introduced as an incidental side effect of a data-loading pattern.

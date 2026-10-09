@@ -1,0 +1,145 @@
+# Standalone capacity-test stack — deliberately NOT merged with docker-compose.yml
+# (Compose concatenates list-valued keys like `volumes:` across merged files
+# rather than replacing them, which would try to mount two volumes onto the
+# same postgres data directory). Run as its own project so it never touches
+# the dev stack's containers, volumes, or data:
+#
+#   docker compose -f docker-compose.capacity.yml -p hellodoctor-capacity up -d --build
+#   docker compose -f docker-compose.capacity.yml -p hellodoctor-capacity down -v   # teardown + wipe its volume
+#
+# PROFILE B (rebalanced, 2-vCPU) — docs/CONSTRAINED_CAPACITY_TEST.md §12. The
+# original Profile A here gave the backend 1.25 cores / Postgres 1.0 core /
+# Redis 0.25 cores (2.5 cores total — already over its own "2 vCPU" headline)
+# and found Postgres pinned at ~100% CPU while the backend (10-40%) and Redis
+# (1-5%) sat mostly idle. This profile moved CPU from the idle components to
+# the saturated one, summing to a genuine 2.0 vCPU total:
+#   backend  0.60 vCPU / 1.25 GiB
+#   postgres 1.25 vCPU / 2.25 GiB
+#   redis    0.15 vCPU / 0.25 GiB
+# That 2-vCPU result is preserved as historical evidence (docs/CAPACITY_EVIDENCE_REPORT.md,
+# docs/CONSTRAINED_CAPACITY_TEST.md) and never overwritten by a later run.
+#
+# PRE_PATIENT_AZURE_4X8_BENCHMARK — this file's values below model a STABLE
+# (non-burstable) 4-vCPU/8GiB VM — an Azure D-series-shaped box, deliberately
+# NOT the B4ls_v2 burstable/credit-based shape (that profile, with its own
+# 1.35/2.25/0.20 vCPU split under a hard `cpus:` quota per service, is
+# preserved as a separate historical run; see docs/audit_evidence/pre_patient_benchmark_4x8/).
+# Memory stays per-service (Docker's `mem_limit` is a hard cap either way, not
+# a credit mechanism):
+#   backend  1.50 GiB
+#   postgres 3.50 GiB
+#   redis    0.40 GiB
+# (5.4 GiB of service caps; the rest of the 8 GiB VM shape is reserved for
+# OS/Docker overhead, per the spec's own margin.)
+#
+# `cpuset: "0-3"` pins the whole stack to exactly four physical cores — the
+# hardware ceiling a real 4-vCPU VM has — with NO per-service `cpus:` quota.
+# A `--cpus` limit is a CFS bandwidth quota enforced per 100ms period: hit the
+# ceiling mid-period and the kernel throttles the container stone dead until
+# the next period, a sawtooth burst-then-stall pattern that is itself a
+# burstable-credit-like artifact, not a stable dedicated core. `cpu_shares`
+# below is pure relative priority under *genuine* contention (no hard
+# ceiling, no periodic throttling) — Postgres gets proportionally the most,
+# matching this workload's DB-heavy profile, but any service can use all 4
+# pinned cores whenever the others are idle, exactly like real dedicated
+# vCPUs on a non-burstable VM.
+#
+# pg_stat_statements is enabled via `command:` below (not in Profile A) so
+# this run can report real slow-query data, not just aggregate CPU%.
+#
+# `name:` below pins the Compose project name intrinsically, so this stack
+# can never collide with the dev stack's default "backend" project (the
+# directory-name-derived default both files would otherwise share) even if
+# someone runs `docker compose -f docker-compose.capacity.yml down` without
+# remembering the `-p hellodoctor-capacity` flag the comment above
+# recommends. This is not a hypothetical: exactly that collision happened
+# live in a real session, removing the dev Postgres/Redis containers via a
+# bare `down -v` against this file — recovered without data loss only
+# because the dev volumes aren't declared in *this* file, but the fix
+# belongs here, structurally, not in remembering a flag.
+name: hellodoctor-capacity
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: hellodoctor-capacity-postgres
+    # jit=off: found live, not assumed — EXPLAIN ANALYZE on a real RLS-protected
+    # query (consultation_sessions, as hellodoctor_api under PLATFORM_ADMIN
+    # context) showed 290ms execution dominated by ~273ms of JIT compilation,
+    # for a query that actually executes in ~3ms once compiled. The RLS
+    # policy's OR'd correlated subquery inflates the planner's cost estimate
+    # (613,821 units) far past `jit_above_cost` (default 100,000) even though
+    # the subplan is never actually executed (short-circuited by the cheap
+    # admin-role check) — a classic JIT-triggers-on-inflated-cost-estimate
+    # false positive. Confirmed via a direct before/after EXPLAIN ANALYZE with
+    # `SET jit = off`: identical plan, identical rows returned, identical RLS
+    # enforcement — only the wasted compilation step disappears. This table's
+    # row count (12-13k) never benefits from JIT in the first place. Disabling
+    # it is a pure query-execution-strategy change, not a security change.
+    command: postgres -c jit=off -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c pg_stat_statements.max=200
+    environment:
+      POSTGRES_USER: hellodoctor
+      POSTGRES_PASSWORD: hellodoctor_dev_password
+      POSTGRES_DB: hellodoctor
+    ports:
+      - "5532:5432"
+    volumes:
+      - hellodoctor_capacity_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hellodoctor -d hellodoctor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    cpuset: "0-3"
+    cpu_shares: 2250
+    mem_limit: 3.5g
+
+  redis:
+    image: redis:7-alpine
+    container_name: hellodoctor-capacity-redis
+    ports:
+      - "6479:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    cpuset: "0-3"
+    cpu_shares: 200
+    mem_limit: 400m
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hellodoctor-capacity-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Override host-relative values from .env to the in-network service names.
+      DATABASE_URL: postgres://hellodoctor:hellodoctor_dev_password@postgres:5432/hellodoctor
+      APP_DB_HOST: postgres
+      REDIS_URL: redis://redis:6379
+      HOST: 0.0.0.0
+      PORT: 8080
+      # The ONE documented exception (docs/CONSTRAINED_CAPACITY_TEST.md §19):
+      # every synthetic request in this test originates from the one real IP
+      # of the machine running capacity_test.rs, unlike real distributed
+      # traffic where each client IP gets its own 120/min budget — confirmed
+      # by a real run (98.8% of "rejections" at 200 RPS were exactly this,
+      # not a genuine capacity finding). No other security control is
+      # touched; never set this in the real .env/production config.
+      GLOBAL_IP_RATE_LIMIT_PER_MIN: "100000"
+    ports:
+      - "8180:8080"
+    cpuset: "0-3"
+    cpu_shares: 1350
+    mem_limit: 1.5g
+
+volumes:
+  hellodoctor_capacity_pgdata:

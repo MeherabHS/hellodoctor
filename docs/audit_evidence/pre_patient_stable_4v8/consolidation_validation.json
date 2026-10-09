@@ -1,0 +1,18 @@
+{
+  "stages_checked": 11,
+  "windows_checked": 396,
+  "exact_authoritative_table_matches_raw_and_parsed_summary": true,
+  "outcome_sums_match_http_sample_counts": true,
+  "system_error_percentages_match_counts": true,
+  "system_errors_total": 96,
+  "all_system_errors_in_grievance_endpoint": true,
+  "old_input_hashes_unchanged": true,
+  "charts_created": 6,
+  "chart_formats": [
+    "PNG",
+    "SVG"
+  ],
+  "new_load_runs": 0,
+  "software_installed": "NONE",
+  "final_classification": "PRE_PATIENT_STABLE_4VCPU_8GB_BENCHMARK_PARTIAL"
+}

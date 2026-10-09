@@ -1,0 +1,39 @@
+{
+  "checks": {
+    "two_independent_doctor_mfa_sessions": "PASS",
+    "duty_server_roundtrip": "PASS",
+    "schedule_create_and_booked_fixture": "PASS",
+    "booked_slot_protected": "PASS",
+    "overlap_conflict": "PASS",
+    "queue_upcoming_first_real_desc_backend": "PASS",
+    "summary_and_history_authorized": "PASS",
+    "history_before_T_minus_15": "PASS",
+    "chat_send_text_escaped": "PASS",
+    "chat_canned_reply": "PASS",
+    "foreign_summary": "PASS",
+    "foreign_history": "PASS",
+    "foreign_slot": "FAIL:409",
+    "foreign_chat": "PASS",
+    "foreign_wallet_parameter_rejected": "PASS",
+    "wallet_statement_destinations_real_api": "PASS",
+    "csrf_foreign_origin": "PASS",
+    "cookie_flags": "PASS",
+    "concurrent_refresh": "PASS",
+    "document_bytes": "STORAGE_CONFIGURATION_REQUIRED",
+    "rx_server_persistence": "STORAGE_CONFIGURATION_REQUIRED",
+    "qna_answer_conflict": "NOT_YET_TESTED",
+    "completion": "NOT_YET_TESTED"
+  },
+  "fixture_ids": {
+    "doctors": [
+      "80769b63-50ec-4dd7-8570-d1e60662b71f",
+      "1c4ea5d6-81c4-4323-9024-0b604762c05a"
+    ],
+    "appointments": [
+      "ca0cd7d4-2bac-469e-adae-e2e7da5b2fe4",
+      "8c99a827-03dd-4c99-8462-31557f12e041"
+    ]
+  },
+  "console_errors": [],
+  "simulation": "Development webhook only; zero-value fees; no real payment"
+}

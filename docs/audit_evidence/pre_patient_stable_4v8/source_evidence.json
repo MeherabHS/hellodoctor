@@ -1,0 +1,28 @@
+{
+  "services/backend/src/services/grievance_service.rs": {
+    "sha256": "47212933a6aa2c9675f2f0a6e4c5a4eb970589008fa9fb2def185440d15862a8",
+    "excerpt": "use crate::auth_context::AuthContext;\nuse crate::domain::ids::{PatientProfileId, UserId};\nuse crate::domain::models::*;\nuse crate::error::AppError;\nuse crate::repository::{\n    appointment_repo, consultation_repo, grievance_repo, transaction_repo, wallet_repo, AppState,\n    DbRole,\n};\nuse crate::services::audit_service::{AuditLogEntry, AuditService};\nuse chrono::Utc;\nuse uuid::Uuid;\n\npub struct GrievanceService;\n\nimpl GrievanceService {\n    /// Patient files formal medical grievance (Star-Rating-Free). `consultation_id` must be\n    /// a real `consultation_sessions.id` \u2014 the FK constraint enforces this at the DB level.\n    pub async fn submit_grievance(\n        state: &AppState,\n        ctx: &AuthContext,\n        patient_id: PatientProfileId,\n        consultation_id: Uuid,\n        target_type: GrievanceTarget,\n        category: String,\n        claim_summary: String,\n    ) -> Result<GrievanceReport, AppError> {\n        let mut tx = state.begin_authed(ctx).await?;\n\n        consultation_repo::find_by_id(&mut *tx, consultation_id)\n            .await?\n            .ok_or_else(|| AppError::NotFound(\"Consultation session not found.\".into()))?;\n\n        let grv_id = Uuid::new_v4();\n\n        let mut report = GrievanceReport {\n            id: grv_id,\n            // Placeholder: `grievance_repo::insert` ignores this and returns\n            // the value Postgres's own sequence-backed DEFAULT actually\n            // generated (see that function's doc comment).\n            grievance_number: String::new(),\n            patient_id,\n            consultation_id,\n            target_type,\n            category,\n            claim_summary,\n            status: GrievanceStatus::PendingReview,\n            created_at: Utc::now(),\n        };\n\n        report.grievance_number = grievance_repo::insert(&mut *tx, &report).await?;\n        tx.commit().await?;\n        Ok(report)\n    }"
+  },
+  "services/backend/src/repository/grievance_repo.rs": {
+    "sha256": "7fdfb8dfba3e2f5f2c50ac636601c3d26d36380272733201c66a36e52a317415",
+    "excerpt": "use crate::domain::models::{\n    FinancialRefundRequest, GrievanceAdjudication, GrievanceReport, GrievanceStatus,\n};\nuse sqlx::PgExecutor;\nuse uuid::Uuid;\n\n/// `grievance_number` is deliberately not supplied by the caller: the\n/// column's own `DEFAULT` (migration 20261028000001) draws it from\n/// `grievance_number_seq`, a Postgres sequence that is atomic under\n/// concurrency by construction \u2014 two transactions can never receive the\n/// same value, unlike the previous truncated-UUID scheme this replaced.\n/// Returns the generated number so the caller can report it back to the\n/// patient without a second round trip.\npub async fn insert<'e, E: PgExecutor<'e>>(\n    executor: E,\n    report: &GrievanceReport,\n) -> Result<String, sqlx::Error> {\n    sqlx::query_scalar(\n        \"INSERT INTO grievance_reports (id, patient_id, consultation_id, target_type, category, claim_summary, status, created_at) \\\n         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING grievance_number\",\n    )\n    .bind(report.id)\n    .bind(report.patient_id)\n    .bind(report.consultation_id)\n    .bind(report.target_type)\n    .bind(&report.category)\n    .bind(&report.claim_summary)\n    .bind(report.status)\n    .bind(report.created_at)\n    .fetch_one(executor)\n    .await\n}\n\npub async fn find_by_id<'e, E: PgExecutor<'e>>("
+  },
+  "services/backend/migrations/20261028000001_grievance_number_sequence.up.sql": {
+    "sha256": "55ea848ab638ef40f9c343255d46bc2cb5ea96ecaef29b2b27b4c2b568fd47a2",
+    "excerpt": "-- Grievance reference numbers must be deterministically unique under\n-- concurrency, not probabilistically unique. The previous scheme truncated a\n-- fresh UUID to its first 4 hex characters (16 bits) per calendar day, which\n-- collided under real concurrent load (found live during the pre-Patient 4x8\n-- capacity benchmark: duplicate-key violations on\n-- grievance_reports_grievance_number_key growing with RPS). A Postgres\n-- sequence is atomic under concurrency by construction \u2014 two transactions\n-- can never receive the same value. Gaps (an aborted transaction leaving a\n-- sequence value unused) are an accepted, standard cost of human-facing\n-- reference numbers; gapless numbering is deliberately not attempted.\nCREATE SEQUENCE grievance_number_seq START 1;\nGRANT USAGE ON SEQUENCE grievance_number_seq TO hellodoctor_api;\n\nALTER TABLE grievance_reports ALTER COLUMN grievance_number\n    SET DEFAULT ('GRV-' || to_char(now(), 'YYYYMMDD') || '-' || lpad(nextval('grievance_number_seq')::text, 8, '0'));\n"
+  },
+  "services/backend/tests/api_tests.rs": {
+    "sha256": "a96e0e99cb7967becc6c005252ff50aaac416f4543e536e72dfeedfe19e40604",
+    "excerpt": null
+  },
+  "test_search": {
+    "grievance_named_tests": [
+      "test_clinical_grievance_and_board_refund_adjudication",
+      "test_grievance_dismiss",
+      "test_grievance_cannot_be_adjudicated_twice",
+      "test_patient_synthetic_api_journey_articles_booking_completion_grievance_and_logout"
+    ],
+    "dedicated_grievance_number_or_sequence_test_found": false,
+    "note": "Existing grievance authorization/lifecycle tests are not a dedicated concurrent-number regression. No new tests run or written for this reporting task."
+  }
+}

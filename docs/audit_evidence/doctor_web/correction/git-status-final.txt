@@ -1,0 +1,166 @@
+﻿ M CLAUDE.md
+ M apps/admin-web/next.config.js
+ M apps/admin-web/src/app/page.tsx
+ M apps/admin-web/src/data/adminStore.ts
+ M apps/admin-web/src/lib/api.ts
+ M apps/admin-web/src/lib/useBackendSync.ts
+ M apps/admin-web/src/types/admin.ts
+ M docs/ERROR_HANDLING.md
+ M docs/FLUTTER_ARCHITECTURE.md
+ M docs/PROGRESS.md
+ M docs/USER_FLOWS.md
+ M docs/VALIDATION_RULES.md
+ M services/backend/.env.example
+ M services/backend/Cargo.toml
+ M services/backend/docker-compose.yml
+ M services/backend/src/api/middleware/idempotency.rs
+ M services/backend/src/api/middleware/mod.rs
+ M services/backend/src/api/router.rs
+ M services/backend/src/api/v1/admin_handlers.rs
+ M services/backend/src/api/v1/appointment_handlers.rs
+ M services/backend/src/api/v1/auth_handlers.rs
+ M services/backend/src/api/v1/chat_handlers.rs
+ M services/backend/src/api/v1/consultation_handlers.rs
+ M services/backend/src/api/v1/doctor_handlers.rs
+ M services/backend/src/api/v1/grievance_handlers.rs
+ M services/backend/src/api/v1/mod.rs
+ M services/backend/src/api/v1/prescription_handlers.rs
+ M services/backend/src/api/v1/wallet_handlers.rs
+ M services/backend/src/api/v1/webhook_handlers.rs
+ M services/backend/src/config.rs
+ M services/backend/src/crypto.rs
+ M services/backend/src/domain/models.rs
+ M services/backend/src/domain/validation.rs
+ M services/backend/src/error.rs
+ M services/backend/src/lib.rs
+ M services/backend/src/main.rs
+ M services/backend/src/repository/appointment_repo.rs
+ M services/backend/src/repository/audit_repo.rs
+ M services/backend/src/repository/chat_repo.rs
+ M services/backend/src/repository/consultation_repo.rs
+ M services/backend/src/repository/doctor_repo.rs
+ M services/backend/src/repository/grievance_repo.rs
+ M services/backend/src/repository/mod.rs
+ M services/backend/src/repository/otp_repo.rs
+ M services/backend/src/repository/patient_repo.rs
+ M services/backend/src/repository/prescription_repo.rs
+ M services/backend/src/repository/session_repo.rs
+ M services/backend/src/repository/transaction_repo.rs
+ M services/backend/src/repository/user_repo.rs
+ M services/backend/src/repository/wallet_repo.rs
+ M services/backend/src/seed.rs
+ M services/backend/src/services/agora_token_service.rs
+ M services/backend/src/services/appointment_service.rs
+ M services/backend/src/services/audit_service.rs
+ M services/backend/src/services/auth_service.rs
+ M services/backend/src/services/chat_service.rs
+ M services/backend/src/services/consultation_service.rs
+ M services/backend/src/services/disbursement_service.rs
+ M services/backend/src/services/grievance_service.rs
+ M services/backend/src/services/mod.rs
+ M services/backend/src/services/prescription_service.rs
+ M services/backend/src/services/upload_security_service.rs
+ M services/backend/src/telemetry/mod.rs
+ M services/backend/tests/api_tests.rs
+?? .github/
+?? admin_token.txt
+?? apps/admin-web/.env.local.example
+?? apps/admin-web/src/app/api/
+?? apps/admin-web/src/app/login/
+?? apps/admin-web/src/lib/session.ts
+?? apps/admin-web/src/middleware.ts
+?? apps/doctor-web/
+?? apps/mobile/
+?? docs/CAPACITY_EVIDENCE_REPORT.md
+?? docs/CHECKPOINT.md
+?? docs/CONSTRAINED_CAPACITY_TEST.md
+?? docs/DATA_RETENTION_POLICY_TEMPLATE.md
+?? docs/DOCTOR_APP_FINAL_SYSTEM_AUDIT.md
+?? docs/DOCTOR_FLUTTER_BACKEND_MAPPING.md
+?? docs/DOCTOR_FLUTTER_FINAL_VERIFICATION.md
+?? docs/DOCTOR_FLUTTER_IMPLEMENTATION.md
+?? docs/DOCTOR_FLUTTER_REPLICATION_REPORT.md
+?? docs/DOCTOR_PAYOUT_ARCHITECTURE.md
+?? docs/DOCTOR_SYSTEM_FINAL_MULTI_AGENT_AUDIT.md
+?? docs/DOCTOR_WEB_BACKEND_MAPPING.md
+?? docs/DOCTOR_WEB_CORRECTION_REPORT.md
+?? docs/DOCTOR_WEB_FINAL_ACCEPTANCE.md
+?? docs/DOCTOR_WEB_PROTOTYPE_INVENTORY.md
+?? docs/DOCTOR_WEB_VISUAL_PARITY_REPORT.md
+?? docs/FINAL_SECURITY_GAP_REVIEW.md
+?? docs/INCIDENT_RESPONSE_RUNBOOK.md
+?? docs/KEY_ROTATION_RUNBOOK.md
+?? docs/PAYMENT_PRODUCTION_READINESS.md
+?? docs/PILOT_READINESS_DECISION.md
+?? docs/PRODUCTION_DEPLOYMENT.md
+?? docs/audit/
+?? docs/audit_evidence/
+?? grievances_out.json
+?? services/backend/Dockerfile
+?? services/backend/docker-compose.capacity.yml
+?? services/backend/examples/
+?? services/backend/migrations/20261003000001_rls_hardening.down.sql
+?? services/backend/migrations/20261003000001_rls_hardening.up.sql
+?? services/backend/migrations/20261004000001_system_error_service.down.sql
+?? services/backend/migrations/20261004000001_system_error_service.up.sql
+?? services/backend/migrations/20261004000002_consultation_telemetry_events.down.sql
+?? services/backend/migrations/20261004000002_consultation_telemetry_events.up.sql
+?? services/backend/migrations/20261004000003_admin_audit_snapshots.down.sql
+?? services/backend/migrations/20261004000003_admin_audit_snapshots.up.sql
+?? services/backend/migrations/20261004000004_security_correctness_fixes.down.sql
+?? services/backend/migrations/20261004000004_security_correctness_fixes.up.sql
+?? services/backend/migrations/20261004000005_pass2_fixes.down.sql
+?? services/backend/migrations/20261004000005_pass2_fixes.up.sql
+?? services/backend/migrations/20261005000001_doctor_contract_qna.down.sql
+?? services/backend/migrations/20261005000001_doctor_contract_qna.up.sql
+?? services/backend/migrations/20261005000002_history_access_window.down.sql
+?? services/backend/migrations/20261005000002_history_access_window.up.sql
+?? services/backend/migrations/20261006000001_doctor_payout_methods.down.sql
+?? services/backend/migrations/20261006000001_doctor_payout_methods.up.sql
+?? services/backend/migrations/20261007000001_kenya_payout_routing.down.sql
+?? services/backend/migrations/20261007000001_kenya_payout_routing.up.sql
+?? services/backend/migrations/20261008000001_financial_state_machine.down.sql
+?? services/backend/migrations/20261008000001_financial_state_machine.up.sql
+?? services/backend/migrations/20261009000001_fix_disbursement_allocation_index.down.sql
+?? services/backend/migrations/20261009000001_fix_disbursement_allocation_index.up.sql
+?? services/backend/migrations/20261010000001_add_kenya_bank_gateway.down.sql
+?? services/backend/migrations/20261010000001_add_kenya_bank_gateway.up.sql
+?? services/backend/migrations/20261011000001_statement_payout_snapshot.down.sql
+?? services/backend/migrations/20261011000001_statement_payout_snapshot.up.sql
+?? services/backend/migrations/20261012000001_financial_close_integrity.down.sql
+?? services/backend/migrations/20261012000001_financial_close_integrity.up.sql
+?? services/backend/migrations/20261013000001_atomic_doctor_onboarding.down.sql
+?? services/backend/migrations/20261013000001_atomic_doctor_onboarding.up.sql
+?? services/backend/migrations/20261014000001_rx_pages_document_authorization.down.sql
+?? services/backend/migrations/20261014000001_rx_pages_document_authorization.up.sql
+?? services/backend/migrations/20261015000001_refund_approval_not_payment.down.sql
+?? services/backend/migrations/20261015000001_refund_approval_not_payment.up.sql
+?? services/backend/migrations/20261016000001_atomic_consultation_completion.down.sql
+?? services/backend/migrations/20261016000001_atomic_consultation_completion.up.sql
+?? services/backend/migrations/20261017000001_clinical_and_payout_invariants.down.sql
+?? services/backend/migrations/20261017000001_clinical_and_payout_invariants.up.sql
+?? services/backend/migrations/20261018000001_audit_corrections.down.sql
+?? services/backend/migrations/20261018000001_audit_corrections.up.sql
+?? services/backend/migrations/20261019000001_migration_status_grant.down.sql
+?? services/backend/migrations/20261019000001_migration_status_grant.up.sql
+?? services/backend/migrations/20261020000001_doctor_engagement_notifications.down.sql
+?? services/backend/migrations/20261020000001_doctor_engagement_notifications.up.sql
+?? services/backend/patient_token.txt
+?? services/backend/scripts/
+?? services/backend/src/abac.rs
+?? services/backend/src/api/middleware/auth.rs
+?? services/backend/src/api/middleware/global_guard.rs
+?? services/backend/src/api/v1/notification_handlers.rs
+?? services/backend/src/auth_context.rs
+?? services/backend/src/ip_jail.rs
+?? services/backend/src/migration_status.rs
+?? services/backend/src/rate_limit.rs
+?? services/backend/src/repository/notification_repo.rs
+?? services/backend/src/repository/payment_event_repo.rs
+?? services/backend/src/repository/system_error_repo.rs
+?? services/backend/src/sanitize.rs
+?? services/backend/src/services/document_storage_service.rs
+?? services/backend/src/services/notification_scheduler.rs
+?? services/backend/src/services/notification_service.rs
+?? services/backend/src/services/notification_transport.rs
+?? services/backend/src/system_error.rs

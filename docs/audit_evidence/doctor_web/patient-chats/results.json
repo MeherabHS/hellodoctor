@@ -1,0 +1,131 @@
+{
+  "checks": {
+    "two_doctor_list_read_and_send_ownership": "PASS",
+    "primary_sidebar_chat_selected_separate_from_telehealth": "PASS",
+    "real_backend_message_history_and_ui_send": "PASS",
+    "conversation_search_and_authoritative_filters": "PASS",
+    "real_backend_expiry_denial_and_read_only_composer": "PASS",
+    "fluid_two_pane_desktop_five_viewports": "PASS",
+    "in_call_chat_retains_same_thread_contract": "PASS",
+    "dedicated_url_back_forward_reload_session_restore": "PASS",
+    "global_appointment_search_distinct_from_chat_search": "PASS",
+    "cold_chat_url_real_login_mfa_empty_inbox": "PASS"
+  },
+  "console_errors": [],
+  "network": [
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/notifications/unread-count",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/qna/questions",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/chat/5755758e-1b74-4d83-8788-4b2d3aa7c61c/messages",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/chat/5755758e-1b74-4d83-8788-4b2d3aa7c61c/messages",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/chat/5755758e-1b74-4d83-8788-4b2d3aa7c61c/messages",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments/8c99a827-03dd-4c99-8462-31557f12e041/patient-history",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/chat/5755758e-1b74-4d83-8788-4b2d3aa7c61c/messages",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments/8c99a827-03dd-4c99-8462-31557f12e041/patient-history",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/notifications/unread-count",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "unread_count": "NOT_SUPPORTED",
+  "last_message_preview": "NOT_SUPPORTED",
+  "classification_filters": "Removed: no authoritative backend classifications",
+  "build_id": "NSx9VY1Mkxp3QUUfkUpDg"
+}

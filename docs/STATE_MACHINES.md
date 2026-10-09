@@ -1,3 +1,12 @@
+## Current professional-registration state machine — Kenya
+
+`professional_verification_status`: PENDING → VERIFIED or PENDING → REJECTED.
+Both transitions require ClinicalAdmin/PlatformAdmin and commit review metadata,
+audit and notification atomically. Concurrent/repeated terminal reviews lose with
+409. There is no approved reapplication or terminal-state reversal. Account
+suspension/activation, duty, MFA and payout state remain separate controls.
+See [current contract](KENYA_PROFESSIONAL_VERIFICATION.md).
+
 # Phase 14 — Formal State Machines & Lifecycle Specifications
 
 > **Document Version:** 1.0.0  
@@ -111,3 +120,7 @@ stateDiagram-v2
     LOCKED_EXPIRED --> [*]
     LOCKED_DISPUTED --> [*]
 ```
+
+## Doctor Articles ? current direct-publication contract
+
+[Doctor Articles](DOCTOR_ARTICLES.md) defines the implemented `DRAFT / PUBLISHED / ARCHIVED` lifecycle, structured fields, APIs, optimistic versions, forced ownership/publication RLS and migration `20261025000001`. Doctors publish directly; no Admin review state or queue exists. Professional verification remains its separate existing state machine. [Session hardening](PUBLIC_EXPOSURE_HARDENING.md) requires an active JWT `sid` family on protected reads/writes.

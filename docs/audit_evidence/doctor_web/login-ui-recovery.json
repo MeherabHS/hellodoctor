@@ -1,0 +1,27 @@
+{
+  "checks": {
+    "localhost_redirect": "PASS",
+    "ui_password_login": "PASS",
+    "ui_mfa": "PASS",
+    "tokens_not_js_readable": "PASS",
+    "reload_session_restored": "PASS",
+    "foreign_origin_denied": "PASS",
+    "logout": "PASS"
+  },
+  "console_errors": [],
+  "auth_responses": [
+    {
+      "action": "login",
+      "status": 200
+    },
+    {
+      "action": "verify",
+      "status": 200
+    },
+    {
+      "action": "logout",
+      "status": 200
+    }
+  ],
+  "fixture": "Controlled development Doctor 2; no credentials recorded"
+}

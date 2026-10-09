@@ -1,8 +1,10 @@
+> Active professional-registration scope: Kenya only; manual HelloDoctor review of submitted KMPDC registration. See [current implementation](docs/KENYA_PROFESSIONAL_VERIFICATION.md). Historical prototype descriptions elsewhere in this specification are not evidence of implemented provider integrations.
+
 # HelloDoctor (HeloDoc) — Complete System Business Logic & Operational Architecture Specification
 
 > **Version:** 2.4.0  
 > **Target Deployments:** Web (Mobile-First SPA), Desktop Clinical Workstation, Central Administration Portal  
-> **Primary Jurisdiction & Markets:** Bangladesh (BMDC / DGDA Compliance) & East Africa / Kenya (English & Swahili Localization, M-Pesa / Mobile Financial Services)  
+> **Primary Jurisdiction & Markets:** Kenya only (KMPDC professional registration; English & Swahili Localization)
 > **Source Repository:** `MeherabHS/hellodoctor`  
 > **Core Web Entry Point:** `index.html` (served via GitHub Pages)
 
@@ -29,7 +31,7 @@
    - [5.1 Executive Command Center](#51-executive-command-center)
    - [5.2 Doctor Directory & Physician Dossiers](#52-doctor-directory--physician-dossiers)
    - [5.3 Patient Directory & Clinical History](#53-patient-directory--clinical-history)
-   - [5.4 BMDC Licensing & Credentialing Engine](#54-bmdc-licensing--credentialing-engine)
+   - [5.4 Professional Registration Review](#54-professional-registration-review-adminpage_verification)
    - [5.5 Telehealth Slot & Capacity Management](#55-telehealth-slot--capacity-management)
    - [5.6 Clinical Protocol & Compliance Oversight](#56-clinical-protocol--compliance-oversight)
    - [5.7 App Incident Diagnostics & Telemetric Error Logs](#57-app-incident-diagnostics--telemetric-error-logs)
@@ -48,13 +50,13 @@
 
 ## 1. Executive Summary & System Philosophy
 
-**HelloDoctor (HeloDoc)** is an enterprise mHealth and Teleconsultation platform built to bridge primary, specialized, and emergency healthcare gaps across developing and emerging markets. Originally architected for Bangladesh and expanded for East African telecare (Kenya), the system balances consumer accessibility with medical governance.
+**HelloDoctor (HeloDoc)** is an enterprise mHealth and Teleconsultation platform built to bridge primary, specialized, and emergency healthcare gaps across developing and emerging markets. Deployed for Kenyan telecare, the system balances consumer accessibility with medical governance.
 
 ### Core Guiding Principles
 
 1. **Elimination of Subjective Star Ratings (Zero Commercialization)**:
    - Traditional e-commerce rating paradigms (5-star reviews, thumbs up, popularity algorithms) are strictly prohibited across all patient-facing surfaces.
-   - Physician quality is governed by **BMDC (configurable per deployment country)** credentialing, years of certified clinical practice, and institutional affiliations.
+   - Physician quality is governed by **KMPDC professional registration (manual HelloDoctor review)** credentialing, years of certified clinical practice, and institutional affiliations.
    - Patient dissatisfaction is handled through an evidence-based **Grievance Redressal Board** rather than public vanity scores.
 
 2. **Transparent Financial Debarment (20% Platform Fee Model)**:
@@ -93,7 +95,7 @@ The system operates as an integrated Single-Page Application (SPA) driven by an 
 ├──────────────────┤    ├──────────────────┤                 ├──────────────────┤    ├────────────────────┤
 │ • 15 Mobile Views│    │ • 6 Mobile Views │                 │ • Dual EMR Split │    │ • 9 Operations Pgs │
 │ • 1-5 Rx Upload  │    │ • 20% Fee Wallet │                 │ • 1080p Telehealth│   │ • payment hold Ledger    │
-│ • Swahili/English│    │ • 24h Chat Desk  │                 │ • Cloud Rx Engine│    │ • BMDC Dossiers    │
+│ • Swahili/English│    │ • 24h Chat Desk  │                 │ • Cloud Rx Engine│    │ • KMPDC Dossiers    │
 │ • Emergency 16263│    │ • Smart Rx Scan  │                 │ • Revenue Center │    │ • Grievance Board  │
 └──────────────────┘    └──────────────────┘                 └──────────────────┘    └────────────────────┘
 ```
@@ -115,7 +117,7 @@ The active workspace is managed by `wbSwitchShell(targetShell)`:
 |---|---|---|---|
 | **Patient** | Phone number, National ID / Clinical MRN | Read doctor directory, book slots, upload 1–5 Rx images, engage in video/chat, lodge grievances, access health vault | Seeks medical consultations, provides medical history, manages family profiles |
 | **Physician** | Medical License Number (configurable per deployment country), National ID | Set availability, join calls, review multi-image records, author e-prescriptions, track 20% debarred wallet earnings | Conducts clinical assessments, authors legal digital prescriptions, monitors patient follow-ups |
-| **Central Admin** | Secure Superuser / Governance Credentials | Full CRUD over physician rosters, payment hold ledger management, BMDC validation, grievance adjudication, system log diagnostics | Clinical governance, fraud prevention, dispute settlement, MFS payment reconciliation |
+| **Central Admin** | Secure Superuser / Governance Credentials | Full CRUD over physician rosters, payment hold ledger management, KMPDC validation, grievance adjudication, system log diagnostics | Clinical governance, fraud prevention, dispute settlement, MFS payment reconciliation |
 
 ### 3.2 Consultation Lifecycle State Machine
 
@@ -151,7 +153,7 @@ stateDiagram-v2
      - **Medical Specialty**: Internal Medicine, Cardiology, Dermatology, Pediatrics, Gynecology, etc. (`filterDoctorBySpecialty`).
 3. **Clinical Credential Display**:
    - Doctor cards explicitly showcase:
-     - Full Name and Medical License Number (configurable per deployment country) (e.g., `BMDC #45821`).
+     - Full Name and Medical License Number (configurable per deployment country) (e.g., `SYNTH-KE-0001`).
      - Clinical Experience (e.g., `12 Years Exp`).
      - Hospital / Institutional Affiliation (e.g., `Dhaka Medical College Hospital`).
      - Transparent Consultation Fees (e.g., Video: `৳ (configurable per deployment country) 800`, Chat: `৳ (configurable per deployment country) 500`).
@@ -405,7 +407,7 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 │ 1. Command    │ Real-time Platform Health, Live Consultations, Alerts  │
 │ 2. Doctors    │ Physician Roster, Dossiers, Residence & Phone History  │
 │ 3. Patients   │ Patient Directory, Records, Lifetime Consultation GMV  │
-│ 4. BMDC       │ Licensing Verification, Expiry Tracker, Credentials    │
+│ 4. KMPDC       │ Manual Registration Review, Review State, Credentials    │
 │ 5. Slots      │ Platform Capacity Manager, Load-Balancing Schedules    │
 │ 6. Compliance │ Clinical Protocol Audits, Prescribing Adherence Logs   │
 │ 7. Logs       │ Real-Time Subsystem Error Diagnostics & Simulators     │
@@ -428,7 +430,7 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
   - Detailed listing of all registered specialists with Medical License ID (configurable per deployment country), Specialty, Hospital, Status, and Lifetime Consultations.
 - **Comprehensive Physician Dossier Modal (`#adminDoctorHistoryModal`)**:
   - Contains complete operational and contact records:
-    - **Phone Number** (e.g., `+880 1711-884920`).
+    - **Phone Number** (e.g., `+254700000101`).
     - **Residential Address** (e.g., `Dhanmondi, Dhaka`).
     - **Official Email** (e.g., `anika.rahman@helodoc.com`).
     - **Consultation History**: Past clinical sessions, patient names, date/time stamps, and session durations.
@@ -442,11 +444,10 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 
 ---
 
-### 5.4 BMDC Licensing & Credentialing Engine (`adminPage_bmdc`)
-- **Verification Portal**:
-  - Direct integration with Bangladesh Medical & Dental Council licensing registers.
-  - Tracks registration validity dates, medical qualification documents (MBBS, FCPS, MD, MRCP), and specialist certificates.
-  - Automatically flags physicians with expiring or disputed medical licenses.
+### 5.4 Professional Registration Review (`adminPage_verification`)
+- Authorized HelloDoctor ClinicalAdmin/PlatformAdmin manually review submitted KMPDC registration information.
+- Pending queue contains only PENDING applications. Verify and Reject produce separate terminal VERIFIED/REJECTED states, with audit, reviewer metadata and notification.
+- Registration is separate from annual practice licensing. No external registry integration or automated licence-expiry tracking is claimed.
 
 ---
 
@@ -485,7 +486,7 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
     - Verification of whether a valid prescription was saved to the patient vault.
 - **Board Adjudication Actions**:
   - **Disburse payment hold Refund (`btnAdjudicateRefund`)**: Refunds consultation fees back to the patient's MFS wallet (`REFUNDED`).
-  - **Issue Disciplinary Warning (`btnAdjudicateWarning`)**: Logs a formal reprimand in the physician's BMDC dossier (`WARNED`).
+  - **Issue Disciplinary Warning (`btnAdjudicateWarning`)**: Logs a formal reprimand in the physician's KMPDC dossier (`WARNED`).
   - **Dismiss Grievance (`btnAdjudicateResolve`)**: Closes the dispute as resolved when evidence demonstrates compliant care.
 
 ---
@@ -523,7 +524,7 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 | `view-10` | **Virtual Waiting Room** | Countdown Timer, Multi-Prescription Previewer, Audio/Video Pre-Flight Check | Holds patients before sessions, verifies camera/mic readiness, and displays queue status. |
 | `view-11` | **Post-Consultation Summary** | Prescription Download Button, Follow-Up Date, Hidden Telemetry Record, Grievance Trigger | Summarizes consultation outcomes and provides access to prescriptions and dispute filing. |
 | `view-12` | **Free Health Q&A Community** | Category Filter Chips, Ask Question Form, Answered Forum Feed | Allows patients to ask anonymous questions answered by on-duty medical officers. |
-| `view-13` | **Health Blogs & Lifestyle Advice** | Search Input, Category Filter Pills, Verified Medical Blog Posts | Provides health education articles reviewed by BMDC physicians. |
+| `view-13` | **Health Blogs & Lifestyle Advice** | Search Input, Category Filter Pills, Verified Medical Blog Posts | Provides health education articles reviewed by KMPDC physicians. |
 | `view-14` | **Skeleton Loading Shimmer View** | Animated Shimmer Cards (`.sk-shimmer`) | Displays placeholder loading states during high-latency network queries to prevent layout shifts. |
 
 ---
@@ -560,11 +561,11 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 | **Command Center** | `adminPage_command` | Central operations dashboard displaying platform KPIs, active sessions, server load, and emergency controls. |
 | **Doctor Management** | `adminPage_doctors` | Physician directory with verified phone numbers, residential addresses, and access to individual dossiers (`#adminDoctorHistoryModal`). |
 | **Patient Management** | `adminPage_patients` | Patient user directory displaying account status, consultation history, lifetime value, and dispute records. |
-| **BMDC Credentialing** | `adminPage_bmdc` | Medical licensing verification portal managing credential audits, renewal deadlines, and practice suspensions. |
+| **KMPDC Credentialing** | `adminPage_verification` | Manual KMPDC registration review with PENDING/VERIFIED/REJECTED states. Account suspension remains separate; annual practice licences are not modeled here. |
 | **Capacity & Slots** | `adminPage_slots` | Platform scheduling manager balancing patient appointment volumes across clinical specialties. |
 | **Clinical Compliance** | `adminPage_compliance` | Monitors consultation protocols, teleconsultation session lengths, and prescription guideline adherence. |
 | **Error Logs & Diagnostics** | `adminPage_logs` | Subsystem error tracker with interactive failure simulation (`#adminSimulateFailureModal`) and recovery triggers. |
-| **Grievance Board** | `adminPage_grievances` | Dispute arbitration desk with session telemetry evidence, payment hold refund triggers, and BMDC warning tools. |
+| **Grievance Board** | `adminPage_grievances` | Dispute arbitration desk with session telemetry evidence, payment hold refund triggers, and KMPDC warning tools. |
 | **Finance & payment hold Ledger** | `adminPage_finance` | Master financial ledger tracking gross GMV, payment hold balances, 20% platform revenue, and MFS reconciliations. |
 
 ---
@@ -592,8 +593,8 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 ### 7.1 Doctor Earnings Store (`doctorEarningsStore`)
 ```javascript
 {
-  doctorName: "Dr. Sabrina Akter",
-  bmdc: "BMDC #45821",
+  doctorName: "Dr. Synthetic Doctor One",
+  registration: "SYNTH-KE-0001",
   totalGross: 35562.50,           // Step 1: Gross earnings
   platformChargePercent: 20,      // HeloDoc platform fee rate
   withheldFee: 7112.50,           // Step 2: 20% platform charge
@@ -622,9 +623,9 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
   target: "DOCTOR",               // "DOCTOR" | "SYSTEM"
   status: "PENDING_REVIEW",       // "PENDING_REVIEW" | "REFUNDED" | "WARNED" | "DISMISSED"
   patientName: "Rafiq Ahmed",
-  patientPhone: "+880 1712-345678",
-  doctorName: "Dr. Sabrina Akter",
-  doctorBmdc: "BMDC #45821",
+  patientPhone: "+254700000002",
+  doctorName: "Dr. Synthetic Doctor One",
+  doctorRegistration: "SYNTH-KE-0001",
   consultId: "CONS-9481",
   category: "Rushed Consultation / Ended Abruptly",
   claimSummary: "Doctor stayed only 2 minutes and abruptly disconnected call without prescribing medicine.",
@@ -653,7 +654,7 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
   platformFee: 160.00,            // 20% Platform Fee
   netAmount: 640.00,              // 80% to Doctor / Refund
   patientName: "Rafiq Ahmed",
-  doctorName: "Dr. Sabrina Akter",
+  doctorName: "Dr. Synthetic Doctor One",
   status: "PAYMENT_HELD",          // "PAYMENT_HELD" | "SETTLED" | "REFUNDED"
   gatewayRef: "BK-IPN-994821038"
 }
@@ -670,7 +671,7 @@ The Central Admin Portal (`#adminPortalShell`) provides oversight across clinica
 | **Prescription Photo Upload Overload** | File input selection exceeds `MAX_PRESCRIPTION_IMAGES = 5` | Accepts the first 5 images and ignores remaining files. Displays an explanatory notification toast to prevent memory issues. |
 | **Offline Form Submission** | Action triggered while `navigator.onLine === false` | Blocks submission, displays `#offlineActionGuardModal`, and preserves form input until connection is restored. |
 | **Prescription Signing Network Drop** | Physician clicks "Sign & Dispatch" while offline | Prevents signature hash generation and warns physician that prescriptions cannot be legally dispatched offline. |
-| **Expired BMDC Medical License** | System clock exceeds doctor's license validity date | Disables the physician's appointment booking options and flags the account in `adminPage_bmdc` for administrative review. |
+| **Unapproved Professional Registration** | Professional state is PENDING or REJECTED | Clinical access and patient booking are denied; only PENDING applications appear in Doctor Verification. |
 | **Simultaneous Booking Conflict** | Dual booking requests received for the same 15-minute slot | Locks the slot for the first verified payment gateway token and offers alternative slots to the second applicant. |
 
 ---

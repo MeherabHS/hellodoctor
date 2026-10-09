@@ -1,0 +1,40 @@
+=== HelloDoctor Constrained-VPS Capacity Test (open-loop) ===
+target=http://localhost:8280 target_rps=400 duration=210s
+
+Identities: 1150 patients, 40 doctors, 10 admins, 31700 available slots
+
+requested_rps=400.0 requested_count=84001 achieved_rps=400.0 achieved_count=84001
+
+--- Time series (10s buckets) ---
+  window_s achieved_rps   p50_ms   p95_ms   p99_ms      5xx
+      0-10        400.0        7       75      110        0
+     10-20        400.0        6       71      106        1
+     20-30        399.6       10       75      111        0
+     30-40        400.4       10       86      132        0
+     40-50        399.8        6       71       91        0
+     50-60        400.2        6       73      107        0
+     60-70        400.0        7       66       91        0
+     70-80        399.9        7       71      116        0
+     80-90        399.7        9      102      196        0
+    90-100        400.4       10       81      110        0
+   100-110        399.9        8       73      104        1
+   110-120        400.1        6       70      101        0
+   120-130        400.0        6       67       95        1
+   130-140        400.0        7       75      108        0
+   140-150        400.0       10       78      105        1
+   150-160        399.5       10       78      111        0
+   160-170        400.5        7       61       81        0
+   170-180        400.0        7       82      103        0
+   180-190        399.8        6      103      165        0
+   190-200        400.2        9       84      119        0
+   200-210        400.1        8       68       97        0
+
+BUSINESS_REJECTION_RATE=0.000%  TRUE_SYSTEM_ERROR_RATE=0.0048%  auth_reject=3.604%  rate_limited=9.706%
+
+endpoint                    total     succ   bizrej  authrej  ratelim   syserr     p50     p95     p99     max
+GET /doctors                49873    49873        0        0        0        0       8      70     105     228
+GET /doctors/:id/slots      16632    16632        0        0        0        0       8      70     104     227
+GET admin telemetry          3363      336        0     3027        0        0       8     108     134     208
+GET wallet summary           5911     5911        0        0        0        0      10      86     122     238
+POST /appointments/book      6529        0        0        0     6529        0       7      92     138     313
+POST grievance               1693       65        0        0     1624        4       7      94     147     280

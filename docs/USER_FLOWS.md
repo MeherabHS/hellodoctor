@@ -30,10 +30,10 @@ flowchart TD
     E & F & G --> H{Select Specialty Filter Chip}
     H -- 'Internal Medicine' --> I[Filter by Specialty]
     H -- 'Cardiology' --> J[Filter by Cardiology]
-    I & J --> K[Inspect Doctor Cards: BMDC ID, Exp, Hospital, Fee]
+    I & J --> K[Inspect Doctor Cards: KMPDC ID, Exp, Hospital, Fee]
     K --> RESULT([Select Doctor -> Advance to Slot Picker])
 ```
-- **Happy Path:** Patient selects modality tab, taps specialty chip (e.g., "Internal Medicine"), browses doctor cards displaying verified BMDC numbers and fees, and taps "Book Appointment".
+- **Happy Path:** Patient selects modality tab, taps specialty chip (e.g., "Internal Medicine"), browses doctor cards displaying verified KMPDC numbers and fees, and taps "Book Appointment".
 - **Alternate Path:** Patient taps on doctor card directly to view full qualifications in `view-9` (Doctor Profile) before booking.
 - **Empty State:** If no physicians match the filter, the view displays: *"No specialists available for the selected criteria."*
 - **Offline State:** Intercepted by `#patientOfflineBanner`; cached doctor directory is shown with a *"Reconnecting..."* status badge.
@@ -63,8 +63,13 @@ flowchart TD
 ```
 - **Validation Rules:**
   - Date and time slot selection are mandatory before payment is enabled.
-  - Image upload accepts `image/*,application/pdf` with a hard limit of 5 photos (`MAX_PRESCRIPTION_IMAGES = 5`).
-  - Excess photos are truncated, and the user receives a warning toast: *"Maximum 5 prescription photos allowed. Extra photos were omitted."*
+  - Image upload accepts `image/*,application/pdf` with a hard limit of 5 photos (`MAX_PRESCRIPTION_IMAGES = 5`)
+    **as literally coded in the `index.html` prototype source**, retained as historical/original
+    reference — the prototype file itself was not changed. **Production correction:** the actual
+    backend/Doctor-Web cap is now 20 photos per consultation at 40 KB each
+    (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`, `MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024`) — see
+    docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md.
+  - Excess photos are rejected/truncated past the cap, and the user receives a warning toast.
 - **Payment payment hold Rule:** Funds are placed into `PAYMENT_HELD` in `adminTransactionStore`. The consulting doctor does not receive a balance credit until clinical consultation completes without dispute.
 
 ---
@@ -119,7 +124,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     START([Patient Taps 'Report an Issue' on View-11 or View-7]) --> A[Open #patientGrievanceModal]
-    A --> B[Auto-Populate Doctor Name, BMDC ID, Consult ID, payment hold Fee]
+    A --> B[Auto-Populate Doctor Name, KMPDC ID, Consult ID, payment hold Fee]
     B --> C[Silently Bind Auto-Collected Session Telemetry in Background]
     C --> D{Select Incident Target}
     D -- DOCTOR --> E[Render Clinical Conduct Categories]
@@ -174,7 +179,7 @@ flowchart TD
 ### FLOW-DOC-001: Doctor Queue Triage & Duty Toggle
 - **Trigger:** Doctor logs in or opens `doc-view-0`.
 - **Duty Toggle:** Doctor toggles the on-duty switch (`toggleDoctorDuty()`). The backend updates physician availability status and begins routing incoming consultations.
-- **Queue Review:** Doctor reviews the queue list sorted by appointment time, inspects patient age, reported symptoms, and checks for attached multi-prescription photos.
+- **Queue Review:** Doctor reviews the queue list — **DOCTOR_QUEUE_UPCOMING_FIRST (2026-10-07, approved product rule superseding the prior "sorted by appointment time" description)**: eligible upcoming consultations always sort first (nearest `start_time` first), with completed/cancelled/other items following newest-first and never displacing an upcoming one, enforced server-side (`GET /doctor/appointments`) — inspects patient age, reported symptoms, and checks for attached multi-prescription photos.
 
 ---
 
@@ -206,15 +211,59 @@ flowchart TD
 
 ---
 
+### FLOW-DOC-004: Doctor Engagement Notifications (2026-10-07)
+- **DOCTOR_DAILY_CONSULTATION_NOTIFICATION:** Once per Kenya-local calendar
+  day, at a configurable local time (`DOCTOR_DAILY_SUMMARY_TIME_LOCAL`,
+  default 07:00 Africa/Nairobi), each verified active Doctor receives one
+  in-app `DAILY_CONSULTATION_SUMMARY` notification counting that day's
+  eligible (non-cancelled/expired) consultations — "You have N consultations
+  scheduled today" / "You have no consultations scheduled today." Backend
+  scheduler, deduplicated per (Doctor, local date) — never created twice.
+- **DOCTOR_T15_CONSULTATION_REMINDER:** For each eligible (`CONFIRMED`/
+  `WAITING`) consultation, a `CONSULTATION_REMINDER_15M` notification is
+  created the moment the window `[start_time - 15m, start_time)` opens — "Your
+  consultation starts in 15 minutes," no patient-identifying detail. A
+  booking made with under 15 minutes' notice gets an immediate reminder, not
+  a skipped/past-dated one. Cancelling the appointment suppresses any
+  still-pending (undelivered) reminder.
+- **DOCTOR_EARNING_NOTIFICATION:** The moment (and only the moment) a
+  consultation's wallet credit genuinely posts inside
+  `doctor_complete_consultation` (`PAYMENT_HELD -> SETTLED_TO_DOCTOR`), the
+  Doctor receives one `EARNING_CREDITED` notification with the real net
+  amount from the ledger — "Consultation earning credited: KES 800." A
+  retried/duplicate completion call never creates a second one. Checkout,
+  `PAYMENT_HELD`, Finance preparing/approving a disbursement, and Finance
+  "approval" never trigger this or any payout-received notification —
+  `PAYOUT_PAID` is a separate, not-yet-wired event gated on a real external
+  provider `PAID` transition that does not exist in this codebase yet.
+- **DOCTOR_VERIFICATION_NOTIFICATION:** A ClinicalAdmin/PlatformAdmin
+  transition of `doctor_profiles.is_verified` creates exactly one
+  `REGISTRATION_VERIFIED` (on a genuine `false -> true` transition) or
+  `REGISTRATION_REJECTED` (deduplicated by doctor profile, so a repeated
+  rejection of an already-rejected/pending doctor is a safe no-op) in-app
+  notification. No sensitive review detail is placed in the notification
+  text.
+- **Delivery status:** `PUSH_PROVIDER_CONFIGURATION_REQUIRED` — no FCM/APNs
+  integration exists; every notification above is created and fully usable
+  as an in-app inbox item (`GET /notifications`, unread count, mark-read),
+  but no push is actually sent to a device. The device-token registration
+  contract (`POST /notifications/devices`) exists and is disabled (not
+  deleted) on logout.
+- **Not yet built:** the Flutter notification bell/inbox UI and deep-link
+  destinations (Queue / consultation / Wallet / Profile / My Articles) — a
+  separate, not-yet-started Flutter-side task.
+
+---
+
 ## 4. Central Administration Journeys
 
 ### FLOW-ADMIN-001: Doctor Dossier Review (Contact & History)
 - **Step 1:** Administrator opens `adminPage_doctors`.
-- **Step 2:** Locates physician record (e.g., Dr. Anika Rahman, BMDC #52891).
+- **Step 2:** Locates physician record (e.g., Dr. Synthetic Doctor Two, SYNTH-KE-0002).
 - **Step 3:** Clicks "View Dossier", opening `#adminDoctorHistoryModal`.
 - **Step 4:** Administrator inspects verified contact information:
-  - **Phone Number:** `+880 1711-884920`
-  - **Residential Address:** `Dhanmondi, Dhaka (House 42, Road 7A)`
+  - **Phone Number:** `+254700000101`
+  - **Residential Address:** `Synthetic Nairobi, Kenya`
   - **Official Email:** `dr.anika.dmch@helodoc.com`
   - **Consultation History & Past Disciplinary Warnings**.
 

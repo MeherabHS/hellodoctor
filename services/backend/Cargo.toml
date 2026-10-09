@@ -7,13 +7,12 @@ edition = "2021"
 # Async Runtime & HTTP Server
 tokio = { version = "1.40", features = ["full"] }
 axum = { version = "0.7", features = ["multipart", "ws"] }
-tower = { version = "0.4", features = ["timeout", "load-shed"] }
-tower-http = { version = "0.5", features = ["cors", "trace", "compression-full"] }
+tower = { version = "0.4", features = ["timeout", "load-shed", "limit", "util"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-full", "limit"] }
 
 # Serialization & Validation
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-validator = { version = "0.18", features = ["derive"] }
 bigdecimal = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.10", features = ["serde", "v4", "v7"] }
 chrono = { version = "0.4", features = ["serde"] }
@@ -30,9 +29,10 @@ base64 = "0.22"
 
 # Image Processing (Upload Security Pipeline)
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+object_store = { version = "0.14", default-features = false, features = ["aws"] }
 
 # Database & Migrations
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "bigdecimal", "migrate", "macros"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "bigdecimal", "migrate", "macros", "json"] }
 
 # MFA (admin TOTP) & encryption-at-rest for TOTP secrets
 totp-rs = { version = "5.6", features = ["gen_secret"] }
@@ -50,6 +50,8 @@ dotenvy = "0.15"
 futures-util = "0.3"
 parking_lot = "0.12"
 async-trait = "0.1"
+deadpool-redis = { version = "0.23.1", features = ["rt_tokio_1"] }
+regex = "1.10"
 
 [dev-dependencies]
 tower = { version = "0.4", features = ["util"] }

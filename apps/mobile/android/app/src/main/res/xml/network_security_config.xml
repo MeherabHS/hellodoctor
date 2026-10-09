@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android blocks plaintext HTTP by default since API 28, independent of
+  anything the Dart layer decides. The actual security policy — whether a
+  build is allowed to talk HTTP at all — is enforced once, in
+  lib/core/network/api_client.dart: a release build only reaches this far
+  over HTTP for a loopback/private-network test address, or when explicitly
+  built with ENVIRONMENT=development and ALLOW_INSECURE_HTTP=true.
+  ApiClient rejects development flags in staging/production and never follows
+  API redirects. This platform permission does not authorize insecure API traffic. This file just
+  stops Android from redundantly (and silently) blocking the traffic that
+  layer already approved.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -1,0 +1,44 @@
+=== HelloDoctor Constrained-VPS Capacity Test (open-loop) ===
+target=http://localhost:8280 target_rps=400 duration=210s
+
+Identities: 1150 patients, 40 doctors, 10 admins, 31729 available slots
+
+requested_rps=400.0 requested_count=84001 achieved_rps=400.1 achieved_count=84030
+
+--- Time series (10s buckets) ---
+  window_s achieved_rps   p50_ms   p95_ms   p99_ms      5xx
+      0-10        400.3        6       69       90        1
+     10-20        400.2        6       84      134        0
+     20-30        400.4        6       76      108        0
+     30-40        400.4        6       68       93        3
+     40-50        400.1       10       77      117        0
+     50-60        400.4       10       72      105        3
+     60-70        399.9        7       69       94        0
+     70-80        400.7        6       70       89        1
+     80-90        400.0        7       72      102        0
+    90-100        400.1        6       69       89        1
+   100-110        399.7       23      341      428        0
+   110-120        400.2       22      270      324        0
+   120-130        400.3        9       71       99        1
+   130-140        400.2        6       71      103        1
+   140-150        399.9        6       68       90        0
+   150-160        400.1        6       72       98        0
+   160-170        400.0        8       72      102        1
+   170-180        400.0       13       86      119        0
+   180-190        400.0       13       86      120        0
+   190-200        400.0        7       82      120        0
+   200-210        400.1        6       67       99        1
+
+BUSINESS_REJECTION_RATE=0.000%  TRUE_SYSTEM_ERROR_RATE=0.0155%  auth_reject=3.675%  rate_limited=9.384%
+
+endpoint                    total     succ   bizrej  authrej  ratelim   syserr     p50     p95     p99     max
+GET /doctors                49503    49503        0        0        0        0       8      75     243     403
+GET /doctors/:id/slots      16867    16867        0        0        0        0       8      74     243     392
+GET admin telemetry          3353      335        0     3018        0        0      12     112     275     437
+GET wallet summary           5943     5943        0        0        0        0      11      93     264     416
+POST /appointments/book      6452       29        0        0     6423        0       7     102     369     586
+POST chat message              83       83        0        0        0        0      37      91     375     375
+POST grievance               1691      216        0        0     1462       13       8     109     319     554
+POST rtc-token                 70        0        0       70        0        0      11     110     166     166
+POST telemetry                 39       39        0        0        0        0      43     134     137     137
+POST webhook confirm           29       29        0        0        0        0      25      97     198     198

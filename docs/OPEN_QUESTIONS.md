@@ -10,11 +10,11 @@
 
 The following items were clarified by reverse-engineering `index.html` and need **NOT** be asked again:
 - **Q:** *Are star ratings allowed for doctors?*  
-  **A:** **NO.** All star ratings (`⭐`, `★`) and reviews were eliminated in favor of BMDC verification and grievance adjudication.
+  **A:** **NO.** All star ratings (`⭐`, `★`) and reviews were eliminated in favor of KMPDC verification and grievance adjudication.
 - **Q:** *What is the doctor earnings platform charge?*  
   **A:** **Strictly 20% withheld platform charge**, displayed via a 3-tier calculation ($G \to C \to N$) with mandatory basis note.
 - **Q:** *How many prescriptions can a patient upload?*  
-  **A:** **1 to 5 images maximum** (`MAX_PRESCRIPTION_IMAGES = 5`).
+  **A:** **1 to 20 images maximum per consultation** (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`), each independently compressed to at most 40 KB (`MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024`), never a shared/divided batch budget. See docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md.
 - **Q:** *Where is the emergency call button placed?*  
   **A:** **Directly above Upcoming Consultation** on `view-0`, labeled "Emergency Contact" (no "24/7" prefix), dialing `16263` (or local equivalent).
 - **Q:** *What languages are supported?*  
@@ -35,7 +35,7 @@ The following items were clarified by reverse-engineering `index.html` and need 
 ---
 
 ### Q-003: SMS Telco Gateway Credentials for Production OTP
-- **Question:** Which SMS provider credentials (e.g., Twilio, Infobip, local Bangladesh/Kenya bulk SMS gateway) will be provisioned in the production environment?
+- **Question:** Which SMS provider credentials (e.g., Twilio, Infobip, local Kenya bulk SMS gateway) will be provisioned in the production environment?
 - **Why It Matters:** Final production SMS OTP delivery requires provider API tokens.
 - **Affected Components:** `services/backend/src/services/auth_service.rs`.
 - **Safe Default:** Implement mock OTP logger in development mode (fixed code `584920` or printed to console logs) while providing configurable environment variables (`SMS_API_KEY`, `SMS_SENDER_ID`) for production.
@@ -43,7 +43,7 @@ The following items were clarified by reverse-engineering `index.html` and need 
 
 ---
 
-### Q-NEW-1: What jurisdiction-specific medical record retention periods apply? (BD vs KE)
+### Q-NEW-1: What jurisdiction-specific medical record retention periods apply? (KE)
 - **Question:** How long must clinical data be stored legally based on jurisdiction?
 - **Blocks Implementation?** **NON-BLOCKER.**
 
@@ -51,10 +51,9 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Decision:** Use `PAYMENT_HELD` and payment-hold terminology throughout product, API, database, and financial operations documents. Do not describe the arrangement as legal escrow unless counsel and the payment provider explicitly approve that classification.
 - **Blocks Implementation?** **NON-BLOCKER.**
 
-### Q-NEW-3: What Bangla localization timeline is appropriate for Bangladesh market launch?
-- **Question:** What Bangla localization timeline is appropriate for Bangladesh market launch?
-- **Blocks Implementation?** **NON-BLOCKER.**
+### Q-NEW-3: Deployment scope
+- **Decision:** Kenya only; English and Swahili. No other-country rollout is in this product scope.
 
-### Q-NEW-4: What Agora data-region configuration is needed for BD/KE compliance?
-- **Question:** What Agora data-region configuration is needed for BD/KE compliance?
+### Q-NEW-4: What Agora data-region configuration is needed for KE compliance?
+- **Question:** What Agora data-region configuration is needed for KE compliance?
 - **Blocks Implementation?** **NON-BLOCKER.**

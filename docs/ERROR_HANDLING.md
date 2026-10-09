@@ -56,7 +56,15 @@ When unexpected infrastructure failures occur (e.g., MFS IPN webhook failure or 
   "logged_at": "2026-10-01T05:32:15Z"
 }
 ```
-Administrators can inspect these incidents in `adminPage_logs`. Failure simulation is available only in development and staging environments. It is stripped from production builds.
+Administrators can inspect these incidents in `adminPage_logs`, backed by `GET
+/api/v1/admin/system-errors` (not `/admin/logs`, which is the separate administrator-action audit
+trail — the two are never merged). `stack_trace` is populated automatically for genuine backend
+failures: `AppError::internal(...)`/`AppError::service_unavailable(...)` and the `?`-triggered
+`sqlx::Error` conversion are all `#[track_caller]`, recording the real "file:line" of the call
+site that raised the error (see `services/backend/src/error.rs`). Failure simulation
+(`POST /api/v1/admin/system-errors/simulate`) is available only in development and staging
+environments — the backend itself returns 403 in production, rather than relying on the build
+stripping it.
 
 ## 4. Logging Rules
 Never dump entire request objects, JWTs, authorization headers, prescription content, uploaded filenames, or PHI. Use allow-list approach for logged fields.

@@ -44,20 +44,22 @@
 
 1. **Zero Star Ratings & Vanity Reviews**:
    - The platform strictly prohibits 5-star ratings, reviews, and popularity algorithms.
-   - Physician qualification is represented exclusively by BMDC registration, clinical experience years, and verified hospital affiliations.
+   - Physician qualification is represented exclusively by manually reviewed KMPDC professional registration, clinical experience years, and verified hospital affiliations.
    - Patient dissatisfaction is handled exclusively via the structured **Clinical Grievance Redressal System**.
 2. **Doctor Earnings 20% Debarred Settlement**:
    - Doctor earnings must always be computed and presented using the 3-step formula:
      $$\text{Gross Earnings} \longrightarrow \text{20\% Withheld Platform Charge} \longrightarrow \text{Final Net Take-Home}$$
    - The mandatory note: *"Total calculation is based including the platform charge 20%"* must be rendered on all earnings views.
-3. **Multi-Prescription Upload Cap (1 to 5 Images)**:
-   - Patient pre-consultation intake allows uploading between 1 and 5 prescription/lab photos (`MAX_PRESCRIPTION_IMAGES = 5`). Selections beyond 5 must be rejected or capped with user notification.
+3. **Multi-Prescription Upload Cap (1 to 20 Images, 40 KB Per Image)**:
+   - Patient pre-consultation intake allows uploading between 1 and 20 prescription/lab photos per consultation (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`), scoped to the current consultation only (never lifetime/account-wide, never summed across consultations). Selections beyond 20 must be rejected or capped with user notification.
+   - Every prescription/Rx image (Patient intake and Doctor Rx alike) is compressed toward its OWN independent `MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024` (40 KB) ceiling — never a shared/batch budget divided by image count. This bounds Patient aggregate per-consultation storage at 20 × 40 KB = 800 KB.
+   - The Doctor's own Rx page-count cap (5 pages per appointment) is a separate, unrelated limit and is unaffected by this item.
 4. **Emergency Contact Helpline**:
    - The Emergency Contact banner must be positioned immediately above the Upcoming Consultation card on the patient home screen. It must never be labeled with the prefix *"24/7"*. 
-   - Note it's configurable per country (BD: 16263, KE: local emergency number).
+   - Note it's configurable per country (Kenya deployment emergency contact).
 5. **Bilingual Regional Localization & Future Expansion**:
    - The patient interface must support instantaneous toggling between **English** and **Swahili (Kiswahili)**.
-   - Bangla localization for Bangladesh market should be planned for future milestone.
+   - Active deployment scope is Kenya only; English and Swahili.
 6. **Consultation Outcomes**:
    - Consultation completion does NOT require a prescription. Doctors may complete consultations with clinical outcomes: COMPLETED_WITH_RX, COMPLETED_NO_RX, REFERRED, ESCALATED.
 
@@ -141,6 +143,27 @@ hellodoctor/
 - Run database migrations: `sqlx migrate run`
 - Run test suite: `cargo test`
 - Run server: `cargo run`
+
+**Migration discipline (added 2026-10-07 after a confirmed incident — see B-01 in
+`docs/DOCTOR_SYSTEM_FINAL_MULTI_AGENT_AUDIT.md`):** `sqlx::migrate!` only applies
+migrations at process start. A long-running `cargo run` backend has no way to
+discover a migration file added to disk after it started, so it will keep silently
+serving the *old* schema — this already caused a real 500 on every Doctor
+registration attempt for roughly 14 hours in this project. Consequences:
+- Whenever a migration file under `services/backend/migrations/` is added or
+  changed, the running dev backend **must be restarted** before trusting any live
+  verification against it.
+- A green `cargo test` run does **not** prove the long-running shared dev database
+  is current — `#[sqlx::test]` gives each test its own freshly-migrated throwaway
+  database, independent of whatever the long-running `cargo run` process is
+  actually serving.
+- Before reporting a backend defect fixed against the persistent/shared dev
+  database (as opposed to the ephemeral test harness), run
+  `services/backend/scripts/verify_backend_schema.ps1` and require it to report
+  success.
+- Never manually insert or edit rows in `_sqlx_migrations`, and never manually run
+  pieces of a migration's SQL by hand — always go through `sqlx migrate run` /
+  the normal `sqlx::migrate!` startup path, even to repair a drifted database.
 
 ### Flutter Mobile
 - Get packages: `flutter pub get`

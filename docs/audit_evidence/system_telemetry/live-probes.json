@@ -1,0 +1,26 @@
+{
+  "checks": {
+    "backend_admin_login_mfa": "PASS",
+    "system_error_feed": "PASS",
+    "command_telemetry": "PASS",
+    "doctor_web_diagnostic_local_endpoint": "PASS",
+    "doctor_web_diagnostic_reached_admin_database": "NO_ROW_CREATED",
+    "backend_prometheus_request_metrics": "PASS"
+  },
+  "scope": "read-only; no incidents injected",
+  "admin_login_http_status": 500,
+  "admin_page_error_markers": [
+    "Cannot find module",
+    "webpack-runtime"
+  ],
+  "database": {
+    "incidents": 2,
+    "telemetry_aggregates": 0,
+    "telemetry_events": 0
+  },
+  "error_feed_totals": {
+    "total": 2,
+    "open_count": 0,
+    "open_critical_count": 0
+  }
+}

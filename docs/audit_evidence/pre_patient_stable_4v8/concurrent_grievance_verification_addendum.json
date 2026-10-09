@@ -1,0 +1,27 @@
+{
+  "recorded_at_utc": "2026-10-09T04:39:35.768402+00:00",
+  "provenance": "User-supplied execution results; raw pgbench stdout and exact uniqueness-query SQL were not supplied or found in the searched saved artifacts.",
+  "supplied_text": "Concurrent grievance-reference verification. The previous grievance identifier implementation was replaced with a PostgreSQL sequence-backed reference generator. A direct database concurrency test was executed using PostgreSQL 16 pgbench with 50 simultaneous clients, 8 worker threads and 10 transactions per client, producing 500 attempted inserts. All 500 transactions completed successfully with zero failed transactions. Average transaction latency was 17.777 ms. A post-test uniqueness query across the accumulated verification dataset returned 1,200 grievance rows and 1,200 distinct grievance_number values, confirming zero collisions. This test deliberately bypassed HTTP rate limiting to isolate the database mechanism that caused the original race condition; it therefore verifies database-level concurrency safety rather than end-to-end API throughput.",
+  "database_version_major": 16,
+  "clients": 50,
+  "worker_threads": 8,
+  "transactions_per_client": 10,
+  "attempted_transactions": 500,
+  "successful_transactions": 500,
+  "failed_transactions": 0,
+  "average_transaction_latency_ms": 17.777,
+  "verification_dataset_rows": 1200,
+  "verification_dataset_distinct_grievance_numbers": 1200,
+  "scope": "Direct database mechanism; HTTP rate limiting bypassed; not an end-to-end API throughput result or whole sequence-range proof.",
+  "independent_prior_observation": "fix_scope_inspection.json captured 1,200 sequence-format rows plus 3,354 legacy-format rows; 1,200 refers to the verification dataset, not the entire historical table.",
+  "newly_inspected_permanent_test": {
+    "path": "services/backend/tests/api_tests.rs",
+    "name": "test_grievance_number_unique_under_concurrent_submission",
+    "sha256": "9dc6e3d3a77315277bd62e813db29db8a4eb967a73a5d191b423abd82e8a4b7c",
+    "concurrent_service_calls": 40,
+    "excerpt": "async fn test_grievance_number_unique_under_concurrent_submission(pool: PgPool) {\n    // Regression test: grievance_number used to be derived from the first 4\n    // hex characters of a fresh UUID (16 bits of entropy) per calendar day,\n    // which collided under real concurrent load \u2014 confirmed live during the\n    // pre-Patient 4x8 capacity benchmark (duplicate-key violations on\n    // grievance_reports_grievance_number_key growing with RPS). Migration\n    // 20261028000001 replaced it with a Postgres sequence, atomic under\n    // concurrency by construction (grievance_repo::insert's own doc comment\n    // has the detail). Exercises GrievanceService directly, not the HTTP\n    // handler, because the handler's own 3-per-day check_grievance_limit\n    // (src/rate_limit.rs) is an orthogonal abuse control unrelated to this\n    // invariant and would otherwise reject most of these concurrent calls.\n    let (app, pool, state) = test_app_and_state(pool).await;\n    let patient_token = make_token(uid(PATIENT_USER_ID), \"PATIENT\");\n    let (apt_id, _) = book_and_confirm(&app, &patient_token).await;\n    let session = consultation_repo::find_by_appointment(&pool, apt_id)\n        .await\n        .unwrap()\n        .unwrap();\n    let ctx = isolation_ctx(UserId::from(uid(PATIENT_USER_ID)), UserRole::Patient);\n\n    let mut handles = Vec::new();\n    for _ in 0..40 {\n        let state = state.clone();\n        let ctx = ctx.clone();\n        let consultation_id = session.id;\n        handles.push(tokio::spawn(async move {\n            hellodoctor_backend::services::GrievanceService::submit_grievance(\n                &state,\n                &ctx,\n                PatientProfileId::from(uid(PATIENT_PROFILE_ID)),\n                consultation_id,\n                GrievanceTarget::System,\n                \"SERVICE_QUALITY\".into(),\n                \"Concurrent grievance-number regression test\".into(),\n            )\n            .await\n        }));\n    }\n    let mut numbers = Vec::new();\n    for h in handles {\n        let report = h\n            .await\n            .unwrap()\n            .expect(\"concurrent submission must not fail with a duplicate-key error\");\n        numbers.push(report.grievance_number);\n    }\n    let distinct: std::collections::HashSet<_> = numbers.iter().collect();\n    assert_eq!(\n        distinct.len(),\n        numbers.len(),\n        \"every concurrently created grievance must get a distinct grievance_number\"\n    );\n}",
+    "executed_for_this_addendum": false
+  },
+  "later_project_record": "docs/PROGRESS.md reports 50/50 library and 143/143 API with fmt/clippy clean; no matching full-run stdout is attached to this addendum.",
+  "remaining_issue": "Eight-digit lpad truncation boundary remains in current migration; this finite test does not cover it."
+}

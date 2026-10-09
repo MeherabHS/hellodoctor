@@ -1,0 +1,128 @@
+{
+  "captured_at_utc": "2026-10-09T04:08:10.613837+00:00",
+  "scope": "Read-only current benchmark database, after ladder; not historical per-stage state",
+  "queries": {
+    "schema": {
+      "exit_code": 0,
+      "value": {
+        "migration_max": 20261028000001,
+        "grievance_default": "((('GRV-'::text || to_char(now(), 'YYYYMMDD'::text)) || '-'::text) || lpad((nextval('grievance_number_seq'::regclass))::text, 8, '0'::text))",
+        "number_constraint": "UNIQUE (grievance_number)",
+        "sequence": {
+          "sequencename": "grievance_number_seq",
+          "start_value": 1,
+          "min_value": 1,
+          "max_value": 9223372036854775807,
+          "increment_by": 1,
+          "cycle": false,
+          "last_value": 200
+        }
+      }
+    },
+    "system_error_columns": {
+      "exit_code": 0,
+      "value": [
+        {
+          "name": "id",
+          "type": "uuid"
+        },
+        {
+          "name": "trace_id",
+          "type": "character varying"
+        },
+        {
+          "name": "subsystem",
+          "type": "character varying"
+        },
+        {
+          "name": "component",
+          "type": "character varying"
+        },
+        {
+          "name": "severity",
+          "type": "character varying"
+        },
+        {
+          "name": "action_attempted",
+          "type": "character varying"
+        },
+        {
+          "name": "error_message",
+          "type": "text"
+        },
+        {
+          "name": "stack_trace",
+          "type": "text"
+        },
+        {
+          "name": "impacted_user_id",
+          "type": "uuid"
+        },
+        {
+          "name": "logged_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "error_code",
+          "type": "character varying"
+        },
+        {
+          "name": "fingerprint",
+          "type": "character varying"
+        },
+        {
+          "name": "http_status",
+          "type": "smallint"
+        },
+        {
+          "name": "endpoint",
+          "type": "character varying"
+        },
+        {
+          "name": "occurrence_count",
+          "type": "integer"
+        },
+        {
+          "name": "first_seen_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "last_seen_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "status",
+          "type": "character varying"
+        },
+        {
+          "name": "acknowledged_by",
+          "type": "uuid"
+        },
+        {
+          "name": "acknowledged_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "resolved_by",
+          "type": "uuid"
+        },
+        {
+          "name": "resolved_at",
+          "type": "timestamp with time zone"
+        },
+        {
+          "name": "resolution_note",
+          "type": "text"
+        },
+        {
+          "name": "client_context",
+          "type": "jsonb"
+        }
+      ]
+    },
+    "error_total": {
+      "exit_code": 0,
+      "value": 1
+    }
+  }
+}

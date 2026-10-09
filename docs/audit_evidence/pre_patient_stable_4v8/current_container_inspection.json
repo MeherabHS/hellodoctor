@@ -1,0 +1,75 @@
+{
+  "captured_at_utc": "2026-10-09T04:07:51.606720+00:00",
+  "scope": "Read-only current-container inspection; not a contemporaneous per-stage inspect archive",
+  "containers": {
+    "hellodoctor-capacity-backend": {
+      "id": "8c51fcf278d96467d62c2b19c85fc39bc30ec199fa5225eb2a00b7203b335b92",
+      "created": "2026-10-09T04:05:42.84733923Z",
+      "started_at": "2026-10-09T04:05:43.986825498Z",
+      "status": "running",
+      "image_id": "sha256:7f4b676991eafc90b9cf091f2a776584287c56baa48b851106bc80049c63389f",
+      "restart_count": 0,
+      "cpu": {
+        "CpusetCpus": "0-3",
+        "NanoCpus": 0,
+        "CpuQuota": 0,
+        "CpuPeriod": 0,
+        "CpuShares": 1350
+      },
+      "memory_limit_bytes": 1610612736,
+      "memory_swap_bytes": 3221225472,
+      "blkio": {
+        "BlkioDeviceReadBps": null,
+        "BlkioDeviceWriteBps": null,
+        "BlkioDeviceReadIOps": null,
+        "BlkioDeviceWriteIOps": null
+      }
+    },
+    "hellodoctor-capacity-postgres": {
+      "id": "50000eb0452c45b71fd98ed520b22d6c1446a240fe591cd0571a9d6169a02e0e",
+      "created": "2026-10-09T02:47:30.688189594Z",
+      "started_at": "2026-10-09T02:47:31.788752206Z",
+      "status": "running",
+      "image_id": "sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54",
+      "restart_count": 0,
+      "cpu": {
+        "CpusetCpus": "0-3",
+        "NanoCpus": 0,
+        "CpuQuota": 0,
+        "CpuPeriod": 0,
+        "CpuShares": 2250
+      },
+      "memory_limit_bytes": 3758096384,
+      "memory_swap_bytes": 7516192768,
+      "blkio": {
+        "BlkioDeviceReadBps": null,
+        "BlkioDeviceWriteBps": null,
+        "BlkioDeviceReadIOps": null,
+        "BlkioDeviceWriteIOps": null
+      }
+    },
+    "hellodoctor-capacity-redis": {
+      "id": "9cb2fb409df663d8208ce7d5f5f723243ad78e5dfe7448a72ee2e01795cc5ec0",
+      "created": "2026-10-09T02:47:30.676835388Z",
+      "started_at": "2026-10-09T02:47:31.789688725Z",
+      "status": "running",
+      "image_id": "sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+      "restart_count": 0,
+      "cpu": {
+        "CpusetCpus": "0-3",
+        "NanoCpus": 0,
+        "CpuQuota": 0,
+        "CpuPeriod": 0,
+        "CpuShares": 200
+      },
+      "memory_limit_bytes": 419430400,
+      "memory_swap_bytes": 838860800,
+      "blkio": {
+        "BlkioDeviceReadBps": null,
+        "BlkioDeviceWriteBps": null,
+        "BlkioDeviceReadIOps": null,
+        "BlkioDeviceWriteIOps": null
+      }
+    }
+  }
+}

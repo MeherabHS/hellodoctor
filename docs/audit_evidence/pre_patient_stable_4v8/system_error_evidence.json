@@ -1,0 +1,19 @@
+{
+  "captured_at_utc": "2026-10-09T04:08:29.103728+00:00",
+  "scope": "Sanitized synthetic benchmark system error evidence; no user IDs/claims/tokens exported",
+  "exit_code": 0,
+  "rows": [
+    {
+      "subsystem": "DATABASE",
+      "component": "AppError::Database",
+      "error_code": "DB_QUERY_FAILED",
+      "http_status": 500,
+      "endpoint": null,
+      "error_message": "error returned from database: duplicate key value violates unique constraint \"grievance_reports_grievance_number_key\"",
+      "stack_trace": "src/services/grievance_service.rs:52",
+      "occurrence_count": 96,
+      "first_seen_at": "2026-10-09T02:56:24.404604+00:00",
+      "last_seen_at": "2026-10-09T03:29:21.032698+00:00"
+    }
+  ]
+}

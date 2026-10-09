@@ -1,0 +1,293 @@
+{
+  "captured_at_utc": "2026-10-09T04:11:28.886929+00:00",
+  "inputs": [
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/build_identity.json",
+      "size_bytes": 1002,
+      "sha256": "0cfd1f9a19fc3b67a0c74d74f6557ffd16635729a949139295528126c1764e19",
+      "file_mtime_utc": "2026-10-08T20:48:08.264732+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/environment.json",
+      "size_bytes": 905,
+      "sha256": "47866fc1cc3eb9c797741c688f18ee986d9167f6185dcd5974b358f703b0ef65",
+      "file_mtime_utc": "2026-10-08T20:37:01.267079+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps100_explore.txt",
+      "size_bytes": 2235,
+      "sha256": "fa48b785694b14521751902b0d269af30f4e3c844ca338f656531ac0fb293628",
+      "file_mtime_utc": "2026-10-08T21:01:00.242209+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps150_explore.txt",
+      "size_bytes": 2237,
+      "sha256": "02169124aec63fb90a3d2c64c06079c98b6ff2311d84ce61829ee5cc6cf9a704",
+      "file_mtime_utc": "2026-10-08T21:02:30.448791+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps200_explore.txt",
+      "size_bytes": 2237,
+      "sha256": "1345c26bd0a036cf053ecac1c030fa37b2c1a1fcdf7fb284781c26d89e9a03b3",
+      "file_mtime_utc": "2026-10-08T21:04:08.257405+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps250_explore.txt",
+      "size_bytes": 2237,
+      "sha256": "bb985600f60bb238a8a5704417819044921e99e03712c01e8a9d4ea582029ed0",
+      "file_mtime_utc": "2026-10-08T21:05:38.475378+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps25_rep1.txt",
+      "size_bytes": 2593,
+      "sha256": "11efd7751668bd67d04092a49d16ed7d9d7f0427175e119c74ccaa1549e3a264",
+      "file_mtime_utc": "2026-10-08T20:57:33.807031+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps300_explore.txt",
+      "size_bytes": 2237,
+      "sha256": "ed1fdf07f46d25344941c57955ceec88c374f88a0184e427a77e572ab2adc98f",
+      "file_mtime_utc": "2026-10-08T21:07:08.726390+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps350_explore.txt",
+      "size_bytes": 2237,
+      "sha256": "aa778728a14455e90337b5c6303c9d14bb6e7617d2fb10e5c66f52fa0e925184",
+      "file_mtime_utc": "2026-10-08T21:08:50.154947+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps400_explore.txt",
+      "size_bytes": 2237,
+      "sha256": "8187abad24fd66d4148fcad735b125f11c14bf5fe828c5b183161f11af234857",
+      "file_mtime_utc": "2026-10-08T21:10:20.381895+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps400_rep1.txt",
+      "size_bytes": 2958,
+      "sha256": "c99c9bbfb4d3400a79c71537f0dddafadb89fcd5b74feaf16fa3d46390099e4e",
+      "file_mtime_utc": "2026-10-08T21:17:40.048680+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps400_rep2.txt",
+      "size_bytes": 2514,
+      "sha256": "b24c83d727ba7ea70e982e03fd1fe4f3287399e2cea569aaca37d92d6db7d4eb",
+      "file_mtime_utc": "2026-10-08T21:21:10.306357+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps400_rep3.txt",
+      "size_bytes": 2514,
+      "sha256": "c83c2448e785dbee6f95b18cddd3716d1f032b5576c4e4d3c4a0e4031fc6e6ea",
+      "file_mtime_utc": "2026-10-08T21:24:40.631673+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps450_explore.txt",
+      "size_bytes": 2238,
+      "sha256": "11591dfb0728c5d1e774b97dc2821b9430353ba6682b2784ccaee29150918814",
+      "file_mtime_utc": "2026-10-09T02:28:43.465079+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps450_rerun.txt",
+      "size_bytes": 193,
+      "sha256": "c028d7be9c599201585a9a116537d5d5712ce7ac8a34396d9938d27513534955",
+      "file_mtime_utc": "2026-10-09T02:29:17.553201+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps500_explore.txt",
+      "size_bytes": 2237,
+      "sha256": "67561cfa246f06006327b1d29a96455d28bce9d7aafe470ab118141b348d64fa",
+      "file_mtime_utc": "2026-10-08T21:11:54.256043+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps500_rep1.txt",
+      "size_bytes": 194,
+      "sha256": "abffe65c2a300104e66c4c92c5055ec1a8f00837e145270fb44cdbe92a19ac93",
+      "file_mtime_utc": "2026-10-08T21:25:31.942431+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps500_resource_snapshots.csv",
+      "size_bytes": 440,
+      "sha256": "be66019ff3af1eaa41e8057150e59dd3e1b0dbb8d41ebc8ab2964ab03cdebc12",
+      "file_mtime_utc": "2026-10-08T21:25:58.816604+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps50_explore.txt",
+      "size_bytes": 2232,
+      "sha256": "893aa52eaa093a5a9e5f52aeb26b6df62c89756d32ebd6f2c571552ce26db0fa",
+      "file_mtime_utc": "2026-10-08T20:59:30.043654+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA/rps600_explore.txt",
+      "size_bytes": 2238,
+      "sha256": "90841246ba3314cc91f0d64d3f3ca77a50d38a98915043044e332bec9c4c207a",
+      "file_mtime_utc": "2026-10-08T21:13:28.316043+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA_4x8_1hr/resource_samples.csv",
+      "size_bytes": 1602,
+      "sha256": "d74f69590610c8458f7a90f66469fdd637c2642a79b641c145d2b1bde94c9c66",
+      "file_mtime_utc": "2026-10-09T02:46:14.588964+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA_4x8_1hr/rps25.txt",
+      "size_bytes": 193,
+      "sha256": "e9f73c68aecc9d77f9247c8aac00d9329a3122f7115b4a6f1fab82b591a07fd9",
+      "file_mtime_utc": "2026-10-09T02:45:21.299598+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/profileA_4x8_1hr/rps50.txt",
+      "size_bytes": 193,
+      "sha256": "678832f55928fedbb6f9c7d340339c6e6c93d64297e47068f1f847171a3923d0",
+      "file_mtime_utc": "2026-10-09T02:45:08.170817+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/parsed_summary.json",
+      "size_bytes": 3745,
+      "sha256": "93e38c924c2b2d7273d5809d5144bd7c0f3264d9506462cca080799ea1c273b6",
+      "file_mtime_utc": "2026-10-09T03:56:00.990590+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/resource_samples.csv",
+      "size_bytes": 47150,
+      "sha256": "239442af14013f39b625636fd171d4b960859951231a93fcc68b3379a1a2b15a",
+      "file_mtime_utc": "2026-10-09T03:47:54.754094+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/resource_samples_tail.csv",
+      "size_bytes": 9879,
+      "sha256": "b4ecd1fce79e890f96a1df057e5bd2782c4809ef413c8d3f99ba9c0ca2b4d432",
+      "file_mtime_utc": "2026-10-09T03:57:20.230871+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps100.txt",
+      "size_bytes": 3858,
+      "sha256": "cf518825fb10730c531d097b4217bd2512e2e35c715efbdc33d47f1138ab16f1",
+      "file_mtime_utc": "2026-10-09T03:06:20.500431+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps150.txt",
+      "size_bytes": 3858,
+      "sha256": "f028651ddaf4e02ef57daf96aa7749b8a71b1b1546bfaf01e37990b49f8bc19a",
+      "file_mtime_utc": "2026-10-09T03:12:28.822998+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps200.txt",
+      "size_bytes": 3858,
+      "sha256": "8a981d6501e34e5e6dec90549a09bfaf9ee37a828de0f62df2baa9daa69a21b9",
+      "file_mtime_utc": "2026-10-09T03:18:37.072880+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps25.txt",
+      "size_bytes": 3853,
+      "sha256": "50392b08513d62323130208fa95994f447f7a6246d95b73e5c97d7c75a50901d",
+      "file_mtime_utc": "2026-10-09T02:54:04.016428+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps250.txt",
+      "size_bytes": 3858,
+      "sha256": "b0b2eddfa8ab6cde2dc33667c12c283341c574089774ca4fa0c759791270eb32",
+      "file_mtime_utc": "2026-10-09T03:24:45.343156+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps300.txt",
+      "size_bytes": 3860,
+      "sha256": "a552cdf5d2adeb948498b0d990db1d8f5d4f7691c59de0e2f82f95b17f667b63",
+      "file_mtime_utc": "2026-10-09T03:30:53.655537+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps350.txt",
+      "size_bytes": 3860,
+      "sha256": "a4c88f1777f55c1604a262f94b335c3f4a910cdd9b9756899b0f36687ff6bbe8",
+      "file_mtime_utc": "2026-10-09T03:37:01.937887+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps400.txt",
+      "size_bytes": 3860,
+      "sha256": "a7815c0ef03211d2a5b741207268e88cce702ef6031b19f2e08e7b55cca761d4",
+      "file_mtime_utc": "2026-10-09T03:43:10.259935+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps450.txt",
+      "size_bytes": 3860,
+      "sha256": "3ffe82fe6c8696853268db31023cdecdc93f25819f49b17d101b500dee4b4d93",
+      "file_mtime_utc": "2026-10-09T03:49:18.547697+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps50.txt",
+      "size_bytes": 3855,
+      "sha256": "453af67bf46cabd69c57e15d718d82ceb236d54eac8690956c18d1186c6104bb",
+      "file_mtime_utc": "2026-10-09T03:00:12.261077+00:00"
+    },
+    {
+      "path": "docs/audit_evidence/pre_patient_benchmark_4x8/stable_4x8/rps500.txt",
+      "size_bytes": 3860,
+      "sha256": "6b4dfb9e808acdf423bcf6c4fb826f41ddf0a0d344ea63af40256032115ddcd9",
+      "file_mtime_utc": "2026-10-09T03:55:26.859129+00:00"
+    },
+    {
+      "path": "docs/CONSTRAINED_CAPACITY_TEST.md",
+      "size_bytes": 31009,
+      "sha256": "2c61de4a1506cc5a62263dda708b0066adb84c5661481f4b0493fb067904e83e",
+      "file_mtime_utc": "2026-10-04T14:20:49.063556+00:00"
+    },
+    {
+      "path": "docs/CAPACITY_EVIDENCE_REPORT.md",
+      "size_bytes": 38308,
+      "sha256": "3dc0fe6ca2ef0aa15c47ff979c63d0cecaa9d9ac26444390918b0053761b9b1b",
+      "file_mtime_utc": "2026-10-04T14:22:34.123329+00:00"
+    },
+    {
+      "path": "services/backend/docker-compose.capacity.yml",
+      "size_bytes": 6875,
+      "sha256": "52dd2788da3cc5bc77e1fa9effa35dc059f043a439e54417dc598ccc87bfa365",
+      "file_mtime_utc": "2026-10-09T02:47:27.183026+00:00"
+    },
+    {
+      "path": "services/backend/docker-compose.benchmark-a.yml",
+      "size_bytes": 3993,
+      "sha256": "b4540d1d7cf44fff2d86a875b9de6addaf778cd29d44cef5113b3403b4e5fc03",
+      "file_mtime_utc": "2026-10-08T20:36:24.417726+00:00"
+    },
+    {
+      "path": "services/backend/docker-compose.benchmark-b.yml",
+      "size_bytes": 2836,
+      "sha256": "85441b7ef50a045e8c60709f084cc5f1f212b594b7d6d58f25ef56f9c26fe049",
+      "file_mtime_utc": "2026-10-08T20:36:40.333091+00:00"
+    },
+    {
+      "path": "services/backend/examples/capacity_test.rs",
+      "size_bytes": 33393,
+      "sha256": "158b26a70633c4d536341f3a614d1a1a765bb8d128291a2f87fd5bd217907239",
+      "file_mtime_utc": "2026-10-09T04:02:01.561839+00:00"
+    },
+    {
+      "path": "services/backend/scripts/seed_capacity_dataset.sql",
+      "size_bytes": 18726,
+      "sha256": "5566d3245054f2b2e8768e71c8d535a4e01b8954cc33e421dfafaeb5e675e9d8",
+      "file_mtime_utc": "2026-10-08T08:00:35.300336+00:00"
+    },
+    {
+      "path": "services/backend/src/services/grievance_service.rs",
+      "size_bytes": 17059,
+      "sha256": "47212933a6aa2c9675f2f0a6e4c5a4eb970589008fa9fb2def185440d15862a8",
+      "file_mtime_utc": "2026-10-09T04:00:43.275662+00:00"
+    },
+    {
+      "path": "services/backend/src/repository/grievance_repo.rs",
+      "size_bytes": 6678,
+      "sha256": "7fdfb8dfba3e2f5f2c50ac636601c3d26d36380272733201c66a36e52a317415",
+      "file_mtime_utc": "2026-10-09T04:00:37.205397+00:00"
+    },
+    {
+      "path": "services/backend/migrations/20261028000001_grievance_number_sequence.up.sql",
+      "size_bytes": 1014,
+      "sha256": "55ea848ab638ef40f9c343255d46bc2cb5ea96ecaef29b2b27b4c2b568fd47a2",
+      "file_mtime_utc": "2026-10-09T03:26:53.986484+00:00"
+    },
+    {
+      "path": "services/backend/tests/api_tests.rs",
+      "size_bytes": 390941,
+      "sha256": "a96e0e99cb7967becc6c005252ff50aaac416f4543e536e72dfeedfe19e40604",
+      "file_mtime_utc": "2026-10-08T20:04:55.405127+00:00"
+    }
+  ]
+}

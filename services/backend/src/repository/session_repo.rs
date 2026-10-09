@@ -1,9 +1,13 @@
+use crate::domain::ids::UserId;
 use crate::domain::models::{AuthSession, MfaCredential, MfaMethod, PendingMfaChallenge};
 use chrono::{DateTime, Utc};
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-pub async fn insert_session<'e, E: PgExecutor<'e>>(executor: E, session: &AuthSession) -> Result<(), sqlx::Error> {
+pub async fn insert_session<'e, E: PgExecutor<'e>>(
+    executor: E,
+    session: &AuthSession,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO auth_sessions (id, user_id, token_family_id, refresh_token_hash, device_fingerprint, ip_hash, user_agent, created_at, last_used_at, rotated_at, revoked_at, expires_at) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
@@ -25,20 +29,37 @@ pub async fn insert_session<'e, E: PgExecutor<'e>>(executor: E, session: &AuthSe
     Ok(())
 }
 
-pub async fn find_active_by_token_hash<'e, E: PgExecutor<'e>>(
+// Consumed identities must remain discoverable for reuse detection and logout.
+pub async fn find_by_token_hash<'e, E: PgExecutor<'e>>(
     executor: E,
     token_hash: &str,
 ) -> Result<Option<AuthSession>, sqlx::Error> {
     sqlx::query_as::<_, AuthSession>(
         "SELECT id, user_id, token_family_id, refresh_token_hash, device_fingerprint, ip_hash, user_agent, created_at, last_used_at, rotated_at, revoked_at, expires_at \
-         FROM auth_sessions WHERE refresh_token_hash = $1 AND revoked_at IS NULL",
+         FROM auth_sessions WHERE refresh_token_hash = $1",
     )
     .bind(token_hash)
     .fetch_optional(executor)
     .await
 }
 
-pub async fn revoke_family<'e, E: PgExecutor<'e>>(executor: E, token_family_id: Uuid) -> Result<(), sqlx::Error> {
+/// Share this lock across refresh, ancestor reuse, and logout. A per-token row
+/// lock cannot serialize revocation against a different generation's rotation.
+pub async fn lock_family(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    family: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(format!("refresh-token-family:{family}"))
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+pub async fn revoke_family<'e, E: PgExecutor<'e>>(
+    executor: E,
+    token_family_id: Uuid,
+) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE auth_sessions SET revoked_at = $2 WHERE token_family_id = $1 AND revoked_at IS NULL")
         .bind(token_family_id)
         .bind(Utc::now())
@@ -47,24 +68,22 @@ pub async fn revoke_family<'e, E: PgExecutor<'e>>(executor: E, token_family_id: 
     Ok(())
 }
 
-pub async fn rotate<'e, E: PgExecutor<'e>>(
-    executor: E,
+pub async fn consume_refresh_token(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     session_id: Uuid,
-    new_hash: &str,
     now: DateTime<Utc>,
-) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE auth_sessions SET refresh_token_hash = $2, rotated_at = $3, last_used_at = $3 WHERE id = $1")
+) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query("UPDATE auth_sessions SET rotated_at = $2, last_used_at = $2 WHERE id = $1 AND rotated_at IS NULL AND revoked_at IS NULL AND expires_at > $2")
         .bind(session_id)
-        .bind(new_hash)
         .bind(now)
-        .execute(executor)
+        .execute(&mut **tx)
         .await?;
-    Ok(())
+    Ok(result.rows_affected() == 1)
 }
 
 pub async fn find_mfa_credential<'e, E: PgExecutor<'e>>(
     executor: E,
-    user_id: Uuid,
+    user_id: UserId,
     method: MfaMethod,
 ) -> Result<Option<MfaCredential>, sqlx::Error> {
     sqlx::query_as::<_, MfaCredential>(
@@ -77,7 +96,10 @@ pub async fn find_mfa_credential<'e, E: PgExecutor<'e>>(
     .await
 }
 
-pub async fn upsert_mfa_credential<'e, E: PgExecutor<'e>>(executor: E, cred: &MfaCredential) -> Result<(), sqlx::Error> {
+pub async fn upsert_mfa_credential<'e, E: PgExecutor<'e>>(
+    executor: E,
+    cred: &MfaCredential,
+) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO mfa_credentials (id, user_id, method, totp_secret_encrypted, recovery_codes_hash, is_enabled, enabled_at, last_verified_at, revoked_at, created_at) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) \
@@ -99,7 +121,11 @@ pub async fn upsert_mfa_credential<'e, E: PgExecutor<'e>>(executor: E, cred: &Mf
     Ok(())
 }
 
-pub async fn touch_mfa_verified<'e, E: PgExecutor<'e>>(executor: E, id: Uuid, at: DateTime<Utc>) -> Result<(), sqlx::Error> {
+pub async fn touch_mfa_verified<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    at: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
     sqlx::query("UPDATE mfa_credentials SET last_verified_at = $2 WHERE id = $1")
         .bind(id)
         .bind(at)
@@ -113,7 +139,7 @@ pub async fn touch_mfa_verified<'e, E: PgExecutor<'e>>(executor: E, id: Uuid, at
 pub async fn insert_pending_challenge<'e, E: PgExecutor<'e>>(
     executor: E,
     token: &str,
-    user_id: Uuid,
+    user_id: UserId,
     code_hash: &str,
     expires_at: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
@@ -135,14 +161,47 @@ pub async fn find_pending_challenge<'e, E: PgExecutor<'e>>(
     token: &str,
 ) -> Result<Option<PendingMfaChallenge>, sqlx::Error> {
     sqlx::query_as::<_, PendingMfaChallenge>(
-        "SELECT token, user_id, code_hash, expires_at, created_at FROM pending_mfa_challenges WHERE token = $1",
+        "SELECT token, user_id, code_hash, expires_at, created_at, attempt_count, max_attempts FROM pending_mfa_challenges WHERE token = $1",
     )
     .bind(token)
     .fetch_optional(executor)
     .await
 }
 
-pub async fn delete_pending_challenge<'e, E: PgExecutor<'e>>(executor: E, token: &str) -> Result<(), sqlx::Error> {
+/// `FOR UPDATE` row lock — must run inside an explicit transaction so the
+/// lock is actually held across the subsequent check-then-increment, closing
+/// the brute-force race a plain read-then-write would leave open (see
+/// `AuthService::doctor_verify_otp`, the only caller).
+pub async fn find_pending_challenge_for_update(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    token: &str,
+) -> Result<Option<PendingMfaChallenge>, sqlx::Error> {
+    sqlx::query_as::<_, PendingMfaChallenge>(
+        "SELECT token, user_id, code_hash, expires_at, created_at, attempt_count, max_attempts \
+         FROM pending_mfa_challenges WHERE token = $1 FOR UPDATE",
+    )
+    .bind(token)
+    .fetch_optional(&mut **tx)
+    .await
+}
+
+pub async fn increment_challenge_attempts(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    token: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE pending_mfa_challenges SET attempt_count = attempt_count + 1 WHERE token = $1",
+    )
+    .bind(token)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+pub async fn delete_pending_challenge<'e, E: PgExecutor<'e>>(
+    executor: E,
+    token: &str,
+) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM pending_mfa_challenges WHERE token = $1")
         .bind(token)
         .execute(executor)

@@ -1,0 +1,32 @@
+=== HelloDoctor Constrained-VPS Capacity Test (open-loop) ===
+target=http://localhost:8280 target_rps=350 duration=90s
+
+Identities: 1150 patients, 40 doctors, 10 admins, 35555 available slots
+
+requested_rps=350.0 requested_count=31501 achieved_rps=371.1 achieved_count=33400
+
+--- Time series (10s buckets) ---
+  window_s achieved_rps   p50_ms   p95_ms   p99_ms      5xx
+      0-10        375.6        6       46       72        0
+     10-20        373.6        6       46       73        1
+     20-30        373.4        5       43       70        0
+     30-40        371.0        5       47       75        4
+     40-50        371.4        5       49       77        2
+     50-60        368.8        6       45       76        1
+     60-70        371.8        6       41       66        4
+     70-80        367.5        5       41       65        1
+     80-90        366.9        5       46       85        2
+
+BUSINESS_REJECTION_RATE=0.000%  TRUE_SYSTEM_ERROR_RATE=0.0449%  auth_reject=7.353%  rate_limited=2.665%
+
+endpoint                    total     succ   bizrej  authrej  ratelim   syserr     p50     p95     p99     max
+GET /doctors                14697    14697        0        0        0        0       4      37      54     115
+GET /doctors/:id/slots       6287     6287        0        0        0        0       5      38      54     118
+GET admin telemetry          1290      129        0     1161        0        0       3      80      93     128
+GET wallet summary           2184     2184        0        0        0        0       7      53      73     119
+POST /appointments/book      2588     1899        0        0      689        0      11      72      94     141
+POST chat message            1702     1702        0        0        0        0       9      50      64     127
+POST grievance                648      432        0        0      201       15       6      53      74      96
+POST rtc-token               1295        0        0     1295        0        0       5      47      64     115
+POST telemetry                810      810        0        0        0        0       6      45      63     128
+POST webhook confirm         1899     1899        0        0        0        0      14      52      83     112

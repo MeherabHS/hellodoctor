@@ -1,0 +1,10 @@
+{
+  "fixture": "Existing synthetic Doctor/appointment; development claims, not MFA evidence",
+  "checks": {
+    "ui_success_matches_authoritative_completion": "PASS",
+    "same_reason_retry_no_double_credit": "PASS",
+    "statement_canonical_dialog_current_build": "PASS",
+    "slot_generator_keyboard_dismissal": "PASS"
+  },
+  "console_errors": []
+}

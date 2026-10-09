@@ -24,7 +24,7 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 - **Purpose:** Central authentication and account entity.
 - **Fields:**
   - `id`: `UUID` (Primary Key, Required)
-  - `phone_number`: `String` (Required, Unique, E.164 format: `+880...` or `+254...`)
+  - `phone_number`: `String` (Required, Unique, Kenyan E.164 format: `+254...`)
   - `email`: `String` (Optional, Unique)
   - `password_hash`: `String` (Optional, Argon2id. Nullable for OTP-only users)
   - `role`: `UserRole` (`PATIENT`, `DOCTOR`, `PLATFORM_ADMIN`, `CLINICAL_ADMIN`, `FINANCE_ADMIN`, `SUPPORT`, `COMPLIANCE`, `SECURITY_ADMIN`)
@@ -119,9 +119,9 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `id`: `UUID` (Primary Key, Required)
   - `user_id`: `UUID` (Foreign Key -> `User.id`, Required, Unique)
   - `full_name`: `String` (Required, prefixed with "Dr.")
-  - `license_number`: `String` (Required, Unique, e.g., "123456")
-  - `license_authority`: `String` (Required)
-  - `license_country`: `String` (Required, Default 'BD')
+  - `license_number`: `String` (Required, Unique; submitted KMPDC registration number, not an annual practice licence)
+  - `license_authority`: `String` (Required; active value KMPDC)
+  - `license_country`: `String` (Required, Default 'KE')
   - `primary_specialty`: `MedicalSpecialty` (Required)
   - `secondary_specialties`: `Vec<MedicalSpecialty>`
   - `experience_years`: `u8` (Required, 0–70)
@@ -132,7 +132,9 @@ This document defines the domain entities reverse-engineered from the HelloDocto
   - `residential_address`: `String` (Required, for verification and dossier)
   - `verified_phone`: `String` (Required)
   - `is_on_duty`: `Boolean` (Default: `false`)
-  - `is_verified`: `Boolean` (Default: `false`)
+  - `professional_verification_status`: `PENDING | VERIFIED | REJECTED` (new registrations: PENDING)
+  - `professional_verification_reviewed_at`, `professional_verification_reviewed_by`, `professional_verification_note`: optional authorized-review metadata
+  - `is_verified`: legacy derived compatibility boolean, true exactly when status is VERIFIED
   - `created_at`: `DateTime<Utc>`
   - `updated_at`: `DateTime<Utc>`
 - **Sensitivity:** `OPERATIONAL` / Contact info is `IDENTITY`.

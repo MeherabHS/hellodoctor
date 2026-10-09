@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="920" viewBox="0 0 1600 920">
+<rect width="100%" height="100%" fill="white"/>
+<title>Requested vs achieved throughput</title>
+<desc>Reported HTTP completions include secondary requests, 401/403 and 429 responses.. Straight line segments through observed values; no smoothing.</desc>
+<text x="155" y="70" font-family="Arial,sans-serif" font-size="35" fill="#25334a">Requested vs achieved throughput</text>
+<text x="155" y="112" font-family="Arial,sans-serif" font-size="21" fill="#25334a">Reported HTTP completions include secondary requests, 401/403 and 429 responses.</text>
+<polyline points="155.000,735.000 1500.000,735.000" fill="none" stroke="#dbe2ea" stroke-width="1"/>
+<text x="45" y="741.0" font-family="Arial,sans-serif" font-size="21" fill="#25334a">0</text>
+<polyline points="155.000,635.909 1500.000,635.909" fill="none" stroke="#dbe2ea" stroke-width="1"/>
+<text x="45" y="641.9090909090909" font-family="Arial,sans-serif" font-size="21" fill="#25334a">100</text>
+<polyline points="155.000,536.818 1500.000,536.818" fill="none" stroke="#dbe2ea" stroke-width="1"/>
+<text x="45" y="542.8181818181818" font-family="Arial,sans-serif" font-size="21" fill="#25334a">200</text>
+<polyline points="155.000,437.727 1500.000,437.727" fill="none" stroke="#dbe2ea" stroke-width="1"/>
+<text x="45" y="443.72727272727275" font-family="Arial,sans-serif" font-size="21" fill="#25334a">300</text>
+<polyline points="155.000,338.636 1500.000,338.636" fill="none" stroke="#dbe2ea" stroke-width="1"/>
+<text x="45" y="344.6363636363636" font-family="Arial,sans-serif" font-size="21" fill="#25334a">400</text>
+<polyline points="155.000,239.545 1500.000,239.545" fill="none" stroke="#dbe2ea" stroke-width="1"/>
+<text x="45" y="245.54545454545456" font-family="Arial,sans-serif" font-size="21" fill="#25334a">500</text>
+<polyline points="155.000,190.000 155.000,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="137.0" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">0</text>
+<polyline points="289.500,190.000 289.500,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="271.5" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">50</text>
+<polyline points="424.000,190.000 424.000,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="406.0" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">100</text>
+<polyline points="558.500,190.000 558.500,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="540.5" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">150</text>
+<polyline points="693.000,190.000 693.000,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="675.0" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">200</text>
+<polyline points="827.500,190.000 827.500,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="809.5" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">250</text>
+<polyline points="962.000,190.000 962.000,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="944.0" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">300</text>
+<polyline points="1096.500,190.000 1096.500,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="1078.5" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">350</text>
+<polyline points="1231.000,190.000 1231.000,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="1213.0" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">400</text>
+<polyline points="1365.500,190.000 1365.500,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="1347.5" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">450</text>
+<polyline points="1500.000,190.000 1500.000,735.000" fill="none" stroke="#edf0f5" stroke-width="1"/>
+<text x="1482.0" y="773" font-family="Arial,sans-serif" font-size="21" fill="#25334a">500</text>
+<polyline points="155.000,190.000 155.000,735.000 1500.000,735.000" fill="none" stroke="#536176" stroke-width="2"/>
+<text x="155" y="168" font-family="Arial,sans-serif" font-size="21" fill="#25334a">Reported completed HTTP requests / second</text>
+<text x="635" y="824" font-family="Arial,sans-serif" font-size="24" fill="#25334a">Target action arrival rate (per second)</text>
+<polyline points="222.250,708.146 289.500,681.392 424.000,627.883 558.500,576.256 693.000,531.765 827.500,486.678 962.000,437.727 1096.500,388.182 1231.000,338.438 1365.500,282.452 1500.000,228.348" fill="none" stroke="#2457a7" stroke-width="3"/>
+<circle cx="222.250" cy="708.146" r="5" fill="#2457a7"/>
+<circle cx="289.500" cy="681.392" r="5" fill="#2457a7"/>
+<circle cx="424.000" cy="627.883" r="5" fill="#2457a7"/>
+<circle cx="558.500" cy="576.256" r="5" fill="#2457a7"/>
+<circle cx="693.000" cy="531.765" r="5" fill="#2457a7"/>
+<circle cx="827.500" cy="486.678" r="5" fill="#2457a7"/>
+<circle cx="962.000" cy="437.727" r="5" fill="#2457a7"/>
+<circle cx="1096.500" cy="388.182" r="5" fill="#2457a7"/>
+<circle cx="1231.000" cy="338.438" r="5" fill="#2457a7"/>
+<circle cx="1365.500" cy="282.452" r="5" fill="#2457a7"/>
+<circle cx="1500.000" cy="228.348" r="5" fill="#2457a7"/>
+<polyline points="155.000,849.000 200.000,849.000" fill="none" stroke="#2457a7" stroke-width="4"/>
+<text x="213" y="853" font-family="Arial,sans-serif" font-size="21" fill="#25334a">Achieved HTTP RPS</text>
+<polyline points="155.000,735.000 1500.000,239.545" fill="none" stroke="#65748b" stroke-width="3" stroke-dasharray="10 10"/>
+<polyline points="434.000,849.000 479.000,849.000" fill="none" stroke="#65748b" stroke-width="4" stroke-dasharray="10 10"/>
+<text x="492" y="853" font-family="Arial,sans-serif" font-size="21" fill="#25334a">Ideal y=x reference</text>
+<text x="155" y="905" font-family="Arial,sans-serif" font-size="21" fill="#25334a">Source: preserved local stable_4x8 evidence. Not an Azure capacity guarantee.</text>
+</svg>

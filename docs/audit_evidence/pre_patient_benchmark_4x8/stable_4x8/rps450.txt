@@ -1,0 +1,59 @@
+=== HelloDoctor Constrained-VPS Capacity Test (open-loop) ===
+target=http://localhost:8180 target_rps=450 duration=360s
+
+Identities: 1150 patients, 40 doctors, 10 admins, 31733 available slots
+
+requested_rps=450.0 requested_count=162000 achieved_rps=456.7 achieved_count=164405
+
+--- Time series (10s buckets) ---
+  window_s achieved_rps   p50_ms   p95_ms   p99_ms      5xx
+      0-10        452.5        4       13       25        0
+     10-20        453.3        4       14       30        0
+     20-30        452.6        4       11       22        0
+     30-40        454.3        4       13       30        0
+     40-50        453.9        4       13       39        0
+     50-60        455.4        6       19       37        0
+     60-70        455.6        4       16       33        0
+     70-80        456.1        4       14       24        0
+     80-90        456.0        4       11       19        0
+    90-100        456.1        3       13       28        0
+   100-110        457.9        4       16       32        0
+   110-120        457.4        5       17       33        0
+   120-130        458.1        4       28       49        0
+   130-140        457.6        4       13       28        0
+   140-150        460.0        4       13       28        0
+   150-160        460.9        4       14       27        0
+   160-170        460.9        4       14       32        0
+   170-180        463.0        4       16       26        0
+   180-190        460.3        5       19       32        0
+   190-200        462.8        4       13       29        0
+   200-210        459.5        4       13       29        0
+   210-220        460.0        4       15       31        0
+   220-230        459.6        4       14       25        0
+   230-240        459.5        4       15       31        0
+   240-250        456.2        6       26       51        0
+   250-260        458.4        4       16       31        0
+   260-270        455.8        4       16       28        0
+   270-280        457.4        4       15       34        0
+   280-290        455.0        4       15       35        0
+   290-300        454.4        4       18       39        0
+   300-310        454.3        6       28       52        0
+   310-320        453.5        4       20       42        0
+   320-330        453.6        4       20       44        0
+   330-340        452.8        4       16       35        0
+   340-350        452.7        4       14       32        0
+   350-360        453.1        4       14       34        0
+
+BUSINESS_REJECTION_RATE=0.000%  TRUE_SYSTEM_ERROR_RATE=0.0000%  auth_reject=5.802%  rate_limited=5.974%
+
+endpoint                    total     succ   bizrej  authrej  ratelim   syserr     p50     p95     p99     max
+GET /doctors                89179    89179        0        0        0        0       3      13      27      96
+GET /doctors/:id/slots      32521    32521        0        0        0        0       5      16      31      78
+GET admin telemetry          6552      655        0     5897        0        0       3     126     146     213
+GET wallet summary          11318    11318        0        0        0        0       5      18      32      71
+POST /appointments/book      8926     2405        0        0     6521        0       4      19      35     109
+POST chat message            4328     4328        0        0        0        0      10      27      47     107
+POST grievance               3303        3        0        0     3300        0       3      13      25      48
+POST rtc-token               3641        0        0     3641        0        0       4      16      32      62
+POST telemetry               2232     2232        0        0        0        0       5      21      44     102
+POST webhook confirm         2405     2405        0        0        0        0      10      21      33      58

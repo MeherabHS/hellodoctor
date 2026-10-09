@@ -1,0 +1,6 @@
+{
+  "checks": {},
+  "browser_exceptions": 1,
+  "unexpected_5xx": 1,
+  "verification_failure": "TimeoutError"
+}

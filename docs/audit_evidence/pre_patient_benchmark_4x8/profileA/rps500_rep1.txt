@@ -1,0 +1,5 @@
+=== HelloDoctor Constrained-VPS Capacity Test (open-loop) ===
+target=http://localhost:8280 target_rps=500 duration=210s
+
+Identities: 1150 patients, 40 doctors, 10 admins, 31700 available slots
+

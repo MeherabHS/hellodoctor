@@ -5,16 +5,68 @@ use std::time::Instant;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 static METRICS_HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
+
+/// Anonymous scrapes exist only in explicit development/test with no configured
+/// credential. Deployed scrapes require Authorization, never a URL secret.
+pub async fn metrics_auth_guard(
+    axum::extract::State(state): axum::extract::State<crate::repository::AppState>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let expected = &state.config.metrics_scrape_token;
+    if expected.is_empty() && state.config.is_development_or_test() {
+        return next.run(request).await;
+    }
+    let candidate = request
+        .headers()
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|header| header.to_str().ok())
+        .and_then(|header| header.strip_prefix("Bearer "));
+    let valid = candidate.is_some_and(|candidate| {
+        if expected.is_empty() {
+            return false;
+        }
+        // Constant-time tag verification rather than a string equality check.
+        let mut correct =
+            Hmac::<Sha256>::new_from_slice(b"HelloDoctor metrics credential comparison")
+                .expect("HMAC key");
+        correct.update(expected.as_bytes());
+        let mut actual =
+            Hmac::<Sha256>::new_from_slice(b"HelloDoctor metrics credential comparison")
+                .expect("HMAC key");
+        actual.update(candidate.as_bytes());
+        correct
+            .verify_slice(&actual.finalize().into_bytes())
+            .is_ok()
+    });
+    if !valid {
+        return crate::error::AppError::Unauthorized("Monitoring credential required.".into())
+            .into_response();
+    }
+    next.run(request).await
+}
 static TRACING_INIT: Once = Once::new();
 
 /// Initializes the global tracing subscriber. Safe to call more than once
 /// (e.g. once per test building its own router) — only the first call takes effect.
 pub fn init_tracing() {
     TRACING_INIT.call_once(|| {
+        // The fallback below only applies when `RUST_LOG` is genuinely unset
+        // anywhere — it must itself be production-safe, since a deployment
+        // that simply forgot to set `RUST_LOG` should get quiet, not
+        // unconditional per-request debug I/O (confirmed live: every single
+        // request logged two synchronous DEBUG lines under the old
+        // `...=debug,tower_http=debug...` fallback). Local development sets
+        // its own verbose value explicitly via `.env`/`.env.example`'s
+        // documented `RUST_LOG=debug`, rather than relying on this fallback.
         tracing_subscriber::registry()
             .with(
-                tracing_subscriber::EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| "hellodoctor_backend=debug,tower_http=debug,axum=info".into()),
+                tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                    "hellodoctor_backend=info,tower_http=warn,axum=warn".into()
+                }),
             )
             .with(tracing_subscriber::fmt::layer())
             .init();

@@ -1,0 +1,157 @@
+{
+  "checks": {
+    "duty_ui_server_confirmed_and_restored": "PASS",
+    "upcoming_first_preserved": "PASS",
+    "foreign_summary_still_denied": "PASS",
+    "authorized_history": "PASS",
+    "foreign_history_still_denied": "PASS",
+    "document_dialog_authorized_empty_state": "PASS",
+    "web_emr_and_incall_chat_panel": "PASS",
+    "two_page_rx_recoverable": "PASS",
+    "rx_retry_remove_preserved": "PASS",
+    "completion_form_preserved_without_mutating_completed_fixture": "PASS",
+    "booked_slots_have_no_cancel_action": "PASS",
+    "web_thread_and_canned_controls": "PASS",
+    "http_chat_send_and_canned_reply": "PASS",
+    "wallet_statement_payout_controls": "PASS"
+  },
+  "console_errors": [],
+  "network": [
+    {
+      "path": "/api/proxy/doctor/profile",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/duty",
+      "method": "PUT",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/consultations/8c99a827-03dd-4c99-8462-31557f12e041/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/consultations/8c99a827-03dd-4c99-8462-31557f12e041/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments/8c99a827-03dd-4c99-8462-31557f12e041/patient-history",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/consultations/8c99a827-03dd-4c99-8462-31557f12e041/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/consultations/8c99a827-03dd-4c99-8462-31557f12e041/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments/8c99a827-03dd-4c99-8462-31557f12e041/patient-history/17f67eb7-6aa3-4e6c-9e38-c43a7ccc91d3",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/appointments/8c99a827-03dd-4c99-8462-31557f12e041/patient-history",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/chat/5755758e-1b74-4d83-8788-4b2d3aa7c61c/messages",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/consultations/8c99a827-03dd-4c99-8462-31557f12e041/prescription",
+      "method": "POST",
+      "status": 409
+    },
+    {
+      "path": "/api/proxy/consultations/8c99a827-03dd-4c99-8462-31557f12e041/prescription",
+      "method": "POST",
+      "status": 409
+    },
+    {
+      "path": "/api/proxy/consultations/8c99a827-03dd-4c99-8462-31557f12e041/prescription",
+      "method": "POST",
+      "status": 409
+    },
+    {
+      "path": "/api/proxy/doctor/slots",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/chats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/chat/5755758e-1b74-4d83-8788-4b2d3aa7c61c/messages",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/chat/5755758e-1b74-4d83-8788-4b2d3aa7c61c/messages",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/proxy/chat/5755758e-1b74-4d83-8788-4b2d3aa7c61c/messages",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/ledger",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/statements",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/proxy/doctor/wallet/payout-methods",
+      "method": "GET",
+      "status": 200
+    }
+  ],
+  "auth_scope": "Existing synthetic Doctor fixtures; test-only signed development claims. UI password/MFA separately verified."
+}
