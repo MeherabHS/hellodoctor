@@ -1,3 +1,18 @@
+## Current appointment cancellation policy — overrides §2.1 below
+
+**2026-10-10, explicit product decision:** patients can never cancel a booked
+consultation, of any status, by any mechanism. No `CONFIRMED -> CANCELLED`
+transition (or any other patient-initiated cancellation) exists in the
+backend or either Flutter client — a short-lived `PENDING_PAYMENT ->
+CANCELLED` self-service endpoint was built and then fully removed the same
+day by explicit instruction. `AppointmentStatus::Cancelled` remains a valid
+enum/DB value (removing it is unrelated schema churn, not requested), but
+nothing in this codebase currently writes it. §2.1's `CONFIRMED -> CANCELLED`
+edge and its "Full refund returned to patient" guard below are historical
+spec text, not current behavior — do not reintroduce a cancellation path
+without a new, explicit instruction. See `docs/CHECKPOINT.md` for the full
+removal record.
+
 ## Current professional-registration state machine — Kenya
 
 `professional_verification_status`: PENDING → VERIFIED or PENDING → REJECTED.

@@ -11,7 +11,6 @@ Status: **IN PROGRESS — DOCTOR_APP_NOT_VERIFIED**. This file supersedes earlie
 > current without cross-checking that report.
 
 ## 1. Environment
-
 - Workspace: `C:\Users\CUBE\Desktop\helodoc old site`; base revision `e3739ae555f198c537dfa7f505fe506b0cd62df2` plus existing uncommitted changes and audit corrections.
 - Rust 1.99.0; PostgreSQL 16 and Redis 7 running locally in Docker.
 - MinIO was removed on 2026-10-07 at the user?s explicit request, including compose services, local settings, containers, images, development object volume and its Docker build cache. Generic encrypted external S3 support remains; development uploads/downloads are explicitly unavailable when storage is not configured. No fake production storage success is substituted.

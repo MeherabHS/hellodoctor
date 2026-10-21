@@ -1,23 +1,49 @@
 # HelloDoctor - Current Project Checkpoint
 
-**Status reconciled:** 2026-10-08. Resume from this snapshot, not an old agent roster or interrupted test count. Latest implementation is complete within its approved scope; the open items below remain explicitly open.
+**Security remediation, payment architecture, data rights, and admin MFA redesign (2026-10-17):** Completed the deferred HELLODOCTOR security remediation campaign (h01-h23, independently re-verified), including a critical fix to a wrong-cased payment-webhook enum literal (h23) that was silently rejecting every M-Pesa confirmation webhook, and a migration-reversibility test fix that correctly scopes the check to Postgres's genuine enum-irreversibility limit rather than papering over it. Built real admin-panel failure observability: every backend panic, request timeout, and Doctor/Patient/Admin-Web client-side error now reports into `system_error_logs` with an exact file:line capture, verified live against a real injected panic, not simulated. Fixed the admin-web's placeholder buttons across the dashboard (CSV/JSON export, notification bell count, payout-readiness badge, PDF document download) and converted several fake-success states (webhook reconciliation, receipt download) into honest "not available" states instead.
+
+Built the full payment-methods architecture this session had been waiting on: patients and doctors can each save multiple payment methods with one marked default, admins configure the platform's own merchant account, and every save is hard-gated on an admin having configured a real provider first - a 409, never a silent pass. Added the Data Protection Act 2019 §40 data-rights feature: admin can export a patient's or doctor's full record as JSON, or erase/anonymize it, where Postgres's own FK constraints (not a hand-maintained table list) decide whether a true delete is possible or the profile must be anonymized with its clinical/financial history left untouched; financial records are never targeted by either path. Wired the patient Flutter booking flow to require picking one of these real saved payment methods at checkout (replacing a hardcoded gateway constant), and replaced the Doctor Flutter wallet page's previously-permanently-disabled "Connect M-Pesa" button with a real, working payout-binding flow against the same backend endpoint Admin's payout routing already reads from.
+
+Redesigned admin login end to end: the old single-screen email+password+authenticator-app-TOTP flow (which left every admin unable to sign in without a pre-loaded authenticator secret) is replaced by a two-step email+password → Azure-emailed one-time-code flow, mirroring Doctor login's proven brute-force protections (account/IP jailing, per-attempt limits, single-use codes). The old TOTP machinery (crypto functions, DB-credential repository functions, the `totp-rs` dependency, seeded TOTP secret) was removed, not left as dead code. Verified live end to end against the real running backend (password step → emailed code → real tokens; code replay correctly rejected), not just via unit tests.
+
+Rust: `cargo fmt`/`clippy -- -D warnings` clean throughout. Full backend suite: 254/261 passed at this session's final run; the other 7 are pre-existing flakes (a Postgres role-grant race under heavy `#[sqlx::test]` parallelism, and Redis-backed rate-limit state shared across tests in one binary) - each confirmed passing cleanly in isolation, not claimed fixed. Patient Flutter (`apps/mobile_patient`): 226/226 pass, `flutter analyze` clean. Doctor Flutter (`apps/mobile`): 226/226 pass, `flutter analyze` clean. Admin-web: `tsc --noEmit` and lint clean on every touched file; its own Jest/unit suite was not rerun this session. Doctor-web was not touched and not rerun. Note: the Patient-facing Flutter app (`apps/mobile_patient` - booking, home, directory, chat, Swahili localization) already existed in full going into this session; an earlier assumption in this project's own tracking that it did not exist was a mistake, corrected here.
+
+**Pre-E2E corrections (2026-10-16):** PostgreSQL queue eligibility/current-first ordering, default Upcoming on Doctor Flutter/Web, completed history, expired-slot filtering/transactional rejection and availability resume/reconnect refresh implemented. Patient payment now uses one owned Proceed to payment action with no fake success; Doctor own chat messages are green/right, Patient messages white/left; secure shared clinical-image attachment routes/composers added. Doctor 197, Patient 195, Doctor Web 50 and Admin 13 tests pass; Rust 53 library tests and the full serialized backend suite pass: 221 passed, 0 failed, 0 ignored, 0 filtered. Signed development APKs Doctor 1.0.1+6 and Patient 1.0.1+5 are built. Physical verification is DEFERRED_BY_USER; live checkout/private storage remain unavailable, and full ecosystem simulation has not begun. [Queue report](PRE_E2E_QUEUE_AVAILABILITY_CORRECTION.md), [payment/testing audit](PATIENT_PAYMENT_UX_VERIFICATION.md), [attachment verification and limits](DOCTOR_CHAT_ATTACHMENT_VERIFICATION.md).
+
+
+**Doctor reminder pop-up follow-up (2026-10-15):** missing Android scheduled-notification receivers and release reflection rules corrected; Doctor 1.0.1+5 built, analysis clean, 190/190 tests pass. Compiled APK manifest and Room constructor checked. Installation and actual pop-up capture remain pending because the reconnected phone has no working ADB debugging connection. [Fix and exact verification boundary](DOCTOR_NOTIFICATION_POPUP_VERIFICATION.md). Video/Agora remains deferred.
+
+**Doctor system-navigation overlap (2026-10-15):** DoctorShell now reserves the Android bottom inset with SafeArea for all six tabs. Nine added layout/tap tests cover 320/360/412dp widths and 0/24/48dp insets; full Doctor suite 189/189, analysis clean. [Fix and physical evidence](DOCTOR_NAVIGATION_SAFE_AREA_FIX.md).
+
+**Patient OTP redirect/local backend recovery (2026-10-15):** successful OTP verification now replaces the signed-out Navigator, immediately showing profile completion or the Patient main menu; logout also removes protected routes. Four added real-app regression cases pass; full Patient suite 185/185, analysis clean. Restored the stopped local backend and verified LAN/local readiness plus Doctor password/MFA authentication. [Details and evidence](PATIENT_AUTH_NAVIGATION_FIX.md).
+
+**Doctor launch crash fixed (2026-10-15):** reproduced the native WorkManager/Room initialization crash on the connected Moto g96 5G (Android 16). R8 removed a reflectively used database constructor. Targeted release rules restore it; the APK constructor check passes and three physical-device cold launches render the login screen without crashing. Installed 1.0.1+3 in place, preserving app data. See [crash fix and evidence](DOCTOR_STARTUP_CRASH_FIX.md). This is launch verification, not full device acceptance of all features.
+
+**Patient consultation completion (2026-10-14):** real paid Chat booking/status/reopen UI and modality-specific Patient visibility/actions implemented across Doctor Flutter and Web. Shared Patient/Web/Flutter message history verified against the live local backend. Patient Flutter 181/181 passed; Doctor Flutter 180/180 passed; Doctor Web 47/47 and Admin Web 13/13 passed. The corrected full serialized backend rerun completed with 214 passed, 0 failed, 0 ignored and 0 filtered; its final output was recovered on 2026-10-15. No existing tests/assertions deleted or weakened; four exact UI-label expectations intentionally updated and documented. See [consultation verification](PATIENT_CHAT_CONSULTATION_VERIFICATION.md) and [device test guide](../releases/PATIENT_CONSULTATION_TESTING_20261014.md). Live M-Pesa, Agora media and physical-device acceptance remain pending; local development payment activation is verified.
+
+**Latest focused Patient correction (2026-10-14):** discovery filters/actions, long-text contracts and editorial Q&A submission/OPEN persistence corrected. Patient analyze: 0 issues; Flutter: 171/171 passed; 9 relevant backend tests passed; live POST 201/OPEN and owner feed reload verified. Migration `20261105000001` adds a context-bound owner-read helper; anonymous author grants remain unchanged. Current LAN: 192.168.0.105. Physical device acceptance remains PENDING_NO_DEVICE. See [Patient correction report](PATIENT_UI_VISUAL_REDESIGN.md). Historical suite counts below are not a new full-backend run.
+
+
+**Status reconciled:** 2026-10-17 (security remediation, payment-methods architecture, Data Protection Act data-rights, Patient/Doctor payment pickers, admin MFA redesign). Resume from this snapshot, not an old agent roster or interrupted test count. Latest implementation is complete within its approved scope; the open items below remain explicitly open.
+
+**Product decision, explicit and binding on all future work:** patients can never cancel a booked consultation, of any status, by any mechanism. The M5 self-service `PENDING_PAYMENT` cancel feature (`POST /appointments/:id/cancel`) built earlier the same day has been fully removed end to end — backend handler/service/route/tests and the Flutter Cancel UI/cubit method/repository call are all gone, not merely hidden. Do not reintroduce any cancellation path without a new, explicit instruction.
 
 ## Latest verified baseline
 
 | Component | Result | Evidence / scope |
 | --- | --- | --- |
 | Rust formatting | PASS | `cargo fmt --check` |
-| Rust lint | PASS | `cargo clippy --offline --all-targets -- -D warnings` |
-| Rust library | **50/50 PASS** | `cargo test --offline --lib` |
-| Backend integration | **139/139 PASS** | Full `api_tests`, serialized with `--test-threads=1`; zero failures |
-| Dart formatting / Flutter analysis | PASS | Format clean; `flutter analyze --no-pub` clean |
-| Flutter tests | **98/98 PASS** | `flutter test --no-pub`; includes 17 Q&A layout/state/golden tests |
-| Doctor Web | **44/44 PASS; typecheck/build PASS** | Last verified in the security/Articles pass; not rerun for the later backend/Q&A correction |
-| Admin Web | **13/13 PASS; typecheck/build PASS** | Last verified in the security/Articles pass; not rerun for the later backend/Q&A correction |
-| Migration agreement | **VERIFIED: 20261026000001** | Source = running binary = persistent development DB at the latest verification; all 34 applied UP checksums match |
-| Historical migration integrity | PASS | 62 saved historical migration files unchanged |
-| Latest live development checks | PASS | Synthetic login, private-profile isolation, canonical trace linkage, denied trace access, session/request audit metadata |
-| Physical-device verification of latest Q&A fix | **PENDING_NO_DEVICE** | No Android device connected; installed phone APK was not replaced |
+| Rust lint | PASS | `cargo clippy --all-targets -- -D warnings`, zero warnings |
+| Backend full suite | **254/261 PASS** | Full `api_tests`; 7 failures are pre-existing flakes (Postgres role-grant race under heavy `#[sqlx::test]` parallelism; Redis-backed rate-limit state shared across tests in one binary) — each individually confirmed passing in isolation, not a regression from this session's changes |
+| Dart formatting / Flutter analysis (Doctor app, `apps/mobile`) | PASS | `flutter analyze --no-pub` clean |
+| Flutter tests (Doctor app, `apps/mobile`) | **226/226 PASS** | Full suite, including new tests for the real payout-binding endpoint |
+| Dart formatting / Flutter analysis (Patient app, `apps/mobile_patient`) | PASS | `flutter analyze --no-pub` clean |
+| Flutter tests (Patient app, `apps/mobile_patient`) | **226/226 PASS** | Full suite, including the new required-payment-method-at-checkout behavior |
+| Doctor Web | Not rerun this session | Untouched this session |
+| Admin Web | `tsc --noEmit` and lint clean on touched files | Jest/unit suite not rerun this session (admin-web changes were UI wiring + two new BFF routes, verified via typecheck/lint plus live manual login flow instead) |
+| Migration agreement | **VERIFIED: 20261109000001** | `SOURCE_LATEST_MIGRATION == BINARY_LATEST_MIGRATION == DATABASE_LATEST_MIGRATION` confirmed via `scripts/start_backend_ready.ps1` after every migration-adding change this session |
+| Admin login redesign | **LIVE-VERIFIED** | Real curl walkthrough against the running dev backend: password step issues a one-time code, code step issues real tokens, replaying a used code is correctly rejected |
+| Physical-device verification | **PENDING_NO_DEVICE** | No Android device connected this session; code-level analyze/test and live backend-integration checks only, not a substitute for the prototype-comparison discipline CLAUDE.md requires |
 
 These are the latest recorded checks, not a new test run for this documentation update. Counts from earlier dated sections are historical. Automated regression and widget goldens do not constitute a penetration test or physical-device acceptance.
 
@@ -38,11 +64,11 @@ Primary evidence: [ownership/Q&A results](audit_evidence/user-isolation-qna.json
 | Scheduling navigation / reported entries | **COMPLETE** | Dedicated Doctor Web Schedule & Slots; two specifically authorized unbooked entries cancelled and audited; unrelated three proposed historical corrections remain unapplied |
 | Slot approval | **NOT_IMPLEMENTED_BY_PRODUCT_DESIGN** | Explicit user policy: no approval workflow; auditing does not require approval |
 | Doctor Articles | **IMPLEMENTED** | Structured Doctor Web + Flutter authoring and direct publication by verified Doctors; no Admin review; published patient feed is API-only |
-| Queue / notification domain | **BACKEND IMPLEMENTED** | Upcoming-first queue, owned inbox APIs, deduplicated reminders/daily summaries and lifecycle notifications; dedicated Flutter notification bell/inbox UI remains unimplemented; real push provider configuration required |
+| Queue / notification domain | **BACKEND IMPLEMENTED; PATIENT FLUTTER UI ADDED (M8, 2026-10-10)** | Upcoming-first queue, owned inbox APIs, deduplicated reminders/daily summaries and lifecycle notifications; Patient Flutter now has a bell/inbox UI (`features/notifications/*`, mirrors the Doctor cubit); real push provider configuration required |
 | Startup incident reporting | **IMPLEMENTED / VERIFIED** | Pre-initialization incident journal, authenticated delivery and Admin reference/build correlation; updated device build still needs installation/acceptance |
 | Doctor Flutter Open Health Q&A | **DOCTOR_QNA_CODE_FIXED_REAL_DEVICE_PENDING** | Dedicated flow layout, flexible long content, keyboard-safe editor, answered list, authoritative 409 recovery and eight goldens verified; actual phone rendering still pending |
 | Doctor Web / Doctor Flutter core workflows | **IMPLEMENTED; ACCEPTANCE PARTIAL** | Existing queue, chat, Smart Rx, schedule, wallet, profile/settings and Articles; user previously confirmed Doctor app acceptance, which does not verify the latest Q&A build |
-| Patient client / complete patient journey | **NOT_IMPLEMENTED / NOT_VERIFIED** | No patient-facing Flutter client exists; synthetic backend journey passes, but patient UI and device journey are not complete |
+| Patient client / complete patient journey | **IN_PROGRESS / M0-M12 CODE-VERIFIED (2026-10-10)** | M12 adds the Doctor-shaped Patient entry screen, email + password + email OTP MFA, phone capture during registration, Azure Communication Services Email delivery, and registration requires current Patient terms, privacy policy, data-rights notice and health-data consent; profile details are stored atomically with account creation. 144/144 Patient Flutter tests, backend `cargo check --tests` clean; integration suite must be rerun after the current migrations. No physical-device/prototype-comparison verification yet (PENDING_NO_DEVICE). |
 | Private clinical-document storage | **IMPLEMENTED; DEPLOYMENT ACCEPTANCE OPEN** | Private storage configuration and successful deployed upload/download acceptance remain required; earlier live development uploads were blocked by missing storage configuration |
 | Seven endpoint coverage gaps | **CLOSED / REGRESSION GREEN** | System-error simulation, compliance alerts, audit simulation, pending verification queue, aggregate telemetry, metrics and finance month-filter tests are in the current API suite |
 | Upload compression / field validation | **IMPLEMENTED / REGRESSION GREEN** | Centralized 400 KiB batch ceiling, server-side field limits, email/phone validation and password rules; no longer deferred |
@@ -75,6 +101,486 @@ See [public-exposure controls](PUBLIC_EXPOSURE_HARDENING.md), [deployment checkl
 ## Historical implementation log
 
 Everything below this boundary records earlier passes. Old test counts, migration versions, agent rosters, environment descriptions, interrupted states and resume instructions are historical, not the current task list. The status tables above supersede them. Historical audit findings are retained rather than rewritten as if later fixes had already existed.
+
+## Patient Flutter app M10 (English/Swahili surface completion) ? 2026-10-10 (later, same day)
+
+The remaining Patient feature-screen copy is now represented in the generated English/Swahili localization catalog: Account/Family Profiles, Directory/Doctor Profile, Health Vault, Q&A, consultation summary, video fallback, navigation, and offline cache states. Locale switching remains device-persisted through `LocaleController`; API category/status values remain fixed identifiers and are localized only at presentation.
+
+Verification: `flutter gen-l10n`, `flutter analyze --no-pub` clean, `dart format` clean, and **119/119 Patient Flutter tests PASS**, including two new locale persistence/translation tests. Device/prototype comparison and live-backend walkthrough remain open.
+
+## Patient Flutter app M9 (Post-Consultation screen) — 2026-10-10 (later, same day)
+
+No backend gap: `GET /appointments/:id` (`appointment_handlers::get_appointment`) already returns the raw `Appointment` row, which already carries `clinical_outcome` and `completed_at` — confirmed directly in `domain/models.rs` before writing any code, not assumed. `AppointmentDetailDto` (`booking_models.dart`) gained a `completedAt` field (the JSON was already there, just unparsed); `WaitingRoomState`/`WaitingRoomCubit.poll()` now additionally carry `clinicalOutcome`/`completedAt` through from each poll response.
+
+**Reachability**: `WaitingRoomPage`'s terminal-state branch now distinguishes `COMPLETED` from `CANCELLED`/`EXPIRED` — `COMPLETED` shows a "View Consultation Summary" button pushing the new `PostConsultationPage`, instead of the old generic "can no longer be joined" message for every terminal status alike. `WaitingRoomPage` gained a new required `familyProfilesCubit` param (threaded from `patient_home_page.dart`'s `_openWaitingRoom`, its only call site) so the summary screen's "View in Vault" button can open `HealthVaultPage` correctly.
+
+**New `features/patient/consultation/post_consultation_page.dart`** (`prototype/index.html` view-11 — "Consultation Completed"): branches honestly on the real clinical outcome (CLAUDE.md §6 — completion never requires a prescription) rather than assuming an e-Prescription was always issued the way the prototype's static demo content does — `COMPLETED_WITH_RX` shows an "Official e-Prescription Issued" card linking to Health Vault (real doctor name + real `completed_at` time, no fabricated BMDC number or fixed timestamp), `COMPLETED_NO_RX`/`REFERRED`/`ESCALATED` each show their own real, honest message instead. Deliberately drops the prototype's `#v11TelemetryCard` ("Session Telemetry Record": fixed "2m 14s" duration, "100% Quality", a fake escrow amount, a fake `#CONS-9481` ref) — that panel is `style="display:none"` in the prototype's own markup, confirming it was never meant to render; no backing endpoint exists for a patient to call anyway. "Return to Home" pops back to the tab root (`popUntil((route) => route.isFirst)`); "Report an Issue" reuses the same `showGrievanceModal`/`GrievanceRepository` flow already built for M8's Chat and Waiting Room.
+
+**Verification**: Flutter Patient `flutter analyze --no-pub` 0 issues, `dart format` clean, **117/117 tests PASS** (116 prior + 1 new `WaitingRoomCubit` test covering `clinicalOutcome`/`completedAt` propagation on a `COMPLETED` response). Backend untouched this pass (no gap existed) — the 206/206 integration count from the M8 entry stands unchanged. **Not yet done, named rather than silently skipped**: physical-device verification and a live click-through against a running dev backend.
+
+## Patient Flutter app M8 (Notifications, Blogs, Grievance, Free Health Q&A — gap #6 closed) — 2026-10-10 (later, same day)
+
+Closed the plan's final named backend gap (#6, Free Health Q&A submission), then built every M8 Flutter screen on top of it and the three already-real backend surfaces (Notifications, Blogs, Grievance) — same just-in-time gap-closing discipline as every prior milestone.
+
+**Notifications** (`features/notifications/*`, new): `notification_models.dart`/`notification_repository.dart`/`notification_cubit.dart` mirror `apps/mobile`'s Doctor notification cubit, minus the Doctor-specific schedule-reconciliation layer Patient has no equivalent dormant infra for. `notification_center_page.dart` is a new inbox list. Wired into `app.dart`'s `_SignedInRootState` (constructed alongside the other root cubits, `..load()..startPolling()`) and into Home's `_Greeting` via a `NotificationBellAction` (pre-existing shared widget, previously unused by Patient). 10 new `NotificationCubit` unit tests (load, markRead/markAllRead optimistic update + rollback-on-failure).
+
+**Blogs** (`features/patient/blogs/*`): `blogs_page.dart` rewritten from a "coming soon" stub into a real feed against the already-real `GET /articles` (no backend gap — confirmed directly by the plan). `blogs_models.dart`'s `BlogArticleDto` deliberately has no "category"/"read time" fields, since `DoctorArticle` carries none — the prototype's per-article "5 min read" badges are static mockup text with nothing to back them. Plain repository, no cubit, per the plan's own "single-fetch, no cross-screen state" architecture note — same precedent as this entry's Grievance and Q&A-read paths below.
+
+**Grievance** (`features/patient/grievance/*`, new): `grievance_repository.dart` resolves `consultation_id` via the new `GET /appointments/:id/consultation` (`appointment_handlers::get_consultation_for_appointment`, closed this pass — the consultation-session read analogue of gap #3's conversation lookup, over the already-existing `consultation_repo::find_by_appointment`) and then files a real `POST /grievances`. `grievance_modal.dart` deliberately omits the prototype's `#patientGrievanceModal` "System Auto-Collected Telemetry" inspector panel — that section is entirely hardcoded demo numbers (a fixed "2m 14s" duration, a fixed audit timeline, a fixed device string) with no backing endpoint a patient can call; showing fabricated telemetry would be a worse "No Phantom Completions" violation than omitting it. Real telemetry (wired earlier this session) still reaches Admin's own adjudication view, which this app has no patient-facing read for. Wired as a "Report Issue" icon in `patient_chat_page.dart`'s `_ChatTopBar` and a "Report Consultation Issue" button in `waiting_room_page.dart`.
+
+**Free Health Q&A — gap #6 closed** (the plan's last named backend gap): `health_questions` had a public `SELECT USING (true)` read policy and a Doctor-only `UPDATE` grant (`20261005000001_doctor_contract_qna`) but **no INSERT grant and no INSERT policy at all** — confirmed by direct migration inspection, not inferred; submitting a question was structurally impossible at the database layer regardless of any application code. New migration `20261101000002_patient_qna_submission` grants `INSERT` and adds the first INSERT policy, using the same guardian-OR-self ownership shape (`fn_patient_profile_owned_by_caller`) `20261101000001_patient_profile_dependents` established for every other patient-authored table, plus a `RESTRICTIVE` author guard mirroring `grievance_patient_author`/`booking_patient_author` exactly (PATIENT role, `status='OPEN'` only). New `Action::SubmitHealthQuestion` ABAC action (mirrors `SubmitGrievance`'s shape rather than overloading `PatientManageProfile`). Two new handlers in `patient_handlers.rs`: `list_answered_questions` (`GET /patients/me/qna/questions`, hardcoded to `status='ANSWERED'` — a patient never sees another patient's still-open question) and `submit_question` (`POST`, same endpoint). `submit_question`'s `INSERT ... RETURNING` deliberately names only the column-scoped-granted columns (never `author_patient_id` — `20261026000001_canonical_user_isolation` revoked full SELECT on this table specifically to keep Q&A anonymous-to-doctors at the grant level, and naming an ungranted column in `RETURNING` fails the whole insert, not just the response shape). 5 new backend tests: submit-then-appears-once-answered round trip (through the real Doctor answer endpoint), empty/oversized-text validation (**caught by the test run, not inspection**: `AppError::Validation` maps to `422`, not `400` — the test's first draft asserted `400` and was corrected against the real `AppError` status mapping), non-PATIENT-role rejection, guardian-submits-for-dependent (asserts `author_patient_id` in the DB really is the dependent's id, not the guardian's), and a BOLA guard rejecting an unowned `profile_id` with `404`.
+
+New Flutter (`features/patient/qna/*`, all new): `qna_models.dart` (`AnsweredQuestionDto`, plus a client-side-only `qnaCategories` chip list — `health_questions.category` is a free-text `VARCHAR(80)`, not a backend enum, same shape as the Grievance modal's fixed category list), `qna_repository.dart`, `qna_cubit.dart` (owns the global answered feed plus submit-flow state; the feed itself is not profile-scoped — any patient may read any doctor-answered question — only `submit()`'s optional `profileId` is), `qna_ask_sheet.dart` (the "Ask Your Medical Question" bottom sheet), `qna_page.dart` (the feed + FAB entry point). Two prototype elements deliberately dropped, both previously-established patterns applied again here: the "Post as Anonymous (Patient)" checkbox (anonymity isn't an optional toggle — the backend's column-scoped SELECT grant means a doctor can *never* see `author_patient_id` regardless of what a patient picks, so presenting it as a choice would be dishonest UI) and the per-answer "👍 N Found Helpful" vote counter (CLAUDE.md §2.1's zero-star-ratings/no-popularity-algorithms rule — no backing column or grant exists for one either). The ask sheet offers a guardian "Asking as" profile picker (reusing `FamilyProfilesCubit`) only when more than one profile exists. Wired into Home's "Ask Free Q&A" grid card and the Services tab's "Ask a Free Question" row, both previously "coming soon." 5 new `QnaCubit` unit tests (load success/failure, submit success/failure, `resetSubmitState`).
+
+**Verification**: backend `cargo fmt`/clippy clean, `cargo check --all-targets` clean, full `cargo test --test api_tests -- --test-threads=1` **206/206 PASS** (three runs this pass: 198→201 confirming the Grievance consultation-lookup tests — one of the three required a fix, documented above, since its premise about *when* a consultation session row is created was wrong — then 201→206 confirming the 5 Q&A tests together with everything else, zero regressions). `cargo test --lib` 53/53 unchanged. Flutter: Patient `flutter analyze --no-pub` 0 issues, `dart format` clean, **116/116 tests PASS** (101 prior + 10 Notifications + 5 Q&A; Blogs/Grievance intentionally have no dedicated unit tests, matching the plan's own "plain repository, no cubit" guidance for single-fetch/single-submit screens). **Not yet done, named rather than silently skipped**: physical-device verification and a live click-through against a running dev backend (no `cargo run` process was started this session) — a migration file was added this pass (`20261101000002`), so per this project's own migration-discipline rule, any future live verification against a persistent dev database must restart that backend process first.
+
+## Cancellation removed, real call telemetry added, M7 Health Vault (gap #2 closed) — 2026-10-10 (later, same day)
+
+**Explicit user instruction, three parts, all completed this pass:** (1) remove booked-consultation cancellation entirely — "there won't be any cancellation of any consultations booked"; (2) make the app send live consultation telemetry (patient joined, doctor joined, disconnection, consultation start, consultation finished, consultation delayed) for grievance review; (3) continue to M7.
+
+**Part 1 — cancellation removed end to end.** The M5 entry immediately below this one documents gap #4's *original* build; that work is now superseded, not just hidden. Removed: `AppointmentService::cancel_appointment` (service), `appointment_handlers::cancel_appointment` (handler), the `/appointments/:id/cancel` route, its 4 integration tests, and the Flutter Cancel button/dialog/cubit method/`BookingRepository.cancel()` call. `WaitingRoomCubit` is now a plain read-only status poller (`canSelfCancel`/`cancelling`/`cancelError` all removed, not just unused). `AppointmentStatus::CANCELLED` remains a valid enum variant (nothing else in this codebase currently writes it), left alone since removing an enum variant is unrelated schema churn, not requested.
+
+**Part 2 — real call-lifecycle telemetry, both Patient and Doctor sides.** `ConsultationService::TELEMETRY_EVENT_TYPES` and the `POST /consultations/:id/telemetry/events` endpoint already existed with zero real callers anywhere in the codebase (confirmed directly: `apps/mobile`'s `DoctorRepository.telemetry()` was dead code, declared but never invoked from `AgoraPage`). This pass wires real submission on both sides:
+- **Patient** (`apps/mobile_patient/lib/features/patient/video/agora_placeholder_page.dart`, backed by `BookingRepository.submitTelemetryEvents` and the `TelemetryEventType`/`telemetryEvent()` helpers in `booking_models.dart`): `CALL_INITIATED`+`PATIENT_JOINED` on successful RTC-token mint (the one real, observable event at this placeholder-video fidelity), `PATIENT_DISCONNECTED`/`PATIENT_RECONNECTED` on app-lifecycle pause/resume while a session is active (the honest proxy for a connection interruption available without a real Agora SDK), `CALL_ENDED` on leaving the screen.
+- **Doctor** (`apps/mobile/lib/features/doctor/agora_page.dart`): identical instrumentation using `DOCTOR_JOINED`/`DOCTOR_DISCONNECTED`/`DOCTOR_RECONNECTED`. `DoctorRepository.telemetry()` was changed from rethrow-on-failure to swallow-on-failure (mirroring the backend's own `record_telemetry_events` doc comment: "ingesting observability data must never be able to break an active consultation") — safe, since it had zero existing callers to break.
+- **"Consultation delayed" is deliberately not a new event type.** The vocabulary is a DB `CHECK` constraint with no `DELAYED` entry; adding one would need a migration for a value that's already fully derivable from data this pass already captures — comparing `PATIENT_JOINED`/`DOCTOR_JOINED`'s real `occurred_at` against the appointment's scheduled slot start time. Patient's placeholder page uses exactly that comparison to show an honest "running late" banner, with no new backend concept invented.
+- Backend side needed zero changes — the vocabulary, endpoint, and RLS-backed authorization all already existed correctly.
+
+**Part 3 — M7 Health Vault, gap #2 closed.** `GET /patients/me/documents` (`patient_handlers::list_own_documents`) merges doctor-issued e-Prescriptions and patient-uploaded intake documents into one chronological list — `prescription_intake_documents` already had a `list_*_for_patient` repo query; `prescriptions` did not, so this queries it directly in the handler (the same precedent `list_own_appointments` already set for a patient-facing joined read, rather than adding a repo wrapper with exactly one caller). `security_status != 'CLEAN'` rows are excluded, matching the gate `prescription_handlers::authorized_document` already enforces at download time — nothing in the list can ever fail to download. No-Rx clinical decisions (`rx_image_object_key IS NULL`) are excluded from the e-Prescription view — confirmed via a real test, not just reasoned about. The existing `GET /appointments/:id/documents/:document_id` already transparently serves both document kinds (confirmed by reading `authorized_document`'s fallback logic directly) — no changes needed there.
+
+New Flutter: `vault_cubit.dart`/`vault_repository.dart`/`vault_models.dart`/`health_vault_page.dart` — grouped-by-month list, client-side kind tabs (All / e-Prescriptions / My Uploads — relabeled from the prototype's finer "Lab Reports"/"Doctor Notes" split, which the backend has no data to actually distinguish), an in-app image viewer for JPEG/PNG, and `url_launcher` external-open for PDFs (no new PDF-rendering dependency). Mirrors `HomeCubit`'s active-profile pattern exactly (§5b requires M7 to scope to the currently active profile). Wired into Home's "Health Records" card and the Services tab's "Health Records & Vault" row, both previously "coming soon."
+
+**Verification**: backend `cargo fmt`/clippy clean, `cargo test --lib` 53/53, full `cargo test --test api_tests -- --test-threads=1` **198/198 PASS** (two complete runs this pass: one confirming the cancel removal + chat gap #3 code at 194/194, one final run confirming all of it plus the 4 new Health Vault tests together at 198/198; zero regressions either time). Flutter: Patient `flutter analyze` 0 issues, `dart format` clean, **101/101 tests PASS**; Doctor `flutter analyze` clean (one pre-existing unrelated info), **168/170 tests PASS** — the 2 failures are a pre-existing golden-image pixel-diff in an unrelated screen (`notification_center_page_test.dart`), confirmed via `git stash` to fail identically without this pass's changes, so not a regression introduced here and not fixed (regenerating a stale golden baseline wasn't requested and changes a visual-regression baseline the project may want to review deliberately). **Not yet done, named rather than silently skipped**: physical-device verification and a live click-through against a running dev backend (no `cargo run` process was started this session).
+
+## Patient Flutter app M5 (Waiting Room + self-cancel) and M6 (24h Chat) — 2026-10-10 (later, same day)
+
+**Superseded, 2026-10-10 (later, same day):** the self-cancel feature described below (gap #4) was fully removed by an explicit product decision — see the entry above this one. This section is preserved as a historical record of what was built and why, not as a description of current behavior; do not resume or reference gap #4 as open or closed going forward, it is simply out of scope.
+
+Closed two of the plan's named backend gaps just-in-time, each small and additive (no migration), then built the Flutter screens that depended on them — same sequencing discipline as every prior milestone this session.
+
+**Gap #4 — `POST /appointments/:id/cancel` (`AppointmentService::cancel_appointment`,
+`services/backend/src/services/appointment_service.rs`).** Scoped deliberately narrower than
+`docs/STATE_MACHINES.md`'s documented `CONFIRMED -> CANCELLED` (full refund, >2h guard): this
+codebase has **no automated fund-movement path anywhere** — every real refund
+(`grievance_service::transition_refund_request`) is a manual, Finance-adjudicated
+`financial_refund_requests` disbursement, never a backend-automatic M-Pesa transfer. Building an
+instant patient-triggered refund would have been a new, un-reviewed financial primitive. Instead:
+only `PENDING_PAYMENT -> CANCELLED` is real self-service (releases the locked slot, marks the
+`Initiated` transaction `Failed`); a `CONFIRMED` (paid) appointment gets a clear 409 naming why,
+surfaced client-side as "contact support" — honest, not a phantom completion. Verified this is
+the common case: `book_appointment` refuses outright outside `environment == "development"`, and
+nothing in this codebase lets a real patient confirm their own payment (only an
+operator/test-triggered webhook does), so almost every real booking sits at `PENDING_PAYMENT`.
+4 new integration tests (self-cancel + slot release + re-cancel-is-409, confirmed-appointment
+rejected with the exact "contact support" message, BOLA reject, guardian-cancels-dependent).
+
+**Gap #3 — `GET /appointments/:id/conversation` (`appointment_handlers.rs`).** Smaller than it
+looked: `chat_repo::find_conversation_by_appointment` already existed, so this was purely a
+missing read endpoint, not new persistence. Authorization is entirely RLS
+(`chat_conversations_access`, already extended for guardian/dependent in the §5b migration) — a
+non-owned appointment 404s before `chat_conversations` is even queried, the same non-leaky shape
+as `get_appointment`. Confirmed directly in `AppointmentService::process_payment_webhook` that
+**every** `CONFIRMED` appointment gets a conversation regardless of modality — the 24-hour chat is
+bundled with a Video booking too, not only a Chat one — which changed the Flutter Waiting Room
+design (see below). 4 new integration tests (resolve-on-confirmed, 404-before-confirmed, BOLA
+reject, guardian-resolves-dependent's).
+
+**New Flutter code**, `apps/mobile_patient/lib/features/patient/`:
+- `booking/waiting_room_cubit.dart` + `waiting_room_page.dart` (prototype view-10) — polls
+  `GET /appointments/:id` for status, real `permission_handler` camera/mic check (declared in
+  `AndroidManifest.xml` for the first time this pass — previously undeclared), Cancel wired to
+  gap #4's real/disabled split exactly.
+- `video/agora_placeholder_page.dart` — mirrors `apps/mobile`'s `AgoraPage`/`AgoraSession`
+  almost verbatim (same mint-then-placeholder shape via the same
+  `POST /consultations/:id/rtc-token` contract).
+- `chat/chat_cubit.dart` + `chat_repository.dart` + `patient_chat_page.dart` (prototype view-6,
+  text messaging only — the prototype's digital-Rx/patient-history header shortcuts have no
+  patient-side contract and aren't fabricated here) — load/send/24h-expiry-lock handling mirrors
+  `apps/mobile`'s `_ChatThreadState` structurally, plus a silent background poll the Doctor
+  screen doesn't have.
+- Waiting Room's Join/Chat buttons corrected to match the gap #3 finding above: Chat-modality
+  shows "Open Chat" as primary; Video-modality shows "Join Video Call" as primary **plus** a
+  secondary "💬 Open 24h Chat" button, since that thread exists for Video appointments too.
+- Wired into Home: the "Manage" button on the Upcoming Consultation card (previously
+  "coming soon") now opens the real Waiting Room for the nearest upcoming appointment.
+
+**Verification**: backend `cargo fmt`/clippy clean, `cargo test --lib` 53/53, full
+`cargo test --test api_tests -- --test-threads=1` **198/198 PASS** (190 prior + 4 + 4, zero
+regressions, two full runs performed — once after gap #4 alone, once after both gaps together).
+Flutter: `flutter analyze` 0 issues, `dart format` clean, **`flutter test` 96/96 PASS** (78 prior
++ 10 `WaitingRoomCubit` + 8 `ChatCubit`, zero regressions). **Not yet done, named rather than
+silently skipped**: physical-device/prototype-comparison verification (no Android device
+connected this session) and a live click-through against a running dev backend (no `cargo run`
+process was started this session, so these new routes have been exercised only by the automated
+test suite, not manually).
+
+## Patient Flutter app M4 — Directory, Doctor Profile, Booking, Intake upload — 2026-10-10 (later, same day)
+
+Implements the plan's M4 milestone (`C:\Users\CUBE\.claude\plans\enumerated-wishing-pearl.md` §6)
+on top of the M3.5 multi-profile/family-support foundation. Confirmed before writing any code
+that all backend endpoints this milestone needs were already real (`GET /doctors`,
+`GET /doctors/:id`, `GET /doctors/:id/slots`, `POST /appointments/book`,
+`POST /appointments/:id/prescriptions`) — **zero backend files changed this pass**, no migration,
+no `cargo` commands needed beyond what M3.5 already verified.
+
+**New Flutter code**, all under `apps/mobile_patient/lib/features/patient/`:
+- `directory/` — `directory_models.dart` (`PublicDoctorDto`, mirroring
+  `doctor_repo::PublicDoctorProfile`'s plain-snake-case JSON), `directory_repository.dart`,
+  `directory_cubit.dart` (modality tab + specialty/search client-side filtering over the current
+  server page), `patient_directory_page.dart` (prototype view-3), `doctor_profile_page.dart`
+  (prototype view-9).
+- `booking/` — `booking_models.dart` (`DoctorSlotDto`, `BookingResultDto`),
+  `booking_repository.dart`, `booking_cubit.dart`, `patient_booking_page.dart` (prototype view-4,
+  shared by both Video and Chat modalities), `paid_chat_booking_modal.dart`,
+  `pre_consult_intake_modal.dart` (prototype's `#preConsultIntakeModal`).
+- Wired into Home's search pill / "Book Specialist" grid card and the Services tab's "Book a
+  Specialist Doctor" row, which previously showed a "coming soon" snackbar for this item.
+
+**Real validation the prototype's static demo lacked** (plan §4's view-4 row, done as specified):
+`BookingState.canProceed` only turns true once the patient has actually selected both a date and
+a slot on that date — the prototype pre-highlights a date and slot by default with no way to
+represent "nothing chosen yet." Covered by `booking_cubit_test.dart`'s dedicated
+"real date/slot-required validation" group.
+
+**Three deliberate, documented departures from a literal prototype port — each because the real
+backend contract required it, not stylistic preference:**
+1. **Paid chat booking still requires picking a real slot.** The prototype's
+   `#paidChatBookingModal` is a self-contained final booking screen with no slot picker, but
+   `AppointmentService::book_appointment` (`services/backend/src/services/appointment_service.rs`)
+   locks a `doctor_schedule_slots` row via `try_lock_slot` for **both** `Modality::Video` and
+   `Modality::Chat` — confirmed by reading the function body directly, not assumed. Faking an
+   instant slot-free chat booking would silently diverge from what actually happens server-side.
+   `paid_chat_booking_modal.dart` keeps the prototype's real informational content (inclusions,
+   fee breakdown) and then hands off to the same real slot-picking `PatientBookingPage` used for
+   Video, documented inline with the exact backend line this decision rests on.
+2. **Doctor Profile's "Availability" tab does not reproduce the prototype's static
+   "Saturday–Thursday 09:00–20:00" weekly-schedule copy.** No backend contract exposes a
+   recurring weekly template (only ad-hoc `doctor_schedule_slots` rows) — inventing one would
+   violate CLAUDE.md's "No Unilateral Feature Inventions" rule. Shows the real next few bookable
+   slots from `GET /doctors/:id/slots` instead.
+3. **Currency and professional-body copy relabeled for the Kenya deployment**: ৳ (Bangladesh taka)
+   → `KES` throughout Directory/Booking/Doctor Profile (the *amounts* are always the real
+   per-doctor `consultation_fee_video`/`consultation_fee_chat` values from the backend, never
+   invented — only the currency symbol changes), and "BMDC Verified"/"BMDC #" → "KMPDC
+   Verified"/"KMPDC #" (plan §4's screen-mapping row for view-3 states this explicitly). Payment
+   gateway sent is `MPESA`, matching the M3.5 test-fixture correction away from `BKASH`.
+
+**Family Profiles / M3.5 carried through from the start, per plan §5b**: `PatientBookingPage`
+takes `FamilyProfilesCubit` as a direct constructor parameter (not resolved via `BuildContext`)
+specifically because Directory/Doctor Profile/Booking are reached via `Navigator.push`, a sibling
+route to the Home/Account tabs that does not inherit `BlocProvider`s declared inside
+`_SignedInRootState`'s single `home` route — confirmed by checking how Flutter's `Navigator`/
+`Overlay` route-stacking actually works before writing this, not assumed. A compact "Booking for:
+[Self ▾]" bar (reusing `FamilyProfileChipRow`) sits above the date/slot picker, defaulting to
+whichever profile is currently active in `FamilyProfilesCubit.state.activeProfileId`.
+
+**Honest pending-payment state, not a phantom completion**: `AppointmentService::book_appointment`
+only ever confirms payment via a provider webhook outside this phase's scope (real M-Pesa
+integration is explicitly deferred — plan §8). The post-booking confirmation sheet states plainly
+that the appointment is reserved pending payment confirmation and that M-Pesa collection runs
+only in this build's development environment today — it does not claim "Confirmed."
+
+**Intake upload** (`pre_consult_intake_modal.dart`) uses the real current 1–20-image/40KB-per-image
+business rule (`core/validation/upload_validation.dart`, already landed before this pass) and
+corrects the prototype's stale "Up to 5 Max" copy to the real current limit, per plan §4's
+intake-modal row. Picks via `image_picker` (gallery multi-select + camera) and `file_picker` (PDF),
+mirroring `apps/mobile`'s existing `_RxPage`/`ImagePicker`/`FilePicker` pattern
+(`apps/mobile/lib/features/doctor/doctor_pages.dart`) rather than inventing a new one.
+
+**Verification**: `flutter analyze --no-pub` 0 issues, `dart format --output=none
+--set-exit-if-changed lib test` clean, **`flutter test --no-pub` 78/78 PASS** (61 prior + 17 new:
+`directory_cubit_test.dart` covering load/modality-tab-switch/specialty+search filtering,
+`booking_cubit_test.dart` covering slot grouping, the canProceed validation gate, submit
+success/failure, and upload-gated-on-a-booking-result). No regressions in the 61 pre-existing
+tests. **Not yet done, named rather than silently skipped**: physical-device / rendered-screen
+comparison against `prototype/index.html` (no Android device connected this session — same
+`PENDING_NO_DEVICE` gate as the rest of this app), and a live manual run against the real dev
+backend (the backend side of this contract was already live-verified during M3.5's resume pass
+and is unchanged here, but the new Flutter screens themselves have not been clicked through
+against a running backend yet).
+
+## Patient Flutter app (M0–M3) + multi-profile/family support backend — RESUMED AND VERIFIED — 2026-10-10
+
+**Resume-session update (same day, later):** all five "exact resume steps" below were
+executed in order and are now green. The two tests that failed in the prior stale run
+(`test_identity_doctor_private_financial_and_treatment_context_rls`,
+`test_security_refresh_migration_revokes_legacy_rotated_families`) pass both in isolation
+and as part of a full fresh run: **`cargo fmt --check` clean, `cargo clippy --all-targets
+-- -D warnings` clean, `cargo test --lib` 53/53, full `cargo test --test api_tests --
+--test-threads=1` 190/190, zero failures.** Dev backend restarted via
+`start_backend_ready.ps1` after the new migration; `SCHEMA_VERIFIED: source == binary ==
+database == 20261101000001`, `HELLODOCTOR_BACKEND_READY`. Flutter side re-confirmed with no
+regression from the M3 additions: `flutter analyze` clean, `dart format` clean, `flutter
+test` **49/49 PASS** (same count as before M3 — M3's Home/Profile/shell files did not add
+new tests). The multi-profile/family-support backend feature (migration `20261101000001`,
+guardian/dependent `patient_profiles`, the 14 extended RLS policies, and the 3 ownership-bug
+fixes for Agora token minting / telemetry / idempotency replay) is now fully verified
+against final code — the earlier "stale run" caveat no longer applies.
+
+**M3.5 Flutter profile-switcher UI — DONE, same day — 2026-10-10.** The prototype's Family
+Profiles chip row (confirmed purely cosmetic there — zero click handlers) is now real:
+- New `FamilyProfilesRepository`/`FamilyProfilesCubit`
+  (`features/patient/profile/family_profiles_{repository,cubit}.dart`), constructed once in
+  `app.dart`'s `_SignedInRootState` alongside `ProfileCubit`/`HomeCubit` so the chosen
+  "active profile" (`null` = self, matching the backend's own `acting_patient_profile_id`
+  default) survives switching between the Home and Account tabs and resets naturally on
+  logout. `PatientProfileDto` (`profile_models.dart`) gained `guardianPatientId`/
+  `relationship`/`isSelf` — confirmed field-for-field against a live `GET
+  /patients/me/profiles` call against the real dev backend (self row first,
+  `guardian_patient_id: null`; a created dependent with `user_id: null`,
+  `guardian_patient_id` pointing at self, `relationship: "Spouse"`).
+- New shared `FamilyProfileChipRow` widget and `showAddDependentSheet` form (full name/DOB/
+  gender/relationship + optional blood group/weight/emergency contact, mirroring
+  `ProfileCompletionPage`'s fields). The dependent-creation POST uses `idempotent: true` —
+  called out explicitly because a dependent profile can never be deleted once created (no
+  soft-delete column exists), so a retried double-submit must not create two; `
+  FamilyProfilesCubit.createDependent` also self-guards against a second call while one is
+  already in flight.
+- Wired into **Account/Profile page** (`patient_profile_page.dart`): a "Family Profiles"
+  section with the chip row + "+ Add Dependent", replacing the page's former doc-comment
+  claim that this was an inert "coming soon" stub.
+- Wired into **Home** (`patient_home_page.dart`): a compact "Managing for: X" bar directly
+  above Upcoming Consultation, tappable to open a profile-switch sheet reusing the same chip
+  row. `HomeCubit` gained `setActiveProfile`/an internal `_activeProfileId`, threaded into
+  `HomeRepository.upcomingAppointments(profileId: ...)` → `GET
+  /patients/me/appointments?profile_id=...`. A `BlocListener<FamilyProfilesCubit>` keeps the
+  two cubits in sync without either needing to know about the other's internals.
+- Cache-safety decision, called out explicitly: `PatientCacheStore`'s fixed key namespace has
+  no per-profile slot, so showing a dependent's appointments falls back to **no offline
+  cache** rather than risk silently showing the wrong profile's cached data while
+  offline — a deliberate, documented scope cut, not an oversight. Added a `family_profiles`
+  cache key for the profile list itself (not time-sensitive clinical data, lower risk).
+- **12 new Flutter unit tests** (`family_profiles_cubit_test.dart`,
+  `home_cubit_active_profile_test.dart`) covering: load/default-to-self, switching to a
+  known dependent and back, rejecting an unknown id, dependent creation success, a
+  double-submit-while-creating no-op, a repository failure surfacing as `createError` (not
+  thrown), and `HomeCubit` re-querying with the right `profile_id` on every switch.
+  **Full Flutter suite: analyze clean, format clean, 61/61 tests pass** (49 prior + 12 new,
+  zero regressions).
+- Not yet done, named rather than silently skipped: M4's booking screen "Booking for: [Self
+  ▾]" selector (next milestone per the plan — carries the active profile from the start,
+  per §5b), and physical-device visual confirmation of this new UI against
+  `prototype/index.html` view-7 (no Android device connected this session — same
+  `PENDING_NO_DEVICE` gate as the rest of this app).
+
+**Original pause entry, preserved for history below — the "What is NOT yet verified"
+section it describes is now resolved by the paragraph above, not by re-reading that section
+as current status.**
+
+### What exists now
+
+**New Patient Flutter package, `apps/mobile_patient/`** (a literal separate
+top-level Flutter package, per the user's explicit, acknowledged override of
+CLAUDE.md §3's single-`apps/mobile/`-project rule — see the approved plan at
+`C:\Users\CUBE\.claude\plans\enumerated-wishing-pearl.md`, which remains the
+authoritative design reference and should be read before resuming). Built
+through M3 of that plan:
+- **M0 Scaffold**: `flutter create`, Android build config with
+  `isMinifyEnabled`/`isShrinkResources` + `proguard-rules.pro` (keep rules for
+  `flutter_local_notifications`/`workmanager`), real `applicationId =
+  "com.hellodoctor.patient"`, `l10n.yaml` + `gen_l10n` wiring. Size budget is
+  **26MB** (raised mid-session from an initial ~20MB target — both the plan
+  file and this doc already reflect the updated number).
+- **M1 Core infra**: `core/network/api_client.dart` (session-generation
+  guard, 401-refresh-on-GET-only, Idempotency-Key support, HTTPS enforcement
+  — replicated near-verbatim from `apps/mobile`'s proven `ApiClient`),
+  `core/cache/patient_cache_store.dart` (JWT-subject-scoped encrypted cache),
+  `core/network/connectivity_service.dart`, `core/network/client_error_reporter.dart`
+  + `core/network/startup_incident_queue.dart`, `core/validation/kenya_phone.dart`
+  + `otp_validation.dart` + `upload_validation.dart` (1–20 image count /
+  JPEG+PNG+PDF mime allow-list, deliberately NOT replicating the backend's
+  40KB-per-image compression math client-side), `core/notifications/` (local
+  notification channels + ids), `core/l10n/locale_controller.dart` (English/
+  Swahili, a `ChangeNotifier`, persisted outside the account-scoped cache so
+  it survives logout), `core/widgets/startup_error_page.dart`.
+- **M2 Auth**: real 2-step OTP flow against the actual backend contract
+  (`POST /auth/register-otp` → `POST /auth/verify-otp-and-login` — confirmed
+  the `session_token` from step 1 is never sent to step 2, only
+  `phone_number` links the two calls). `features/auth/auth_cubit.dart`
+  (sealed `AuthState`), `phone_entry_page.dart`, `otp_verify_page.dart`
+  (resend countdown, DEV-only OTP banner). **49/49 Flutter tests passing** at
+  this point (confirmed), including a regression test for the startup
+  safety net (`app_boot_test.dart` — an unconfigured `ENVIRONMENT`
+  dart-define is now proven to show `StartupErrorPage`, not a blank screen).
+- **M3 Profile completion + Home shell**: `features/patient/profile/`
+  (`profile_cubit.dart`/`profile_repository.dart`/`profile_models.dart`,
+  `patient_profile_page.dart`, `profile_edit_sheet.dart`,
+  `language_modal.dart` wired to the real `LocaleController`),
+  `features/patient/home/` (`home_cubit.dart`/`home_repository.dart`/
+  `home_models.dart`, `patient_home_page.dart`,
+  `emergency_contact_banner.dart` — text is exactly "Emergency Contact",
+  never "24/7", positioned directly above Upcoming Consultation, per the
+  CLAUDE.md business rule, confirmed against the live prototype markup),
+  `features/auth/profile_completion_page.dart` (routes a freshly-OTP-logged-in
+  account through real-data collection while its profile still matches the
+  OTP placeholder sentinel), `PatientShell`/`PatientBottomNav` in `app.dart`
+  (Home/Services/Blogs/Account tabs — Services and Blogs are honest "coming
+  soon" stubs per the plan, not yet real screens).
+  **`flutter analyze` was clean at this point, but `flutter test` was NOT
+  re-run after these M3 files landed** — this is an explicit, known gap, not
+  an oversight being hidden. Run it first thing tomorrow.
+
+**Backend, M3's two blocking gaps closed**: `GET/PATCH /patients/me` and
+`GET /patients/me/appointments` (`src/api/v1/patient_handlers.rs`, new file),
+`ctx.patient_profile_id` auth-context helper already existed and was reused.
+No migration needed for these two — purely new handlers/routes over the
+existing `patient_profiles`/`appointments` tables, plus one RLS fix (the
+`list_own_appointments` query had to join `doctor_public_directory`, the
+RLS-safe view, not the raw `doctor_profiles` table, which a patient session
+cannot read directly — confirmed by a failing integration test before the
+fix, not just by inspection).
+
+### Mid-session scope addition: multi-profile / family support
+
+**The user explicitly escalated this from "out of scope" to "must-have"
+mid-build**, with a concrete product description: one authenticated account
+(one phone number, one login, one device) can create and manage several
+patient profiles under itself (e.g. a parent + a spouse + children), each
+with its own fully independent appointments/prescriptions/health-vault
+history — "each distinct profile acts solely as different accounts in the
+system." No separate login for a dependent profile. This is now formally
+part of the plan as **§5b / milestone M3.5** (see the plan file) and must be
+threaded through Booking (M4) and every later milestone, not retrofitted.
+
+**Design, confirmed with the user**: extend `patient_profiles` itself with a
+nullable, self-referencing `guardian_patient_id` (dependents are first-class
+`patient_profiles` rows with `user_id = NULL`, not a separate table) — single
+guardian per dependent, no "graduate a dependent into its own login" path.
+Full reasoning and the rejected alternative (a separate `patient_dependents`
+table) are in the plan file's §5b and in the migration's own comments.
+
+**Backend implementation, this session:**
+- New migration `services/backend/migrations/20261101000001_patient_profile_dependents.{up,down}.sql`:
+  `patient_profiles.user_id` now nullable, new `guardian_patient_id`/
+  `relationship` columns, `patient_profiles_self_xor_dependent` CHECK
+  constraint, `guard_single_level_dependents` trigger (blocks nested
+  dependents), two new RLS helper functions
+  (`fn_patient_profile_is_self`/`fn_patient_profile_owned_by_caller`), and
+  **14 RLS policies across 9 tables** extended additively (same `OR`-shape
+  throughout) to recognize a guardian acting for their dependent —
+  `patient_profiles_access`, `patient_profile_self_update`,
+  `dependent_profile_author_guard` (new), `appointments_access`,
+  `booking_patient_author`, `appointment_clinical_intake_access`,
+  `prescription_intake_documents_access`, `intake_document_author_guard`,
+  `consultation_sessions_access`, `prescriptions_access`,
+  `consultation_telemetry_access`, `consultation_telemetry_events_access`,
+  `chat_conversations_access`, `chat_messages_access`,
+  `chat_messages_insert`, `transactions_access`, `payment_events_access`,
+  `grievance_reports_access`, `grievance_reports_insert`,
+  `grievance_patient_author`, `grievance_adjudications_access`. Also fixes a
+  pre-existing `guard_profile_identity()` trigger that unconditionally
+  required every `patient_profiles` row to resolve to a `users` row with
+  `role='PATIENT'` — correct for a self profile, but a dependent's
+  `user_id IS NULL` by design, so this was rewritten to skip the role lookup
+  (not the identity-immutability check) only when `user_id IS NULL`. Also
+  adds `GRANT INSERT ON patient_profiles TO hellodoctor_api` (previously only
+  `hellodoctor_auth_worker` had it).
+- New endpoints: `GET/POST /patients/me/profiles` (list self+dependents /
+  create a dependent), `PATCH /patients/me/profiles/:id` (update one
+  dependent; deliberately rejects the caller's own self id with a clear
+  error telling them to use `/patients/me` instead).
+- New `AuthContext::acting_patient_profile_id(state, requested: Option<...>)`
+  — resolves to the caller's self profile when `requested` is `None`/equals
+  self, or authorizes a dependent via an RLS-scoped lookup (a non-owned id
+  simply isn't found, same non-leaky shape as everything else in this
+  codebase). Threaded through `POST /appointments/book` (new `profile_id`
+  field), `GET /patients/me/appointments` (new `profile_id` query param,
+  defaults to self), and — resolved from the resource itself, not a
+  client-supplied field, since the appointment/consultation already pins down
+  which profile it belongs to — `POST /appointments/:id/prescriptions` and
+  `POST /grievances`.
+- New `patient_repo::list_for_guardian`/`exists_for_user_id` functions;
+  `patient_repo::insert`/`update`/`find_*` all extended for the two new
+  columns.
+- New ABAC actions `PatientRead`/`PatientManageProfile` (scoped to the
+  `Patient` role only).
+- **15 new integration tests**, all individually confirmed passing (full
+  create/list/update dependent flow, cross-patient BOLA checks, self-vs-
+  dependent endpoint misuse rejection, dependent booking end-to-end
+  including intake upload and grievance filing, booking-as-a-profile-you-
+  don't-own rejected, and a dedicated regression test for the Agora bug
+  below). Uses `MPESA` as the gateway (the user explicitly corrected an
+  earlier `BKASH` leftover in these new test fixtures — Kenya-only
+  deployment) via `send_webhook_provider(app, "mpesa", ...)`, NOT the
+  shared `send_webhook()` helper, which is hardcoded to `"bkash"` and is left
+  untouched in all the pre-existing tests that already relied on it.
+
+**Three real, pre-existing-pattern bugs found and fixed** (not introduced by
+the schema change itself, but newly reachable/testable once dependents
+existed) — all three independently re-derived "is this caller the patient"
+by looking up the caller's own self profile via `find_by_user_id` and
+comparing its id directly against an appointment's `patient_id`, which can
+never match when that appointment belongs to a dependent:
+1. `ConsultationService::mint_agora_token` — a guardian joining their
+   dependent's own consultation was wrongly rejected as "not an authorized
+   participant." Fixed by resolving ownership one level up through
+   `guardian_patient_id` (dependents cannot nest, so one level is always
+   enough). Covered by the new
+   `test_guardian_can_mint_rtc_token_for_dependents_consultation` test.
+2. `ConsultationService::record_telemetry_events` — identical bug, identical
+   fix.
+3. `Idempotency::replay` (`api/middleware/idempotency.rs`) — a guardian
+   retrying an idempotent booking/upload call for a dependent would have
+   been wrongly rejected with "Appointment not found." Identical fix.
+
+### What is NOT yet verified — READ THIS BEFORE DOING ANYTHING ELSE TOMORROW
+
+A full `cargo test --test api_tests -- --test-threads=1` run was kicked off
+**before** the three ownership-bug fixes above existed. That stale run
+finished with **187 passed, 2 failed**:
+- `test_identity_doctor_private_financial_and_treatment_context_rls` — a
+  real RLS regression **I introduced**: my first draft of
+  `appointment_clinical_intake_access` was based on that policy's ORIGINAL
+  text (`20261003000001_rls_hardening`), not its actual current text — I had
+  not checked for later amendments. `20261017000001_clinical_and_payout_invariants`
+  had already replaced the bare `d.user_id = current_user_id` doctor branch
+  with the real treatment-context-window check
+  `doctor_history_context_allowed(...)` and narrowed the admin role list
+  (dropping `FINANCE_ADMIN`/`SUPPORT` from clinical PHI access). My draft
+  would have silently reverted that security fix.
+- `test_security_refresh_migration_revokes_legacy_rotated_families` — a real
+  500 error (`column "guardian_patient_id" does not exist"`), caused by this
+  test deliberately rolling the DB back to an older migration version
+  (`migrator.undo(&pool, 20261022000001)`) to test refresh-token-lineage
+  migration behavior, then calling the real OTP-login endpoint while in that
+  rolled-back state. `auth_service::verify_otp_and_login`'s existing-user
+  check unconditionally selected the full current column set.
+
+**Both are fixed in the code as of this checkpoint** (migration role lists
+and the `appointment_clinical_intake_access` doctor-branch corrected back to
+their real current text; `patient_repo::exists_for_user_id` added as an
+existence-only query touching only `user_id`, used in place of the full-row
+`find_by_user_id` in the OTP-login placeholder-creation check). **While
+auditing this, I also found and fixed the identical role-list regression on
+two more policies that had NOT yet surfaced a test failure**
+(`prescriptions_access`/`prescription_intake_documents_access`, also
+narrowed by `20261014000001_rx_pages_document_authorization` and also
+silently reverted by my first draft) — these had real, separate restrictive
+"window" policies (`prescriptions_doctor_window`/
+`intake_documents_doctor_window`) that were never touched and kept enforcing
+the time window correctly regardless, so the *role list* was the only actual
+regression there, not a PHI-window bypass — but still a genuine mistake
+worth fixing, and now fixed.
+
+**I was in the middle of re-running the two originally-failing tests in
+isolation to confirm the fixes when the user asked to pause. That
+confirmation never completed. A full fresh suite run has also never
+completed against this final code.**
+
+### Exact resume steps, in order
+
+1. `cd services/backend && cargo test --test api_tests -- --test-threads=1 test_identity_doctor_private_financial_and_treatment_context_rls test_security_refresh_migration_revokes_legacy_rotated_families` — confirm both pass in isolation first (fast signal, ~1 min).
+2. If both pass, run the full suite:
+   `cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test --lib && cargo test --test api_tests -- --test-threads=1` (the integration run takes ~22 minutes — this project's own house rule is it must be single-threaded due to cluster-wide capability-role setup, see the file's own top-of-file comment).
+3. Only once that full run is 100% green: restart the real dev backend (new migration landed — see CLAUDE.md §4's restart-discipline rule) and run `services/backend/scripts/verify_backend_schema.ps1` before trusting anything against the persistent dev DB.
+4. On the Flutter side: `cd apps/mobile_patient && flutter analyze --no-pub && dart format --output=none --set-exit-if-changed lib test && flutter test --no-pub` — confirm the M3 additions didn't regress the 49 passing tests from M2 (never re-confirmed this session).
+5. Then continue the plan at **M3.5** (`C:\Users\CUBE\.claude\plans\enumerated-wishing-pearl.md` §5b): Flutter profile-switcher UI (the prototype's Family Profiles chip row, made real) reachable from Home/Account, "+Add Dependent" form, wiring an "active profile" concept into Home's upcoming-consultation card — all backend endpoints for this already exist and are implemented, only the Flutter UI remains. After that, M4 (Directory/Booking) should carry the profile selector from the start, per the plan.
+
+**Do not re-litigate the design decisions already made this session**
+(separate `apps/mobile_patient` package, 26MB budget, `guardian_patient_id`
+column-extension approach, single-guardian/no-graduation scope, MPESA not
+BKASH in new test fixtures) — they're settled, confirmed with the user, and
+recorded in the plan file and this entry.
 
 ## Completed correction - Kenya professional registration - 2026-10-08
 

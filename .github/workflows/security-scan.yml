@@ -18,24 +18,22 @@ jobs:
     name: Rust dependency vulnerability scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.x
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master @ 2026-10-17
+        with:
+          toolchain: stable
 
       - name: Install cargo-audit (prebuilt binary, not compiled from source)
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
         with:
           tool: cargo-audit
 
-      - name: Generate Cargo.lock
-        # Cargo.lock is gitignored for this application (see
-        # services/backend/.gitignore) — cargo-audit needs one to know exact
-        # resolved versions, so CI resolves its own rather than relying on a
-        # committed lockfile.
-        working-directory: services/backend
-        run: cargo generate-lockfile
-
       - name: cargo audit
+        # Scans the committed services/backend/Cargo.lock directly — the
+        # same lockfile `cargo test`/`cargo clippy` use below and in
+        # backend-migrations.yml (fixes h18-cargo-audit-unaudited-drift: no
+        # more throwaway job-local lockfile that the test job never sees).
         working-directory: services/backend
         # RUSTSEC-2023-0071 (rsa: Marvin Attack timing sidechannel, no fixed
         # upstream release) is ignored deliberately: it reaches Cargo.lock
@@ -56,11 +54,11 @@ jobs:
     # rather than giving it a meaningless range.
     if: github.event_name != 'schedule'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.x
         with:
           fetch-depth: 0
 
       - name: TruffleHog OSS
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@e76dff8a7e57d6df0c60ad8cbf5d5cba505a8fc9 # v3.99.2, not @main
         with:
           extra_args: --only-verified
