@@ -1,0 +1,51 @@
+name: hellodoctor_mobile_patient
+description: HelloDoctor Patient mobile client
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_bloc: ^8.1.6
+  provider: ^6.1.2
+  dio: ^5.6.0
+  crypto: ^3.0.7
+  flutter_secure_storage: ^9.2.2
+  connectivity_plus: ^6.0.5
+  image_picker: ^1.1.2
+  # Pinned to match apps/mobile's exact constraint (not just "any 8.x"):
+  # file_picker 10.3.3's own Android module pulls in
+  # androidx.lifecycle:lifecycle-runtime:2.8.7, which requires compiling
+  # against Android API 34+ — a real, confirmed conflict with
+  # agora_rtc_engine's own AAR (published compiled against API 31), surfaced
+  # by Gradle's `checkDebugAarMetadata` task as a hard build failure. 8.1.2's
+  # own lifecycle-runtime requirement (2.1.0) has no such conflict, and this
+  # app's only usage (pickFiles/clearTemporaryFiles) is unchanged across both
+  # versions.
+  file_picker: ^8.1.2
+  url_launcher: ^6.3.1
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
+  workmanager: 0.6.0
+  permission_handler: ^11.3.1
+  intl: any
+  agora_rtc_engine: ^6.6.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  bloc_test: ^9.1.7
+  flutter_lints: ^4.0.0
+
+flutter:
+  generate: true
+  uses-material-design: true
+  fonts:
+    - family: Plus Jakarta Sans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans.ttf

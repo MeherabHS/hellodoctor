@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android permits the local-development exception so a release test build can
+  reach a LAN backend. ApiClient is the authoritative policy gate: public HTTP
+  and unsafe deployment flags are rejected, while production/staging require
+  HTTPS. The debug overlay keeps Flutter debug behavior explicit as well.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
