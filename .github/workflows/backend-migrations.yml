@@ -67,13 +67,19 @@ jobs:
       DATABASE_URL: postgres://hellodoctor:hellodoctor_dev_password@localhost:5432/hellodoctor
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.x
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master @ 2026-10-17
+        with:
+          toolchain: stable
 
       - name: cargo test --lib (unit tests, no database)
+        # --locked: fails closed if this resolves a dependency graph that
+        # differs from the committed Cargo.lock, instead of silently
+        # re-resolving — the same lockfile cargo-audit scans in
+        # security-scan.yml (fixes h18-cargo-audit-unaudited-drift).
         working-directory: services/backend
-        run: cargo test --lib
+        run: cargo test --lib --locked
 
       - name: cargo test --test api_tests (every migration applied fresh, real HTTP against it)
         working-directory: services/backend
@@ -81,4 +87,4 @@ jobs:
         # tests/api_tests.rs: the five capability roles are cluster-wide
         # Postgres objects, so parallel test threads race on shared
         # pg_authid catalog rows across the one Postgres service container.
-        run: cargo test --test api_tests -- --test-threads=1
+        run: cargo test --test api_tests --locked -- --test-threads=1

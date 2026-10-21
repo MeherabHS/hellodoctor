@@ -1,7 +1,10 @@
 # Rust build artifacts
 target/
 **/*.rs.bk
-Cargo.lock
+# services/backend/Cargo.lock is intentionally tracked (application binary,
+# not a library — fixes h18-cargo-audit-unaudited-drift). If another Rust
+# crate is ever added to this repo that IS a library, ignore its lockfile
+# specifically rather than repo-wide.
 
 # IDE & Editor
 .vscode/

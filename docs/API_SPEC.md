@@ -543,6 +543,11 @@ acknowledgements land atomically or not at all. See
 | Route | Auth | Contract |
 | --- | --- | --- |
 | `GET /api/v1/legal/documents` | Public | Returns all current documents: `[{ "document_type", "version", "title", "body", "required" }]`. Backs the mobile Legal & Consent screen — body text is always fetched from here, never duplicated as static strings client-side. |
+| `POST /api/v1/auth/patient/register` | Public | Patient registration step 1: `{email, phone_number, password}`. Creates a short-lived email OTP challenge; account creation waits for OTP and current consent. |
+| `POST /api/v1/auth/patient/login` | Public | Patient login step 1: `{email, password}`. Verifies the password and sends a short-lived Azure email OTP challenge. |
+| `POST /api/v1/auth/patient/verify-otp` | Public | Patient MFA step 2: `{challenge_token, otp_code, accepted_documents?}`. Registration requires the current Patient data-sharing consent; login does not. |
+| `POST /api/v1/auth/verify-otp-and-login` | Public | For a new Patient, accepts `accepted_documents: [{"type":"PATIENT_DATA_SHARING_CONSENT","version":"1.0"}]`; the current server version is required and is recorded atomically with account/profile creation. |
+| `GET /api/v1/patients/legal/acceptances` | Patient (own) | Returns the Patient's immutable consent-evidence history. |
 | `GET /api/v1/doctor/legal/acceptances` | Doctor (own) | That Doctor's own immutable acceptance history. |
 | `GET /api/v1/admin/legal/acceptances/{user_id}` | Compliance, PlatformAdmin, ClinicalAdmin | Evidence view of a specific user's acceptance history (`abac::Action::ViewLegalAcceptances`). |
 
@@ -551,3 +556,30 @@ document version produces a new row, never a mutation of an old one. Forcing
 re-consent at next login when a document version is bumped, and a dedicated
 marketing-consent revoke endpoint, are both out of scope for this pass (the
 data model supports detecting staleness; no login-time gate/UI is built yet).
+
+
+### Patient Q&A owner-read correction (2026-10-14)
+
+`GET /api/v1/patients/me/qna/questions?include_own_open=true` additively includes the authenticated Patient's own and guardian-dependent OPEN questions alongside the public ANSWERED feed. Omitting the parameter preserves the answered-only result. Each row includes `status` (`OPEN`/`ANSWERED`) and `answering_doctor_verified`; OPEN answer/doctor fields are null. Author IDs remain inaccessible and are never serialized. POST returns the server-created OPEN DTO with HTTP 201. CHAT consultation availability continues to use the existing positive-fee directory contract and requires slot selection/payment.
+
+### Consultation client correction (2026-10-14)
+
+No new booking, payment or messaging endpoint is introduced. Existing response projections add:
+
+- `GET /appointments/:id`: nullable transaction `payment_status`, under the same authenticated role/ownership context as the appointment.
+- `GET /patients/me/appointments`: nullable `chat_expires_at` and `chat_locked`, scoped to the requested authorized self/dependent profile; existing `consultation_fee`, Doctor identity and modality remain authoritative.
+- `GET /doctor/appointments`: nullable `conversation_id`, `chat_expires_at` and `chat_locked`; Patient name and modality are still joined from authorized backend records.
+- `GET /doctor/chats`: `modality` and `appointment_status` for modality-specific entry and read-only rendering.
+- `GET /appointments/:id/conversation`: closed appointment states present `is_locked=true` without deleting authorized history. Resolution remains read-only and never creates a paid consultation.
+
+`POST /chat/:id/messages` rejects unactivated/cancelled/refunded/no-show appointments as well as existing locked/expired conversations. RTC authorization rejects CHAT modality before minting. Opening the same paid booking repeatedly, or concurrent VIDEO authorization when the session was initially absent, resolves the one stored appointment-scoped conversation/session. Nonpositive configured modality fees return 409 from booking. Existing successful payment transitions and VIDEO follow-up messaging are preserved. See [verification contract and evidence](PATIENT_CHAT_CONSULTATION_VERIFICATION.md).
+
+
+## 2026-10-16 pre-E2E additive contracts
+
+- Doctor appointments return database-calculated `queue_actionable`. `view=upcoming` filters to IN_CONSULTATION/current/future work, including an authorized still-active Chat window. The complete endpoint remains available for history. Default client surfaces use the flag and server ordering, not client clocks. Own-slot rows include `bookable`; Patient public slots require AVAILABLE and a future full UTC start timestamp. Booking revalidates using the wall clock after the row lock.
+- `POST /appointments/:id/payment`: Patient-owned existing payment attempt only; role/RLS/guardian/state/start-time checks and booking rate limit. With the current absent collection adapter it returns controlled 409 and performs no economic mutation. Clients must never open the old `.invalid` booking URL or infer confirmation locally.
+- `POST /chat/:conversation_id/attachments`: verified Doctor, authorized active clinical context, JPEG/PNG `{mime_type, base64_content}` and required `Idempotency-Key`. Existing normalization guarantees at most 40 KiB per stored image. Same scoped key/image is concurrency-safe. Returns the authoritative chat message and safe attachment metadata, without private storage keys.
+- `GET /chat/:conversation_id/messages/:message_id/attachment`: authenticated conversation/document authorization on every view, including Doctor clinical-window check; returns `{mime_type, base64_content}` with no-store/private/nosniff headers. No public or bearer document URL is issued. Existing encrypted DocumentStorageService remains the only byte-storage path; unconfigured live storage fails honestly.
+
+No database migration or new business enum was introduced. Video/Agora media remains deferred.

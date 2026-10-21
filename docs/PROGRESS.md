@@ -1,357 +1,3 @@
-# HelloDoctor - Current Engineering Progress
-
-**Status reconciled:** 2026-10-08. This is the authoritative current status; dated records below are history. No overall percentage is claimed because implemented code, automated verification, device acceptance and production deployment are different gates.
-
-## Latest verified baseline
-
-| Component | Result | Evidence / scope |
-| --- | --- | --- |
-| Rust formatting | PASS | `cargo fmt --check` |
-| Rust lint | PASS | `cargo clippy --offline --all-targets -- -D warnings` |
-| Rust library | **50/50 PASS** | `cargo test --offline --lib` |
-| Backend integration | **139/139 PASS** | Full `api_tests`, serialized with `--test-threads=1`; zero failures |
-| Dart formatting / Flutter analysis | PASS | Format clean; `flutter analyze --no-pub` clean |
-| Flutter tests | **98/98 PASS** | `flutter test --no-pub`; includes 17 Q&A layout/state/golden tests |
-| Doctor Web | **44/44 PASS; typecheck/build PASS** | Last verified in the security/Articles pass; not rerun for the later backend/Q&A correction |
-| Admin Web | **13/13 PASS; typecheck/build PASS** | Last verified in the security/Articles pass; not rerun for the later backend/Q&A correction |
-| Migration agreement | **VERIFIED: 20261026000001** | Source = running binary = persistent development DB at the latest verification; all 34 applied UP checksums match |
-| Historical migration integrity | PASS | 62 saved historical migration files unchanged |
-| Latest live development checks | PASS | Synthetic login, private-profile isolation, canonical trace linkage, denied trace access, session/request audit metadata |
-| Physical-device verification of latest Q&A fix | **PENDING_NO_DEVICE** | No Android device connected; installed phone APK was not replaced |
-
-These are the latest recorded checks, not a new test run for this documentation update. Counts from earlier dated sections are historical. Automated regression and widget goldens do not constitute a penetration test or physical-device acceptance.
-
-Primary evidence: [ownership/Q&A results](audit_evidence/user-isolation-qna.json), [security/Articles results](audit_evidence/public-exposure-security.json), [ownership/Q&A report](USER_ISOLATION_AND_QNA.md).
-
-## Current implementation status
-
-| Area | Current status | Remaining boundary |
-| --- | --- | --- |
-| Canonical identity / ownership | **USER_LEVEL_DB_ISOLATION_VERIFIED** | `users.id` is the security identity; unique FK-backed Patient/Doctor mappings, role/profile consistency, composite ownership FKs and pooled SET LOCAL context tested |
-| Database isolation / traceability | **VERIFIED** | All 40 tables inventoried; 35 FORCE RLS tables and five documented pre-auth/infrastructure exceptions; five capability roles have no BYPASSRLS or table ownership |
-| Controlled Compliance trace | **IMPLEMENTED / AUDITED** | COMPLIANCE and PLATFORM_ADMIN only; stable internal IDs, required reason, session/request audit, fail-closed audit persistence; no unrestricted Admin DB access or formal legal export workflow |
-| JWT/session lifecycle | **IMPLEMENTED / REGRESSION GREEN** | Immediate access-token invalidation on current-family logout; other sessions preserved; atomic refresh rotation/reuse revocation and single-use Patient OTP tested |
-| Protected API / cache boundary | **IMPLEMENTED / REGRESSION GREEN** | JWT, ABAC, ownership and RLS retained; subject/authorization/query-scoped idempotency cannot replay private data ahead of downstream checks |
-| Public-exposure application guards | **IMPLEMENTED; DEPLOYMENT PARTIAL** | Explicit environment, production seed/dev-OTP prohibition, trusted HTTPS ingress checks, protected production metrics, blocked production simulation, Redis failure = 503 rather than fail-open |
-| Kenya professional review | **KENYA_PROFESSIONAL_VERIFICATION_VERIFIED** | KMPDC/KE; explicit PENDING/VERIFIED/REJECTED; pending-only queue; atomic verify/reject with one race winner; boolean compatibility derived; internal manual review, no external registry integration |
-| Scheduling / cross-portal availability | **IMPLEMENTED / VERIFIED** | Doctor owns normal slot management; authorized Admin emergency operations; patient availability API excludes unavailable slots; visible online portals refresh every 15 seconds plus request latency |
-| Scheduling navigation / reported entries | **COMPLETE** | Dedicated Doctor Web Schedule & Slots; two specifically authorized unbooked entries cancelled and audited; unrelated three proposed historical corrections remain unapplied |
-| Slot approval | **NOT_IMPLEMENTED_BY_PRODUCT_DESIGN** | Explicit user policy: no approval workflow; auditing does not require approval |
-| Doctor Articles | **IMPLEMENTED** | Structured Doctor Web + Flutter authoring and direct publication by verified Doctors; no Admin review; published patient feed is API-only |
-| Queue / notification domain | **BACKEND IMPLEMENTED** | Upcoming-first queue, owned inbox APIs, deduplicated reminders/daily summaries and lifecycle notifications; dedicated Flutter notification bell/inbox UI remains unimplemented; real push provider configuration required |
-| Startup incident reporting | **IMPLEMENTED / VERIFIED** | Pre-initialization incident journal, authenticated delivery and Admin reference/build correlation; updated device build still needs installation/acceptance |
-| Doctor Flutter Open Health Q&A | **DOCTOR_QNA_CODE_FIXED_REAL_DEVICE_PENDING** | Dedicated flow layout, flexible long content, keyboard-safe editor, answered list, authoritative 409 recovery and eight goldens verified; actual phone rendering still pending |
-| Doctor Web / Doctor Flutter core workflows | **IMPLEMENTED; ACCEPTANCE PARTIAL** | Existing queue, chat, Smart Rx, schedule, wallet, profile/settings and Articles; user previously confirmed Doctor app acceptance, which does not verify the latest Q&A build |
-| Patient client / complete patient journey | **NOT_IMPLEMENTED / NOT_VERIFIED** | No patient-facing Flutter client exists; synthetic backend journey passes, but patient UI and device journey are not complete |
-| Private clinical-document storage | **IMPLEMENTED; DEPLOYMENT ACCEPTANCE OPEN** | Private storage configuration and successful deployed upload/download acceptance remain required; earlier live development uploads were blocked by missing storage configuration |
-| Seven endpoint coverage gaps | **CLOSED / REGRESSION GREEN** | System-error simulation, compliance alerts, audit simulation, pending verification queue, aggregate telemetry, metrics and finance month-filter tests are in the current API suite |
-| Upload compression / field validation | **IMPLEMENTED / REGRESSION GREEN** | Centralized 400 KiB batch ceiling, server-side field limits, email/phone validation and password rules; no longer deferred |
-| Newtype identity refactor | **COMPLETE** | Distinct UserId / PatientProfileId / DoctorProfileId types; schema and wire UUID representation preserved |
-| Machine-generated OpenAPI | **DEFERRED / NOT_IMPLEMENTED** | Handwritten API/client contracts remain; no utoipa/schemars retrofit or dependency installation |
-| Current Azure hosting proposal | **PROPOSED / NOT_DEPLOYED_OR_LOAD_VERIFIED** | User will handle hosting; no infrastructure changes or capacity guarantee recorded |
-
-## Current milestone coverage
-
-| Milestone | Current status |
-| --- | --- |
-| SPEC / M0-M1: architecture and security model | Implemented foundation; current product decisions override historical spec assumptions |
-| M2: canonical database / ownership | Implemented and regression/live verified through migration 20261026000001 |
-| M3: API / authentication | Implemented and regression verified; sensitive Admin step-up remains open |
-| M4: Flutter / Agora setup | Doctor Flutter workspace and RTC client exist; live media/device acceptance remains open |
-| M5: specialist discovery | Backend directory exists; patient client acceptance incomplete |
-| M6: patient home / helpline | Patient client not implemented |
-| M7: booking / payment hold | Backend atomic booking and synthetic payment journey tested; real provider acceptance open |
-| M8: prescription/intake uploads | Backend and Doctor workflows implemented; complete patient UI acceptance open |
-| M9: waiting room / device readiness | Doctor queue exists; full patient waiting-room/device journey not verified |
-| M10: RTC / telemetry | Backend tokens/telemetry and Doctor RTC client exist; real-device/provider verification open |
-| M11: 24-hour clinical chat | Backend/Doctor workflows implemented; full patient client journey open |
-| M12: prescription / health vault | Backend/Doctor prescription workflows implemented; patient health-vault UI and lab-report model remain gaps |
-| M13: Doctor wallet / settlement | Internal ledger and Doctor views implemented/tested; live disbursement/provider readiness separate |
-| M14: grievances / arbitration | Backend/Admin workflow and synthetic tests exist; live refund/provider readiness separate |
-| M15: Admin / dossiers | Implemented; controlled audited trace added; step-up remains open for sensitive operations |
-| M16: English/Swahili | Full bilingual product acceptance not verified |
-| M17: offline guards | Doctor safe cached-read/error behavior exists; complete patient/offline acceptance open |
-| M-SECURITY: application security | Latest defined regressions green; external production gates and step-up remain open |
-| M18: final production acceptance | OPEN; not equivalent to unit/integration tests passing |
-
-## Remaining work and release gates
-
-1. **Sensitive Admin step-up authentication remains open** for financial/security operations. Existing authorization is not recent reauthentication.
-2. **Latest Q&A real-device render/acceptance remains pending.** Connect an existing Android device and verify the corrected build against `prototype/index.html` before claiming the fix visually accepted. Widget goldens are separate evidence.
-3. **Patient client and complete patient journey remain unfinished.** Patient APIs and synthetic backend tests do not replace patient UI/device/provider acceptance.
-4. **External deployment/provider acceptance remains open:** approved TLS termination and production configuration, production OTP/SMS delivery, private clinical-document storage, real push delivery, live Agora/media acceptance, and payment/refund/payout provider validation. Purchasing Azure services does not integrate them automatically.
-5. **Operational release evidence remains open:** off-host backups and restore drill, deployed monitoring/alerts, production secrets/key management, retention and the payment-production readiness checklist. Current Azure load/soak testing has not been performed; earlier local capacity results predate the latest session/RLS changes.
-6. **Scoped product/quality gaps remain:** dedicated Flutter notification inbox/bell UI, lab-report endpoint/model, generated OpenAPI, and formal legal export workflow. These are recorded gaps, not authorization to reopen them in this documentation pass.
-
-Overall release status: **PUBLIC_EXPOSURE_SECURITY_GATES_PARTIAL**. Controlled synthetic-data development/testing is supported; unrestricted clinical production, real-money operation and an unsupervised 1,200-user pilot are not declared ready. No evidence-based overall completion percentage is assigned.
-
-See [public-exposure controls](PUBLIC_EXPOSURE_HARDENING.md), [deployment checklist](PRODUCTION_DEPLOYMENT.md), [Articles policy](DOCTOR_ARTICLES.md), [ownership inventory](USER_OWNERSHIP_INVENTORY.md), and [scheduling evidence](SCHEDULE_SYNC_FOLLOWUP.md).
-
-## Current scope and resume rules
-
-- This update changes documentation only. No code changes, deployments, service starts, package installs or host configuration changes are included.
-- The user will handle the proposed Azure hosting setup. Hosting is not marked deployed, integrated or performance-verified.
-- Do not re-run completed Articles, Kenya review, ownership-isolation or security implementation solely because an archived entry says "not started" or "resume here".
-- Do not add slot approvals or Article Admin review. Preserve current five-role DB architecture, ABAC, RLS, session boundaries and Kenya-only professional review.
-- Apply new SQLx migrations for future schema changes. Never edit applied migration history or manually modify `_sqlx_migrations`; B-01 source/binary/database guards remain required.
-- No further implementation is automatically queued by this status reconciliation. Future work requires the user's next instruction; record pending acceptance and release gates accurately.
-
-## Historical implementation log
-
-Everything below this boundary records earlier passes. Old test counts, migration versions, agent rosters, environment descriptions, interrupted states and resume instructions are historical, not the current task list. The status tables above supersede them. Historical audit findings are retained rather than rewritten as if later fixes had already existed.
-
-## Pre-Patient capacity benchmark + grievance-number concurrency fix — 2026-10-28
-
-Ran a manually-driven open-loop RPS ramp (25→500+ RPS, 11 stages, 6 min each,
-≈67 min total) against an isolated `docker-compose.capacity.yml` stack
-(`hellodoctor-capacity-*`, never touching the real dev containers), reusing
-the existing `examples/capacity_test.rs` harness and
-`scripts/seed_capacity_dataset.sql` dataset (1150 patients, 40 doctors, 10
-admins). Two Docker CPU models were tried: a CFS-quota ("burst") profile,
-which collapsed catastrophically above ~400 RPS (21%+ true system error
-rate, p50 climbing into multi-second territory — later understood to be a
-Docker throttling artifact, not a real application limit), and a
-`cpuset`-pinned/`cpu_shares`-based ("stable", non-burstable) profile, which
-handled the entire 25–500+ RPS range cleanly (true system error rate
-0.00–0.04% throughout, p50/p95 staying in single-to-low-double-digit
-milliseconds, peak CPU never exceeding ~1.3 of the 4 pinned cores). No real
-capacity ceiling was found under the stable profile within this range.
-Raw evidence: `docs/audit_evidence/pre_patient_benchmark_4x8/`.
-
-**Real bug found by the benchmark, not by inspection**: `POST /grievances`
-threw genuine HTTP 500s (duplicate-key violations on
-`grievance_reports_grievance_number_key`) starting at 50 RPS, growing with
-load (96 total across the full stable-profile ramp). Root cause: the
-grievance number was built from the first 4 hex characters of a fresh UUID
-(16 bits of entropy) per calendar day — a probabilistic scheme that collided
-under genuine concurrency. Fixed via migration `20261028000001`: a Postgres
-sequence (`grievance_number_seq`) backs the column's own `DEFAULT`
-(`GRV-YYYYMMDD-00000123`-shaped, zero-padded), atomic under concurrency by
-construction, with gaps accepted as the normal cost of human-facing
-reference numbers (not solved by widening the random suffix, which stays
-probabilistic). `grievance_repo::insert` no longer accepts a caller-supplied
-number; it returns the one the database generated via `RETURNING`.
-
-Verified three ways: (1) 500 concurrent `pgbench` clients directly against
-Postgres — 0 failures, 1200/1200 distinct numbers; (2) a new permanent
-regression test, `test_grievance_number_unique_under_concurrent_submission`
-(40 concurrent `GrievanceService::submit_grievance` calls, asserts all
-succeed with distinct numbers); (3) the full suite — **fmt clean, clippy
-clean, 50/50 lib, 143/143 integration** (142 prior + the 1 new test) — run
-against both the capacity stack and the real dev backend, with
-`verify_backend_schema.ps1` confirming source == binary == database ==
-`20261028000001` on the real dev backend afterward.
-
-No other error type appeared anywhere in the backend logs across the full
-67-minute, 11-stage run — every other endpoint (`GET /doctors`,
-`/doctors/:id/slots`, admin telemetry, wallet summary, appointment booking,
-chat, rtc-token, telemetry, webhook confirm) stayed at 0% system errors
-throughout.
-
-**Caveats, stated plainly**: this is a local Docker/WSL2 benchmark on desktop
-hardware (AMD Ryzen 5 5600), not a real Azure B4ls_v2/D-series VM — CPU
-microarchitecture, virtualized networking/storage, disk IOPS, and
-multi-tenant noisy-neighbor effects all differ from the real target
-environment. Treat throughput/latency numbers as directional engineering
-signal (where the architecture bends, which component saturates first,
-correctness under load), not as a production capacity guarantee. That
-requires the real Azure staging run the original benchmark spec itself
-defers to.
-
-## Doctor registration legal/consent gate — verified — 2026-10-27
-
-Added a mandatory Legal & Professional Agreements step to Doctor
-registration, per [ADR-011](ADR/ADR-011-legal-consent-ledger.md). New tables
-`legal_documents` (server-owned registry, current/historical versions,
-hash recomputed by a Postgres trigger, never client-supplied) and
-`legal_acceptances` (immutable, append-only; no role is ever granted
-`UPDATE`/`DELETE`) via migration `20261027000001_legal_acceptances`.
-`POST /auth/doctor/register` now requires `accepted_documents: [{type,
-version}]` covering every currently required document (`DOCTOR_TERMS`,
-`PRIVACY_NOTICE`, `PROFESSIONAL_VERIFICATION_DECLARATION`,
-`TELEMEDICINE_PRACTITIONER_POLICY`), with `MARKETING_COMMUNICATIONS`
-optional; both a handler-level check and a DB trigger independently reject a
-missing or non-current document, so a direct API call cannot bypass it.
-Acceptance rows are written inside the existing registration transaction, so
-the account and its acknowledgements land atomically. New public
-`GET /legal/documents`, plus protected `GET /doctor/legal/acceptances` and
-`GET /admin/legal/acceptances/{user_id}` (new `abac::Action::ViewLegalAcceptances`,
-Compliance/PlatformAdmin/ClinicalAdmin).
-
-Flutter: registration's existing single form now navigates to a new
-`LegalConsentPage` (`features/auth/legal_consent_page.dart`) on "Continue"
-instead of submitting directly — four required checkboxes (unchecked by
-default) with a "View" reader for each document's live-fetched text, an
-"Optional" marketing checkbox, and a "Submit application" button disabled
-until all required boxes are checked. The account is only actually created
-from this screen.
-
-Seeded v1.0 document text is a reasonable draft grounded in Kenya ODPC
-guidance (cross-border/Azure processing disclosure, KMPDC verification
-authorization, telemedicine confidentiality) — explicitly **not
-lawyer-reviewed**; must be replaced with legal/compliance-approved copy
-before production launch.
-
-Out of scope this pass (flagged, not silently dropped): forcing re-consent
-at next login when a document version is bumped (the data model supports
-detecting staleness; no login-time gate/UI is built yet), and a dedicated
-marketing-consent revoke endpoint.
-
-Verification: **cargo fmt clean, cargo clippy --all-targets -D warnings
-clean, 142/142 backend integration tests PASS** (`cargo test --test
-api_tests -- --test-threads=1`, includes 3 new tests covering the 10 named
-scenarios from the spec plus the existing registration test updated for the
-new required field). **Flutter: analyze clean, 98/98 tests PASS**. Schema
-verified via `verify_backend_schema.ps1`: source == binary == database ==
-`20261027000001`, confirmed against the actual running dev backend (restarted
-after the migration landed, per this project's own migration-discipline
-rule). Live-checked `GET /legal/documents` against the running dev backend
-and confirmed it serves the seeded documents. Physical-device walkthrough of
-the new consent screen itself is pending the user's own test pass.
-
-## Kenya professional registration - verified - 2026-10-08
-
-Professional registration now uses KMPDC/KE and explicit PENDING / VERIFIED /
-REJECTED states. The Admin queue filters PENDING in SQL. ClinicalAdmin/PlatformAdmin
-review commits state, metadata, audit and notification together; concurrent
-verify/reject yields one success and one 409. The compatibility boolean is derived.
-Account suspension, duty, MFA, payout readiness and sessions remain separate.
-Doctor Web, Flutter and Admin use the new contract.
-
-Migration 20261024000001 was applied through normal startup. Source, binary and
-database agree; all 62 pre-existing SQL files retain their hashes. Exactly two
-proven synthetic seed Doctor profiles and four related seed phone fields were
-corrected. Unknown records and scheduling/finance data were left alone. Two new
-clearly synthetic live-review Doctors remain off duty and have no slots.
-
-Final sequential Rust checks: **fmt/clippy PASS, 50/50 library, 113/113 API**.
-Flutter: **analysis clean, 74/74 tests**. Doctor Web: **typecheck/source guard clean,
-33/33 tests, build PASS**. Admin: **typecheck clean, 4/4 tests, build PASS**.
-The live walkthrough passed **14 checks, zero browser exceptions**, covering both
-terminal review paths, refreshed queue exclusion and KMPDC/status display. The user
-confirms the Doctor app is verified. No software or dependencies were installed.
-
-This is internal manual registration review, with no claim of official registry
-confirmation or current annual practice licensure. Details and requested status
-fields: [Kenya verification report](KENYA_PROFESSIONAL_VERIFICATION.md).
-
-## Dedicated Doctor scheduling navigation - verified - 2026-10-08
-
-Added Schedule & Slots immediately before Appointments in the Doctor Web sidebar.
-It opens availability and the Add Schedule Slot action directly, has its own active
-state, and supports desktop/narrow-screen navigation and browser history. No
-appointment/date shortcut is needed to reach slot creation. TypeScript,
-source-safety/format, 32 web tests and production build pass. The isolated browser
-walkthrough now passes 13 assertions with zero browser exceptions and cleans up its
-owned database/processes/Redis data. Doctor Web restarted on port 3001.
-Details: [scheduling follow-up](SCHEDULE_SYNC_FOLLOWUP.md).
-
-## Scheduling follow-up - verified - 2026-10-08
-
-Admin and Doctor Web now use the same EAT scheduling clock and expose schedule
-freshness/errors. Admin schedule polling/mutations are independent of other
-dashboard reads; Doctor appointments poll alongside availability. Two reported
-unrecognized availability entries were confirmed unbooked and cancelled with audit
-snapshots after the user's explicit choice. Their historical creators are unknown.
-Verification: 32 Doctor Web tests, 2 Admin time-zone tests, both production builds,
-and 11 isolated browser assertions pass with zero browser exceptions. The final
-read-only browser check confirms both actual entries are CANCELLED in both portals.
-All browser
-mutation fixtures used an owned throwaway database, which was removed afterward.
-Details: [scheduling follow-up](SCHEDULE_SYNC_FOLLOWUP.md).
-
-## Startup reporting and schedule synchronization - verified - 2026-10-08
-
-Startup failures are journaled before API/session initialization and delivered
-after Doctor authentication, with reference/build visible to Admin. Admin blocks
-now use BLOCKED; Doctor Web and mobile refresh schedules and display blocked rows.
-Slot creation and transitions are audited. Four historical fixture scripts now
-require explicit opt-in; three confirmed old fixture slots were identified without
-changing shared schedule data. Three legacy cancellation-to-block corrections are
-prepared pending the user's choice.
-
-Verification: fmt/clippy clean, **50/50 library**, **106/106 serialized API**,
-**72/72 mobile**, **32/32 Doctor Web**; Flutter analysis, both web builds and the
-native ARM64 APK build pass. Read-only browser checks confirm both portals display
-the same existing blocked slot and observe Doctor polling. Updated phone APK is
-required; no physical phone was connected for verification.
-Details: [startup reporting and slot sync report](STARTUP_REPORTING_AND_SLOT_SYNC.md).
-
-## Authentication boundary hardening — verified — 2026-10-08
-
-Completed in order: authenticated/authorized idempotency replay, atomic refresh
-lineage with family reuse revocation, and single-use patient OTP concurrency.
-Explicit environment/seed guards and expired JWT artifact cleanup are included.
-Verification: fmt/clippy clean, **50/50 library**, **103/103 serialized API tests**,
-five built-executable startup refusal checks, and source/binary/database schema
-agreement at `20261023000001`. Legacy rotated refresh families require login again.
-Details and exact tests: [backend security report](../services/backend/SECURITY_HARDENING.md).
-Production verdict remains controlled synthetic-data testing only; unrestricted
-clinical and real-money readiness is not declared.
-
-## Doctor Engagement extension: Queue + notification domain — DONE — 2026-10-07 (later)
-
-Full detail: `docs/CHECKPOINT.md`'s matching entry (pointer only here). Part A (Queue
-upcoming-first ordering) and Parts B-G (full notification domain: schema, in-app inbox, DB-backed
-daily-summary/T-15-reminder scheduler, push adapter boundary, registration/earning-credit
-triggers) of the "HELLODOCTOR — DOCTOR ENGAGEMENT & CONTENT EXTENSION" spec are done and
-independently re-verified: `cargo fmt`/clippy clean, `cargo test --lib` 43/43, full
-`cargo test --test api_tests -- --test-threads=1` **62/62** (up from 53, zero regressions),
-migration schema-verified (`SOURCE = BINARY = DATABASE`, `HELLODOCTOR_BACKEND_READY`). Two genuine
-PostgreSQL RLS gotchas were found and fixed along the way (both documented in code comments and
-the checkpoint entry): `ON CONFLICT DO NOTHING` and plain `UPDATE` both require implicit `SELECT`
-visibility to find candidate rows, which an owner-scoped `SELECT` policy silently defeats for any
-backend-authored write made on another user's behalf. `PUSH_PROVIDER_CONFIGURATION_REQUIRED` —
-no real FCM/APNs integration exists or was faked.
-
-Backend field validation + stricter email/phone + password strength (8+ chars, upper/lower/digit/
-special) is also done, including an orchestrator follow-up fix (a stale 12-char password check
-that was silently overriding the new 8-char policy — removed).
-
-**Status reconciliation (2026-10-08):** Articles backend, Doctor Web/Flutter authoring and patient-feed APIs are implemented without Admin review. The newtype-ID refactor and backend validation are complete. Dedicated Flutter notification bell/inbox UI, real push delivery and generated OpenAPI remain open. No patient-facing Flutter app exists. The old deferred backlog is superseded.
-
-## Multi-agent pass: Finance UI, Flutter parity/cleanup, upload compression, input-safety — 2026-10-07
-
-Full detail: `docs/CHECKPOINT.md`'s matching entry (pointer only here). **Historical interrupted state; later validation and engagement work supersedes this old deferred list. Refer to the current status table before resuming.**
-
-Done & independently re-verified by the orchestrator (not just trusted from agent self-reports):
-admin-web Finance UI (refund-request resolution screen + a real month-filter bug fix); a second
-Doctor Flutter prototype-parity pass (5 of 6 items — the 6th correctly identified as blocked on a
-genuinely missing backend lab-report feature, not faked); a Flutter cleanup pass (controller-leak
-fix, dead-widget removal, one new regression test); a mobile + admin-web "input safety" pass
-(double-submit/busy-guard audit — found and fixed several real missing guards on both platforms —
-plus an `Idempotency-Key` network-retry-safety mechanism wired into the Flutter API client, plus
-field length caps using canonical numbers 150/1000/2000/300 chars). Evidence across all of the
-above: Flutter `flutter analyze` 0 issues / `flutter test` 50/50 / `dart format` clean; admin-web
-`tsc --noEmit`/`npm run build` clean.
-
-**New feature, iterated three times with the user — done, independently re-verified, closed
-out**: default server-side prescription/intake image compression (`upload_security_service.rs`),
-settled at **400 KB total per upload batch** (divided across however many images are in it, e.g.
-80 KB/image at 5 images), as a **guaranteed ceiling that is never exceeded and never rejects the
-upload** — proven against genuine worst-case random-noise fixtures, not just realistic
-document-photo ones. `cargo fmt`/clippy clean, `cargo test --lib` 29/29, full
-`cargo test --test api_tests -- --test-threads=1` re-confirmed green. See the checkpoint entry's
-§4 for the full algorithm and empirical numbers.
-
-**Status reconciliation (2026-10-08):** Server-side length limits, sanitization, stricter email/phone validation, upcoming-first Queue, notification backend and direct Doctor Articles are implemented. Notification Flutter UI and real push delivery remain open; patient article feed exists as an API only. This entry is no longer a resume queue.
-
-## Admin panel error-log/crash-report wiring + real stack-trace capture — 2026-10-07
-
-Full detail: `docs/CHECKPOINT.md`'s matching entry (pointer only here, not duplicated). Summary:
-admin-web's "App Error & Incident Logs" page was reading the wrong backend table (`/admin/logs`,
-the audit trail) with fully client-side-fake resolve/simulate actions; rewired to the dedicated
-`/admin/system-errors` endpoints (real `trace_id`/`subsystem`/`component`/`error_code` codename
-fields, real acknowledge/resolve, a new dev-only `simulate` endpoint that writes a genuine row).
-Separately, the `stack_trace` ("code snippet") column had zero writers anywhere, a known gap
-flagged since the original System Error Service pass (§8.1) — fixed via `#[track_caller]`
-constructors (`AppError::internal`/`AppError::service_unavailable`) and a manual, trackable
-`From<sqlx::Error>` impl, with ~40 call sites migrated across 10 files. Backend:
-`cargo fmt`/clippy clean, `cargo test --lib` 23/23 (4 new location-capture tests),
-`cargo test --test api_tests -- --test-threads=1` 53/53 (unchanged, zero regressions). Admin-web:
-`tsc --noEmit`/`npm run build` clean. Live-verified end to end against the real dev server
-(simulate → list → acknowledge → resolve, all real HTTP calls against real Postgres).
-
 ## B-01 prevention control (migration/deployment integrity) — 2026-10-07 (follow-up pass)
 
 Direct follow-up to the four-agent audit below, scoped to exactly one finding: B-01, where a
@@ -496,21 +142,77 @@ Triggered by real on-device IRL testing of pass 2's build, which surfaced a visu
 
 Evidence: backend `cargo check`/clippy clean, `cargo test --test api_tests -- --test-threads=1` **43/43** (up from 42); Flutter `flutter analyze`/`dart format` clean, `flutter test` **41/41** (up from 40); live server restarted and re-verified against the real running Postgres/Redis containers after every change, not just the test suite; release APK rebuilt successfully throughout (`apps/mobile/build_field_test.ps1`). The three documented backend-data gaps from pass 2 (chat preview/category, Rx lab-reports/vitals, Q&A answered-list) remain untouched, awaiting a product decision.
 
-## Historical Doctor visual replication checkpoint - 2026-10-06 (pass 2: Chat/Smart Rx/Schedule/Wallet/Q&A)
+## Doctor visual replication checkpoint - 2026-10-06 (pass 2: Chat/Smart Rx/Schedule/Wallet/Q&A)
 
 Queue was accepted from a real-device screenshot this session (minor typography/overflow fixes applied and now frozen per instruction). The remaining five primary Doctor screens — Consultation Chats, Smart Rx Scanner, Consultation Schedule, Doctor Earnings & Wallet, and Open Health Q&A — were fully rebuilt this pass by reading the actual `prototype/index.html` markup/CSS for each (not from memory), cross-checked against the real Rust backend contracts, and verified with `flutter analyze` (clean), `dart format --set-exit-if-changed` (clean), and `flutter test` (40/40, including new responsive tests at 360/390/412px and business-rule-wording tests). Full detail, per-screen discrepancy notes, and the three backend-data gaps intentionally left unfilled (chat preview/category, Rx lab-reports/vitals, Q&A answered-list) are in `docs/DOCTOR_FLUTTER_REPLICATION_REPORT.md`.
 
 A genuine, minimal, additive backend defect was found and fixed in this pass: `list_own_appointments`, `list_own_chats`, `list_own_slots`, and `wallet_ledger` only ever returned `patient_id` (a UUID), never a patient name — every screen needs this to show a doctor who a row belongs to. Fixed via a `patient_profiles` join (RLS-safety verified first), with a new regression test; full backend suite re-run clean at 42/42 after each change, live dev server restarted to serve the fix.
 
-**Current acceptance scope (2026-10-08):** The user subsequently confirmed the Doctor app. The latest Q&A correction has passed structural/widget/golden checks but still needs physical-device inspection; the old blanket app verdict below is historical.
-
 **The rendered-screenshot-comparison gate below is still not satisfied for these five screens** — this environment has no Android SDK/emulator (confirmed: no adb devices), so only code-level/structural verification was possible. The app remains `DOCTOR_FLUTTER_NOT_VERIFIED` until a human (or an environment with device access) actually compares each screen's rendered output against the prototype, the same way Queue was confirmed.
 
 The Doctor Flutter app must replicate the canonical source file `prototype/index.html` in every visual and interaction detail. This is a hard rule for all future work: every screen or component change must be checked back and forth between the prototype and the rendered Flutter screen. The required loop is inspect HTML/CSS/JS, render Flutter, compare, correct discrepancies, and compare again. Code inspection, analyzer success, and widget tests do not replace rendered comparison evidence. The app remains `DOCTOR_FLUTTER_NOT_VERIFIED` until every required screen passes this gate.
-## Retired 2026-10-04 milestone tracker
+# HelloDoctor â€” Engineering Progress & Milestone Tracker
 
-The old 37% dashboard, 14/35 test baseline and "do not start Flutter" resume plan are superseded by the current milestone/status tables at the top of this document. Earlier capacity results remain historical evidence, not current Azure capacity verification.
+> **Document Version:** 1.2.0
+> **Status:** M2 (Database v2) and M3 (Auth v2) implemented and verified against a real PostgreSQL instance. M-SECURITY (backend hardening: default-deny auth, ABAC, five-role RLS, rate limiting/IP jail, webhook signatures, N+1 cleanup, load testing) is implemented and verified end-to-end against a live Postgres 16 + Redis instance. Two load-testing passes exist: an unconstrained-hardware pass (`docs/CAPACITY_EVIDENCE_REPORT.md`, `LOCAL_BACKEND_VALIDATION_PASSED`) and a resource-constrained pass (`docs/CONSTRAINED_CAPACITY_TEST.md`) that first found Postgres CPU-saturated at a 2.5-core profile (`LOCAL_CONSTRAINED_CAPACITY_TARGET_FAILED`, ~20â€“30 RPS healthy ceiling), then â€” per explicit instruction â€” reran once with CPU rebalanced toward Postgres within a genuine 2.0-vCPU budget, found and fixed a PostgreSQL JIT-compilation overhead bug along the way, and reached **`LOCAL_CONSTRAINED_CAPACITY_TARGET_PASSED` up to ~200 RPS** (a 7â€“10x improvement), confirming the original failure was substantially a resource-allocation/configuration problem, not an application-design flaw. Zero data corruption and no security control weakened at any stage of either pass. See `docs/PILOT_READINESS_DECISION.md` for the still-standing `NOT_READY_FOR_UNSUPERVISED_1200_USER_PILOT` decision (unchanged â€” the constrained-capacity result is encouraging but still a local-laptop simulation, not a real production VPS run). M4+ (Flutter mobile, Agora client UI, localization, offline guards) remain pending and explicitly not started per user sequencing ("introduce all of these before we touch flutter").
+> **Target Execution Agent:** Claude Code Autonomous Engineer
+> **Last Updated:** 2026-10-04
 
+---
+
+## 1. Executive Status Dashboard
+
+- **Current Milestone:** M-SECURITY â€” Backend hardening core work and load testing complete; two financial-control deferrals and CI scanning remain before M4 (see Â§3)
+- **Overall Completion:** `~37%`
+- **Last Completed Task:** Implemented the full backend security architecture requested by the user, frozen as: (1) five least-privilege PostgreSQL capability roles (`hellodoctor_api`, `_auth_worker`, `_payment_worker`, `_system_worker`, `_finance_worker`) instead of one generic app role, with no passwords ever committed to a migration; (2) a default-deny-by-construction Axum auth path (every protected handler takes `AuthContext`, which now gets its claims from a pre-verified source rather than re-parsing the JWT per call site â€” see CHECKPOINT.md for the exact mechanism); (3) ABAC (`abac.rs`) on every protected route; (4) Row-Level Security across all PHI/financial tables, keyed on transaction-local `app.current_user_id`/`app.current_role`; (5) Redis-backed rate limiting + fail2ban-style IP jail; (6) real HMAC-SHA256 payment webhook signature verification plus an event-timestamp freshness check. All of this was run against a real local Postgres+Redis (not just `cargo check`) â€” full patient OTP login, doctor-directory read, and cross-role 403 enforcement were exercised live. That live run caught and fixed two bugs static review could not have found: an RLS circular-policy infinite-recursion bug between `patient_profiles`/`appointments`, and a critical pre-existing JWT verification bug (`jsonwebtoken`'s `from_ed_der` does no DER parsing â€” it needs the raw 32-byte Ed25519 key, not the 44-byte SPKI-DER key `openssl pkey -pubout` produces â€” so every bearer token would have failed verification in production).
+- **Current Task:** Constrained-VPS capacity test complete, including the rebalanced rerun (`docs/CONSTRAINED_CAPACITY_TEST.md` Â§12) â€” built from scratch this pass: a real Docker image of the backend (it had only ever run as a bare `.exe`), a resource-capped container stack with limits verified via `docker inspect`, a deterministic ~1,200-user/13,440-appointment synthetic dataset (`scripts/seed_capacity_dataset.sql`), and a new open-loop load generator (`examples/capacity_test.rs`). First pass (Profile A, 2.5 cores): `LOCAL_CONSTRAINED_CAPACITY_TARGET_FAILED`, Postgres CPU-pinned, ~20â€“30 RPS ceiling. Per explicit instruction, reran once with CPU moved from the idle backend/Redis to the saturated Postgres, within a genuine 2.0-vCPU budget this time (all three containers pinned to the same 2 physical cores for real shared-core contention, not just independent quotas) â€” result: **`LOCAL_CONSTRAINED_CAPACITY_TARGET_PASSED` up to ~200 RPS**, a 7â€“10x improvement, with the bottleneck confirmed to have genuinely moved (to the now-smaller backend CPU share at 250 RPS, not Postgres). Two real bugs found and fixed along the way: `get_command_telemetry`'s N+1-at-scale (whole-table fetches that didn't scale past the tiny original dev dataset â€” p50 1,406ms â†’ 317ms) and a PostgreSQL JIT-compilation overhead bug on RLS-protected queries (an `OR`'d correlated-subquery policy inflates the planner's cost estimate past Postgres's JIT threshold even though the expensive branch is never executed â€” p50 265ms â†’ 4ms with `jit=off`, zero change to RLS enforcement or results). Zero data corruption at any stage, no security control weakened. Capacity-tuning work is now frozen, as instructed.
+- **Last Completed Task (this pass):** Â§8.2's remaining two-thirds of the observability/accountability follow-on â€” consultation telemetry event timeline (`consultation_telemetry_events`, ordered per-perspective PATIENT/DOCTOR/SERVER events, reconnect-window reconstruction, admin incident-reconstruction endpoint correlating grievances and â€” best-effort â€” system errors) and the admin audit trail (`before_data`/`after_data`/`changed_fields` snapshots on `audit_events`, wired into 8 admin mutations, up from 2; global audit-history read access narrowed from six admin roles to one designated "Super Admin" authority, SECURITY_ADMIN). Full detail: `docs/CHECKPOINT.md` Â§8.2. A real bug was found and fixed live (not just in tests): the new table's `BIGSERIAL` column needed an explicit `GRANT USAGE, SELECT ON SEQUENCE ...` â€” table `INSERT` alone does not cover it, confirmed via a genuine `permission denied for sequence` error on first run.
+- **Blocked Tasks:** None.
+- **Known Issues:** see `docs/CHECKPOINT.md`, `docs/CAPACITY_EVIDENCE_REPORT.md`, `docs/CONSTRAINED_CAPACITY_TEST.md`, and `docs/PILOT_READINESS_DECISION.md` for the full, current list â€” this section is intentionally not duplicated here to avoid the docs drifting out of sync.
+- **Tests Passing:** the latest full baseline is clean: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --lib` (**14/14**), and `cargo test --test api_tests -- --test-threads=1` (**35/35**). The two new migrations (`20261004000002`, `20261004000003`) were also live-verified against the real persistent dev Postgres container, not just ephemeral test databases. `.github/workflows/security-scan.yml` (cargo-audit + TruffleHog secret scanning) is done. Remaining before production hardening sign-off are the explicitly listed payment, step-up, provider, deployment, and operational controls; logout refresh-token revocation is no longer deferred.
+- **Active Architecture Decisions:** ADR-001 through ADR-010 approved. The five-role DB capability split and router-level default-deny auth (this session's work) are a direct, explicit user decision overriding an earlier single-role simplification that was never executed â€” see CHECKPOINT.md Â§0 for the full decision record.
+
+---
+
+## 2. Milestone Execution Checklist
+
+| Milestone ID | Description | Status | Verification Check |
+|---|---|---|---|
+| **SPEC** | Complete 30-Phase Architecture & Engineering Specs | **COMPLETE** | Cross-document stale-term and endpoint consistency checks pass |
+| **M0-M1** | Architecture Remediation & Security Model | **COMPLETE** | Security, payment, schema, MFA, RLS, and privacy decisions synchronized |
+| **M2** | Canonical State Model & Database v2 | **COMPLETE** | `sqlx migrate run` applies cleanly (6 reversible migrations, each with a `.down.sql`); 13 per-aggregate repository modules replace the in-memory `AppState` |
+| **M3** | API v2 & Auth (Ed25519) | **COMPLETE** | Real Argon2id passwords, hashed+rate-limited OTP, encrypted TOTP, Ed25519 JWT with `permissions[]` claim; `cargo test` auth suites pass |
+| **M4** | Agora ADR & Implementation Setup | PENDING | Backend RTC-token endpoint exists (`agora_token_service.rs`); Flutter mobile workspace (`apps/mobile/`) not yet created â€” `cargo check` passes, `flutter analyze` N/A |
+| **M5** | Specialist Discovery & Star-Rating Elimination | PENDING | Zero star rating widget test passes |
+| **M6** | Emergency Contact Helpline & Patient Home | PENDING | Banner position & dialer test passes |
+| **M7** | Atomic Slot Booking & Payment Hold | PENDING | Concurrency double-booking and payment-reconciliation tests pass |
+| **M8** | Multi-Prescription Upload Engine (Max 5 Images) | PENDING | Cap & dropzone widget tests pass |
+| **M9** | Virtual Waiting Room & Device Readiness | PENDING | Pre-flight mock tests pass |
+| **M10** | Agora RTC Telehealth & Telemetry Auto-Capture | PENDING | Agora token tests pass |
+| **M11** | 24-Hour Clinical Chat Desk | PENDING | 24h lock & WebSocket broadcast tests pass |
+| **M12** | Handwritten Prescription Photos & Health Vault | PENDING | Upload-pipeline and cryptographic integrity tests pass |
+| **M13** | Doctor Wallet & 20% Debarred Settlement | PENDING | 3-tier arithmetic unit test passes |
+| **M14** | Clinical Grievance Redressal & Board Arbitration | PENDING | Dispute & payment refund tests pass |
+| **M15** | Central Admin Consoles & Doctor Dossiers | PENDING | Dossier & error log tests pass |
+| **M16** | Bilingual Localization (English/Swahili) | PENDING | Language switcher & offline tests pass |
+| **M17** | Offline Guards | PENDING | Network guard tests pass |
+| **M-SECURITY**| Security Gates & Verification | **CORE COMPLETE, PILOT NOT YET CLEARED** | Default-deny auth + ABAC + 5-role RLS + rate limiting/IP jail + webhook HMAC/provider binding + N+1 cleanup + consultation telemetry/admin audit trail all implemented and live-verified against real Postgres+Redis; the latest baseline is 14/14 library tests and 35/35 serialized integration tests; cargo-audit/secret-scanning CI wired up and clean; load testing remains frozen at approximately 150â€“200 RPS. The explicit decision remains `NOT_READY_FOR_UNSUPERVISED_1200_USER_PILOT` because provider/deployment controls are not complete. Server-side refresh-token logout revocation is implemented; admin step-up re-authentication remains open. |
+| **M18** | Final Quality Assurance & Production Verification | PENDING | 100% full regression pass |
+
+---
+
+## 3. Immediate Next Actions for Claude Code
+
+**Do not start Flutter (M4+) work yet** â€” the user has explicitly sequenced full backend hardening (M-SECURITY) before any mobile work begins. CHECKPOINT.md Â§3 items 1â€“10 are all done (System Error Service + consultation telemetry + admin audit trail, the constrained-VPS capacity test, and cargo-audit/secret-scanning CI all completed 2026-10-04). One item remains before M-SECURITY can be called fully signed off:
+
+1. Implement admin step-up re-authentication for sensitive actions (refund, disbursement initiation, MFA reset, and privileged security changes). Server-side refresh-token-family revocation on logout is complete and regression-tested; it is no longer a deferral.
+
+Once that's done (or the user explicitly decides to proceed without it):
+
+3. M4: scaffold the Flutter mobile workspace (`apps/mobile/`) per `docs/FLUTTER_ARCHITECTURE.md` and wire it to the now-real, now-hardened, now-load-tested backend.
+4. Add a doctor/admin password-change and TOTP-enrollment flow (today these are only seeded for the fixed demo accounts).
+5. Continue M5+ per the roadmap once M4 lands.
+6. Update this `docs/PROGRESS.md` document after completing each milestone.
 ## Final gap-closure pass (2026-10-04)
 
 - Verified the existing MFA, IDOR, upload, wallet/disbursement race, grievance,
@@ -815,132 +517,48 @@ The legacy `PUT /doctor/wallet/payout-method` compatibility endpoint is developm
 Removed newly added local MinIO compose/configuration defaults, containers, images, object volume and associated Docker build cache. Uninstalled newly added Android emulator and deleted incomplete system-image downloads. PostgreSQL/Redis and their data, existing Android build tools and APKs remain. Development document operations explicitly report storage unavailable until external private S3 is configured; tests use an identified in-memory object-store fixture only.
 
 User approved development-only MFA bypass for now; no real SMS delivery is claimed. Flutter formatting/analyze passed and all 49 tests passed; Rust library 15 passed. Final checks: Rust formatting/clippy passed; API full run 50 passed plus one temporary-database setup failure, with the failed test passing on an isolated rerun (51 distinct API tests passed across runs). Sixteen real local backend HTTP checks passed, including KES/current and previous monthly statements, login/dev MFA, refresh and logout. Backend restarted and left running. Requested cleanup/verification work is complete and stopped; Android runtime remains unverified. Android runtime/visual acceptance is not claimed: no device is attached. The full acceptance audit is stopped at the user's requested cleanup/verification boundary; see DOCTOR_APP_FINAL_SYSTEM_AUDIT.md.
+### 2026-10-19 — Economic idempotency, distributed admission and session hardening
 
+Status: IMPLEMENTATION_DELIVERED / ACCEPTANCE_INCONCLUSIVE. Added appointment-level
+payment uniqueness/economic identities, bounded origin/auth/upload work, server-verified
+web challenges with Admin BFF assertions, Admin SHA256 TOTP, Android session proof and
+recovery jitter. The isolated PostgreSQL fixture passed six 100-operation phases
+(maximum eight concurrent SQL clients), state-regression checks and economic migration
+down/up. Full Rust/Next/Flutter/Android regression and 30,000-client HTTP evidence remain
+unverified because suitable isolated application toolchains are unavailable. Real
+payment-provider integration and production edge/origin configuration remain required.
+Do not mark launch-ready. See [detailed report](SECURITY_MILESTONE_IMPLEMENTATION_REPORT.md)
+and [assertions/evidence](ADVERSARIAL_RESILIENCE_RESULTS.md).
 
-## 2026-10-07 — Doctor Web implementation checkpoint
+### 2026-10-20 — Backend regression gate closed; admission-capacity defect found, fixed and measured
 
-Created one Doctor Web project at `apps/doctor-web`, using the canonical
-`prototype/index.html` and current Rust contracts. Flutter application source
-is unchanged; Flutter analyze and all 50 tests pass. No host software, browser,
-global package, Windows service or infrastructure was installed; MinIO remains
-absent. The user approved only the loopback preview on 127.0.0.1:3001.
+Status: BACKEND_REGRESSION_COMPLETE / OVERALL_NOT_ACCEPTED (unchanged). Completed the
+backend half of the stabilization campaign referenced in
+`docs/audit_evidence/final_remediation_20261020/`: both single-test `exit_code=101`
+failures (`security_acceptance::`, `pool_pressure::`) traced to a stale scratch-evidence
+copy of already-fixed test files, not live defects. Found and fixed one genuine
+production defect — `Admission::new()` in `services/backend/src/repository/mod.rs` was
+sized from one capability-role DB pool instead of the combined capacity across the five
+independent per-role pools the application actually runs — then built a dedicated
+`#[ignore]`d A/B benchmark (`tests/cases/admission_capacity_bench.rs`) to measure, not
+merely assert, that the fix is inert at production's real default configuration and
+bounded-safe regardless of input (every per-lane admission ceiling is a hardcoded
+constant independent of the capacity argument once reached). Investigated and fixed the
+remaining 19 concurrency-sensitive test failures individually; none required further
+admission/pool-capacity tuning — root causes included a shared advisory-lock key
+serializing supposedly-concurrent grievance submissions, three tests missing the
+already-established OTP-delivery-cooldown-expiry pattern, a wrong expected error-code
+literal, a fixed non-capacity-derived admission rate shield, and tests whose own
+concurrency level exceeded an architecturally-fixed lane ceiling (now batched to that
+ceiling without reducing total operations verified).
 
-Current Web production build, typecheck, local format/safety checks and 8 Node
-tests pass. Installed Edge was used for real MFA/session/core API checks and 55
-canonical visual references across five viewport widths. Visual parity is not
-accepted: 11 screen roots and 20 explicit subflows still require complete
-rendered comparison and final control acceptance. Current verdict is
-DOCTOR_WEB_PARTIAL; this is not completion of the requested exact replication.
-
-A live reproducible shared defect required a narrow Rust service change:
-complete-no-rx previously returned success while the appointment remained
-CONFIRMED. It now runs the existing authoritative completion function in the
-no-Rx transaction, preserving DTOs and existing clinical-document authorization.
-No schema migration or financial redesign was introduced. Format/clippy and
-29 Rust library tests pass. The second full API run passed 52/53, exposing an
-old early-timing historical fixture; that fixture's corrected targeted test
-passes. All 53 distinct API tests pass across runs; a final single full green
-run is not claimed.
-
-Backend canonical startup restored readiness and verified source, binary and
-database migration versions all 20261019000001. The latest production Web
-browser test verifies authoritative no-Rx completion, unchanged earnings on
-retry, statement dialog and slot-generator Escape dismissal, with no browser
-exceptions. Full visual/session/prototype coverage remains unfinished.
-
-See DOCTOR_WEB_PROTOTYPE_INVENTORY.md, DOCTOR_WEB_BACKEND_MAPPING.md,
-DOCTOR_WEB_VISUAL_PARITY_REPORT.md and DOCTOR_WEB_FINAL_ACCEPTANCE.md for
-current evidence and concrete remaining work.
-# Doctor Web login recovery — 2026-10-07
-
-The support-reference sign-in error reproduced as backend HTTP 500 caused by
-API tests changing shared PostgreSQL role passwords. The test harness now
-reuses current development credentials. Installed Edge verified real UI
-password login, MFA, reload session restoration and logout; all auth requests
-returned 200, foreign-origin login returned 403, and no JavaScript exceptions
-occurred. Localhost now redirects correctly to 127.0.0.1:3001. Web tests (10),
-typecheck, lint, formatting checks and production build pass. See
-docs/audit_evidence/doctor_web/LOGIN_RECOVERY.md for validation limits.
-Overall Doctor Web acceptance remains PARTIAL. No host installation or
-Doctor Flutter source change was made for login recovery.
-
-
-## Doctor Web presentation correction - 2026-10-07
-
-Corrected build `vBxYbGtSpLPl4rQ_7Fvhi` is running on approved loopback 3001.
-Fullscreen viewport shell, sole canonical Web sidebar, no mobile bottom tabs,
-desktop Rx/chat/availability/earnings and Web EMR panel are implemented. Existing
-APIs/session handling retained. All five canonical Web roots are accounted for.
-10 Web tests, typecheck/lint/format/build PASS; 45 Edge screen/viewport checks,
-UI login/MFA/reload/logout and 14 populated workflow checks PASS, zero JS
-exceptions. Original/normalized prototype references are kept separately.
-VISUAL_PARITY remains PARTIAL, with data/provider and exhaustive dialog limits
-explicit in DOCTOR_WEB_CORRECTION_REPORT.md. Overall DOCTOR_WEB_PARTIAL.
-Baseline hashes prove Flutter unchanged. No backend edits were made by this pass;
-three separately changed notification/test files are recorded and preserved.
-No software,
-browser, service or Docker infrastructure installed. Stop correction scope here.
-
-
-## User-approved functional follow-up - 2026-10-07
-
-Latest result: [DOCTOR_WEB_FUNCTIONAL_FOLLOWUP.md](DOCTOR_WEB_FUNCTIONAL_FOLLOWUP.md).
-Slot-dialog field clicks no longer dismiss it; real single/batch slot publishing,
-UTC+3 conversion, overlap handling and reload persistence are verified. Publishing
-opens the schedule on the chosen date. Dashboard Resume Call, unsupported lab
-controls, Doctor patient registration and Smart Rx vitals are removed as requested.
-Doctor tools provides separate workflow links; calendar and notification bell
-have distinct actions. Existing notifications are wired through the HttpOnly BFF.
-Canonical startup resolved stale running-backend 404s; source/binary/database
-migration versions all equal 20261020000001. No Rust/Flutter source was edited.
-
-11 Web unit tests and typecheck/lint/format/build PASS. Final Edge walkthrough:
-7 slot checks + 15 notification/workflow checks PASS; zero JS exceptions. Real
-UI login/MFA/reload/logout and two-Doctor notification ownership checks pass.
-22 is the declared follow-up regression count, not full historic app acceptance.
-Overall full-project visual parity remains PARTIAL; see the linked report's limits.
-The article backend is absent and the user explicitly narrowed this follow-up
-to existing notifications. No articles API/workflow was invented.
-
-3 local prototype visual assets reused, 0 external downloads, SVG inspection PASS,
-0 hotlinked/unlicensed third-party additions and no software/browser/global package/
-Docker infrastructure installation. THIRD_PARTY_UI_ASSETS.md records details.
-
-## 2026-10-07 ? Dashboard / account / settings verified checkpoint
-
-This targeted correction is complete before the dedicated Patient Chats routing follow-up. Build `lGgKwZC70Jn19ywa_XOwV`: production build PASS; typecheck, source lint, format checks and 11 unit tests PASS; 13 browser/API checks PASS with no JavaScript exceptions or unexpected 5xx. Installed Edge only. Evidence: `audit_evidence/doctor_web/dashboard-settings/results.json` and adjacent screenshots.
-
-Dashboard: four supported summaries, one upcoming/active list preserving server order; duplicate sidebar queue and modality metrics removed. Instant Rx removed. Unsupported recent dispatch aggregation omitted (BACKEND_DATA_NOT_AVAILABLE). No developer-unavailable cards or emoji placeholders remain on Dashboard.
-
-Account: compact keyboard-accessible popover, View profile opens the read-only Professional section, Settings is a full desktop page with Profile/Professional/Availability/Payout/Security sections. Display-name PATCH and server-confirmed duty tested then restored on the synthetic Doctor. Protected professional fields rejected by server on attempted mass assignment; only display name editable. Payout masking/empty state preserved; actual provider binding remains deferred. Wallet is a separate existing domain, not a profile action strip.
-
-Prescription: camera removal/file picker/recoverable failed-page states separately PASS (7 browser checks). Current actual backend returns 409 RESOURCE_CONFLICT because private storage is unconfigured. STORAGE_CONFIGURATION_REQUIRED; successful server persistence has not passed.
-
-Mobile and Rust source untouched by this pass; no installation or host/infrastructure change. Original whole-app acceptance remains DOCTOR_WEB_PARTIAL; this checkpoint is scoped to the user-authorized UX changes.
-
-## 2026-10-07 ? Final targeted UX verification
-
-Preview: http://127.0.0.1:3001; final build `NSx9VY1Mkxp3QUUfkUpDg`. Dashboard/account/settings completed first; dedicated Patient Chats followed. Production build, typecheck, lint, format and 11 unit tests PASS. Installed-Edge walkthroughs PASS: 7 prescription + 13 Dashboard/settings + 10 Patient Chats = 30 checks, all on this build, no JavaScript exceptions or unexpected 5xx.
-
-Patient Chats: primary sidebar destination `/doctor/chats`; fluid two-pane desktop; correct selected navigation; back/forward/reload and cold login/MFA pass. In-call Chat remains contextual inside Telehealth, sharing the same thread implementation. Two-Doctor list/read/send authorization and real backend expiry pass. Unsupported category filters removed; unread-count/preview APIs are not supplied and were not fabricated. Dashboard has four supported summaries and one queue; Settings has five coherent full-page sections. All requested rendered states reviewed.
-
-Prescription camera removed. Local file picker/previews/retry/remove work; real POST returns 409 RESOURCE_CONFLICT because document storage is not configured. `STORAGE_CONFIGURATION_REQUIRED`; successful persistence remains unverified. No MinIO/provider/storage replacement configured.
-
-Mobile/backend source hashes unchanged; no installation/system/Docker/browser change. Complete scoped matrices, endpoint mapping, screenshots, reversible fixture-testing scope and host/asset integrity: [DOCTOR_WEB_UX_CORRECTION_REPORT.md](DOCTOR_WEB_UX_CORRECTION_REPORT.md). Whole-app acceptance remains DOCTOR_WEB_PARTIAL, not a whole-prototype parity claim. Stop this correction scope.
-
-
-## 2026-10-07 ? Prescription compression and progress
-
-Completed targeted Web Rx auto-compression to 400 KB per page and actual upload progress beside Send Prescription. Verified JPEG/PNG/WebP input, corrupt/source-size errors, prepared previews, frozen retry payloads, partial-state safety and session cancellation. Final build `6MUCqdkhsIXrtOLwiipGX`, 18 unit tests and 15 focused browser checks pass; narrow visual supplement passes. Storage persistence remains blocked by current private-storage configuration; no mobile/Rust/host changes.
-
-Detailed contract, evidence and host integrity: [DOCTOR_WEB_RX_UPLOAD_REPORT.md](DOCTOR_WEB_RX_UPLOAD_REPORT.md).
-
-
-## 2026-10-07 ? Schedule correction verified
-
-User-approved Schedule correction VERIFIED on build `vROyHPJLjR3IY3OKge4Ib`: real own-slot PATCH AVAILABLE?BLOCKED, separate cancellation, atomic booking race protection, correct counts/filter/semantic icons and EAT dates. Source=binary=database migration `20261021000001`. Rust format/Clippy PASS, 43 library + 75 API tests PASS (13 new blocking cases); Web 21 units + 12 real browser checks PASS; Flutter analysis and 51 tests PASS. Minimal mobile compatibility exception omits BLOCKED from the legacy booked-patient view. No installation or new infrastructure. Web client diagnostics still log locally rather than feed Admin; this question was answered, not broadened into a telemetry implementation. Full matrix/evidence: [DOCTOR_WEB_SCHEDULE_CORRECTION.md](DOCTOR_WEB_SCHEDULE_CORRECTION.md).
-
-
-## 2026-10-07 - System telemetry verification
-
-FULL_SYSTEM_TELEMETRY_REQUIREMENT = NOT_MET. Real PostgreSQL incident service and Admin APIs verified; 11 unique focused Rust tests pass. Live Admin MFA/login/error feed/command telemetry and Prometheus metrics pass. Web browser diagnostics only log locally and create no Admin database incident; Flutter global handlers do not ingest crashes. Notification scheduler failures bypass the central incident sink. Missing measurements are replaced by Connected/24 ms defaults; Admin export is a toast, and the feed stops at 200 records. Running Admin login page returns HTTP 500 with missing compiled-module markers, so browser acceptance is blocked. No production code/mobile/backend changes or installations in this verification pass. Evidence and exact gaps: [SYSTEM_TELEMETRY_VERIFICATION.md](SYSTEM_TELEMETRY_VERIFICATION.md).
+Full backend `api_tests` suite: 275 passed, 0 failed, 4 ignored (two independent
+consecutive runs). `cargo clippy --all-targets -- -D warnings`: 0 diagnostics.
+`cargo fmt --all -- --check`: clean. `cargo test --lib`: 76 passed, 0 failed. Zero
+assertions weakened, zero tests deleted/skipped, one production source file corrected.
+Web/Flutter/Android/distributed-load evidence not touched this round; overall verdict
+remains `NOT_ACCEPTED` per
+[`FINAL_AUTOMATED_ACCEPTANCE_MATRIX.md`](FINAL_AUTOMATED_ACCEPTANCE_MATRIX.md). Full
+per-defect detail: [`FINAL_DEFECT_REMEDIATION_LOG.md`](FINAL_DEFECT_REMEDIATION_LOG.md).
+Admission-capacity architecture trace and measurement:
+[`FINAL_RESILIENCE_ROOT_CAUSE.md`](FINAL_RESILIENCE_ROOT_CAUSE.md).
