@@ -1,10 +1,13 @@
 ﻿'use client';
 
-import React, { useState, useEffect } from 'react';
+import { GrievanceInvestigation } from '@/components/GrievanceInvestigation';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useBackendSync, ModalitySplit } from '@/lib/useBackendSync';
 import { useSlotSync } from '@/lib/useSlotSync';
 import { scheduleDay, scheduleLabel } from '@/lib/schedule';
 import {
+  clearAdminRuntime,
   initiateDisbursement,
   approveDisbursementItem,
   finalizeFinancialPeriod,
@@ -17,6 +20,15 @@ import {
   adjudicateGrievanceWarn,
   adjudicateGrievanceDismiss,
   transitionRefundRequest,
+  getPlatformPaymentMethods,
+  savePlatformPaymentMethod,
+  setPrimaryPlatformPaymentMethod,
+  deactivatePlatformPaymentMethod,
+  PlatformPaymentMethod,
+  getPatientDossier,
+  getDoctorDossier,
+  executePatientDataRights,
+  executeDoctorDataRights,
   AdminOverview,
   FinanceSummary,
   CommandTelemetry,
@@ -43,7 +55,8 @@ type AdminPageId =
   | 'verification'
   | 'compliance'
   | 'logs'
-  | 'grievances';
+  | 'grievances'
+  | 'settings';
 
 interface ToastNotice {
   id: string;
@@ -76,19 +89,104 @@ export default function AdminPortalPage() {
   const [verificationQueue, setVerificationQueue] = useState<PendingDoctorVerification[]>([]);
   const [modalitySplit, setModalitySplit] = useState<ModalitySplit>({ videoRevenue: 0, chatRevenue: 0, videoCount: 0, chatCount: 0 });
   const [adminSlots, setAdminSlots] = useState<AdminSlot[]>([]);
-  const slotSync = useSlotSync(setAdminSlots);
+  const slotSync = useSlotSync(setAdminSlots,activeAdminPage==='slots');
   const [slotDate, setSlotDate] = useState(() => scheduleDay(new Date().toISOString()));
   const visibleSlots = adminSlots.filter(slot => !slotDate || scheduleDay(slot.start_time) === slotDate);
   const [complianceAlerts, setComplianceAlerts] = useState<ComplianceAlert[]>([]);
   const [refundRequests, setRefundRequests] = useState<FinancialRefundRequest[]>([]);
   const [refundBusy, setRefundBusy] = useState<string | null>(null);
   const [verificationBusy, setVerificationBusy] = useState(false);
+  const [platformPaymentMethods, setPlatformPaymentMethods] = useState<PlatformPaymentMethod[]>([]);
+  const [paymentMethodsBusy, setPaymentMethodsBusy] = useState(false);
+  const [addPaymentMethodModalOpen, setAddPaymentMethodModalOpen] = useState(false);
+  const [newProviderCode, setNewProviderCode] = useState('MPESA_PAYBILL');
+  const [newLabel, setNewLabel] = useState('');
+  const [newMaskedDisplay, setNewMaskedDisplay] = useState('');
+  const [newCredentialsJson, setNewCredentialsJson] = useState('{\n  "paybill": "",\n  "consumer_key": "",\n  "consumer_secret": ""\n}');
+
+  const refreshPlatformPaymentMethods = useCallback(() => {
+    getPlatformPaymentMethods().then(setPlatformPaymentMethods).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (activeAdminPage === 'settings') refreshPlatformPaymentMethods();
+  }, [activeAdminPage, refreshPlatformPaymentMethods]);
+
+  async function handleSavePlatformPaymentMethod() {
+    if (paymentMethodsBusy) return;
+    if (!newLabel.trim() || !newMaskedDisplay.trim()) {
+      showToast('Missing Fields', 'Label and display text are both required.', 'ℹ️', 'info');
+      return;
+    }
+    let credentials: Record<string, string>;
+    try {
+      credentials = JSON.parse(newCredentialsJson);
+    } catch {
+      showToast('Invalid Credentials JSON', 'Fix the JSON syntax before saving.', '⚠️', 'warning');
+      return;
+    }
+    setPaymentMethodsBusy(true);
+    try {
+      await savePlatformPaymentMethod({
+        provider_code: newProviderCode,
+        label: newLabel.trim(),
+        masked_display: newMaskedDisplay.trim(),
+        credentials,
+      });
+      showToast('Payment Method Saved', `${newLabel} is now configured. This is the body — plug in the real driver when ready.`, '💳', 'success');
+      setAddPaymentMethodModalOpen(false);
+      setNewLabel('');
+      setNewMaskedDisplay('');
+      refreshPlatformPaymentMethods();
+    } catch (e) {
+      showToast('Save Failed', 'The backend did not save this payment method.', '⚠️', 'warning');
+      console.warn('Platform payment method save notice:', e);
+    } finally {
+      setPaymentMethodsBusy(false);
+    }
+  }
+
+  async function handleSetPrimaryPlatformPaymentMethod(id: string) {
+    if (paymentMethodsBusy) return;
+    setPaymentMethodsBusy(true);
+    try {
+      await setPrimaryPlatformPaymentMethod(id);
+      showToast('Primary Updated', 'This method is now primary for its provider type.', '✓', 'info');
+      refreshPlatformPaymentMethods();
+    } catch {
+      showToast('Update Failed', 'The backend did not change the primary method.', '⚠️', 'warning');
+    } finally {
+      setPaymentMethodsBusy(false);
+    }
+  }
+
+  async function handleDeactivatePlatformPaymentMethod(id: string) {
+    if (paymentMethodsBusy) return;
+    setPaymentMethodsBusy(true);
+    try {
+      await deactivatePlatformPaymentMethod(id);
+      showToast('Payment Method Removed', 'It no longer appears in the active list.', '✓', 'info');
+      refreshPlatformPaymentMethods();
+    } catch {
+      showToast('Removal Failed', 'The backend did not remove this payment method.', '⚠️', 'warning');
+    } finally {
+      setPaymentMethodsBusy(false);
+    }
+  }
   const [slotBusy, setSlotBusy] = useState<string | null>(null);
   const [simulateBusy, setSimulateBusy] = useState(false);
   const [logActionBusy, setLogActionBusy] = useState<string | null>(null);
+  const [dataRightsBusy, setDataRightsBusy] = useState<string | null>(null);
   const [selectedVerificationId, setSelectedVerificationId] = useState<string | null>(null);
   const [financeMonth, setFinanceMonth] = useState(new Date().toISOString().slice(0, 7));
   const [financeBusy, setFinanceBusy] = useState(false);
+
+  // Modals Active State
+  const [selectedDoctorKey, setSelectedDoctorKey] = useState<string | null>(null);
+  const [selectedPatientKey, setSelectedPatientKey] = useState<string | null>(null);
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
+  const [selectedGrievanceId, setSelectedGrievanceId] = useState<string | null>(null);
+  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
+  const [simulateModalOpen, setSimulateModalOpen] = useState(false);
 
   // Live Backend Synchronization Hook
   // Once the backend has answered at least once, its data is the source of truth —
@@ -119,7 +217,7 @@ export default function AdminPortalPage() {
     onModalitySplitUpdate: setModalitySplit,
     onComplianceAlertsUpdate: setComplianceAlerts,
     onRefundRequestsUpdate: setRefundRequests,
-  }, financeMonth);
+  }, financeMonth, activeAdminPage, selectedDoctorKey, selectedPatientKey);
 
   // Formats a numeric-string amount from the backend as "KES  12,345".
   const money = (value: string | number | null | undefined) => `KES  ${Number(value || 0).toLocaleString()}`;
@@ -142,14 +240,6 @@ export default function AdminPortalPage() {
   const [financeGatewayFilter, setFinanceGatewayFilter] = useState('ALL');
   const [financeSearchQuery, setFinanceSearchQuery] = useState('');
 
-  // Modals Active State
-  const [selectedDoctorKey, setSelectedDoctorKey] = useState<string | null>(null);
-  const [selectedPatientKey, setSelectedPatientKey] = useState<string | null>(null);
-  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
-  const [selectedGrievanceId, setSelectedGrievanceId] = useState<string | null>(null);
-  const [selectedTransactionId, setSelectedTransactionId] = useState<string | null>(null);
-  const [simulateModalOpen, setSimulateModalOpen] = useState(false);
-
   // Simulation Form State
   const [simScenario, setSimScenario] = useState('mpesa_timeout');
   const [simSeverity, setSimSeverity] = useState('CRITICAL');
@@ -157,9 +247,10 @@ export default function AdminPortalPage() {
 
   // Toasts
   const [toasts, setToasts] = useState<ToastNotice[]>([]);
+  const toastSequence = useRef(0);
 
   function showToast(title: string, message: string, icon = '✓', type: 'success' | 'urgent' | 'warning' | 'info' = 'success') {
-    const id = 'toast_' + Date.now();
+    const id = 'toast_' + ++toastSequence.current;
     setToasts((prev) => [...prev, { id, title, message, icon, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -204,7 +295,71 @@ export default function AdminPortalPage() {
       title: 'Consultation Grievance & Injustice Adjudication',
       breadcrumb: 'Patient Rights & Clinical Accountability • Doctor Conduct & System Failure Disputes',
     },
+    settings: {
+      title: 'Platform Payment Settings',
+      breadcrumb: 'Merchant & Collection Configuration • M-Pesa, Card, and Future Providers',
+    },
   };
+
+  // Real client-side export: errorLogs is already the full currently-loaded
+  // incident feed (kept accurate on every page since the sync job that
+  // populates it is no longer gated to the Logs/Command tab), so this needs
+  // no backend round trip — just an honest download instead of the toast
+  // that previously claimed a file was produced without ever creating one.
+  function handleExportLedgerCsv() {
+    if (transactions.length === 0) {
+      showToast('Nothing to Export', 'There are no transactions currently loaded to export.', 'ℹ️', 'info');
+      return;
+    }
+    const escapeCsv = (value: unknown) => {
+      const s = String(value ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const columns: [string, (t: TransactionItem) => unknown][] = [
+      ['Transaction ID', (t) => t.txId],
+      ['Gateway Reference', (t) => t.gatewayRef],
+      ['Timestamp', (t) => t.timestamp],
+      ['Type', (t) => t.typeLabel],
+      ['Gateway', (t) => t.gatewayLabel],
+      ['Patient', (t) => t.patient?.name],
+      ['Doctor', (t) => t.doctor?.name],
+      ['Gross Amount', (t) => t.grossAmount],
+      ['Platform Fee', (t) => t.platformFeeAmount],
+      ['Net Amount', (t) => t.netAmount],
+      ['Escrow Status', (t) => t.escrowStatusLabel],
+    ];
+    const rows = [
+      columns.map(([header]) => escapeCsv(header)).join(','),
+      ...transactions.map((t) => columns.map(([, get]) => escapeCsv(get(t))).join(',')),
+    ];
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hellodoctor-ledger-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Ledger CSV Exported', `${transactions.length} transactions exported as CSV file.`, '📄', 'success');
+  }
+
+  function handleExportLogs() {
+    if (errorLogs.length === 0) {
+      showToast('Nothing to Export', 'There are no incidents currently loaded to export.', 'ℹ️', 'info');
+      return;
+    }
+    const blob = new Blob([JSON.stringify(errorLogs, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `hellodoctor-incident-logs-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Logs Exported 📥', `${errorLogs.length} incidents exported as JSON file.`, '📥', 'success');
+  }
 
   // 1. Batch Payout Action — reports the real batch result, not an optimistic guess.
   async function handleExecuteBatchPayout() {
@@ -346,17 +501,19 @@ export default function AdminPortalPage() {
   }
 
   // 4. Grievance Adjudication
+  const [adjudicationNotes, setAdjudicationNotes] = useState('');
   async function handleAdjudicateGrievance(grvId: string, action: 'REFUND' | 'WARN' | 'RESOLVE') {
-    if (financeBusy) return;
+    if (financeBusy || adjudicationNotes.trim().length < 8) return;
     setFinanceBusy(true);
     try {
       if (action === 'REFUND') {
-        await adjudicateGrievanceRefund(grvId, 'Board-approved refund; provider execution pending');
+        await adjudicateGrievanceRefund(grvId, adjudicationNotes.trim());
       } else if (action === 'WARN') {
-        await adjudicateGrievanceWarn(grvId, 'Clinical Governance warning');
+        await adjudicateGrievanceWarn(grvId, adjudicationNotes.trim());
       } else {
-        await adjudicateGrievanceDismiss(grvId, 'Telemetry evidence did not substantiate the claim');
+        await adjudicateGrievanceDismiss(grvId, adjudicationNotes.trim());
       }
+      setAdjudicationNotes('');
       await refreshBackend();
       showToast(action === 'REFUND' ? 'Refund approved' : 'Decision recorded',
         action === 'REFUND' ? 'Provider execution is pending. No money has been returned.' : 'The backend confirmed the decision.', '?', 'success');
@@ -364,6 +521,114 @@ export default function AdminPortalPage() {
       showToast('Decision not confirmed', error instanceof Error ? error.message : 'Retry after checking the server state.', '!', 'warning');
     } finally {
       setFinanceBusy(false);
+    }
+  }
+
+  // Data Protection Act 2019 (Kenya) rights: export always works (the
+  // dossier already fetched to render this modal is the full record);
+  // erase requires a typed reason and confirmation since the backend may
+  // perform a true, irreversible delete when there is no retained history.
+  function downloadJson(filenamePrefix: string, data: unknown) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filenamePrefix}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleExportPatientData(patientId: string) {
+    if (dataRightsBusy) return;
+    setDataRightsBusy(patientId);
+    try {
+      const dossier = await getPatientDossier(patientId);
+      downloadJson(`hellodoctor-patient-${patientId.slice(0, 8)}-export`, dossier);
+      showToast('Patient Data Exported 📥', 'Full record downloaded as JSON.', '📥', 'success');
+    } catch (error) {
+      showToast('Export Failed', error instanceof Error ? error.message : 'The backend did not return this record.', '⚠️', 'warning');
+    } finally {
+      setDataRightsBusy(null);
+    }
+  }
+
+  async function handleExportDoctorData(doctorId: string) {
+    if (dataRightsBusy) return;
+    setDataRightsBusy(doctorId);
+    try {
+      const dossier = await getDoctorDossier(doctorId);
+      downloadJson(`hellodoctor-doctor-${doctorId.slice(0, 8)}-export`, dossier);
+      showToast('Doctor Data Exported 📥', 'Full record downloaded as JSON.', '📥', 'success');
+    } catch (error) {
+      showToast('Export Failed', error instanceof Error ? error.message : 'The backend did not return this record.', '⚠️', 'warning');
+    } finally {
+      setDataRightsBusy(null);
+    }
+  }
+
+  async function handleErasePatientData(patientId: string, displayName: string) {
+    if (dataRightsBusy) return;
+    const reason = window.prompt(
+      `Erase/anonymize ${displayName}'s data (Data Protection Act 2019 §40). This cannot be undone.\n\nIf this account has consultation history, the profile is anonymized and the clinical/financial trail is kept; otherwise it is permanently deleted.\n\nEnter the justification for this request (8–300 characters):`
+    );
+    if (!reason || !reason.trim()) return;
+    const trimmed = reason.trim();
+    if (trimmed.length < 8 || trimmed.length > 300) {
+      showToast('Invalid Reason', 'Justification must be 8–300 characters.', '⚠️', 'warning');
+      return;
+    }
+    if (!window.confirm(`Confirm: permanently erase or anonymize ${displayName}'s data? This cannot be undone.`)) return;
+    setDataRightsBusy(patientId);
+    try {
+      const result = await executePatientDataRights(patientId, trimmed);
+      await refreshBackend();
+      setSelectedPatientKey(null);
+      showToast(
+        result.outcome === 'HARD_DELETED' ? 'Patient Data Erased' : 'Patient Data Anonymized',
+        result.outcome === 'HARD_DELETED'
+          ? 'No retained history — the profile was permanently deleted.'
+          : 'Retained clinical/financial history — personal fields were scrubbed, the record stays on file.',
+        '🗑️',
+        'success'
+      );
+    } catch (error) {
+      showToast('Request Failed', error instanceof Error ? error.message : 'The backend rejected this request.', '⚠️', 'warning');
+    } finally {
+      setDataRightsBusy(null);
+    }
+  }
+
+  async function handleEraseDoctorData(doctorId: string, displayName: string) {
+    if (dataRightsBusy) return;
+    const reason = window.prompt(
+      `Erase/anonymize ${displayName}'s data (Data Protection Act 2019 §40). This cannot be undone.\n\nKMPDC professional/regulatory record (license, qualifications) is kept either way; personal/contact fields are scrubbed.\n\nEnter the justification for this request (8–300 characters):`
+    );
+    if (!reason || !reason.trim()) return;
+    const trimmed = reason.trim();
+    if (trimmed.length < 8 || trimmed.length > 300) {
+      showToast('Invalid Reason', 'Justification must be 8–300 characters.', '⚠️', 'warning');
+      return;
+    }
+    if (!window.confirm(`Confirm: permanently erase or anonymize ${displayName}'s data? This cannot be undone.`)) return;
+    setDataRightsBusy(doctorId);
+    try {
+      const result = await executeDoctorDataRights(doctorId, trimmed);
+      await refreshBackend();
+      setSelectedDoctorKey(null);
+      showToast(
+        result.outcome === 'HARD_DELETED' ? 'Doctor Data Erased' : 'Doctor Data Anonymized',
+        result.outcome === 'HARD_DELETED'
+          ? 'No retained history — the profile was permanently deleted.'
+          : 'Retained consultation/payout history — personal fields were scrubbed, the record stays on file.',
+        '🗑️',
+        'success'
+      );
+    } catch (error) {
+      showToast('Request Failed', error instanceof Error ? error.message : 'The backend rejected this request.', '⚠️', 'warning');
+    } finally {
+      setDataRightsBusy(null);
     }
   }
 
@@ -420,7 +685,7 @@ export default function AdminPortalPage() {
     if (logActionBusy) return;
     setLogActionBusy(logId);
     try {
-      await resolveSystemError(logId, 'Administrative resolution signed off by Clinical Ops Director.');
+      await resolveSystemError(logId, 'Administrative resolution requested by the authenticated Admin account.');
       await refreshBackend();
       showToast('Incident Resolved', 'Telemetry exception marked resolved.', '✓', 'success');
     } catch (e) {
@@ -652,6 +917,15 @@ export default function AdminPortalPage() {
               {pendingGrievancesCount > 0 ? `${pendingGrievancesCount} Open` : '0'}
             </span>
           </div>
+
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'settings' ? 'active' : ''}`}
+            id="adminNav-settings"
+            onClick={() => setActiveAdminPage('settings')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            <span>Payment Settings</span>
+          </div>
         </nav>
 
         <div className="admin-sidebar-footer">
@@ -704,17 +978,24 @@ export default function AdminPortalPage() {
             <div
               className="admin-top-icon-btn"
               title="Pending Notifications"
-              onClick={() => showToast('Central Notifications', '3 Professional registration physician applications pending review.', '🔔', 'info')}
+              onClick={() => {
+                if (verificationQueue.length === 0) {
+                  showToast('Central Notifications', 'No professional registration applications are pending review.', '🔔', 'info');
+                } else {
+                  showToast('Central Notifications', `${verificationQueue.length} professional registration application${verificationQueue.length === 1 ? '' : 's'} pending review.`, '🔔', 'info');
+                  setActiveAdminPage('verification');
+                }
+              }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              <span className="badge-dot"></span>
+              {verificationQueue.length > 0 && <span className="badge-dot"></span>}
             </div>
 
             <div className="admin-user-pill">
-              <div className="admin-avatar">AR</div>
+              <div className="admin-avatar">AD</div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="admin-user-name">Amina Rashid</span>
-                <span className="admin-user-role">Clinical Ops Director</span>
+                <span className="admin-user-name">Admin account</span>
+                <span className="admin-user-role">ADMIN</span>
               </div>
             </div>
 
@@ -723,10 +1004,12 @@ export default function AdminPortalPage() {
               title="Sign out"
               onClick={async () => {
                 try {
+                  clearAdminRuntime();
                   const result = await fetch('/api/logout', { method: 'POST' });
                   if (!result.ok) window.alert('Signed out locally. Server revocation could not be confirmed.');
                 } catch { window.alert('Unable to reach the server. Server sign-out could not be confirmed.'); }
-                window.location.href = '/login';
+                // A full document navigation discards the authenticated runtime.
+                window.location.assign(new URL('/login', window.location.origin).href);
               }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -938,7 +1221,17 @@ export default function AdminPortalPage() {
                               </span>
                             </td>
                             <td>
-                              <span className={`badge ${doc.payoutRouting?.readiness === 'ACTIVE' ? 'badge-green' : 'badge-amber'} doc-payout-status`}>
+                              {/* The backend's `readiness` field is never literally the
+                                  string 'ACTIVE' — it's 'DEV_SIMULATED', 'ASSIGNED', the
+                                  destination's real verification_status, or
+                                  'PAYOUT_SETUP_REQUIRED' when nothing is on file at all
+                                  (see admin_handlers::list_payout_routing's CASE
+                                  expression). Checking for the literal 'ACTIVE' string
+                                  meant a doctor who had genuinely saved a working payout
+                                  method could never show as ready. Green now means
+                                  "something usable is on file", not "matches one
+                                  specific string". */}
+                              <span className={`badge ${doc.payoutRouting?.readiness && doc.payoutRouting.readiness !== 'PAYOUT_SETUP_REQUIRED' ? 'badge-green' : 'badge-amber'} doc-payout-status`}>
                                 {doc.payoutRouting?.disbursementStatus || doc.payoutRouting?.readiness || 'Payout setup required'}
                               </span>
                               <div style={{ fontSize: '10px' }}>{doc.payoutRouting?.statementStatus || 'Not loaded'} · {doc.payoutRouting?.readiness || 'Unknown'}</div>
@@ -1384,7 +1677,7 @@ export default function AdminPortalPage() {
                   {simulationsAllowed && <button className="slot-subtle-btn" style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '7px 12px', borderRadius: '9px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }} onClick={() => setSimulateModalOpen(true)}>
                     <span>⚡ Simulate App Failure</span>
                   </button>}
-                  <button className="slot-subtle-btn" style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', padding: '7px 12px', borderRadius: '9px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }} onClick={() => showToast('Logs Exported 📥', `${errorLogs.length} incidents exported as JSON file.`, '📥', 'success')}>
+                  <button className="slot-subtle-btn" style={{ background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0', padding: '7px 12px', borderRadius: '9px', fontSize: '11.5px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }} onClick={handleExportLogs}>
                     <span>📥 Export Logs (.JSON)</span>
                   </button>
                   <button className="admin-btn-pri" onClick={() => { refreshBackend(); showToast('Telemetry Synced 🔄', 'Refreshed latest error streams from the backend.', '🔄', 'info'); }} style={{ padding: '7px 14px', fontSize: '11.5px' }}>
@@ -1708,6 +2001,69 @@ export default function AdminPortalPage() {
             </div>
           )}
 
+          {/* PLATFORM PAYMENT SETTINGS — the platform's own merchant
+              configuration, distinct from a patient's saved payment methods
+              and a doctor's payout destinations: this is the platform's own
+              identity with its payment provider(s). More than one may be
+              active at once. */}
+          {activeAdminPage === 'settings' && (
+            <div className="admin-page-view active" id="adminPage_settings" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>Platform Merchant &amp; Payment Methods</div>
+                  <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>
+                    How the platform itself collects payment (M-Pesa, card, or any future provider) — separate from a patient&apos;s saved payment method or a doctor&apos;s payout destination. Credentials are encrypted at rest and never returned by the API.
+                  </div>
+                </div>
+                <button className="admin-btn-pri" onClick={() => setAddPaymentMethodModalOpen(true)} style={{ padding: '7px 14px', fontSize: '11.5px' }}>
+                  + Add Payment Method
+                </button>
+              </div>
+
+              <div className="admin-table-card">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Provider</th>
+                      <th>Label</th>
+                      <th>Display</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {platformPaymentMethods.length === 0 ? (
+                      <tr><td colSpan={5} style={{ textAlign: 'center', color: '#94A3B8', padding: '24px' }}>No platform payment methods configured yet.</td></tr>
+                    ) : (
+                      platformPaymentMethods.map((m) => (
+                        <tr key={m.id}>
+                          <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{m.provider_code}</td>
+                          <td>{m.label}</td>
+                          <td style={{ fontFamily: 'monospace' }}>{m.masked_display}</td>
+                          <td>
+                            <span className={`badge ${m.is_primary ? 'badge-green' : 'badge-amber'}`}>
+                              {m.is_primary ? 'Primary' : 'Active'}
+                            </span>
+                          </td>
+                          <td style={{ display: 'flex', gap: '8px' }}>
+                            {!m.is_primary && (
+                              <button className="admin-btn-sec" disabled={paymentMethodsBusy} onClick={() => handleSetPrimaryPlatformPaymentMethod(m.id)} style={{ fontSize: '11px', padding: '5px 10px' }}>
+                                Make Primary
+                              </button>
+                            )}
+                            <button className="admin-btn-sec" disabled={paymentMethodsBusy} onClick={() => handleDeactivatePlatformPaymentMethod(m.id)} style={{ fontSize: '11px', padding: '5px 10px', color: '#DC2626' }}>
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* PAGE 9: OMNICHANNEL PAYMENTS & ESCROW MASTER LEDGER */}
           {activeAdminPage === 'finance' && (
             <div className="admin-page-view active" id="adminPage_finance" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1722,10 +2078,10 @@ export default function AdminPortalPage() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
                     <span>Doctor Payouts Hub →</span>
                   </button>
-                  <button className="admin-action-btn" onClick={() => showToast('MFS Webhooks Reconciled', '0 discrepancies detected across Kenyan payment rails payment gateways.', '✓', 'success')} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1D4ED8', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <button className="admin-action-btn" onClick={() => showToast('Not Yet Available', 'Automated MFS webhook reconciliation is not implemented yet — no backend reconciliation service exists to check against.', 'ℹ️', 'info')} style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#64748B', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <span>Reconcile MFS Webhooks</span>
                   </button>
-                  <button className="admin-action-btn" onClick={() => showToast('Ledger CSV Exported', 'Full financial audit export downloaded.', '📄', 'success')} style={{ background: '#0F172A', border: '1px solid #0F172A', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <button className="admin-action-btn" onClick={handleExportLedgerCsv} style={{ background: '#0F172A', border: '1px solid #0F172A', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <span>Export Ledger CSV</span>
                   </button>
                 </div>
@@ -2058,7 +2414,24 @@ export default function AdminPortalPage() {
 
             <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '11px', color: '#64748B' }}>Professional registration Verified Credential Ledger • HelloDoctor Kenya</span>
-              <button className="admin-btn-sec" onClick={() => setSelectedDoctorKey(null)}>Close Dossier</button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className="admin-btn-sec"
+                  disabled={dataRightsBusy === selectedDoctorKey}
+                  onClick={() => selectedDoctorKey && handleExportDoctorData(selectedDoctorKey)}
+                >
+                  {dataRightsBusy === selectedDoctorKey ? 'Working…' : 'Export Data (JSON)'}
+                </button>
+                <button
+                  className="admin-btn-sec"
+                  style={{ color: '#DC2626', borderColor: '#FCA5A5' }}
+                  disabled={dataRightsBusy === selectedDoctorKey}
+                  onClick={() => selectedDoctorKey && handleEraseDoctorData(selectedDoctorKey, selectedDocObj?.name || 'this doctor')}
+                >
+                  Erase / Anonymize Data
+                </button>
+                <button className="admin-btn-sec" onClick={() => setSelectedDoctorKey(null)}>Close Dossier</button>
+              </div>
             </div>
           </div>
         </div>
@@ -2138,27 +2511,49 @@ export default function AdminPortalPage() {
               <div style={{ marginTop: '20px' }}>
                 <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>Health Vault Attached Diagnostic Tests &amp; Prescriptions</strong>
                 <div style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <div style={{ padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <strong style={{ fontSize: '12px', color: '#0F172A' }}>📄 Lipid_Profile_Panel.pdf</strong>
-                      <div style={{ fontSize: '10px', color: '#64748B' }}>Cholesterol: 215 mg/dL • Attached 18 Sep 2026</div>
+                  {!selectedPatObj.vaultRecords || selectedPatObj.vaultRecords.length === 0 ? (
+                    <div style={{ gridColumn: '1 / -1', padding: '14px', textAlign: 'center', color: '#94A3B8', fontSize: '11.5px', background: '#F8FAFC', border: '1px dashed #E2E8F0', borderRadius: '10px' }}>
+                      No documents in this patient&apos;s health vault.
                     </div>
-                    <button className="admin-btn-sec" onClick={() => showToast('Opening Report', 'Displaying diagnostic report from patient vault.', '📄', 'info')}>View PDF</button>
-                  </div>
-                  <div style={{ padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <strong style={{ fontSize: '12px', color: '#0F172A' }}>📄 CBC_Hemogram_Report.pdf</strong>
-                      <div style={{ fontSize: '10px', color: '#64748B' }}>Hb: 12.8 g/dL • Attached 12 Aug 2026</div>
-                    </div>
-                    <button className="admin-btn-sec" onClick={() => showToast('Opening Report', 'Displaying diagnostic report from patient vault.', '📄', 'info')}>View PDF</button>
-                  </div>
+                  ) : (
+                    selectedPatObj.vaultRecords.map((doc) => (
+                      <div key={doc.id} style={{ padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <strong style={{ fontSize: '12px', color: '#0F172A' }}>📄 {doc.mimeType === 'application/pdf' ? 'Document' : 'Image'} ({(doc.fileSizeBytes / 1024).toFixed(0)} KB)</strong>
+                          <div style={{ fontSize: '10px', color: '#64748B' }}>{doc.securityStatus} • Attached {new Date(doc.createdAt).toLocaleDateString()}</div>
+                        </div>
+                        {doc.securityStatus === 'CLEAN' ? (
+                          <button className="admin-btn-sec" onClick={() => window.open(`/api/documents/download?appointment_id=${encodeURIComponent(doc.appointmentId)}&document_id=${encodeURIComponent(doc.id)}`, '_blank')}>View PDF</button>
+                        ) : (
+                          <span style={{ fontSize: '10.5px', color: '#DC2626', fontWeight: 700 }}>Not cleared for viewing</span>
+                        )}
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
 
             <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '11px', color: '#64748B' }}>Confidential Medical Record • HelloDoctor Health Vault</span>
-              <button className="admin-btn-sec" onClick={() => setSelectedPatientKey(null)}>Close Dossier</button>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  className="admin-btn-sec"
+                  disabled={dataRightsBusy === selectedPatientKey}
+                  onClick={() => selectedPatientKey && handleExportPatientData(selectedPatientKey)}
+                >
+                  {dataRightsBusy === selectedPatientKey ? 'Working…' : 'Export Data (JSON)'}
+                </button>
+                <button
+                  className="admin-btn-sec"
+                  style={{ color: '#DC2626', borderColor: '#FCA5A5' }}
+                  disabled={dataRightsBusy === selectedPatientKey}
+                  onClick={() => selectedPatientKey && handleErasePatientData(selectedPatientKey, selectedPatObj?.name || 'this patient')}
+                >
+                  Erase / Anonymize Data
+                </button>
+                <button className="admin-btn-sec" onClick={() => setSelectedPatientKey(null)}>Close Dossier</button>
+              </div>
             </div>
           </div>
         </div>
@@ -2332,6 +2727,63 @@ export default function AdminPortalPage() {
         </div>
       )}
 
+      {/* ── MODAL: ADD PLATFORM PAYMENT METHOD ── */}
+      {addPaymentMethodModalOpen && (
+        <div className="admin-modal-backdrop" id="adminAddPaymentMethodModal" style={{ display: 'flex' }} onClick={(e) => { if (e.target === e.currentTarget) setAddPaymentMethodModalOpen(false); }}>
+          <div className="admin-modal-card" style={{ maxWidth: '620px' }}>
+            <div style={{ background: '#0F172A', color: '#fff', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '20px' }}>💳</span>
+                <div>
+                  <strong style={{ fontSize: '15px' }}>Add Platform Payment Method</strong>
+                  <div style={{ fontSize: '11px', color: '#94A3B8' }}>The platform&apos;s own merchant configuration — not a patient&apos;s or doctor&apos;s</div>
+                </div>
+              </div>
+              <button onClick={() => setAddPaymentMethodModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '18px', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ fontSize: '11px', color: '#64748B', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 10px' }}>
+                Credentials are encrypted at rest and never returned by the API. The first saved method for a given provider becomes primary automatically.
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Provider Code</label>
+                  <select value={newProviderCode} onChange={(e) => setNewProviderCode(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}>
+                    <option value="MPESA_PAYBILL">M-Pesa Paybill</option>
+                    <option value="MPESA_TILL">M-Pesa Till</option>
+                    <option value="CARD_AGGREGATOR">Card Aggregator</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Label</label>
+                  <input type="text" maxLength={80} placeholder="e.g. Primary M-Pesa Paybill" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none' }} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Display Text (shown in lists, e.g. &quot;Paybill ****1234&quot;)</label>
+                <input type="text" maxLength={80} placeholder="Paybill ****1234" value={newMaskedDisplay} onChange={(e) => setNewMaskedDisplay(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none' }} />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Credentials (JSON — whatever fields the real provider driver will need)</label>
+                <textarea rows={5} value={newCredentialsJson} onChange={(e) => setNewCredentialsJson(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }} />
+              </div>
+            </div>
+
+            <div style={{ padding: '14px 20px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button disabled={paymentMethodsBusy} className="admin-btn-sec" onClick={() => setAddPaymentMethodModalOpen(false)}>Cancel</button>
+              <button disabled={paymentMethodsBusy} className="admin-btn-pri" onClick={handleSavePlatformPaymentMethod}>
+                <span>💳 Save Payment Method</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── MODAL 5: GRIEVANCE DETAIL MODAL ── */}
       {selectedGrvObj && (
         <div className="admin-modal-backdrop" id="adminGrievanceDetailModal" style={{ display: 'flex' }} onClick={(e) => { if (e.target === e.currentTarget) setSelectedGrievanceId(null); }}>
@@ -2360,7 +2812,7 @@ export default function AdminPortalPage() {
                 </div>
 
                 <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', background: '#F8FAFC' }}>
-                  <div style={{ fontSize: '10.5px', fontWeight: 750, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>🩺 Accused Physician</div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 750, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>Treating Doctor</div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{selectedGrvObj.doctor.name}</div>
                   <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>{selectedGrvObj.doctor.registrationNumber} • Fee: {selectedGrvObj.doctor.fee}</div>
                 </div>
@@ -2395,6 +2847,12 @@ export default function AdminPortalPage() {
                 </div>
               </div>
 
+              {selectedGrvObj.backendId && <GrievanceInvestigation key={selectedGrvObj.backendId} grievanceId={selectedGrvObj.backendId} />}
+
+              <label>Investigation decision notes
+                <textarea className="auth-input" aria-label="Investigation decision notes" minLength={8} maxLength={1000} value={adjudicationNotes} onChange={e => setAdjudicationNotes(e.target.value)} placeholder="Record the evidence and reason for this decision." />
+              </label>
+
               {selectedGrvObj.adjudication && (
                 <div style={{ border: '1px solid #86EFAC', borderRadius: '10px', padding: '12px 14px', background: '#F0FDF4' }}>
                   <div style={{ fontSize: '11px', fontWeight: 750, color: '#166534', textTransform: 'uppercase', marginBottom: '4px' }}>✓ Adjudication Decision Recorded</div>
@@ -2406,14 +2864,14 @@ export default function AdminPortalPage() {
             <div style={{ padding: '14px 20px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <button className="admin-btn-sec" onClick={() => setSelectedGrievanceId(null)}>Close</button>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button disabled={financeBusy} className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'REFUND')} style={{ background: '#059669', borderColor: '#059669' }}>
-                  <span>💳 Record Finance Refund</span>
+                <button disabled={financeBusy || !selectedGrvObj.backendId || adjudicationNotes.trim().length < 8} className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.backendId!, 'REFUND')} style={{ background: '#059669', borderColor: '#059669' }}>
+                  <span>Record refund decision</span>
                 </button>
-                <button disabled={financeBusy} className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'WARN')} style={{ background: '#DC2626', borderColor: '#DC2626' }}>
-                  <span>⚠️ Issue Doctor Professional registration Warning</span>
+                <button disabled={financeBusy || !selectedGrvObj.backendId || adjudicationNotes.trim().length < 8} className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.backendId!, 'WARN')} style={{ background: '#DC2626', borderColor: '#DC2626' }}>
+                  <span>Record Doctor warning</span>
                 </button>
-                <button disabled={financeBusy} className="admin-btn-sec" onClick={() => handleAdjudicateGrievance(selectedGrvObj.id, 'RESOLVE')}>
-                  <span>✓ Mark Resolved</span>
+                <button disabled={financeBusy || !selectedGrvObj.backendId || adjudicationNotes.trim().length < 8} className="admin-btn-sec" onClick={() => handleAdjudicateGrievance(selectedGrvObj.backendId!, 'RESOLVE')}>
+                  <span>Dismiss grievance</span>
                 </button>
               </div>
             </div>
@@ -2488,7 +2946,7 @@ export default function AdminPortalPage() {
             </div>
 
             <div style={{ padding: '14px 22px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button className="sheet-btn" onClick={() => showToast('Receipt Downloaded 📄', 'Official tax voucher saved.', '📄', 'success')} style={{ padding: '8px 16px', fontSize: '12px', background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#334155', borderRadius: '8px', cursor: 'pointer' }}>
+              <button className="sheet-btn" onClick={() => showToast('Not Yet Available', 'Tax voucher/receipt generation is not implemented yet — no backend document generation exists for this.', 'ℹ️', 'info')} style={{ padding: '8px 16px', fontSize: '12px', background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#334155', borderRadius: '8px', cursor: 'pointer' }}>
                 📄 Print / Save Tax Voucher
               </button>
               <button className="sheet-btn primary" onClick={() => setSelectedTransactionId(null)} style={{ padding: '8px 20px', fontSize: '12px', background: '#0F172A', color: '#fff', borderRadius: '8px', cursor: 'pointer' }}>

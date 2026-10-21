@@ -3,17 +3,20 @@ import { isProfessionallyVerified, professionalVerificationLabel } from '../lib/
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorText, runtimeGeneration, useResource } from '../lib/client';
 import { startScheduleSync } from '../lib/schedule-sync';
-import { Appointment, Profile, upcomingFirst } from '../lib/contracts';
+import { Appointment, Profile, upcomingFirst, consultationAction, consultationActionLabel } from '../lib/contracts';
 import { Prototype, hasClass, id, text } from './Prototype';
 import { State } from './Common';
 
 export type ClinicalAction = (action: 'summary' | 'history' | 'documents' | 'call' | 'chat' | 'rx', appointment: Appointment) => void;
 export type QueueState = ReturnType<typeof useAppointments>;
-export function useAppointments(enabled: boolean) {
+export function useAppointments(enabled: boolean, view: 'upcoming'|'all'='upcoming', live=true) {
   const [data,setData] = useState<Appointment[]>([]);
   const [loading,setLoading] = useState(enabled);
   const [error,setError] = useState('');
   const epoch = useRef(0);
+  const loadedPages=useRef(1);
+  const [hasMore,setHasMore]=useState(false);
+  const [moreBusy,setMoreBusy]=useState(false);
   const refresh = useCallback(async () => {
     if (!enabled) return;
     const version = ++epoch.current;
@@ -21,26 +24,27 @@ export function useAppointments(enabled: boolean) {
     const current = () => version === epoch.current && generation === runtimeGeneration();
     setError(''); setLoading(true);
     try {
-      const results: Appointment[] = [];
-      for (let offset = 0; ; offset += 100) {
-        const page = await api<Appointment[]>(`doctor/appointments?limit=100&offset=${offset}`);
-        if (!current()) return;
-        results.push(...page);
-        if (page.length < 100) break;
-        if (offset >= 9900) throw new Error('Queue exceeds display capacity.');
-      }
-      if (current()) setData(upcomingFirst(results));
+      const results:Appointment[]=[];let more=false;
+      for(let page=0;page<loadedPages.current;page++){const batch=await api<Appointment[]>(`doctor/appointments?view=${view}&limit=100&offset=${page*100}`);if(!current())return;results.push(...batch);more=batch.length===100;if(!more)break;}
+      if(current()){setData(upcomingFirst(results));setHasMore(more);}
     } catch (e) { if (current() && !(e instanceof DOMException && e.name === 'AbortError')) setError(errorText(e)); }
     finally { if (current()) setLoading(false); }
-  }, [enabled]);
+  }, [enabled,view]);
   useEffect(() => {
     if (!enabled) { epoch.current++; setData([]); return; }
-    void refresh();
-    const stop = startScheduleSync(refresh, {window,document,online:()=>navigator.onLine,
-      every:(callback,ms)=>window.setInterval(callback,ms),cancel:timer=>window.clearInterval(timer as number)});
+    loadedPages.current=1;void refresh();
+    const stop = live ? startScheduleSync(refresh, {window,document,online:()=>navigator.onLine,
+      every:(callback,ms)=>window.setInterval(callback,ms),cancel:timer=>window.clearInterval(timer as number)}) : ()=>{};
     return () => { stop(); epoch.current++; };
-  }, [enabled,refresh]);
-  return { data,loading,error,refresh };
+  }, [enabled,refresh,live]);
+  const loadMore=async()=>{
+    if(!enabled||moreBusy||!hasMore)return;
+    const version=epoch.current,generation=runtimeGeneration();setMoreBusy(true);
+    try{const next=await api<Appointment[]>(`doctor/appointments?view=${view}&limit=100&offset=${data.length}`);
+     if(version===epoch.current&&generation===runtimeGeneration()){loadedPages.current++;setData(old=>upcomingFirst([...new Map([...old,...next].map(a=>[a.id,a])).values()]));setHasMore(next.length===100);}
+    }catch(e){if(version===epoch.current)setError(errorText(e));}finally{setMoreBusy(false);}
+  };
+  return { data,loading,error,refresh,hasMore,loadMore,moreBusy };
 }
 export function initials(name: string) { return name.trim().split(/\s+/).slice(0,2).map(x => x[0]).join('').toUpperCase() || '👤'; }
 export function date(value: string | null | undefined) { return value ? new Date(value).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Nairobi' }) : '—'; }
@@ -54,26 +58,31 @@ export function statusLabel(a: Appointment, nextId?: string, now = Date.now()) {
   return `${a.id === nextId ? 'Next · ' : ''}${dayKey(a.start_time) === dayKey(new Date(now).toISOString()) ? 'Today' : 'Upcoming'}`;
 }
 export function QueueCard({ appointment: a, nextId, action }: { appointment: Appointment; nextId?: string; action: ClinicalAction }) {
-  return <Prototype name="queueCard" action={handler => { if (handler.includes('callPatient')) action('call',a); else if (handler.includes('openDoctorChat')) action('chat',a); else action('rx',a); }} override={n => {
-    if (hasClass(n,'queue-card')) return { props: { 'data-appointment-id':a.id,'data-category':a.status, style: { ...n.props.style as object } } };
-    if (hasClass(n,'doc-slot-avatar')) return { children:initials(a.patient_display_name) };
-    if (hasClass(n,'queue-patient-name')) return { children:<><button className="web-name-button" onClick={() => action('summary',a)}>{a.patient_display_name}</button><span className="badge badge-green" style={{ fontSize:9.5 }}>{a.modality}</span></> };
-    if (hasClass(n,'queue-patient-meta')) return { children: <>{a.appointment_number} · {date(a.start_time)} · {statusLabel(a,nextId)}</> };
-    if (hasClass(n,'badge') && !hasClass(n,'badge-green')) return { children:<>🕒 {time(a.start_time)} – {time(a.end_time)}</> };
-    if (hasClass(n,'queue-complaint')) return { children:<><strong>Chief Complaint:</strong> <span>{a.clinical_outcome ?? 'Clinical intake requires authorized consultation access.'}</span><button className="dw-btn-mini" style={{ marginLeft:8 }} onClick={() => action('summary',a)}>View intake</button></> };
-    if (n.tag === 'span' && text(n).includes('Call Patient')) return { children:'Call Patient 📞' };
-    return undefined;
-  }} />;
+  const primary = consultationAction(a);
+  return <article className="queue-card" data-appointment-id={a.id} data-category={a.status}>
+    <div className="web-action-row"><div className="doc-slot-avatar">{initials(a.patient_display_name)}</div><div>
+      <button className="web-name-button" onClick={()=>action('summary',a)}>{a.patient_display_name}</button>
+      <p className="sheet-desc">{a.modality==='CHAT'?'Chat consultation':'Video consultation'}</p>
+      <p className="sheet-desc">{date(a.start_time)} · {time(a.start_time)} · {statusLabel(a,nextId)}</p>
+    </div></div>
+    {a.clinical_outcome&&<p className="queue-complaint">{a.clinical_outcome}</p>}
+    <div className="web-action-row">
+      <button className="dw-btn-primary" disabled={!primary} onClick={()=>primary&&action(primary,a)}>{consultationActionLabel(a)}</button>
+      {a.modality==='VIDEO'&&<button className="dw-btn-outline-sm" onClick={()=>action('chat',a)}>Follow-up messages</button>}
+      {primary&&<button className="dw-btn-outline-sm" onClick={()=>action('rx',a)}>Write prescription</button>}
+    </div>
+  </article>;
 }
 export function Queue({ queue, profile, duty, onDuty, action, onQna }: { queue: QueueState; profile: Profile; duty: { value?: boolean; busy:boolean; error:string }; onDuty:()=>void; action:ClinicalAction; onQna:()=>void }) {
   const [search,setSearch] = useState('');
-  const [filter,setFilter] = useState('all');
+  const [filter,setFilter] = useState('upcoming');
   const publicQuestions=useResource<unknown[]>('doctor/qna/questions?status=OPEN&limit=100&offset=0');
   const [visibleCount,setVisibleCount] = useState(25);
   const [,setTick] = useState(0);
   useEffect(() => { const timer=setInterval(()=>setTick(t=>t+1),30000); return ()=>clearInterval(timer); },[]);
-  const active = queue.data.filter(a=>!['COMPLETED','CANCELLED','REFUNDED','NO_SHOW'].includes(a.status) && a.doctor_lifecycle!=='DONE');
-  const filtered = queue.data.filter(a => (filter==='all' || (filter==='upcoming' ? active.includes(a) : filter==='completed' ? a.status==='COMPLETED' || a.doctor_lifecycle==='DONE' : a.status==='CANCELLED')) && `${a.patient_display_name} ${a.appointment_number} ${a.clinical_outcome ?? ''}`.toLowerCase().includes(search.toLowerCase()));
+  const active = queue.data.filter(a=>a.queue_actionable === true);
+  const filtered = active.filter(a => `${a.patient_display_name} ${a.appointment_number} ${a.clinical_outcome ?? ''}`.toLowerCase().includes(search.toLowerCase()));
+
   return <Prototype name="doc-view-0" action={(handler,event) => {
     if (handler.includes('toggleDoctorDuty')) onDuty();
     else if (handler.includes('filterDoctorQueue')) setSearch((event.target as HTMLInputElement).value);
@@ -88,7 +97,8 @@ export function Queue({ queue, profile, duty, onDuty, action, onQna }: { queue: 
     if (n.tag==='span'&&text(n).includes('Unanswered')) return {children:publicQuestions.data?`${publicQuestions.data.length}${publicQuestions.data.length===100?'+':''} Unanswered`:'—'};
     if (id(n)==='docDutySwitch') return { tag:'button', props:{className:`duty-switch ${duty.value?'online':'offline'}`,disabled:duty.busy || duty.value===undefined,'aria-pressed':duty.value},children:<><div className="duty-dot"/><span id="dutyLabel">{duty.busy?'Updating…':duty.value?'Online':'Offline'}</span></> };
     if (id(n)==='doctorQueueList') return { children:<><State loading={queue.loading} error={queue.error || duty.error} empty={!queue.loading&&!queue.error&&filtered.length===0?'No waiting patients found':undefined} retry={()=>void queue.refresh()} />{filtered.slice(0,visibleCount).map(a=><QueueCard key={a.id} appointment={a} nextId={active[0]?.id} action={action} />)}{filtered.length>visibleCount&&<button className="slot-btn sec" onClick={()=>setVisibleCount(c=>c+25)}>Load more consultations</button>}</> };
-    if (hasClass(n,'doc-filter-strip')) return { children:<><button className={`doc-filter-chip ${filter==='all'?'active':''}`} onClick={()=>{setFilter('all');setVisibleCount(25);}}>All Scheduled ({queue.data.length})</button><button className={`doc-filter-chip ${filter==='upcoming'?'active':''}`} onClick={()=>setFilter('upcoming')}>Upcoming ({active.length})</button><button className={`doc-filter-chip ${filter==='completed'?'active':''}`} onClick={()=>setFilter('completed')}>Completed ({queue.data.filter(a=>a.status==='COMPLETED').length})</button><button className={`doc-filter-chip ${filter==='cancelled'?'active':''}`} onClick={()=>setFilter('cancelled')}>Cancelled</button><button className="doc-filter-chip" style={{background:'var(--accent-light)',color:'#B45309'}} onClick={onQna}>❓ Free Q&amp;A</button></> };
+    if (hasClass(n,'doc-filter-strip')) return { children:<><span>Current and remaining today ({active.length})</span><button className="doc-filter-chip" onClick={onQna}>Free Q&amp;A</button></> };
+
     if (id(n)==='docMobileChipQnaCount') return { children:null };
     return undefined;
   }} />;

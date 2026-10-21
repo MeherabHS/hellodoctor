@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 // Every HTML response must use the nonce set by middleware, including login.
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-slate-50 text-slate-900 min-h-screen antialiased flex flex-col">
-        {children}
+        <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>
   );

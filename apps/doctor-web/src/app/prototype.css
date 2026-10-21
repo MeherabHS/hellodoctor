@@ -2,6 +2,7 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
+  --clinical-own-message: #087A5B;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: #E8EDF5;
   color: #1E293B;
@@ -4434,3 +4435,16 @@ body[data-role="admin"] .online-recovery-toast.show {
 body:not([data-role="doctor-web"]):not([data-role="admin"]) .online-recovery-toast {
   display: none !important;
 }
+
+/* Clinical message ownership follows sender identity on every history load. */
+.web-chat-thread .dw-chat-bubble-row.doctor { flex-direction: row-reverse; }
+.web-chat-thread .dw-chat-bubble-row.patient { justify-content: flex-start; }
+.web-chat-thread .dw-chat-bubble-content { flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.web-chat-thread .dw-chat-bubble-row.doctor .dw-chat-bubble-content { background: var(--clinical-own-message); color: #fff; border-color: transparent; }
+.web-chat-thread .dw-chat-bubble-row.patient .dw-chat-bubble-content { background: #fff; color: #172321; border: 1px solid #E1E7E4; }
+.clinical-attach-button { min-width: 48px; min-height: 48px; display: grid; place-items: center; border: 0; background: transparent; color: var(--primary, #087A5B); }
+.clinical-attachment { display: flex; flex-direction: column; gap: 6px; }
+.clinical-attachment button { min-height: 48px; }
+.clinical-image-dialog { position: fixed; inset: 24px; background: #fff; color: #172321; z-index: 10000; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 0 0 100vmax #0009; }
+.clinical-image-dialog img { max-width: 100%; min-height: 0; object-fit: contain; flex: 1; }
+.web-chat-thread textarea { width: 100%; min-height: 32px; max-height: 140px; resize: vertical; border: 0; background: transparent; font: inherit; }

@@ -1,3 +1,4 @@
+import { createInflightReads } from './inflight.mjs';
 // API client connecting HelloDoctor Admin Portal to the Axum Rust Backend.
 //
 // Every call goes through this Next.js server's own same-origin proxy
@@ -16,6 +17,7 @@ export interface ApiResponse<T> {
 }
 
 export interface AdminOverview {
+  modality_split?:{videoCount:number;chatCount:number;videoRevenue:string;chatRevenue:string};
   total_doctors: number;
   on_duty_doctors: number;
   pending_professional_verification: number;
@@ -194,9 +196,11 @@ export interface PatientDossier {
   }>;
   vault_records: Array<{
     id: string;
+    appointment_id: string;
     page_number: number;
     mime_type: string;
     file_size_bytes: number;
+    security_status: string;
     created_at: string;
   }>;
 }
@@ -265,23 +269,35 @@ export interface AdminGrievance {
 }
 
 // Network Request Helper
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+let runtimeGeneration=0;
+const inflightReads=createInflightReads();
+export function clearAdminRuntime(){runtimeGeneration++;inflightReads.clear();}
+function request<T>(path:string,options?:RequestInit):Promise<T>{
+ return (options?.method??'GET').toUpperCase()==='GET'&&!options?.signal&&!options?.headers
+  ? inflightReads.run(`${runtimeGeneration}:${path}`,()=>performRequest<T>(path,options)) : performRequest<T>(path,options);
+}
+async function performRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const generation=runtimeGeneration;
   const url = `${API_BASE}${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      "X-Request-Id": crypto.randomUUID(),
+      "X-Client-Type": "ADMIN_WEB",
       ...(options?.headers || {}),
     },
     credentials: "include",
     cache: "no-store",
   });
 
+  if(generation!==runtimeGeneration)throw new DOMException('Account changed','AbortError');
   if (res.status === 401 && typeof window !== "undefined") {
     // Session cookie missing/expired and the proxy's own silent-refresh
     // attempt also failed — send the admin back to login rather than
     // surfacing a confusing in-page error.
-    window.location.href = "/login";
+    // Clear the authenticated document/runtime rather than retaining its caches.
+    window.location.assign(new URL('/login', window.location.origin).href);
     throw new Error("Not authenticated.");
   }
 
@@ -429,6 +445,24 @@ export async function getAdminPatients(): Promise<AdminPatient[]> {
 
 export async function getPatientDossier(id: string): Promise<PatientDossier> {
   return request<PatientDossier>(`/admin/patients/${id}/dossier`);
+}
+
+export interface DataRightsOutcome {
+  outcome: "HARD_DELETED" | "ANONYMIZED";
+}
+
+export async function executePatientDataRights(id: string, reason: string): Promise<DataRightsOutcome> {
+  return request<DataRightsOutcome>(`/admin/patients/${id}/data-rights/erase`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function executeDoctorDataRights(id: string, reason: string): Promise<DataRightsOutcome> {
+  return request<DataRightsOutcome>(`/admin/doctors/${id}/data-rights/erase`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export async function getPendingDoctorVerifications(): Promise<PendingDoctorVerification[]> {
@@ -585,4 +619,55 @@ export async function adjudicateGrievanceDismiss(
     method: "POST",
     body: JSON.stringify({ audit_notes }),
   });
+}
+
+export interface InvestigationEvent {
+ id:string; event_type?:string; action?:string; event_time_server?:string; created_at?:string;
+ actor_user_id?:string; actor_role?:string; auth_session_id?:string; request_id?:string; trace_id?:string;
+ resource_type?:string; resource_id?:string; result?:string; reason_code?:string;
+ safe_metadata?:Record<string,unknown>; expires_at?:string; client_type?:string; client_build?:string;
+}
+export interface GrievanceInvestigation {
+ grievance_id:string; facts:Record<string,unknown>; trace_events:InvestigationEvent[]; audit_events:InvestigationEvent[];
+ records:Record<string,Record<string,unknown>[]>; preservation_holds:Record<string,unknown>[];
+ telemetry:Record<string,unknown>; semantics:string;
+ event_page?:{snapshot_at:string;total:number;has_more:boolean;next:{time:string;id:string;source:string}|null};
+ record_page?:{offset:number;limit:number;totals:Record<string,number>};
+}
+export function getGrievanceInvestigation(id:string,page:Record<string,string|number|boolean>={}) {
+ const query=new URLSearchParams(Object.entries({event_limit:50,record_limit:50,...page}).map(([key,value])=>[key,String(value)]));
+ return request<GrievanceInvestigation>(`/admin/grievances/${encodeURIComponent(id)}/timeline?${query}`);
+}
+export function rescheduleAppointment(id:string,slot_id:string,reason:string,grievance_id:string) {
+ return request(`/admin/appointments/${encodeURIComponent(id)}/reschedule`,{method:'POST',body:JSON.stringify({slot_id,reason,grievance_id})});
+}
+
+export interface BookableDoctorSlot {id:string;start_time:string;end_time:string;status:string}
+export function getBookableDoctorSlots(doctor:string){return request<BookableDoctorSlot[]>(`/doctors/${encodeURIComponent(doctor)}/slots`);}
+
+// Platform merchant/payment-method configuration — "the body waiting for
+// the heart" (the real payment-gateway API key/driver). Never returns raw
+// or encrypted credentials; the backend strips both from every response.
+export interface PlatformPaymentMethod {
+  id: string; provider_code: string; label: string; currency: string;
+  masked_display: string; is_primary: boolean; is_active: boolean;
+  created_by: string; created_at: string; updated_at: string;
+}
+export function getPlatformPaymentMethods() {
+  return request<PlatformPaymentMethod[]>("/admin/platform-payment-methods");
+}
+export function savePlatformPaymentMethod(payload: {
+  provider_code: string; label: string; masked_display: string;
+  credentials: Record<string, string>; make_primary?: boolean;
+}) {
+  return request<PlatformPaymentMethod>("/admin/platform-payment-methods", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+export function setPrimaryPlatformPaymentMethod(id: string) {
+  return request<{ id: string; is_primary: boolean }>(`/admin/platform-payment-methods/${encodeURIComponent(id)}/set-primary`, { method: "POST" });
+}
+export function deactivatePlatformPaymentMethod(id: string) {
+  return request<{ id: string; is_active: boolean }>(`/admin/platform-payment-methods/${encodeURIComponent(id)}`, { method: "DELETE" });
 }

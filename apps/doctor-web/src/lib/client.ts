@@ -1,4 +1,5 @@
 'use client';
+import { createInflightReads } from './inflight.mjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createIncidentReporter, operationContext, IncidentContext } from './client-incidents';
 import { deliverCallTelemetry, CallEvent } from './call-telemetry';
@@ -9,8 +10,10 @@ let incidentScreen = 'Application';
 export function setIncidentScreen(screen:string) { incidentScreen = screen; }
 export function runtimeGeneration() { return generation; }
 const pending = new Set<AbortController>();
+const inflightReads=createInflightReads();
 export function clearRuntime() {
   generation++;
+  inflightReads.clear();
   scope = null;
   pending.forEach(controller => controller.abort());
   pending.clear();
@@ -25,13 +28,19 @@ const reportIncident = createIncidentReporter(() => scope !== null,
       signal: AbortSignal.timeout(3000), keepalive: true });
     if (!response.ok) throw new Error('Incident delivery failed');
   });
-export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+export function request<T>(path:string,options:RequestInit={}):Promise<T> {
+ if((options.method??'GET').toUpperCase()==='GET'&&!options.signal&&!options.headers) {
+  return inflightReads.run(`${generation}:${path}`,()=>performRequest<T>(path,options));
+ }
+ return performRequest<T>(path,options);
+}
+async function performRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const version = generation;
   const controller = new AbortController();
   pending.add(controller);
   let responseReceived = false;
   try {
-    const res = await fetch(path, { ...options, credentials: 'same-origin', cache: 'no-store', signal: options.signal ?? controller.signal, headers: { 'Content-Type': 'application/json', ...options.headers } });
+    const res = await fetch(path, { ...options, credentials: 'same-origin', cache: 'no-store', signal: options.signal ?? controller.signal, headers: { 'Content-Type': 'application/json', 'X-Request-Id':crypto.randomUUID(), 'X-Client-Type':'DOCTOR_WEB', ...options.headers } });
     responseReceived = true;
     if (version !== generation) throw new DOMException('Session changed', 'AbortError');
     const serverScope = res.headers.get('X-Doctor-Scope');
@@ -149,6 +158,7 @@ export function uploadPrescription<T>(appointmentId: string, body: unknown, key:
       xhr.timeout = 120000;
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.setRequestHeader('Idempotency-Key', key);
+      xhr.setRequestHeader('X-Request-Id',crypto.randomUUID());
       xhr.send(JSON.stringify(body));
     } catch { reject(new ApiError(0, 'NETWORK_UNAVAILABLE', 'Unable to start this upload. Please retry.')); }
   }).finally(() => { pending.delete(controller); });
@@ -167,7 +177,7 @@ export function useResource<T>(path: string | null, initial?: T) {
   const counter = useRef(0);
   const refresh = useCallback(async () => {
     const version = ++counter.current;
-    setState({path,loading:!!path,error:''});
+    setState(previous=>({path,data:previous.path===path?previous.data:initial,loading:!!path,error:''}));
     if (!path) return;
     try {
       const result = await api<T>(path);

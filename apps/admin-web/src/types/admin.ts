@@ -100,7 +100,7 @@ export interface PatientRecord {
 
 export interface AuditEvent {
   id: string;
-  actor_role: 'FINANCE_ADMIN' | 'CLINICAL_ADMIN' | 'PLATFORM_ADMIN' | 'SECURITY_ADMIN' | 'SYSTEM_WORKER';
+  actor_role: 'ADMIN' | 'FINANCE_ADMIN' | 'CLINICAL_ADMIN' | 'PLATFORM_ADMIN' | 'SECURITY_ADMIN' | 'SYSTEM_WORKER';
   action: string;
   entity_type: string;
   entity_id: string;

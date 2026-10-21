@@ -1,10 +1,10 @@
 import type { Slot } from './contracts';
 
 // Counts need the complete authorized listing, not just 100 historical slots.
-export async function loadDoctorSlots(load: (path: string) => Promise<Slot[]>, isCurrent: () => boolean): Promise<Slot[]> {
+export async function loadDoctorSlots(load: (path: string) => Promise<Slot[]>, isCurrent: () => boolean, day?: string): Promise<Slot[]> {
   const rows: Slot[] = [];
   for (let offset = 0; offset <= 9900; offset += 100) {
-    const next = await load(`doctor/slots?limit=100&offset=${offset}`);
+    const next = await load(`doctor/slots?limit=100&offset=${offset}${day?`&day=${encodeURIComponent(day)}`:""}`);
     if (!isCurrent()) throw new DOMException('Session changed', 'AbortError');
     rows.push(...next);
     if (next.length < 100) return rows;
