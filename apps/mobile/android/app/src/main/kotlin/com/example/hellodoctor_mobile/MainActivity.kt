@@ -8,6 +8,7 @@ import android.os.Build
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        DeviceProof.register(flutterEngine, this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "hellodoctor/build_metadata")
             .setMethodCallHandler { call, result ->
                 if (call.method != "get") { result.notImplemented() }

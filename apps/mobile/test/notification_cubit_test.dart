@@ -39,6 +39,21 @@ class StubNotificationRepository extends NotificationRepository {
   }
 
   @override
+  Future<List<NotificationDto>> newerThan(NotificationDto cursor) async {
+    final rows = (await list())
+        .where((n) =>
+            n.createdAt.isAfter(cursor.createdAt) ||
+            (n.createdAt.isAtSameMomentAs(cursor.createdAt) &&
+                n.id.compareTo(cursor.id) > 0))
+        .toList();
+    rows.sort((a, b) {
+      final time = a.createdAt.compareTo(b.createdAt);
+      return time == 0 ? a.id.compareTo(b.id) : time;
+    });
+    return rows;
+  }
+
+  @override
   Future<int> unreadCount() async => unreadCountResponse;
 
   @override

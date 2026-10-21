@@ -1,98 +1,290 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/network/api_client.dart';
+import 'package:permission_handler/permission_handler.dart';
+
 import '../../core/theme/tokens.dart';
+import '../../core/video/agora_engine.dart';
+import '../../core/video/call_controller.dart';
 import 'doctor_cubit.dart';
 
-/// Boundary for the future Agora SDK adapter. The server contract is exercised
-/// here, but this client deliberately does not render fake media or claim a
-/// call is active while Agora credentials/provider integration is deferred.
-class AgoraSession {
-  const AgoraSession({required this.channel, required this.appId});
-  final String channel;
-  final String appId;
-}
-
+/// Real Agora RTC consultation call screen. Reuses the existing server
+/// contract (`POST /consultations/:id/rtc-token`) exclusively — this screen
+/// never mints a token itself and never sees the Agora App Certificate
+/// (CLAUDE.md §1.10: Agora RTC SDK only, no custom signaling, certificate
+/// stays server-side). Joining, leaving, muting, camera switching and
+/// connection-state handling are all delegated to [CallController], which is
+/// the directly unit-tested piece (`test/core/video/call_controller_test.dart`);
+/// this widget is responsible only for rendering whatever state it reports.
 class AgoraPage extends StatefulWidget {
   const AgoraPage({super.key, required this.appointmentId});
   final String appointmentId;
   @override
-  State<AgoraPage> createState() => _AgoraState();
+  State<AgoraPage> createState() => _AgoraPageState();
 }
 
-class _AgoraState extends State<AgoraPage> {
-  bool loading = true;
-  String? error;
-  AgoraSession? session;
+class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
+  late final CallController _controller;
 
   @override
   void initState() {
     super.initState();
-    authorize();
+    WidgetsBinding.instance.addObserver(this);
+    _controller = CallController(
+      engine: RealAgoraEngine(),
+      mintToken: _mintToken,
+      requestPermissions: _requestPermissions,
+    )..addListener(_onControllerChanged);
+    _controller.start();
   }
 
-  Future<void> authorize() async {
-    setState(() {
-      loading = true;
-      error = null;
-    });
-    try {
-      final data =
-          await context.read<DoctorCubit>().repo.rtcToken(widget.appointmentId);
-      final channel = data['channel_name']?.toString();
-      final appId = data['app_id']?.toString();
-      if (channel == null ||
-          appId == null ||
-          channel.isEmpty ||
-          appId.isEmpty) {
-        throw const ApiException(
-            422, 'The RTC authorization response is incomplete.');
-      }
-      session = AgoraSession(channel: channel, appId: appId);
-    } on ApiException catch (e) {
-      error = e.userMessage;
-    } catch (_) {
-      error = 'The consultation call could not be authorized.';
-    } finally {
-      if (mounted) setState(() => loading = false);
+  Future<RtcTokenData> _mintToken() async {
+    final data =
+        await context.read<DoctorCubit>().repo.rtcToken(widget.appointmentId);
+    return RtcTokenData.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  Future<bool> _requestPermissions() async {
+    final result = await [Permission.camera, Permission.microphone].request();
+    return result.values.every((status) => status.isGranted);
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
+      _controller.handleAppBackgrounded();
+    } else if (state == AppLifecycleState.resumed) {
+      _controller.handleAppForegrounded();
     }
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.removeListener(_onControllerChanged);
+    _controller.leave();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _leaveAndPop() async {
+    await _controller.leave();
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Consultation call')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: loading
-              ? const CircularProgressIndicator()
-              : error != null
-                  ? Column(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.cloud_off,
-                          size: 42, color: DoctorTokens.textSub),
-                      const SizedBox(height: 12),
-                      Text(error!, textAlign: TextAlign.center),
-                      TextButton(
-                          onPressed: authorize, child: const Text('Retry')),
-                    ])
-                  : Column(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.videocam_off_outlined,
-                          size: 52, color: DoctorTokens.primary),
-                      const SizedBox(height: 14),
-                      const Text('Live video is temporarily unavailable',
-                          style: TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w800),
-                          textAlign: TextAlign.center),
-                      const SizedBox(height: 8),
-                      const Text(
-                          'This consultation is authorized and ready for the Agora adapter. No remote video or fake call state is shown while Agora integration is deferred.',
-                          textAlign: TextAlign.center),
-                      const SizedBox(height: 16),
-                      Text('Channel prepared: ${session!.channel}',
-                          style: const TextStyle(color: DoctorTokens.textSub)),
-                    ]),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _leaveAndPop();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        appBar: _controller.state == CallScreenState.connected ||
+                _controller.state == CallScreenState.reconnecting
+            ? null
+            : AppBar(title: const Text('Consultation call')),
+        body: _buildBody(context),
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    switch (_controller.state) {
+      case CallScreenState.requestingPermissions:
+        return const _CenteredStatus(
+          icon: Icons.mic_none,
+          message: 'Requesting camera and microphone access…',
+          showSpinner: true,
+        );
+      case CallScreenState.permissionDenied:
+        return const _CenteredStatus(
+          icon: Icons.videocam_off_outlined,
+          message:
+              'Camera and microphone access is required to join this call.',
+          actionLabel: 'Open Settings',
+          onAction: openAppSettings,
+        );
+      case CallScreenState.authorizing:
+        return const _CenteredStatus(
+          icon: Icons.lock_outline,
+          message: 'Preparing your call…',
+          showSpinner: true,
+        );
+      case CallScreenState.connecting:
+        return const _CenteredStatus(
+          icon: Icons.sync,
+          message: 'Connecting…',
+          showSpinner: true,
+        );
+      case CallScreenState.connected:
+      case CallScreenState.reconnecting:
+        return _InCallView(controller: _controller, onLeave: _leaveAndPop);
+      case CallScreenState.failed:
+        return _CenteredStatus(
+          icon: Icons.cloud_off,
+          message: _controller.errorMessage ??
+              'The consultation call could not be connected.',
+          actionLabel: 'Retry',
+          onAction: _controller.retry,
+        );
+      case CallScreenState.left:
+        return const _CenteredStatus(
+          icon: Icons.call_end,
+          message: 'Call ended.',
+        );
+    }
+  }
+}
+
+class _InCallView extends StatelessWidget {
+  const _InCallView({required this.controller, required this.onLeave});
+  final CallController controller;
+  final Future<void> Function() onLeave;
+
+  @override
+  Widget build(BuildContext context) {
+    final remoteUid = controller.remoteUid;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (remoteUid != null)
+          controller.engine.buildRemoteView(
+            remoteUid: remoteUid,
+            channelId: controller.channelId ?? '',
+          )
+        else
+          const Center(
+            child: Text('Waiting for the other participant to join…',
+                style: TextStyle(color: Colors.white70)),
+          ),
+        Positioned(
+          right: 16,
+          top: 16,
+          width: 110,
+          height: 150,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: controller.videoEnabled
+                ? controller.engine.buildLocalPreview()
+                : Container(color: DoctorTokens.surfaceSubtle),
+          ),
         ),
+        if (controller.state == CallScreenState.reconnecting)
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 146,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text('Reconnecting…',
+                  style: TextStyle(color: Colors.white)),
+            ),
+          ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 24,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _CallControlButton(
+                icon: controller.audioMuted ? Icons.mic_off : Icons.mic,
+                onTap: controller.toggleMute,
+              ),
+              const SizedBox(width: 16),
+              _CallControlButton(
+                icon: controller.videoEnabled
+                    ? Icons.videocam
+                    : Icons.videocam_off,
+                onTap: controller.toggleVideo,
+              ),
+              const SizedBox(width: 16),
+              _CallControlButton(
+                icon: Icons.cameraswitch_outlined,
+                onTap: controller.switchCamera,
+              ),
+              const SizedBox(width: 16),
+              _CallControlButton(
+                icon: Icons.call_end,
+                background: Colors.red,
+                onTap: onLeave,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CallControlButton extends StatelessWidget {
+  const _CallControlButton({
+    required this.icon,
+    required this.onTap,
+    this.background,
+  });
+  final IconData icon;
+  final Future<void> Function() onTap;
+  final Color? background;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: CircleAvatar(
+        radius: 26,
+        backgroundColor: background ?? Colors.white24,
+        child: Icon(icon, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _CenteredStatus extends StatelessWidget {
+  const _CenteredStatus({
+    required this.icon,
+    required this.message,
+    this.showSpinner = false,
+    this.actionLabel,
+    this.onAction,
+  });
+  final IconData icon;
+  final String message;
+  final bool showSpinner;
+  final String? actionLabel;
+  final Future<void> Function()? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (showSpinner)
+            const CircularProgressIndicator()
+          else
+            Icon(icon, size: 52, color: Colors.white70),
+          const SizedBox(height: 16),
+          Text(message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white)),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(height: 16),
+            TextButton(onPressed: onAction, child: Text(actionLabel!)),
+          ],
+        ]),
       ),
     );
   }

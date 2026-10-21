@@ -1,3 +1,8 @@
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'dart:math';
+import 'dart:typed_data';
+import 'clinical_image_viewer.dart';
+import 'clinical_message_bubble.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -7,9 +12,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/screen_refresh.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/time/kenya_time.dart';
+import '../../core/validation/kenya_phone.dart';
 import '../../core/widgets/doctor_widgets.dart';
 import '../auth/auth_cubit.dart';
+import 'profile_photo_avatar.dart';
 import '../notifications/notification_center_page.dart';
 import '../notifications/notification_cubit.dart';
 import 'doctor_cubit.dart';
@@ -52,7 +61,6 @@ class QueuePage extends StatefulWidget {
 
 class _QueuePageState extends State<QueuePage> {
   String query = '';
-  String filter = 'all';
 
   List<AppointmentDto> visible(List<dynamic> source) {
     final items = source.whereType<AppointmentDto>().where((a) {
@@ -60,9 +68,7 @@ class _QueuePageState extends State<QueuePage> {
           '${a.patientName ?? ''} ${a.complaint ?? ''}'.toLowerCase();
       final matchesQuery =
           query.trim().isEmpty || haystack.contains(query.toLowerCase());
-      final matchesFilter = filter == 'all' ||
-          (filter == 'upcoming' && a.lifecycle.toUpperCase() != 'COMPLETED') ||
-          (filter == 'completed' && a.lifecycle.toUpperCase() == 'COMPLETED');
+      final matchesFilter = a.isQueueActionable;
       return matchesQuery && matchesFilter;
     }).toList();
     return items;
@@ -85,7 +91,13 @@ class _QueuePageState extends State<QueuePage> {
           duty: s.duty,
           updating: s.dutyUpdating,
           onDutyChanged: (_) => cubit.toggleDuty(),
-          actions: _notificationBellActions(c)),
+          actions: [
+            IconButton(
+                tooltip: 'Write an article',
+                icon: const Icon(Icons.edit_note_outlined),
+                onPressed: () => openDoctorArticleEditor(c, cubit.repo.api)),
+            ..._notificationBellActions(c)
+          ]),
       _QnaBanner(
           unansweredCount: s.questions
               .whereType<QnaDto>()
@@ -96,7 +108,7 @@ class _QueuePageState extends State<QueuePage> {
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
           child: Row(children: [
             const Expanded(
-                child: Text("Today's Scheduled Consultations",
+                child: Text("Current and remaining today",
                     style:
                         TextStyle(fontSize: 15, fontWeight: FontWeight.w800))),
             InkWell(
@@ -118,24 +130,17 @@ class _QueuePageState extends State<QueuePage> {
                   prefixIcon: Icon(Icons.search, size: 18),
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(vertical: 10)))),
-      SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.only(left: 18, right: 18, bottom: 10),
+      Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
           child: Row(children: [
-            _QueueFilter('All Scheduled (${s.queue.length})', 'all', filter,
-                (v) => setState(() => filter = v)),
-            _QueueFilter(
-                'Upcoming (${s.queue.whereType<AppointmentDto>().where((a) => a.lifecycle.toUpperCase() != 'COMPLETED').length})',
-                'upcoming',
-                filter,
-                (v) => setState(() => filter = v)),
-            _QueueFilter(
-                'Completed (${s.queue.whereType<AppointmentDto>().where((a) => a.lifecycle.toUpperCase() == 'COMPLETED').length})',
-                'completed',
-                filter,
-                (v) => setState(() => filter = v)),
-            _QueueFilter('❓ Free Q&A', 'qna', filter, (_) => showDoctorQna(c),
-                accent: true),
+            Expanded(
+                child: OutlinedButton.icon(
+                    icon: const Icon(Icons.history),
+                    label: const Text('Consultation History'),
+                    onPressed: () => Navigator.push(
+                        c,
+                        MaterialPageRoute(
+                            builder: (_) => const ConsultationHistoryPage())))),
           ]))
     ];
     if (s.error != null && s.queue.isEmpty) {
@@ -154,6 +159,163 @@ class _QueuePageState extends State<QueuePage> {
             : RefreshIndicator(
                 onRefresh: cubit.loadAll, child: ListView(children: body)));
   }
+}
+
+class ConsultationHistoryPage extends StatefulWidget {
+  const ConsultationHistoryPage({super.key});
+  @override
+  State<ConsultationHistoryPage> createState() => _ConsultationHistoryState();
+}
+
+class _ConsultationHistoryState extends State<ConsultationHistoryPage> {
+  final items = <AppointmentDto>[];
+  bool loading = false, hasMore = true;
+  String? error;
+  @override
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load({bool reset = false}) async {
+    if (loading) return;
+    setState(() => loading = true);
+    try {
+      final rows = await context
+          .read<DoctorCubit>()
+          .repo
+          .consultationHistory(offset: reset ? 0 : items.length);
+      if (mounted) {
+        setState(() {
+          if (reset) items.clear();
+          items.addAll(rows);
+          hasMore = rows.length == 100;
+          error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => error =
+            e is ApiException ? e.userMessage : 'Unable to load history.');
+      }
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(title: const Text('Consultation History')),
+      body: SafeArea(
+          child: RefreshIndicator(
+              onRefresh: () => load(reset: true),
+              child: ListView(children: [
+                const Padding(
+                    padding: EdgeInsets.all(18),
+                    child: Text(
+                        'Your past encounters. Closed chat consultations remain available as read-only history.')),
+                if (error != null) ErrorPanel(error!, onRetry: () => load()),
+                ...items.map((a) => ListTile(
+                    leading: const Icon(Icons.assignment_outlined),
+                    title: Text(a.patientName ?? 'Patient'),
+                    subtitle: Text(
+                        '${a.modality} consultation ? ${a.start ?? ''} ? ${a.status}'),
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) =>
+                                EncounterHistoryPage(appointment: a))))),
+                if (loading) const Center(child: CircularProgressIndicator()),
+                if (!loading && items.isEmpty && error == null)
+                  const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('No consultation history yet.')),
+                if (hasMore && !loading && items.isNotEmpty)
+                  TextButton(
+                      onPressed: () => load(),
+                      child: const Text('Load more history'))
+              ]))));
+}
+
+class EncounterHistoryPage extends StatefulWidget {
+  const EncounterHistoryPage({super.key, required this.appointment});
+  final AppointmentDto appointment;
+  @override
+  State<EncounterHistoryPage> createState() => _EncounterHistoryState();
+}
+
+class _EncounterHistoryState extends State<EncounterHistoryPage> {
+  late final Future<Json> details;
+  @override
+  void initState() {
+    super.initState();
+    details = context.read<DoctorCubit>().repo.summary(widget.appointment.id);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      appBar: AppBar(title: const Text('Consultation history')),
+      body: SafeArea(
+          child: FutureBuilder<Json>(
+              future: details,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return const Center(
+                      child: Text(
+                          'Unable to retrieve this encounter. Reopen to retry.'));
+                }
+                final data = snapshot.data!;
+                final documents = findDocumentIds({
+                  'documents': data['documents'],
+                  'prescriptions': data['prescriptions']
+                });
+                return ListView(padding: const EdgeInsets.all(18), children: [
+                  Text(widget.appointment.patientName ?? 'Patient',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                      '${widget.appointment.modality} consultation - ${widget.appointment.status}'),
+                  Text('${widget.appointment.start ?? ''}'),
+                  if (data['chief_complaint'] != null)
+                    ListTile(
+                        title: const Text('Presenting concern'),
+                        subtitle: Text('${data['chief_complaint']}')),
+                  if (data['clinical_notes'] != null)
+                    ListTile(
+                        title: const Text('Clinical notes'),
+                        subtitle: Text('${data['clinical_notes']}')),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                      icon: const Icon(Icons.forum_outlined),
+                      label: const Text('View chat transcript'),
+                      onPressed: () async {
+                        try {
+                          final chat = await context
+                              .read<DoctorCubit>()
+                              .repo
+                              .conversationForAppointment(widget.appointment);
+                          if (context.mounted) {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        ChatThreadPage(chat: chat)));
+                          }
+                        } catch (e) {
+                          if (context.mounted) showError(context, e);
+                        }
+                      }),
+                  const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text('Clinical attachments and prescriptions')),
+                  if (documents.isEmpty)
+                    const Text('No clinical documents recorded.'),
+                  ...documents.map((id) => DocumentButton(
+                      appointmentId: widget.appointment.id, documentId: id)),
+                ]);
+              })));
 }
 
 class _DoctorProfileBar extends StatelessWidget {
@@ -331,11 +493,9 @@ class _QnaBanner extends StatelessWidget {
 }
 
 class _QueueFilter extends StatelessWidget {
-  const _QueueFilter(this.label, this.value, this.current, this.onTap,
-      {this.accent = false});
+  const _QueueFilter(this.label, this.value, this.current, this.onTap);
   final String label, value, current;
   final ValueChanged<String> onTap;
-  final bool accent;
   @override
   Widget build(BuildContext context) {
     final active = current == value;
@@ -347,11 +507,7 @@ class _QueueFilter extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
                 decoration: BoxDecoration(
-                    color: active
-                        ? DoctorTokens.primary
-                        : accent
-                            ? DoctorTokens.warningLight
-                            : Colors.white,
+                    color: active ? DoctorTokens.primary : Colors.white,
                     border: Border.all(
                         color: active
                             ? DoctorTokens.primary
@@ -361,11 +517,8 @@ class _QueueFilter extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: active
-                            ? Colors.white
-                            : accent
-                                ? const Color(0xFFB45309)
-                                : DoctorTokens.textSub)))));
+                        color:
+                            active ? Colors.white : DoctorTokens.textSub)))));
   }
 }
 
@@ -394,8 +547,9 @@ class AppointmentCard extends StatelessWidget {
                 Text(a.patientName ?? 'Patient',
                     style: const TextStyle(
                         fontSize: 13.5, fontWeight: FontWeight.w700)),
-                const Text('Patient consultation · 24h chat included',
-                    style: TextStyle(fontSize: 11, color: DoctorTokens.textSub))
+                Text(a.isChat ? 'Chat consultation' : 'Video consultation',
+                    style: const TextStyle(
+                        fontSize: 11, color: DoctorTokens.textSub))
               ])),
           StatusChip(_timeLabel(a.start),
               color: const Color(0xFFECFDF5),
@@ -413,49 +567,7 @@ class AppointmentCard extends StatelessWidget {
                 style: const TextStyle(
                     fontSize: 11.5, color: DoctorTokens.muted, height: 1.35))),
         const SizedBox(height: 10),
-        Row(children: [
-          // Mirrors the prototype's `.slot-btn.pri` / `.q-btn.pri` toolbar
-          // (prototype/index.html:1160-1179): primary gets flex 1.3 against
-          // 1 for each secondary action, 11.5px nowrap labels.
-          Expanded(
-              flex: 13,
-              child: _QueueActionButton(
-                  icon: Icons.videocam_outlined,
-                  label: 'Call Patient',
-                  primary: true,
-                  onPressed: () => Navigator.push(
-                      c,
-                      MaterialPageRoute(
-                          builder: (_) => ConsultationPage(appointment: a))))),
-          const SizedBox(width: 8),
-          Expanded(
-              flex: 10,
-              child: _QueueActionButton(
-                  icon: Icons.chat_outlined,
-                  label: 'Chat',
-                  onPressed: () {
-                    final chats =
-                        c.read<DoctorCubit>().state.chats.cast<ChatDto>();
-                    final match = chats
-                        .where((chat) => chat.appointmentId == a.id)
-                        .toList();
-                    Navigator.push(
-                        c,
-                        MaterialPageRoute(
-                            builder: (_) => match.isEmpty
-                                ? ChatListPage(focus: a)
-                                : ChatThreadPage(chat: match.first)));
-                  })),
-          const SizedBox(width: 8),
-          Expanded(
-              flex: 10,
-              child: _QueueActionButton(
-                  label: 'Write Rx',
-                  onPressed: () => Navigator.push(
-                      c,
-                      MaterialPageRoute(
-                          builder: (_) => ScannerPage(initialAppointment: a)))))
-        ])
+        ConsultationActions(appointment: a)
       ])));
 
   static String _initials(String name) => name
@@ -467,72 +579,90 @@ class AppointmentCard extends StatelessWidget {
       .toUpperCase();
   static String _timeLabel(DateTime? time) {
     if (time == null) return 'Scheduled';
-    final local = time.toLocal();
+    final local = kenyaTime(time);
     final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
     return '$hour:${local.minute.toString().padLeft(2, '0')} ${local.hour >= 12 ? 'PM' : 'AM'}';
   }
 }
 
-/// A single action in the queue/schedule "2-tier clinical action toolbar"
-/// (prototype/index.html `.slot-btn`/`.q-btn`, line ~1160). The label is
-/// forced to a single line by design — the prototype itself never wraps
-/// these (`white-space: nowrap`) — and `FittedBox` scales the whole label+
-/// icon down together as a last resort on an unusually narrow device,
-/// rather than ever breaking a word mid-letter.
-class _QueueActionButton extends StatelessWidget {
-  const _QueueActionButton(
-      {required this.label,
-      required this.onPressed,
-      this.icon,
-      this.primary = false});
-  final String label;
-  final IconData? icon;
-  final bool primary;
-  final VoidCallback onPressed;
+class ConsultationActions extends StatefulWidget {
+  const ConsultationActions({super.key, required this.appointment});
+  final AppointmentDto appointment;
+  @override
+  State<ConsultationActions> createState() => _ConsultationActionsState();
+}
+
+class _ConsultationActionsState extends State<ConsultationActions> {
+  bool busy = false;
+  Future<void> openChat() async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      final chat = await context
+          .read<DoctorCubit>()
+          .repo
+          .conversationForAppointment(widget.appointment);
+      if (mounted) {
+        await Navigator.push(context,
+            MaterialPageRoute(builder: (_) => ChatThreadPage(chat: chat)));
+      }
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final fg = primary ? Colors.white : DoctorTokens.primaryDark;
-    return Material(
-        color: primary ? DoctorTokens.primary : DoctorTokens.surfaceSubtle,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: onPressed,
-            child: Container(
-                height: 36,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: primary
-                    ? null
-                    : BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: DoctorTokens.border)),
-                alignment: Alignment.center,
-                child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      if (icon != null) ...[
-                        Icon(icon, size: 14, color: fg),
-                        const SizedBox(width: 6),
-                      ],
-                      Text(label,
-                          maxLines: 1,
-                          softWrap: false,
-                          style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: fg))
-                    ])))));
+    final a = widget.appointment;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (a.canStart)
+        FilledButton.icon(
+            onPressed: busy || !a.isQueueActionable
+                ? null
+                : a.isChat
+                    ? openChat
+                    : () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => ConsultationPage(appointment: a))),
+            icon:
+                Icon(a.isChat ? Icons.chat_outlined : Icons.videocam_outlined),
+            label: Text(busy ? 'Opening consultation...' : a.startLabel,
+                textAlign: TextAlign.center)),
+      if (!a.canStart) Text(a.status.replaceAll('_', ' ')),
+      Wrap(spacing: 8, children: [
+        if (a.isChat && !a.canStart && a.conversationId != null)
+          TextButton(
+              onPressed: busy ? null : openChat,
+              child: const Text('View consultation history')),
+        if (a.modality == 'VIDEO' && a.conversationId != null)
+          TextButton(
+              onPressed: busy ? null : openChat,
+              child: const Text('Follow-up messages')),
+        if (a.canStart)
+          TextButton(
+              onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => ScannerPage(initialAppointment: a))),
+              child: const Text('Write prescription')),
+      ]),
+    ]);
   }
 }
+
+DateTime _calendarDate(DateTime date) =>
+    DateTime.utc(date.year, date.month, date.day);
 
 bool _sameDate(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
 
 String _timeRange(DateTime? start, DateTime? end) {
   if (start == null || end == null) return 'Time unavailable';
-  final local = start.toLocal();
-  final localEnd = end.toLocal();
+  final local = kenyaTime(start);
+  final localEnd = kenyaTime(end);
   final duration = end.difference(start).inMinutes;
   return '${_shortTime(local.toIso8601String())} – '
       '${_shortTime(localEnd.toIso8601String())} (${duration}m)';
@@ -544,41 +674,33 @@ class SchedulePage extends StatefulWidget {
   State<SchedulePage> createState() => _ScheduleState();
 }
 
-class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
-  Timer? _syncTimer;
+class _ScheduleState extends State<SchedulePage> {
+  late final ScreenRefresh _screenRefresh;
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    unawaited(context.read<DoctorCubit>().refreshSlots());
-    _syncTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (mounted &&
-          (WidgetsBinding.instance.lifecycleState == null ||
-              WidgetsBinding.instance.lifecycleState ==
-                  AppLifecycleState.resumed)) {
-        unawaited(context.read<DoctorCubit>().refreshSlots());
-      }
-    });
+    unawaited(context.read<DoctorCubit>().refreshSlots(day: selectedDate));
+    _screenRefresh = ScreenRefresh(
+        () => context.read<DoctorCubit>().refreshSlots(day: selectedDate),
+        interval: const Duration(seconds: 30),
+        networkChanges: context.read<DoctorCubit>().connectivity?.changes);
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      unawaited(context.read<DoctorCubit>().refreshSlots());
-    }
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _screenRefresh.attach(context);
   }
 
   @override
   void dispose() {
-    _syncTimer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
+    _screenRefresh.dispose();
     super.dispose();
   }
 
   bool busy = false;
   String filter = 'all';
-  late DateTime selectedDate =
-      DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+  late DateTime selectedDate = _calendarDate(kenyaTime(DateTime.now()));
 
   @override
   Widget build(BuildContext c) {
@@ -586,9 +708,9 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
     final allSlots = s.slots.cast<SlotDto>().toList()
       ..sort(
           (a, b) => (a.start ?? DateTime(0)).compareTo(b.start ?? DateTime(0)));
-    final today = DateTime.now();
-    final todaySlots =
-        allSlots.where((x) => x.start != null && _sameDate(x.start!, today));
+    final today = kenyaTime(DateTime.now());
+    final todaySlots = allSlots
+        .where((x) => x.start != null && _sameDate(kenyaTime(x.start!), today));
     final leftToday = todaySlots
         .where((x) =>
             x.end != null &&
@@ -606,25 +728,27 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
 
     final visible = allSlots
         .where((x) => x.status != 'CANCELLED')
-        .where((x) => x.start != null && _sameDate(x.start!, selectedDate))
+        .where((x) =>
+            x.start != null && _sameDate(kenyaTime(x.start!), selectedDate))
         .where((x) =>
             filter == 'all' ||
             (filter == 'booked' &&
                 (x.status == 'BOOKED' || x.status == 'LOCKED_IN_PAYMENT')) ||
             (filter == 'blocked' && x.status == 'BLOCKED') ||
-            (filter == 'available' && x.status == 'AVAILABLE'))
+            (filter == 'available' && x.status == 'AVAILABLE' && x.bookable))
         .toList();
     final dayBooked = allSlots
         .where((x) =>
             x.start != null &&
-            _sameDate(x.start!, selectedDate) &&
+            _sameDate(kenyaTime(x.start!), selectedDate) &&
             (x.status == 'BOOKED' || x.status == 'LOCKED_IN_PAYMENT'))
         .length;
     final dayAvailable = allSlots
         .where((x) =>
             x.start != null &&
-            _sameDate(x.start!, selectedDate) &&
-            x.status == 'AVAILABLE')
+            _sameDate(kenyaTime(x.start!), selectedDate) &&
+            x.status == 'AVAILABLE' &&
+            x.bookable)
         .length;
 
     // No AppBar here, so without this the custom DoctorPageHeader below
@@ -636,11 +760,14 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
             body: s.loading && s.slots.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
-                    onRefresh: c.read<DoctorCubit>().loadAll,
+                    onRefresh: () =>
+                        c.read<DoctorCubit>().refreshSlots(day: selectedDate),
                     child: ListView(padding: EdgeInsets.zero, children: [
                       DoctorPageHeader('Consultation Schedule',
                           'Manage your live availability & calendar slots',
-                          onRefresh: c.read<DoctorCubit>().loadAll,
+                          onRefresh: () => c
+                              .read<DoctorCubit>()
+                              .refreshSlots(day: selectedDate),
                           actions: _notificationBellActions(c)),
                       CacheStatusBar(
                           offline: s.offline,
@@ -648,7 +775,9 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
                           lastUpdated: s.lastUpdatedAt),
                       if (s.error != null)
                         InlineError(s.error!,
-                            onRetry: c.read<DoctorCubit>().loadAll),
+                            onRetry: () => c
+                                .read<DoctorCubit>()
+                                .refreshSlots(day: selectedDate)),
                       _ScheduleSummaryBanner(
                           leftToday: leftToday,
                           completedToday: completedToday,
@@ -671,14 +800,18 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
                       _DateSlider(
                           slots: allSlots,
                           selected: selectedDate,
-                          onSelected: (d) => setState(() => selectedDate = d)),
+                          onSelected: (d) {
+                            setState(() => selectedDate = d);
+                            unawaited(
+                                c.read<DoctorCubit>().refreshSlots(day: d));
+                          }),
                       SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.only(
                               left: 18, right: 18, bottom: 10),
                           child: Row(children: [
                             _QueueFilter(
-                                'All Slots (${allSlots.where((x) => x.start != null && _sameDate(x.start!, selectedDate) && x.status != 'CANCELLED').length})',
+                                'All Slots (${allSlots.where((x) => x.start != null && _sameDate(kenyaTime(x.start!), selectedDate) && x.status != 'CANCELLED').length})',
                                 'all',
                                 filter,
                                 (v) => setState(() => filter = v)),
@@ -727,26 +860,28 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
 
   Future<void> createSlot() async {
     final cubit = context.read<DoctorCubit>();
-    final now = DateTime.now();
+    final now = kenyaTime(DateTime.now());
     final date = await showDatePicker(
         context: context,
         firstDate: DateTime(now.year, now.month, now.day),
         lastDate: now.add(const Duration(days: 90)),
-        initialDate: selectedDate.isBefore(now) ? now : selectedDate);
+        initialDate: _calendarDate(selectedDate).isBefore(_calendarDate(now))
+            ? now
+            : selectedDate);
     if (!mounted || date == null) return;
     final startTime = await showTimePicker(
         context: context,
         initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 2))));
     if (!mounted || startTime == null) return;
-    final start = DateTime(
+    final start = kenyaWallTime(
         date.year, date.month, date.day, startTime.hour, startTime.minute);
     final endTime = await showTimePicker(
         context: context,
         initialTime:
             TimeOfDay.fromDateTime(start.add(const Duration(minutes: 10))));
     if (!mounted || endTime == null) return;
-    final end =
-        DateTime(date.year, date.month, date.day, endTime.hour, endTime.minute);
+    final end = kenyaWallTime(
+        date.year, date.month, date.day, endTime.hour, endTime.minute);
     if (!start.isAfter(now) || !end.isAfter(start)) {
       showMessage(
           context, 'Choose a future date with an end time after start.');
@@ -755,10 +890,9 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
     setState(() => busy = true);
     try {
       await cubit.repo.createSlot(start, end);
-      await cubit.loadAll();
+      await cubit.refreshSlots(day: selectedDate);
       if (mounted) {
-        setState(
-            () => selectedDate = DateTime(date.year, date.month, date.day));
+        setState(() => selectedDate = _calendarDate(date));
       }
     } catch (e) {
       if (mounted) {
@@ -777,16 +911,16 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
   /// without silently claiming the whole batch worked).
   Future<void> createBulkSlots() async {
     final cubit = context.read<DoctorCubit>();
-    final now = DateTime.now();
+    final now = kenyaTime(DateTime.now());
     final startTime = await showTimePicker(
         context: context,
         helpText: 'START OF FIRST 10-MIN SLOT',
         initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))));
     if (!mounted || startTime == null) return;
-    final date = selectedDate.isBefore(DateTime(now.year, now.month, now.day))
+    final date = _calendarDate(selectedDate).isBefore(_calendarDate(now))
         ? DateTime(now.year, now.month, now.day)
         : selectedDate;
-    var cursor = DateTime(
+    var cursor = kenyaWallTime(
         date.year, date.month, date.day, startTime.hour, startTime.minute);
     setState(() => busy = true);
     var created = 0;
@@ -802,7 +936,7 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
         }
         cursor = end;
       }
-      await cubit.loadAll();
+      await cubit.refreshSlots(day: selectedDate);
     } finally {
       if (mounted) setState(() => busy = false);
     }
@@ -820,7 +954,7 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
     setState(() => busy = true);
     try {
       await cubit.repo.cancelSlot(id);
-      await cubit.loadAll();
+      await cubit.refreshSlots(day: selectedDate);
     } catch (e) {
       if (mounted) showError(context, e);
     } finally {
@@ -833,7 +967,7 @@ class _ScheduleState extends State<SchedulePage> with WidgetsBindingObserver {
     setState(() => busy = true);
     try {
       await cubit.repo.updateSlotStatus(id, status);
-      await cubit.loadAll();
+      await cubit.refreshSlots(day: selectedDate);
     } catch (e) {
       if (mounted) showError(context, e);
     } finally {
@@ -922,8 +1056,8 @@ class _DateSlider extends StatelessWidget {
   static const _days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   @override
   Widget build(BuildContext c) {
-    final today = DateTime.now();
-    final base = DateTime(today.year, today.month, today.day);
+    final today = kenyaTime(DateTime.now());
+    final base = _calendarDate(today);
     final dates = List.generate(7, (i) => base.add(Duration(days: i)));
     return SizedBox(
         height: 72,
@@ -935,8 +1069,8 @@ class _DateSlider extends StatelessWidget {
             itemBuilder: (_, i) {
               final d = dates[i];
               final isSelected = _sameDate(d, selected);
-              final hasSlots =
-                  slots.any((s) => s.start != null && _sameDate(s.start!, d));
+              final hasSlots = slots.any(
+                  (s) => s.start != null && _sameDate(kenyaTime(s.start!), d));
               return InkWell(
                   onTap: () => onSelected(d),
                   borderRadius: BorderRadius.circular(14),
@@ -1003,7 +1137,7 @@ class _ScheduleSlotCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext c) {
-    final now = DateTime.now();
+    final now = kenyaTime(DateTime.now());
     final blocked = slot.status == 'BLOCKED';
     final booked =
         slot.status == 'BOOKED' || slot.status == 'LOCKED_IN_PAYMENT';
@@ -1017,7 +1151,7 @@ class _ScheduleSlotCard extends StatelessWidget {
         ? ('Blocked', DoctorTokens.surfaceSubtle, DoctorTokens.textSub)
         : !booked
             ? (
-                'Open for Booking',
+                slot.bookable ? 'Open for Booking' : 'Past opening',
                 const Color(0xFFFEF3C7),
                 const Color(0xFFB45309)
               )
@@ -1101,46 +1235,10 @@ class _ScheduleSlotCard extends StatelessWidget {
                               fontSize: 10.5, color: DoctorTokens.textSub)))
                 ])),
             const SizedBox(height: 10),
-            Row(children: [
-              Expanded(
-                  flex: 13,
-                  child: _QueueActionButton(
-                      icon: Icons.videocam_outlined,
-                      label: 'Call Patient',
-                      primary: true,
-                      onPressed: appointment == null
-                          ? () => showMessage(
-                              c, 'Appointment details are still loading.')
-                          : () => Navigator.push(
-                              c,
-                              MaterialPageRoute(
-                                  builder: (_) => ConsultationPage(
-                                      appointment: appointment!))))),
-              const SizedBox(width: 8),
-              Expanded(
-                  flex: 10,
-                  child: _QueueActionButton(
-                      icon: Icons.chat_outlined,
-                      label: 'Chat',
-                      onPressed: chat == null
-                          ? () => showMessage(
-                              c, 'No chat thread for this slot yet.')
-                          : () => Navigator.push(
-                              c,
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      ChatThreadPage(chat: chat!))))),
-              const SizedBox(width: 8),
-              Expanded(
-                  flex: 10,
-                  child: _QueueActionButton(
-                      label: 'Write Rx',
-                      onPressed: () => Navigator.push(
-                          c,
-                          MaterialPageRoute(
-                              builder: (_) => ScannerPage(
-                                  initialAppointment: appointment)))))
-            ])
+            if (appointment != null)
+              ConsultationActions(appointment: appointment!)
+            else
+              const Text('Refresh appointments to load consultation details.')
           ] else if (blocked) ...[
             const Padding(
                 padding: EdgeInsets.only(top: 6, bottom: 10),
@@ -1223,7 +1321,8 @@ const _monthNames = [
 ];
 
 String _mediumDateTime(String? iso) {
-  final t = DateTime.tryParse(iso ?? '')?.toLocal();
+  final parsed = DateTime.tryParse(iso ?? '');
+  final t = parsed == null ? null : kenyaTime(parsed);
   if (t == null) return 'Date unavailable';
   return '${_monthNames[t.month - 1]} ${t.day} · ${_shortTime(t.toIso8601String())}';
 }
@@ -1387,36 +1486,48 @@ class _WalletState extends State<WalletPage> {
   }
 
   Future<void> editPayoutMethod() async {
-    await showModalBottomSheet<void>(
+    final repo = context.read<DoctorCubit>().repo;
+    final bound = await showModalBottomSheet<Json>(
         context: context,
         isScrollControlled: true,
-        builder: (_) => _PayoutBindingSheet(onDevConnected: () async {
-              if (!mounted) return;
-              try {
-                final connected = await context
-                    .read<DoctorCubit>()
-                    .repo
-                    .devBindPayoutMethod();
+        builder: (_) => _PayoutBindingSheet(
+              onDevConnected: () async {
                 if (!mounted) return;
-                setState(() => payoutMethod = {
-                      ...connected,
-                      'configured': true,
-                      'display_label':
-                          connected['masked_destination'] ?? 'M-Pesa •••• 3812',
-                    });
-              } catch (_) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text(
-                          'Could not connect the development payout destination.')));
+                try {
+                  final connected = await repo.devBindPayoutMethod();
+                  if (!mounted) return;
+                  setState(() => payoutMethod = {
+                        ...connected,
+                        'configured': true,
+                        'display_label': connected['masked_destination'] ??
+                            'M-Pesa •••• 3812',
+                      });
+                } catch (_) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text(
+                            'Could not connect the development payout destination.')));
+                  }
+                  return;
                 }
-                return;
-              }
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text(
-                      'DEV MODE: M-Pesa destination connected (simulated).'),
-                  behavior: SnackBarBehavior.floating));
-            }));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text(
+                        'DEV MODE: M-Pesa destination connected (simulated).'),
+                    behavior: SnackBarBehavior.floating));
+              },
+              onBind: (phoneNumber) =>
+                  repo.bindPayoutDestination(phoneNumber, makePrimary: true),
+            ));
+    if (bound == null || !mounted) return;
+    setState(() => payoutMethod = {
+          ...bound,
+          'configured': true,
+          'display_label':
+              '${bound['method_type'] ?? 'MPESA'} ${bound['masked_destination'] ?? ''}',
+        });
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Payout destination connected.'),
+        behavior: SnackBarBehavior.floating));
   }
 
   @override
@@ -1946,22 +2057,73 @@ class PayoutMethodCard extends StatelessWidget {
   }
 }
 
-class _PayoutBindingSheet extends StatelessWidget {
-  const _PayoutBindingSheet({required this.onDevConnected});
+class _PayoutBindingSheet extends StatefulWidget {
+  const _PayoutBindingSheet(
+      {required this.onDevConnected, required this.onBind});
   final Future<void> Function() onDevConnected;
+
+  /// Real bind call (`DoctorRepository.bindPayoutDestination`), given an
+  /// already-normalized phone number — returns the bound destination's JSON
+  /// on success, throws (typically `ApiException`) on failure, including the
+  /// honest 409 the backend returns when the platform has no M-Pesa provider
+  /// configured yet.
+  final Future<Json> Function(String phoneNumber) onBind;
+
+  @override
+  State<_PayoutBindingSheet> createState() => _PayoutBindingSheetState();
+}
+
+class _PayoutBindingSheetState extends State<_PayoutBindingSheet> {
+  final _phoneController = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() => _error = null);
+    final normalized = normalizeKenyaPhone(_phoneController.text);
+    if (normalized == null) {
+      setState(() => _error = 'Enter a valid Kenyan phone number.');
+      return;
+    }
+    setState(() => _submitting = true);
+    try {
+      final destination = await widget.onBind(normalized);
+      if (!mounted) return;
+      Navigator.pop(context, destination);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = e is ApiException
+            ? e.userMessage
+            : 'Could not connect this payout destination.';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext c) => Padding(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
-      child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 18,
+          bottom: MediaQuery.of(c).viewInsets.bottom + 28),
+      child: SingleChildScrollView(
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             const Text('Payout Setup',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             const Text(
-                'Connect a supported provider account so Finance can send approved earnings to your verified destination.',
+                'Connect your M-Pesa number so Finance can send approved earnings to your verified destination.',
                 style: TextStyle(fontSize: 11.5, color: DoctorTokens.textSub)),
             const SizedBox(height: 14),
             Container(
@@ -1975,29 +2137,50 @@ class _PayoutBindingSheet extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 11, color: Color(0xFF92400E), height: 1.35))),
             const SizedBox(height: 14),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                hintText: 'e.g. 0712 345 678',
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!,
+                  style: const TextStyle(fontSize: 11.5, color: Colors.red)),
+            ],
+            const SizedBox(height: 14),
             SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                    onPressed: _devPayoutBinding
-                        ? () {
-                            Navigator.pop(c);
-                            onDevConnected();
-                          }
-                        : null,
-                    icon: const Icon(Icons.account_balance_wallet_outlined),
-                    label: const Text(_devPayoutBinding
-                        ? 'Connect M-Pesa (Dev Simulation)'
-                        : 'Connect M-Pesa'))),
-            const SizedBox(height: 6),
-            const Center(
-                child: Text(
-                    _devPayoutBinding
-                        ? 'Development simulation only. No provider request or payout state is changed.'
-                        : 'External provider binding is deferred until official provider credentials and callback verification are configured.',
-                    textAlign: TextAlign.center,
-                    style:
-                        TextStyle(fontSize: 10, color: DoctorTokens.textSub)))
-          ]));
+                    onPressed: _submitting ? null : _submit,
+                    icon: _submitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.account_balance_wallet_outlined),
+                    label: const Text('Connect M-Pesa'))),
+            if (_devPayoutBinding) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(c);
+                        widget.onDevConnected();
+                      },
+                      child: const Text('Connect M-Pesa (Dev Simulation)'))),
+              const SizedBox(height: 6),
+              const Center(
+                  child: Text(
+                      'Development simulation only. No provider request or payout state is changed.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 10, color: DoctorTokens.textSub))),
+            ],
+          ])));
 }
 
 class _LedgerCard extends StatelessWidget {
@@ -2130,7 +2313,8 @@ String _personInitials(String name) {
 }
 
 String _shortTime(String? iso) {
-  final time = DateTime.tryParse(iso ?? '')?.toLocal();
+  final parsed = DateTime.tryParse(iso ?? '');
+  final time = parsed == null ? null : kenyaTime(parsed);
   if (time == null) return '—';
   final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
   return '$hour:${time.minute.toString().padLeft(2, '0')} ${time.hour >= 12 ? 'PM' : 'AM'}';
@@ -2150,6 +2334,29 @@ class ChatListPage extends StatefulWidget {
 }
 
 class _ChatListState extends State<ChatListPage> {
+  late final ScreenRefresh _refresh;
+  @override
+  void initState() {
+    super.initState();
+    _refresh = ScreenRefresh(() => context.read<DoctorCubit>().refreshChats(),
+        interval: const Duration(seconds: 30),
+        enabled: () => filter != 'closed',
+        networkChanges: context.read<DoctorCubit>().connectivity?.changes);
+    unawaited(context.read<DoctorCubit>().refreshChats());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _refresh.attach(context);
+  }
+
+  @override
+  void dispose() {
+    _refresh.dispose();
+    super.dispose();
+  }
+
   String query = '';
   String filter = 'all';
 
@@ -2163,7 +2370,7 @@ class _ChatListState extends State<ChatListPage> {
       final haystack = (chat.patientName ?? '').toLowerCase();
       final matchesQuery =
           query.trim().isEmpty || haystack.contains(query.toLowerCase());
-      final active = chat.locked != true;
+      final active = !chat.isClosed;
       final matchesFilter = filter == 'all' ||
           (filter == 'active' && active) ||
           (filter == 'closed' && !active);
@@ -2176,7 +2383,7 @@ class _ChatListState extends State<ChatListPage> {
     final s = c.watch<DoctorCubit>().state;
     final all = s.chats.cast<ChatDto>().toList();
     final chats = _visible(s.chats);
-    final activeCount = all.where((x) => x.locked != true).length;
+    final activeCount = all.where((x) => !x.isClosed).length;
     final closedCount = all.length - activeCount;
     final cubit = c.read<DoctorCubit>();
     // No AppBar here, so without this the custom DoctorPageHeader below
@@ -2193,9 +2400,9 @@ class _ChatListState extends State<ChatListPage> {
                   child: s.loading && s.chats.isEmpty
                       ? const Center(child: CircularProgressIndicator())
                       : s.error != null && s.chats.isEmpty
-                          ? ErrorPanel(s.error!, onRetry: cubit.loadAll)
+                          ? ErrorPanel(s.error!, onRetry: cubit.refreshChats)
                           : RefreshIndicator(
-                              onRefresh: cubit.loadAll,
+                              onRefresh: cubit.refreshChats,
                               child: ListView(
                                   padding:
                                       const EdgeInsets.fromLTRB(0, 10, 0, 18),
@@ -2206,7 +2413,7 @@ class _ChatListState extends State<ChatListPage> {
                                         lastUpdated: s.lastUpdatedAt),
                                     if (s.error != null)
                                       InlineError(s.error!,
-                                          onRetry: cubit.loadAll),
+                                          onRetry: cubit.refreshChats),
                                     Padding(
                                         padding: const EdgeInsets.fromLTRB(
                                             18, 0, 18, 8),
@@ -2271,7 +2478,16 @@ class _ChatListState extends State<ChatListPage> {
                                                                   ChatThreadPage(
                                                                       chat:
                                                                           chat)))))
-                                                  .toList()))
+                                                  .toList())),
+                                    if (s.hasMoreChats)
+                                      TextButton(
+                                          onPressed: s.loadingMoreChats
+                                              ? null
+                                              : () => cubit.refreshChats(
+                                                  older: true),
+                                          child: Text(s.loadingMoreChats
+                                              ? 'Loading?'
+                                              : 'Load more conversations'))
                                   ])))
             ])));
   }
@@ -2283,7 +2499,7 @@ class _ConvCard extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext c) {
-    final active = chat.locked != true;
+    final active = !chat.isClosed;
     final name = chat.patientName ?? 'Patient';
     final colors = _avatarColors(chat.patientId ?? chat.id);
     return Container(
@@ -2354,7 +2570,7 @@ class _ConvCard extends StatelessWidget {
                               Expanded(
                                   child: Text(
                                       active
-                                          ? 'Tap to view the conversation'
+                                          ? chat.actionLabel
                                           : 'Consultation window closed',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -2384,12 +2600,24 @@ class ChatThreadPage extends StatefulWidget {
 
 class _ChatThreadState extends State<ChatThreadPage> {
   final input = TextEditingController();
+  late final ScreenRefresh _screenRefresh;
+  bool _polling = false;
+  DateTime? _refreshFailure;
+  bool hasOlder = true, loadingOlder = false;
+  final _acknowledged = <String>{};
+  final _displayed = <String>{};
+  bool _ackBusy = false;
   List<MessageDto> messages = [];
-  bool loading = true, sending = false;
+  bool loading = true, sending = false, uploadingAttachment = false;
+  Uint8List? pendingAttachment;
+  String? pendingMime, pendingUploadKey, attachmentError;
   bool notSent = false;
+  bool serverClosed = false;
   String? error;
   @override
   void dispose() {
+    _screenRefresh.dispose();
+    pendingAttachment = null;
     input.dispose();
     super.dispose();
   }
@@ -2397,14 +2625,133 @@ class _ChatThreadState extends State<ChatThreadPage> {
   @override
   void initState() {
     super.initState();
+    input.addListener(() {
+      if (mounted) setState(() {});
+    });
     load();
+    unawaited(ack('CHAT_OPENED'));
+    unawaited(ack('CONSULTATION_OPENED'));
+    _screenRefresh = ScreenRefresh(() async {
+      if (_polling || !mounted) return;
+      _polling = true;
+      try {
+        final next = await refreshMessages();
+        final failedAt = _refreshFailure;
+        if (failedAt != null && mounted) {
+          try {
+            await context.read<DoctorCubit>().repo.acknowledgeChat(
+                widget.chat, 'CHAT_REFRESH_FAILED',
+                clientOccurredAt: failedAt);
+            await ack('CHAT_REFRESH_SUCCEEDED');
+            _refreshFailure = null;
+          } catch (_) {
+            /* Retry observational acknowledgement after recovery. */
+          }
+        }
+        if (mounted) {
+          setState(() {
+            messages = merge(messages, next);
+            error = null;
+          });
+        }
+      } catch (_) {
+        _refreshFailure ??= DateTime.now().toUtc();
+        /* Keep visible history; manual refresh reports errors. */
+      } finally {
+        _polling = false;
+      }
+    },
+        interval: const Duration(seconds: 10),
+        enabled: () => !widget.chat.isClosed && !serverClosed,
+        hasError: () => _refreshFailure != null,
+        networkChanges: context.read<DoctorCubit>().connectivity?.changes);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _screenRefresh.attach(context);
+  }
+
+  Future<List<MessageDto>> refreshMessages() async {
+    final source = context.read<DoctorCubit>().repo;
+    if (messages.isEmpty) return source.messages(widget.chat.id);
+    final result = <MessageDto>[];
+    var after = messages.last;
+    // Catch up incrementally; older pages stay in memory and are never redownloaded by a tick.
+    for (var pageNumber = 0; pageNumber < 4; pageNumber++) {
+      final page = await source.newerMessages(widget.chat.id, after);
+      result.addAll(page);
+      if (page.length < 50) break;
+      after = page.last;
+    }
+    return result;
+  }
+
+  List<MessageDto> merge(List<MessageDto> old, List<MessageDto> next) {
+    final all = {for (final m in old) m.id: m, for (final m in next) m.id: m}
+        .values
+        .toList();
+    all.sort((a, b) {
+      final time = compareMessageInstants(a.sentAt, b.sentAt);
+      return time == 0 ? a.id.compareTo(b.id) : time;
+    });
+    return all;
+  }
+
+  Future<void> ack(String event, {List<String> ids = const []}) async {
+    try {
+      await context
+          .read<DoctorCubit>()
+          .repo
+          .acknowledgeChat(widget.chat, event, messages: ids);
+    } catch (_) {
+      /* Observational acknowledgement; sending remains server-authorized. */
+    }
+  }
+
+  Future<void> acknowledgeDisplayed() async {
+    if (_ackBusy || !mounted) return;
+    final ids = _displayed.difference(_acknowledged).take(50).toList();
+    if (ids.isEmpty) return;
+    _ackBusy = true;
+    try {
+      await context.read<DoctorCubit>().repo.acknowledgeChat(
+          widget.chat, 'CHAT_READ_ACKNOWLEDGED',
+          messages: ids);
+      _acknowledged.addAll(ids);
+    } catch (_) {/* Retry after another displayed refresh. */} finally {
+      _ackBusy = false;
+    }
+  }
+
+  Future<void> loadOlder() async {
+    if (loadingOlder || !hasOlder || messages.isEmpty) return;
+    setState(() => loadingOlder = true);
+    try {
+      final old = await context
+          .read<DoctorCubit>()
+          .repo
+          .olderMessages(widget.chat.id, messages.first);
+      if (mounted) {
+        setState(() {
+          messages = merge(messages, old);
+          hasOlder = old.length == 50;
+        });
+      }
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => loadingOlder = false);
+    }
   }
 
   Future<void> load() async {
     if (mounted) setState(() => loading = true);
     try {
-      messages =
-          await context.read<DoctorCubit>().repo.messages(widget.chat.id);
+      final next = await refreshMessages();
+      if (messages.isEmpty) hasOlder = next.length == 50;
+      messages = merge(messages, next);
       error = null;
     } catch (_) {
       error = 'Unable to load this conversation.';
@@ -2415,9 +2762,9 @@ class _ChatThreadState extends State<ChatThreadPage> {
 
   Future<void> send() async {
     final text = input.text.trim();
-    if (text.isEmpty || sending || widget.chat.locked == true) return;
+    if (text.isEmpty || sending || widget.chat.isClosed || serverClosed) return;
     await _sendText(text);
-    input.clear();
+    if (!notSent) input.clear();
   }
 
   /// Shared by the text-field send button and the canned-reply pills below —
@@ -2425,7 +2772,7 @@ class _ChatThreadState extends State<ChatThreadPage> {
   /// preset clinical text immediately rather than merely prefilling the box
   /// (`prototype/index.html` ~14763).
   Future<void> _sendText(String text) async {
-    if (text.isEmpty || sending || widget.chat.locked == true) return;
+    if (text.isEmpty || sending || widget.chat.isClosed || serverClosed) return;
     setState(() => sending = true);
     try {
       await context.read<DoctorCubit>().repo.sendMessage(widget.chat.id, text);
@@ -2434,10 +2781,109 @@ class _ChatThreadState extends State<ChatThreadPage> {
       // Refresh the bounded conversation-list cache after a confirmed send.
       if (mounted) await context.read<DoctorCubit>().loadAll();
     } catch (e) {
-      if (mounted) setState(() => notSent = true);
+      if (mounted) {
+        setState(() {
+          notSent = true;
+          if (e is ApiException && (e.status == 403 || e.status == 409)) {
+            serverClosed = true;
+          }
+        });
+      }
       if (mounted) showError(context, e);
     } finally {
       if (mounted) setState(() => sending = false);
+    }
+  }
+
+  Future<void> pickAttachment() async {
+    if (uploadingAttachment || widget.chat.isClosed || serverClosed) return;
+    final select = await showModalBottomSheet<bool>(
+        context: context,
+        builder: (context) => SafeArea(
+            child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Attach to consultation',
+                          style: TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 12),
+                      ListTile(
+                          leading: const Icon(Icons.description_outlined),
+                          title: const Text('Clinical image'),
+                          subtitle:
+                              const Text('JPEG or PNG medical document photo'),
+                          onTap: () => Navigator.pop(context, true)),
+                    ]))));
+    if (select != true || !mounted) return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+          type: FileType.custom,
+          allowedExtensions: const ['jpg', 'jpeg', 'png'],
+          withData: true);
+      if (result == null) return;
+      final file = result.files.single;
+      Uint8List bytes;
+      try {
+        if (!mounted) return;
+        if (file.size > 10 * 1024 * 1024) {
+          throw const ApiException(413, 'Select an image smaller than 10 MB.');
+        }
+        bytes = file.bytes ?? await File(file.path!).readAsBytes();
+      } finally {
+        await FilePicker.platform.clearTemporaryFiles();
+      }
+      if (!mounted) return;
+      pendingAttachment = bytes;
+      pendingMime =
+          file.extension?.toLowerCase() == 'png' ? 'image/png' : 'image/jpeg';
+      pendingUploadKey = List.generate(
+          16,
+          (_) => Random.secure()
+              .nextInt(256)
+              .toRadixString(16)
+              .padLeft(2, '0')).join();
+      await uploadAttachment();
+    } catch (e) {
+      if (mounted) {
+        setState(() => attachmentError = e is ApiException
+            ? e.userMessage
+            : 'Unable to select this image. Please retry.');
+      }
+    }
+  }
+
+  Future<void> uploadAttachment() async {
+    if (uploadingAttachment || pendingAttachment == null) return;
+    setState(() {
+      uploadingAttachment = true;
+      attachmentError = null;
+    });
+    try {
+      final message = await context
+          .read<DoctorCubit>()
+          .repo
+          .uploadClinicalImage(widget.chat.id, pendingAttachment!, pendingMime!,
+              pendingUploadKey!);
+      if (!mounted) return;
+      setState(() {
+        messages = [...messages.where((m) => m.id != message.id), message];
+        pendingAttachment = null;
+        pendingMime = null;
+        pendingUploadKey = null;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => attachmentError = e is ApiException && e.status == 409
+            ? 'Document upload is currently unavailable. Your image was not sent.'
+            : e is ApiException
+                ? e.userMessage
+                : 'Upload was not confirmed. Please retry.');
+      }
+    } finally {
+      if (mounted) setState(() => uploadingAttachment = false);
     }
   }
 
@@ -2451,7 +2897,7 @@ class _ChatThreadState extends State<ChatThreadPage> {
         body: SafeArea(
             child: Column(children: [
           _ChatTopBar(name: name, chat: chat),
-          if (chat.expiresAt != null || chat.locked == true)
+          if (chat.expiresAt != null || chat.isClosed)
             _ChatExpiryBar(chat: chat),
           Expanded(
               child: loading
@@ -2464,48 +2910,48 @@ class _ChatThreadState extends State<ChatThreadPage> {
                                   style:
                                       TextStyle(color: DoctorTokens.textSub)))
                           : ListView.builder(
+                              reverse: true,
+                              scrollCacheExtent:
+                                  const ScrollCacheExtent.pixels(0),
                               padding: const EdgeInsets.all(16),
-                              itemCount: messages.length,
+                              itemCount: messages.length + 1,
                               itemBuilder: (_, i) {
-                                final m = messages[i];
-                                final fromDoctor =
-                                    myUserId != null && m.senderId == myUserId;
-                                return _ChatBubble(
-                                    message: m, fromDoctor: fromDoctor);
+                                if (i == messages.length) {
+                                  return hasOlder
+                                      ? TextButton(
+                                          onPressed:
+                                              loadingOlder ? null : loadOlder,
+                                          child: Text(loadingOlder
+                                              ? 'Loading history...'
+                                              : 'Load earlier messages'))
+                                      : const SizedBox.shrink();
+                                }
+                                final m = messages[messages.length - 1 - i];
+                                if (m.senderId != myUserId) {
+                                  _displayed.add(m.id);
+                                  WidgetsBinding.instance.addPostFrameCallback(
+                                      (_) => acknowledgeDisplayed());
+                                }
+                                return ClinicalMessageBubble(
+                                    message: m,
+                                    myUserId: myUserId,
+                                    onViewAttachment: () => Navigator.push(
+                                        c,
+                                        MaterialPageRoute(
+                                            builder: (_) => ClinicalImageViewer(
+                                                load: () => c
+                                                    .read<DoctorCubit>()
+                                                    .repo
+                                                    .clinicalImage(
+                                                        chat.id, m.id)))));
                               })),
-          if (chat.locked == true)
+          if (chat.isClosed || serverClosed)
             const Padding(
                 padding: EdgeInsets.all(14),
-                child: Text(
-                    '🔒 Consultation window closed (24h expired). Chat is no longer available.',
+                child: Text('Consultation ended. This history is read-only.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: DoctorTokens.danger, fontSize: 12)))
           else ...[
-            _CannedReplyStrip(
-                onSendCanned: _sendText,
-                onOpenHistory: chat.appointmentId == null
-                    ? null
-                    : () => Navigator.push(
-                        c,
-                        MaterialPageRoute(
-                            builder: (_) => HistoryPage(
-                                appointmentId: chat.appointmentId!))),
-                onOpenRx: () {
-                  final queue =
-                      c.read<DoctorCubit>().state.queue.cast<AppointmentDto>();
-                  AppointmentDto? match;
-                  for (final a in queue) {
-                    if (a.id == chat.appointmentId) {
-                      match = a;
-                      break;
-                    }
-                  }
-                  Navigator.push(
-                      c,
-                      MaterialPageRoute(
-                          builder: (_) =>
-                              ScannerPage(initialAppointment: match)));
-                }),
             Container(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                 decoration: const BoxDecoration(
@@ -2523,7 +2969,26 @@ class _ChatThreadState extends State<ChatThreadPage> {
                                 style: TextStyle(
                                     color: DoctorTokens.danger,
                                     fontSize: 11)))),
+                  if (attachmentError != null)
+                    Text(attachmentError!,
+                        style: const TextStyle(color: DoctorTokens.danger)),
+                  if (pendingAttachment != null && !uploadingAttachment)
+                    TextButton(
+                        onPressed: uploadAttachment,
+                        child: const Text('Retry image upload')),
                   Row(children: [
+                    IconButton(
+                        tooltip: 'Attach clinical image',
+                        onPressed: uploadingAttachment ? null : pickAttachment,
+                        icon: uploadingAttachment
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.attach_file),
+                        constraints:
+                            const BoxConstraints(minWidth: 48, minHeight: 48)),
                     Expanded(
                         child: Container(
                             decoration: BoxDecoration(
@@ -2535,6 +3000,8 @@ class _ChatThreadState extends State<ChatThreadPage> {
                                 controller: input,
                                 textInputAction: TextInputAction.send,
                                 onSubmitted: (_) => send(),
+                                minLines: 1,
+                                maxLines: 4,
                                 maxLength: 2000,
                                 style: const TextStyle(fontSize: 12.5),
                                 decoration: const InputDecoration(
@@ -2546,23 +3013,23 @@ class _ChatThreadState extends State<ChatThreadPage> {
                                     contentPadding:
                                         EdgeInsets.symmetric(vertical: 10))))),
                     const SizedBox(width: 8),
-                    SizedBox(
-                        width: 38,
-                        height: 38,
-                        child: Material(
-                            color: DoctorTokens.primary,
-                            shape: const CircleBorder(),
-                            child: InkWell(
-                                customBorder: const CircleBorder(),
-                                onTap: sending ? null : send,
-                                child: sending
-                                    ? const Padding(
-                                        padding: EdgeInsets.all(9),
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white))
-                                    : const Icon(Icons.send,
-                                        size: 17, color: Colors.white))))
+                    IconButton.filled(
+                        tooltip: 'Send message',
+                        onPressed:
+                            sending || input.text.trim().isEmpty ? null : send,
+                        style: IconButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                            backgroundColor: DoctorTokens.primary,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor:
+                                DoctorTokens.surfaceSubtle),
+                        icon: sending
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.send, size: 20)),
                   ])
                 ]))
           ]
@@ -2615,18 +3082,18 @@ class _ChatTopBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 Text(name,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w800)),
                 Text(
-                    chat.locked == true
+                    chat.isClosed
                         ? 'Consultation closed'
                         : 'Consultation chat active',
                     style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: chat.locked == true
+                        color: chat.isClosed
                             ? DoctorTokens.textSub
                             : DoctorTokens.primary))
               ])),
@@ -2649,22 +3116,26 @@ class _ChatTopBar extends StatelessWidget {
                   alignment: Alignment.center,
                   child: const Icon(Icons.history, size: 17))),
           const SizedBox(width: 6),
-          _ChatIconBtn(
-              icon: Icons.videocam_outlined,
-              tooltip: 'Start Video Call',
-              onTap: chat.appointmentId == null || chat.locked == true
-                  ? null
-                  : () => Navigator.push(
-                      c,
-                      MaterialPageRoute(
-                          builder: (_) =>
-                              AgoraPage(appointmentId: chat.appointmentId!)))),
+          if (chat.modality == 'VIDEO' && !chat.isClosed)
+            _ChatIconBtn(
+                icon: Icons.videocam_outlined,
+                tooltip: 'Start Video Call',
+                onTap: chat.modality != 'VIDEO' ||
+                        chat.appointmentId == null ||
+                        chat.isClosed
+                    ? null
+                    : () => Navigator.push(
+                        c,
+                        MaterialPageRoute(
+                            builder: (_) => AgoraPage(
+                                appointmentId: chat.appointmentId!)))),
           const SizedBox(width: 6),
-          _ChatIconBtn(
-              icon: Icons.medical_services_outlined,
-              tooltip: 'Snap & Send Rx',
-              onTap: () => Navigator.push(
-                  c, MaterialPageRoute(builder: (_) => const ScannerPage())))
+          if (!chat.isClosed)
+            _ChatIconBtn(
+                icon: Icons.medical_services_outlined,
+                tooltip: 'Snap & Send Rx',
+                onTap: () => Navigator.push(
+                    c, MaterialPageRoute(builder: (_) => const ScannerPage())))
         ]));
   }
 }
@@ -2700,63 +3171,12 @@ class _ChatIconBtn extends StatelessWidget {
   }
 }
 
-/// Doctor pre-made canned clinical response pills, shown above the message
-/// composer (prototype `.doc-canned-strip`, `prototype/index.html`
-/// ~7503-7509). The "View Lab Report" pill from the prototype is
-/// deliberately omitted: there is no lab-report data model or endpoint
-/// anywhere in this backend yet (confirmed by search) — this is the
-/// pre-existing, already-documented `GENUINE_BACKEND_GAP` named in
-/// `docs/CHECKPOINT.md`/`docs/DOCTOR_FLUTTER_REPLICATION_REPORT.md`, not an
-/// oversight introduced here. Adding a button with nothing behind it would
-/// be a phantom feature, not a fix.
-class _CannedReplyStrip extends StatelessWidget {
-  const _CannedReplyStrip(
-      {required this.onSendCanned,
-      required this.onOpenHistory,
-      required this.onOpenRx});
-  final ValueChanged<String> onSendCanned;
-  final VoidCallback? onOpenHistory;
-  final VoidCallback onOpenRx;
-
-  @override
-  Widget build(BuildContext context) {
-    Widget pill(String label, VoidCallback? onTap) => Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: OutlinedButton(
-            onPressed: onTap,
-            style: OutlinedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                side: const BorderSide(color: DoctorTokens.border),
-                foregroundColor: DoctorTokens.primaryDark),
-            child: Text(label, style: const TextStyle(fontSize: 11))));
-    return Container(
-        color: DoctorTokens.surface,
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-        child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              pill(
-                  '📋 Take after meals',
-                  () => onSendCanned(
-                      'Take all medicines after meals with warm water.')),
-              pill(
-                  '🌡️ Check fever',
-                  () => onSendCanned(
-                      'Please recheck body temperature in 4 hours.')),
-              pill('📋 Patient History', onOpenHistory),
-              pill('📸 Snap/Send Rx', onOpenRx),
-            ])));
-  }
-}
-
 class _ChatExpiryBar extends StatelessWidget {
   const _ChatExpiryBar({required this.chat});
   final ChatDto chat;
   @override
   Widget build(BuildContext c) {
-    final locked = chat.locked == true;
+    final locked = chat.isClosed;
     final expiresAt = DateTime.tryParse(chat.expiresAt ?? '');
     final remaining = expiresAt?.difference(DateTime.now().toUtc());
     final label = locked
@@ -2789,55 +3209,16 @@ class _ChatExpiryBar extends StatelessWidget {
   }
 }
 
-class _ChatBubble extends StatelessWidget {
-  const _ChatBubble({required this.message, required this.fromDoctor});
-  final MessageDto message;
-  // Ports prototype/index.html's `.chat-bubble.doctor` (left, white/bordered)
-  // vs `.chat-bubble.patient` (right, green) — note this is the opposite of
-  // the usual "my messages on the right" chat convention; the prototype
-  // itself always renders a doctor-authored message on the left regardless
-  // of which side of the app is viewing it (confirmed in sendDoctorChatMessage()).
-  final bool fromDoctor;
-  @override
-  Widget build(BuildContext c) => Align(
-      alignment: fromDoctor ? Alignment.centerLeft : Alignment.centerRight,
-      child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          constraints:
-              BoxConstraints(maxWidth: MediaQuery.sizeOf(c).width * 0.82),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-              color: fromDoctor ? DoctorTokens.surface : DoctorTokens.primary,
-              border:
-                  fromDoctor ? Border.all(color: DoctorTokens.border) : null,
-              borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(fromDoctor ? 4 : 16),
-                  bottomRight: Radius.circular(fromDoctor ? 16 : 4))),
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(message.content,
-                    style: TextStyle(
-                        fontSize: 12.5,
-                        height: 1.45,
-                        color: fromDoctor ? DoctorTokens.text : Colors.white)),
-                const SizedBox(height: 4),
-                Text(_shortTime(message.sentAt),
-                    style: TextStyle(
-                        fontSize: 10,
-                        color:
-                            fromDoctor ? DoctorTokens.textSub : Colors.white70))
-              ])));
-}
-
 enum _PageStatus { pending, uploading, done, failed }
 
 class _RxPage {
-  _RxPage(this.file);
+  _RxPage(this.file, {this.fromFilePicker = false});
   final XFile file;
+
+  /// True when this page's on-disk file was created by file_picker
+  /// (pickFile()) rather than image_picker (pick()) — cleanup for the two
+  /// plugins uses different, plugin-safe mechanisms (see _cleanupPage).
+  final bool fromFilePicker;
   _PageStatus status = _PageStatus.pending;
   String? error;
 
@@ -2847,6 +3228,51 @@ class _RxPage {
   /// the UI falls back to an indeterminate spinner rather than a fake value.
   double? progress;
   bool get isPdf => file.path.toLowerCase().endsWith('.pdf');
+}
+
+/// Best-effort cleanup of one picked Rx page's on-disk file. Extracted as a
+/// standalone, plugin-call-injectable function (rather than inlined in
+/// `_ScannerState`) so its "never raw-delete a file_picker-sourced path"
+/// safety property is directly unit-testable without needing to drive
+/// image_picker/file_picker's platform channels.
+///
+/// Only ever deletes a file HelloDoctor itself is responsible for cleaning
+/// up:
+/// - image_picker-sourced pages (`fromFilePicker: false`): the plugin's own
+///   app-cache-dir copy, via a direct delete of the exact path the plugin
+///   handed back.
+/// - file_picker-sourced pages (`fromFilePicker: true`): NEVER deleted by
+///   path directly — file_picker can in principle surface a path outside its
+///   managed cache depending on platform/options. Instead this calls the
+///   plugin's own `clearTemporaryFiles()` API, which only ever clears
+///   file_picker's own managed temp files and never a user's external
+///   original. That call is skipped while `otherFilePickerPagesPending` is
+///   true, so a batch of several file_picker-sourced pages doesn't pull a
+///   file out from under a sibling still awaiting upload.
+///
+/// Failures are swallowed — cleanup must never surface to the UI or affect
+/// upload/removal outcome.
+@visibleForTesting
+Future<void> cleanupPickedRxFile({
+  required String path,
+  required bool fromFilePicker,
+  required bool otherFilePickerPagesPending,
+  Future<void> Function() clearFilePickerTemp = _clearFilePickerTempFiles,
+}) async {
+  try {
+    if (fromFilePicker) {
+      if (!otherFilePickerPagesPending) await clearFilePickerTemp();
+    } else {
+      final f = File(path);
+      if (await f.exists()) await f.delete();
+    }
+  } catch (_) {
+    // best-effort only
+  }
+}
+
+Future<void> _clearFilePickerTempFiles() async {
+  await FilePicker.platform.clearTemporaryFiles();
 }
 
 const _maxRxPages = 5;
@@ -2871,6 +3297,28 @@ class _ScannerState extends State<ScannerPage> {
 
   @override
   void dispose() {
+    // This screen's `pages` list is purely ephemeral in-memory state (never
+    // persisted), so once this widget is torn down — whether by navigating
+    // away or by the session ending at logout — any not-yet-uploaded page's
+    // on-disk file becomes permanently unreachable PHI residue unless swept
+    // here. Already-`done` pages were already cleaned up at upload-success
+    // time in _uploadPage. The "pending siblings" snapshot is computed once,
+    // up front, so multiple still-pending file_picker pages don't each defer
+    // to one another (each seeing the others as "still pending") and cause
+    // clearTemporaryFiles() to never fire.
+    final remaining = pages.where((p) => p.status != _PageStatus.done).toList();
+    final lastFilePickerIndex =
+        remaining.lastIndexWhere((p) => p.fromFilePicker);
+    for (var i = 0; i < remaining.length; i++) {
+      final page = remaining[i];
+      unawaited(cleanupPickedRxFile(
+          path: page.file.path,
+          fromFilePicker: page.fromFilePicker,
+          // Only the LAST file_picker-sourced page in this batch triggers
+          // the (process-wide) clearTemporaryFiles() call, so it fires
+          // exactly once per dispose() even with several pending pages.
+          otherFilePickerPagesPending: i != lastFilePickerIndex));
+    }
     notes.dispose();
     super.dispose();
   }
@@ -2900,9 +3348,17 @@ class _ScannerState extends State<ScannerPage> {
     final path = selected?.files.single.path;
     if (path == null || !mounted) return;
     setState(() {
-      if (pages.length < _maxRxPages) pages.add(_RxPage(XFile(path)));
+      if (pages.length < _maxRxPages) {
+        pages.add(_RxPage(XFile(path), fromFilePicker: true));
+      }
     });
   }
+
+  Future<void> _cleanupPage(_RxPage page) => cleanupPickedRxFile(
+      path: page.file.path,
+      fromFilePicker: page.fromFilePicker,
+      otherFilePickerPagesPending:
+          pages.any((p) => p != page && p.fromFilePicker));
 
   Future<void> _uploadPage(_RxPage page) async {
     if (appointment == null ||
@@ -2934,6 +3390,7 @@ class _ScannerState extends State<ScannerPage> {
         setState(() => page.progress = sent / total);
       });
       if (mounted) setState(() => page.status = _PageStatus.done);
+      unawaited(_cleanupPage(page));
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -2971,6 +3428,7 @@ class _ScannerState extends State<ScannerPage> {
 
   void remove(_RxPage page) {
     if (dispatching || page.status == _PageStatus.uploading) return;
+    if (page.status != _PageStatus.done) unawaited(_cleanupPage(page));
     setState(() => pages.remove(page));
   }
 
@@ -3249,7 +3707,20 @@ class _RxPageThumb extends StatelessWidget {
                     child: Center(
                         child: Icon(Icons.picture_as_pdf,
                             color: DoctorTokens.muted)))
-                : Image.file(File(page.file.path), fit: BoxFit.cover)),
+                : Image.file(File(page.file.path),
+                    fit: BoxFit.cover,
+                    // A `done` page's on-disk file is deleted immediately
+                    // after a successful upload (PHI lifecycle cleanup); the
+                    // thumbnail falls back to a status icon rather than
+                    // surfacing a raw file-not-found error.
+                    errorBuilder: (_, __, ___) => ColoredBox(
+                        color: DoctorTokens.surfaceSubtle,
+                        child: Center(
+                            child: Icon(
+                                page.status == _PageStatus.done
+                                    ? Icons.check_circle
+                                    : Icons.image_not_supported,
+                                color: DoctorTokens.muted))))),
         Positioned(
             left: 4,
             bottom: 4,
@@ -3764,6 +4235,18 @@ class _ConsultationState extends State<ConsultationPage> {
   void initState() {
     super.initState();
     load();
+    unawaited(_ackOpen());
+  }
+
+  Future<void> _ackOpen() async {
+    try {
+      await context
+          .read<DoctorCubit>()
+          .repo
+          .acknowledgeConsultation(widget.appointment.id);
+    } catch (_) {
+      // Best-effort display acknowledgement; backend access remains authoritative.
+    }
   }
 
   Future<void> load() async {
@@ -4292,6 +4775,8 @@ class _ProfileState extends State<ProfilePage> {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                const Center(child: ProfilePhotoAvatar(radius: 36)),
+                const SizedBox(height: 14),
                 TextField(
                     controller: name,
                     maxLength: 150,

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/network/api_client.dart';
+import 'core/network/screen_refresh.dart';
 import 'core/network/client_error_reporter.dart';
 import 'core/network/connectivity_service.dart';
 import 'core/cache/doctor_cache_store.dart';
@@ -189,6 +190,7 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
         value: auth!,
         child: BlocBuilder<AuthCubit, AuthState>(builder: (_, state) {
           Widget application(Widget home) => MaterialApp(
+              navigatorObservers: [screenRouteObserver],
               debugShowCheckedModeBanner: false,
               theme: DoctorTokens.theme(),
               home: home);
@@ -208,7 +210,7 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
                             : DoctorRepository(api!,
                                 cache: cache, connectivity: connectivity!),
                         doctorId: _doctorId,
-                      )..startPolling()),
+                      )..startPolling(interval: const Duration(minutes: 1))),
             ], child: application(const DoctorShell()));
           }
           return application(state is SessionRestoring
@@ -592,25 +594,69 @@ class DoctorShell extends StatefulWidget {
   State<DoctorShell> createState() => _ShellState();
 }
 
-class _ShellState extends State<DoctorShell> {
+class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
   int tab = 0;
+  late final ScreenRefresh _queueRefresh;
+  StreamSubscription<NotificationState>? _queueNoticeSubscription;
+  Set<String> _knownNotificationIds = {};
 
-  void selectTab(int index) => setState(() {
-        tab = index;
-        ClientErrorReporter.current?.screen = const [
-          'Queue',
-          'Chat',
-          'SmartRx',
-          'Schedule',
-          'Wallet',
-          'Settings'
-        ][index];
-      });
+  void _refreshDoctorData() {
+    if (mounted && tab == 0) unawaited(_queueRefresh.run());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshDoctorData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _queueRefresh.attach(context);
+  }
+
+  @override
+  void dispose() {
+    _queueRefresh.dispose();
+    _queueNoticeSubscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  void selectTab(int index) {
+    setState(() {
+      tab = index;
+      ClientErrorReporter.current?.screen = const [
+        'Queue',
+        'Chat',
+        'SmartRx',
+        'Schedule',
+        'Wallet',
+        'Settings'
+      ][index];
+    });
+    if (index == 0) _refreshDoctorData();
+  }
+
   @override
   void initState() {
     super.initState();
     ClientErrorReporter.current?.screen = 'Queue';
+    _queueRefresh = ScreenRefresh(() => context.read<DoctorCubit>().loadQueue(),
+        interval: const Duration(seconds: 30),
+        enabled: () => tab == 0,
+        networkChanges: context.read<DoctorCubit>().connectivity?.changes);
+    final notifications = context.read<NotificationCubit>();
+    _knownNotificationIds =
+        notifications.state.items.map((item) => item.id).toSet();
+    _queueNoticeSubscription = notifications.stream.listen((state) {
+      final ids = state.items.map((item) => item.id).toSet();
+      final hasNew = ids.difference(_knownNotificationIds).isNotEmpty;
+      _knownNotificationIds = ids;
+      if (hasNew) _refreshDoctorData();
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       context.read<DoctorCubit>().loadAll();
       context.read<NotificationCubit>().load();
       unawaited(_registerDeviceBestEffort());
@@ -694,8 +740,9 @@ class _ShellState extends State<DoctorShell> {
     ];
     return Scaffold(
         body: pages[tab],
-        bottomNavigationBar:
-            DoctorBottomNav(selected: tab, onSelected: selectTab));
+        bottomNavigationBar: SafeArea(
+            top: false,
+            child: DoctorBottomNav(selected: tab, onSelected: selectTab)));
   }
 }
 

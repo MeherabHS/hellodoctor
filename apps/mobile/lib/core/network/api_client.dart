@@ -1,8 +1,14 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'device_proof.dart';
 
 /// Generates a token for the `Idempotency-Key` header (see
 /// `services/backend/src/api/middleware/idempotency.rs`). Not an RFC 4122
@@ -98,10 +104,11 @@ bool _isLanTestHost(String host) {
 /// correctly configured production build white-screens for every patient and
 /// doctor on launch; too loose and a production build could silently send
 /// clinical data over an unencrypted public connection.
-bool allowsInsecureHttp(
-        {required bool allowInsecureHttpFlag,
-        required Uri baseUri,
-        required String environment}) =>
+bool allowsInsecureHttp({
+  required bool allowInsecureHttpFlag,
+  required Uri baseUri,
+  required String environment,
+}) =>
     baseUri.scheme == 'https' ||
     (baseUri.scheme == 'http' &&
         environment == 'development' &&
@@ -113,13 +120,14 @@ bool allowsInsecureHttp(
 bool developmentOtpEnabled({required String environment, required bool flag}) =>
     environment == 'development' && flag;
 
-void validateMobileDeployment(
-    {required String environment,
-    required bool release,
-    required Uri baseUri,
-    required bool allowHttp,
-    required bool devOtp,
-    required bool devPayoutBinding}) {
+void validateMobileDeployment({
+  required String environment,
+  required bool release,
+  required Uri baseUri,
+  required bool allowHttp,
+  required bool devOtp,
+  required bool devPayoutBinding,
+}) {
   if (!release && environment.isEmpty) return;
   if (!['development', 'test', 'staging', 'production'].contains(environment)) {
     throw StateError('An explicit valid ENVIRONMENT is required.');
@@ -129,32 +137,45 @@ void validateMobileDeployment(
     throw StateError('Development flags are forbidden outside development.');
   }
   if (!allowsInsecureHttp(
-      allowInsecureHttpFlag: allowHttp,
-      baseUri: baseUri,
-      environment: environment)) {
-    throw StateError('API_BASE_URL requires HTTPS. LAN HTTP requires explicit '
-        'ENVIRONMENT=development and ALLOW_INSECURE_HTTP=true.');
+    allowInsecureHttpFlag: allowHttp,
+    baseUri: baseUri,
+    environment: environment,
+  )) {
+    throw StateError(
+      'API_BASE_URL requires HTTPS. LAN HTTP requires explicit '
+      'ENVIRONMENT=development and ALLOW_INSECURE_HTTP=true.',
+    );
   }
 }
 
 class ApiClient {
-  ApiClient(
-      {String? baseUrl,
-      Dio? dio,
-      Dio? refreshDio,
-      FlutterSecureStorage? storage,
-      TokenStore? tokenStore})
-      : _storage = tokenStore ?? SecureTokenStore(storage),
+  ApiClient({
+    String? baseUrl,
+    Dio? dio,
+    Dio? refreshDio,
+    FlutterSecureStorage? storage,
+    DeviceProofSigner? proofSigner,
+    TokenStore? tokenStore,
+  })  : _proofSigner = proofSigner ??
+            DeviceProofSigner(enabled: dio == null || kReleaseMode),
+        _storage = tokenStore ?? SecureTokenStore(storage),
         _dio = dio ??
-            Dio(BaseOptions(
+            Dio(
+              BaseOptions(
                 baseUrl: baseUrl ??
-                    const String.fromEnvironment('API_BASE_URL',
-                        defaultValue: 'http://10.0.2.2:8080/api/v1'),
+                    const String.fromEnvironment(
+                      'API_BASE_URL',
+                      defaultValue: 'http://10.0.2.2:8080/api/v1',
+                    ),
                 connectTimeout: const Duration(seconds: 15),
                 sendTimeout: const Duration(seconds: 20),
-                receiveTimeout: const Duration(seconds: 20))) {
-    const allowInsecureHttp =
-        bool.fromEnvironment('ALLOW_INSECURE_HTTP', defaultValue: false);
+                receiveTimeout: const Duration(seconds: 20),
+              ),
+            ) {
+    const allowInsecureHttp = bool.fromEnvironment(
+      'ALLOW_INSECURE_HTTP',
+      defaultValue: false,
+    );
     final baseUri = Uri.parse(_dio.options.baseUrl);
     if (dio == null || kReleaseMode) {
       validateMobileDeployment(
@@ -171,67 +192,197 @@ class ApiClient {
     _dio.options.followRedirects = false;
     _refreshDio = refreshDio ?? Dio(_dio.options.copyWith());
     _refreshDio.options.followRedirects = false;
-    _dio.interceptors
-        .add(InterceptorsWrapper(onRequest: (options, handler) async {
-      if (options.extra['client_incident'] == true) {
-        if (options.extra['session_generation'] != _sessionGeneration) {
-          return handler.reject(DioException(
-              requestOptions: options, type: DioExceptionType.cancel));
-        }
-        return handler.next(options);
-      }
-      options.extra.putIfAbsent('session_generation', () => _sessionGeneration);
-      if (!options.path.startsWith('/auth/')) {
-        final token = await _storage.read('access_token');
-        if (options.extra['session_generation'] != _sessionGeneration) {
-          return handler.reject(DioException(
-              requestOptions: options, type: DioExceptionType.cancel));
-        }
-        if (token != null) options.headers['Authorization'] = 'Bearer $token';
-      }
-      handler.next(options);
-    }, onError: (error, handler) async {
-      final options = error.requestOptions;
-      if (options.extra['client_incident'] == true) return handler.next(error);
-      if (options.extra['session_generation'] != _sessionGeneration) {
-        return handler.next(error);
-      }
-      if (error.response?.statusCode != 401 ||
-          options.path.startsWith('/auth/')) {
-        return handler.next(error);
-      }
-      if (options.extra['retried'] == true) {
-        await expireSession();
-        return handler.next(error);
-      }
-      try {
-        await refreshSession();
-        final token = await read('access_token');
-        if (options.extra['session_generation'] != _sessionGeneration) {
-          return handler.next(error);
-        }
-        if (token == null) return handler.next(error);
-        if (options.method != 'GET' && options.method != 'HEAD') {
-          return handler.reject(DioException(
-              requestOptions: options,
-              type: DioExceptionType.badResponse,
-              response:
-                  Response(requestOptions: options, statusCode: 409, data: {
-                'error': {
-                  'message':
-                      'Your session was renewed. Please retry this action.'
-                }
-              })));
-        }
-        options.headers['Authorization'] = 'Bearer $token';
-        options.extra['retried'] = true;
-        handler.resolve(await _dio.fetch<dynamic>(options));
-      } catch (_) {
-        handler.next(error);
-      }
-    }));
+    _refreshDio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          try {
+            await _attachDeviceProof(options);
+            handler.next(options);
+          } catch (error) {
+            handler.reject(DioException(requestOptions: options, error: error));
+          }
+        },
+      ),
+    );
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final requestHex = _generateIdempotencyKey();
+          options.headers.putIfAbsent(
+            'X-Request-Id',
+            () =>
+                '${requestHex.substring(0, 8)}-${requestHex.substring(8, 12)}-${requestHex.substring(12, 16)}-${requestHex.substring(16, 20)}-${requestHex.substring(20)}',
+          );
+          options.headers['X-Client-Type'] = 'DOCTOR_FLUTTER';
+          options.headers['X-Client-Build'] = const String.fromEnvironment(
+            'APP_BUILD',
+            defaultValue: 'unreported',
+          );
+          if (_proofSigner.enabled) {
+            options.headers['X-Device-Proof-Required'] = '1';
+          }
+          if (options.extra['client_incident'] == true) {
+            if (options.extra['session_generation'] != _sessionGeneration) {
+              return handler.reject(
+                DioException(
+                  requestOptions: options,
+                  type: DioExceptionType.cancel,
+                ),
+              );
+            }
+            try {
+              await _attachDeviceProof(options);
+            } catch (error) {
+              return handler.reject(
+                DioException(requestOptions: options, error: error),
+              );
+            }
+            if (options.extra['session_generation'] != _sessionGeneration) {
+              return handler.reject(
+                DioException(
+                  requestOptions: options,
+                  type: DioExceptionType.cancel,
+                ),
+              );
+            }
+            return handler.next(options);
+          }
+          options.extra.putIfAbsent(
+            'session_generation',
+            () => _sessionGeneration,
+          );
+          if (!options.path.startsWith('/auth/')) {
+            final token = await read('access_token');
+            if (options.extra['session_generation'] != _sessionGeneration) {
+              return handler.reject(
+                DioException(
+                  requestOptions: options,
+                  type: DioExceptionType.cancel,
+                ),
+              );
+            }
+            if (token != null) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+          }
+          try {
+            await _attachDeviceProof(options);
+          } catch (error) {
+            return handler.reject(
+              DioException(requestOptions: options, error: error),
+            );
+          }
+          if (options.extra['session_generation'] != _sessionGeneration) {
+            return handler.reject(
+              DioException(
+                requestOptions: options,
+                type: DioExceptionType.cancel,
+              ),
+            );
+          }
+          handler.next(options);
+        },
+        onResponse: (response, handler) {
+          if (_proofSigner.enabled &&
+              _isSessionEstablishment(response.requestOptions.path)) {
+            final body = response.data;
+            if (body is! Map ||
+                body['data'] is! Map ||
+                body['data']['device_bound'] != true) {
+              return handler.reject(
+                DioException(
+                  requestOptions: response.requestOptions,
+                  response: response,
+                  error: 'A device-bound session is required.',
+                ),
+              );
+            }
+          }
+          handler.next(response);
+        },
+        onError: (error, handler) async {
+          final options = error.requestOptions;
+          if (options.extra['client_incident'] == true) {
+            return handler.next(error);
+          }
+          if (options.extra['session_generation'] != _sessionGeneration) {
+            return handler.next(error);
+          }
+          if (error.response?.statusCode != 401 ||
+              options.path.startsWith('/auth/')) {
+            return handler.next(error);
+          }
+          if (options.extra['retried'] == true) {
+            await expireSession();
+            return handler.next(error);
+          }
+          try {
+            await refreshSession();
+            final token = await read('access_token');
+            if (options.extra['session_generation'] != _sessionGeneration) {
+              return handler.next(error);
+            }
+            if (token == null) return handler.next(error);
+            if (options.method != 'GET' && options.method != 'HEAD') {
+              return handler.reject(
+                DioException(
+                  requestOptions: options,
+                  type: DioExceptionType.badResponse,
+                  response: Response(
+                    requestOptions: options,
+                    statusCode: 409,
+                    data: {
+                      'error': {
+                        'message':
+                            'Your session was renewed. Please retry this action.',
+                      },
+                    },
+                  ),
+                ),
+              );
+            }
+            options.headers['Authorization'] = 'Bearer $token';
+            options.extra['retried'] = true;
+            handler.resolve(await _dio.fetch<dynamic>(options));
+          } catch (_) {
+            handler.next(error);
+          }
+        },
+      ),
+    );
   }
   final Dio _dio;
+  final DeviceProofSigner _proofSigner;
+
+  bool _isSessionEstablishment(String path) =>
+      path.endsWith('/verify-otp') || path.endsWith('/verify-otp-and-login');
+
+  Future<void> _attachDeviceProof(RequestOptions options) async {
+    if (!_proofSigner.enabled) return;
+    String? binding;
+    final body = options.data;
+    if (body is Map && _isSessionEstablishment(options.path)) {
+      binding = (body['challenge_token'] ??
+          body['session_token'] ??
+          body['phone_number']) as String?;
+    } else if (body is Map &&
+        (options.path.endsWith('/auth/refresh') ||
+            options.path.endsWith('/auth/logout'))) {
+      binding = body['refresh_token'] as String?;
+    } else if (!options.path.startsWith('/auth/')) {
+      binding = await read('access_token');
+    }
+    // Always replace a previous proof when Dio retries the same RequestOptions.
+    options.headers.remove('X-Device-Proof');
+    if (binding != null) {
+      options.headers['X-Device-Proof'] = await _proofSigner.sign(
+        options.method,
+        options.uri.path,
+        binding,
+      );
+    }
+  }
+
   late final Dio _refreshDio;
   final TokenStore _storage;
   Uri resolveServerUrl(String value) =>
@@ -288,8 +439,10 @@ class ApiClient {
     try {
       final refresh = await read('refresh_token');
       if (refresh == null) throw const ApiException(401, '');
-      final response = await _refreshDio
-          .post<dynamic>('/auth/refresh', data: {'refresh_token': refresh});
+      final response = await _refreshDio.post<dynamic>(
+        '/auth/refresh',
+        data: {'refresh_token': refresh},
+      );
       final data = response.data['data'] as Map;
       await _serializeSessionStorage(() async {
         if (_sessionGeneration != generation) {
@@ -311,9 +464,29 @@ class ApiClient {
     }
   }
 
-  Future<Response<dynamic>> get(String path, {Map<String, dynamic>? query}) =>
-      _request((options) =>
-          _dio.get(path, queryParameters: query, options: options));
+  final _inflightReads = <String, Future<Response<dynamic>>>{};
+  Future<Response<dynamic>> get(String path, {Map<String, dynamic>? query}) {
+    final parameters = Map<String, dynamic>.from(query ?? {});
+    final keys = parameters.keys.toList()..sort();
+    final key = jsonEncode([
+      _sessionGeneration,
+      path,
+      [
+        for (final key in keys) [key, parameters[key]],
+      ],
+    ]);
+    final existing = _inflightReads[key];
+    if (existing != null) return existing;
+    late final Future<Response<dynamic>> work;
+    work = _request(
+      (options) =>
+          _dio.get(path, queryParameters: parameters, options: options),
+    ).whenComplete(() {
+      if (identical(_inflightReads[key], work)) _inflightReads.remove(key);
+    });
+    _inflightReads[key] = work;
+    return work;
+  }
 
   /// [idempotent]: attaches a fresh `Idempotency-Key` header for this one
   /// logical call. Generated once per `post`/`put` invocation (not per raw
@@ -327,32 +500,67 @@ class ApiClient {
   /// creation, chat send, prescription upload, consultation completion);
   /// skip it for naturally idempotent "set to this value" calls (duty,
   /// profile, payout method) and reads.
-  Future<Response<dynamic>> post(String path,
-          {Object? data,
-          ProgressCallback? onSendProgress,
-          bool idempotent = false}) =>
+  Future<Response<dynamic>> post(
+    String path, {
+    Object? data,
+    ProgressCallback? onSendProgress,
+    bool idempotent = false,
+    String? idempotencyKey,
+  }) =>
       _request(
-          (options) => _dio.post(path,
-              data: data, onSendProgress: onSendProgress, options: options),
-          idempotencyKey: idempotent ? _generateIdempotencyKey() : null);
-  Future<Response<dynamic>> put(String path,
-          {Object? data, bool idempotent = false}) =>
-      _request((options) => _dio.put(path, data: data, options: options),
-          idempotencyKey: idempotent ? _generateIdempotencyKey() : null);
+        (options) => _dio.post(
+          path,
+          data: data,
+          onSendProgress: onSendProgress,
+          options: options,
+        ),
+        idempotencyKey:
+            idempotencyKey ?? (idempotent ? _generateIdempotencyKey() : null),
+      );
+  Future<Response<dynamic>> put(
+    String path, {
+    Object? data,
+    bool idempotent = false,
+  }) =>
+      _request(
+        (options) => _dio.put(path, data: data, options: options),
+        idempotencyKey: idempotent ? _generateIdempotencyKey() : null,
+      );
   Future<Response<dynamic>> patch(String path, {Object? data}) =>
       _request((options) => _dio.patch(path, data: data, options: options));
   Future<Response<dynamic>> delete(String path) =>
       _request((options) => _dio.delete(path, options: options));
+
+  /// Raw-bytes GET (a profile photo, not JSON) — everything else in this
+  /// client assumes a JSON body, so this bypasses Dio's default JSON
+  /// response parsing explicitly rather than trying to coerce bytes through
+  /// it. A 404 (no photo set) still throws `ApiException` like any other
+  /// error; the caller decides how to treat "no photo" (see
+  /// `DoctorRepository.fetchPhotoBytes`).
+  Future<List<int>> getBytes(String path, {Map<String, dynamic>? query}) async {
+    final response = await _request(
+      (options) => _dio.get<List<int>>(
+        path,
+        queryParameters: query,
+        options: options.copyWith(responseType: ResponseType.bytes),
+      ),
+    );
+    return response.data as List<int>;
+  }
   Future<Response<dynamic>> _request(
-      Future<Response<dynamic>> Function(Options options) call,
-      {String? idempotencyKey}) async {
+    Future<Response<dynamic>> Function(Options options) call, {
+    String? idempotencyKey,
+  }) async {
     final generation = _sessionGeneration;
     try {
-      final response = await call(Options(
+      final response = await call(
+        Options(
           extra: {'session_generation': generation},
           headers: idempotencyKey != null
               ? {'Idempotency-Key': idempotencyKey}
-              : null));
+              : null,
+        ),
+      );
       if (_sessionGeneration != generation) {
         throw const ApiException(401, 'The account session changed.');
       }
@@ -375,7 +583,8 @@ class ApiClient {
             DioExceptionType.connectionError =>
               'You appear to be offline. Check your connection and retry.',
             DioExceptionType.cancel => 'The request was cancelled.',
-            _ => 'Unable to reach HelloDoctor. Check your connection and retry.'
+            _ =>
+              'Unable to reach HelloDoctor. Check your connection and retry.',
           };
     final requestId = body is Map && body['meta'] is Map
         ? body['meta']['request_id']?.toString()
@@ -389,10 +598,20 @@ class ApiClient {
       if (generation != _sessionGeneration) return;
       await _storage.write('access_token', access);
       await _storage.write('refresh_token', refresh);
+      if (_proofSigner.enabled) await _storage.write('device_bound', 'true');
     });
   }
 
-  Future<String?> read(String key) => _storage.read(key);
+  Future<String?> read(String key) async {
+    // Existing bearer sessions must authenticate again after adopting device
+    // binding. Never silently bind a copied refresh token to a new device key.
+    if (_proofSigner.enabled &&
+        (key == 'access_token' || key == 'refresh_token') &&
+        await _storage.read('device_bound') != 'true') {
+      return null;
+    }
+    return _storage.read(key);
+  }
 
   /// Uses the current session snapshot without refreshing, expiring it or
   /// replaying a mutation when best-effort diagnostics fail.
@@ -401,18 +620,16 @@ class ApiClient {
     try {
       final token = await read('access_token');
       if (token == null || generation != _sessionGeneration) return false;
-      final result = await _dio.post('/client-errors',
-          data: payload,
-          options: Options(
-              headers: {
-                'Authorization': 'Bearer $token'
-              },
-              extra: {
-                'client_incident': true,
-                'session_generation': generation
-              },
-              sendTimeout: const Duration(seconds: 2),
-              receiveTimeout: const Duration(seconds: 3)));
+      final result = await _dio.post(
+        '/client-errors',
+        data: payload,
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+          extra: {'client_incident': true, 'session_generation': generation},
+          sendTimeout: const Duration(seconds: 2),
+          receiveTimeout: const Duration(seconds: 3),
+        ),
+      );
       return result.statusCode == 202;
     } catch (_) {
       return false;

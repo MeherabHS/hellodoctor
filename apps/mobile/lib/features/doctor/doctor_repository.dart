@@ -1,3 +1,6 @@
+import 'dart:math';
+import 'dart:convert';
+import 'dart:typed_data';
 import '../../core/network/client_error_reporter.dart';
 import '../../core/network/api_client.dart';
 import '../../core/cache/doctor_cache_store.dart';
@@ -100,7 +103,8 @@ class DoctorRepository {
       }
     }
 
-    final queue = parse('queue', AppointmentDto.fromJson);
+    final queue = parse('queue',
+        (j) => AppointmentDto.fromJson({...j, 'queue_actionable': false}));
     final slots = parse('slots', SlotDto.fromJson);
     final chats = parse('chats', ChatDto.fromJson);
     final questions = parse('questions', QnaDto.fromJson);
@@ -140,13 +144,27 @@ class DoctorRepository {
     );
   }
 
+  Future<ChatDto> conversationForAppointment(AppointmentDto appointment) async {
+    requireOnline();
+    final raw = mapData(
+        data(await api.get('/appointments/${appointment.id}/conversation')));
+    return ChatDto.fromJson({
+      ...raw,
+      'patient_display_name': appointment.patientName,
+      'modality': appointment.modality,
+      'appointment_status': appointment.status
+    });
+  }
+
   Future<List<AppointmentDto>> queue({int limit = 25, int offset = 0}) async {
     try {
       requireOnline();
       final raw = listData(data(await api.get('/doctor/appointments',
-          query: {'limit': limit, 'offset': offset})));
-      await cacheWrite('queue', raw.take(50).toList(),
-          ttl: const Duration(minutes: 5));
+          query: {'limit': limit, 'offset': offset, 'view': 'all'})));
+      if (offset == 0) {
+        await cacheWrite('queue', raw.take(50).toList(),
+            ttl: const Duration(minutes: 5));
+      }
       return raw
           .map((e) =>
               AppointmentDto.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -156,6 +174,15 @@ class DoctorRepository {
           screen: 'Queue', operation: 'load');
       rethrow;
     }
+  }
+
+  Future<List<AppointmentDto>> consultationHistory({int offset = 0}) async {
+    requireOnline();
+    return listData(data(await api.get('/doctor/appointments',
+            query: {'limit': 100, 'offset': offset, 'view': 'history'})))
+        .map(
+            (e) => AppointmentDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   Future<Json> duty() async {
@@ -169,6 +196,26 @@ class DoctorRepository {
           screen: 'Queue', operation: 'load');
       rethrow;
     }
+  }
+
+  Future<List<AppointmentDto>> allQueue() async {
+    final result = <AppointmentDto>[];
+    for (var offset = 0; offset < 10000; offset += 100) {
+      final batch = await queue(limit: 100, offset: offset);
+      result.addAll(batch);
+      if (batch.length < 100) return result;
+    }
+    throw const ApiException(null, 'Consultations exceed display capacity.');
+  }
+
+  Future<List<ChatDto>> allChats() async {
+    final result = <ChatDto>[];
+    for (var offset = 0; offset < 10000; offset += 100) {
+      final batch = await chats(limit: 100, offset: offset);
+      result.addAll(batch);
+      if (batch.length < 100) return result;
+    }
+    throw const ApiException(null, 'Conversations exceed display capacity.');
   }
 
   Future<Json> setDuty(bool value) async {
@@ -185,13 +232,21 @@ class DoctorRepository {
     }
   }
 
-  Future<List<SlotDto>> slots({int limit = 25, int offset = 0}) async {
+  Future<List<SlotDto>> slots(
+      {int limit = 25, int offset = 0, DateTime? day}) async {
     try {
       requireOnline();
-      final raw = listData(data(await api
-          .get('/doctor/slots', query: {'limit': limit, 'offset': offset})));
-      await cacheWrite('slots', raw.take(100).toList(),
-          ttl: const Duration(minutes: 10));
+      final raw = listData(data(await api.get('/doctor/slots', query: {
+        'limit': limit,
+        'offset': offset,
+        if (day != null)
+          'day':
+              '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}'
+      })));
+      if (offset == 0) {
+        await cacheWrite('slots', raw.take(100).toList(),
+            ttl: const Duration(minutes: 10));
+      }
       return raw
           .map((e) => SlotDto.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
@@ -202,10 +257,10 @@ class DoctorRepository {
     }
   }
 
-  Future<List<SlotDto>> allSlots() async {
+  Future<List<SlotDto>> allSlots({DateTime? day}) async {
     final result = <SlotDto>[];
     for (var offset = 0; offset < 10000; offset += 100) {
-      final batch = await slots(limit: 100, offset: offset);
+      final batch = await slots(limit: 100, offset: offset, day: day);
       result.addAll(batch);
       if (batch.length < 100) return result;
     }
@@ -259,8 +314,10 @@ class DoctorRepository {
       requireOnline();
       final raw = listData(data(await api
           .get('/doctor/chats', query: {'limit': limit, 'offset': offset})));
-      await cacheWrite('chats', raw.take(50).toList(),
-          ttl: const Duration(minutes: 10));
+      if (offset == 0) {
+        await cacheWrite('chats', raw.take(50).toList(),
+            ttl: const Duration(minutes: 10));
+      }
       return raw
           .map((e) => ChatDto.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
@@ -269,6 +326,63 @@ class DoctorRepository {
           screen: 'Chat', operation: 'load');
       rethrow;
     }
+  }
+
+  Future<MessageDto> uploadClinicalImage(String conversationId, Uint8List bytes,
+      String mime, String requestKey) async {
+    requireOnline();
+    final raw = data(await api.post('/chat/$conversationId/attachments',
+        idempotencyKey: requestKey,
+        data: {'mime_type': mime, 'base64_content': base64Encode(bytes)}));
+    return MessageDto.fromJson(mapData(raw));
+  }
+
+  Future<Uint8List> clinicalImage(
+      String conversationId, String messageId) async {
+    requireOnline();
+    final raw = mapData(data(
+        await api.get('/chat/$conversationId/messages/$messageId/attachment')));
+    return base64Decode(raw['base64_content'] as String);
+  }
+
+  Future<void> acknowledgeConsultation(String appointmentId) async {
+    requireOnline();
+    await api.post('/appointments/$appointmentId/trace-ack',
+        data: {'event': 'CONSULTATION_OPENED'});
+  }
+
+  final _pendingMessages = <String, ({String content, String key})>{};
+  Future<void> acknowledgeChat(ChatDto chat, String event,
+      {List<String> messages = const [], DateTime? clientOccurredAt}) async {
+    requireOnline();
+    if (chat.appointmentId == null) return;
+    await api.post('/appointments/${chat.appointmentId}/trace-ack', data: {
+      'event': event,
+      'conversation_id': chat.id,
+      'message_ids': messages,
+      if (clientOccurredAt != null)
+        'client_occurred_at': clientOccurredAt.toUtc().toIso8601String(),
+    });
+  }
+
+  Future<List<MessageDto>> newerMessages(
+      String conversation, MessageDto after) async {
+    requireOnline();
+    final raw = listData(data(await api.get('/chat/$conversation/messages',
+        query: {'after_time': after.sentAt, 'after_id': after.id})));
+    return raw
+        .map((e) => MessageDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<MessageDto>> olderMessages(
+      String conversation, MessageDto before) async {
+    requireOnline();
+    final raw = listData(data(await api.get('/chat/$conversation/messages',
+        query: {'before_time': before.sentAt, 'before_id': before.id})));
+    return raw
+        .map((e) => MessageDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
   }
 
   Future<List<MessageDto>> messages(String id) async {
@@ -286,8 +400,7 @@ class DoctorRepository {
         }
       }
       requireOnline();
-      final raw =
-          listData(data(await api.get('/chat/$id/messages'))).take(50).toList();
+      final raw = listData(data(await api.get('/chat/$id/messages')));
       final all = <String, dynamic>{};
       if (cachedMessages?.data is Map) {
         all.addAll(Map<String, dynamic>.from(cachedMessages!.data as Map));
@@ -310,8 +423,20 @@ class DoctorRepository {
   Future<Json> sendMessage(String id, String content) async {
     try {
       requireOnline();
-      return mapData(data(await api.post('/chat/$id/messages',
-          data: {'content': content}, idempotent: true)));
+      if (_pendingMessages[id]?.content != content) {
+        final key = List.generate(
+            16,
+            (_) => Random.secure()
+                .nextInt(256)
+                .toRadixString(16)
+                .padLeft(2, '0')).join();
+        _pendingMessages[id] = (content: content, key: key);
+      }
+      final message = mapData(data(await api.post('/chat/$id/messages',
+          data: {'content': content},
+          idempotencyKey: _pendingMessages[id]!.key)));
+      _pendingMessages.remove(id);
+      return message;
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'Chat', operation: 'send_message');
@@ -425,6 +550,54 @@ class DoctorRepository {
     }
   }
 
+  /// Compression/resizing and the 40KB ceiling are entirely server-side
+  /// (`UploadSecurityService`) — this client sends the picked image's bytes
+  /// unmodified, the same "server is the sole source of truth on size"
+  /// choice already made for Rx-photo uploads.
+  Future<void> uploadPhoto({
+    required Uint8List bytes,
+    required String mimeType,
+  }) async {
+    try {
+      requireOnline();
+      await api.post('/doctor/profile/photo', data: {
+        'mime_type': mimeType,
+        'base64_content': base64Encode(bytes),
+      });
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Settings', operation: 'upload_photo');
+      rethrow;
+    }
+  }
+
+  Future<void> deletePhoto() async {
+    try {
+      requireOnline();
+      await api.delete('/doctor/profile/photo');
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Settings', operation: 'delete_photo');
+      rethrow;
+    }
+  }
+
+  /// Returns `null` when no photo is set (a 404 from the backend) rather
+  /// than throwing — "no photo yet" is an expected, common state for this
+  /// optional feature, not an error condition the UI needs to surface.
+  Future<Uint8List?> fetchPhotoBytes() async {
+    try {
+      requireOnline();
+      final bytes = await api.getBytes('/doctor/profile/photo');
+      return Uint8List.fromList(bytes);
+    } on ApiException catch (error, stack) {
+      if (error.status == 404) return null;
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Settings', operation: 'fetch_photo');
+      rethrow;
+    }
+  }
+
   Future<WalletDto?> cachedWallet() async {
     final saved = await cached('wallet');
     if (saved?.data is Map) {
@@ -510,6 +683,46 @@ class DoctorRepository {
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'Wallet', operation: 'update');
+      rethrow;
+    }
+  }
+
+  /// `POST /doctor/wallet/payout-methods/bind` — the real, reachable-in-
+  /// every-environment provider binding flow (`wallet_handlers::bind_payout_destination`),
+  /// writing to `doctor_payout_destinations` (the table Admin's payout
+  /// routing and the disbursement pipeline actually read from), unlike
+  /// [setPayoutMethod]'s legacy `doctor_payout_method` pair above. The
+  /// backend hard-stops (409) if the platform has no active M-Pesa provider
+  /// configured yet — surfaced honestly here, not silently retried or
+  /// swallowed.
+  Future<Json> bindPayoutDestination(String accountIdentifier,
+      {bool? makePrimary}) async {
+    try {
+      requireOnline();
+      final raw = mapData(data(await api
+          .post('/doctor/wallet/payout-methods/bind', idempotent: true, data: {
+        'method_type': 'MPESA',
+        'account_identifier': accountIdentifier,
+        if (makePrimary != null) 'make_primary': makePrimary,
+      })));
+      await cacheWrite('payout_method', raw, ttl: const Duration(hours: 12));
+      return raw;
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Wallet', operation: 'bind_payout_destination');
+      rethrow;
+    }
+  }
+
+  /// `POST /doctor/wallet/payout-methods/set-primary`.
+  Future<void> setPrimaryPayoutDestination(String destinationId) async {
+    try {
+      requireOnline();
+      await api.post('/doctor/wallet/payout-methods/set-primary',
+          idempotent: true, data: {'destination_id': destinationId});
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Wallet', operation: 'set_primary_payout_destination');
       rethrow;
     }
   }
@@ -655,15 +868,19 @@ class DoctorRepository {
     }
   }
 
-  Future<Json> telemetry(String id, List<Map<String, dynamic>> events) async {
+  /// Best-effort by design (mirrors the backend's own
+  /// `record_telemetry_events` fail-open stance: "ingesting observability
+  /// data must never be able to break an active consultation") — swallows
+  /// failures rather than rethrowing, since every call site fires this
+  /// without awaiting into a user-visible error path.
+  Future<void> telemetry(String id, List<Map<String, dynamic>> events) async {
     try {
       requireOnline();
-      return mapData(data(await api.post('/consultations/$id/telemetry/events',
-          data: {'events': events})));
+      await api.post('/consultations/$id/telemetry/events',
+          data: {'events': events});
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'Telehealth', operation: 'call_telemetry');
-      rethrow;
     }
   }
 

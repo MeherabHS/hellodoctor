@@ -3,6 +3,13 @@ import '../../core/network/api_client.dart';
 import '../../core/widgets/doctor_widgets.dart';
 import 'articles_repository.dart';
 
+void openDoctorArticleEditor(BuildContext context, ApiClient api) {
+  Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => _ArticleEditor(repo: ArticlesRepository(api))));
+}
+
 class DoctorArticlesPage extends StatefulWidget {
   const DoctorArticlesPage({super.key, required this.api});
   final ApiClient api;

@@ -82,6 +82,8 @@ class _LegalConsentState extends State<LegalConsentPage> {
                 required: d['required'] as bool,
               ))
           .toList();
+      documents.removeWhere(
+          (document) => document.type == 'PATIENT_DATA_SHARING_CONSENT');
       if (mounted) setState(() => _documents = documents);
     } on ApiException catch (e) {
       if (mounted) setState(() => _loadError = e.userMessage);

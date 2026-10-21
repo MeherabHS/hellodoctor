@@ -50,6 +50,24 @@ class NotificationRepository {
     }
   }
 
+  Future<List<NotificationDto>> newerThan(NotificationDto cursor) =>
+      _cursorPage(cursor, false);
+  Future<List<NotificationDto>> olderThan(NotificationDto cursor) =>
+      _cursorPage(cursor, true);
+  Future<List<NotificationDto>> _cursorPage(
+      NotificationDto cursor, bool before) async {
+    final raw = _listData(_data(await api.get('/notifications', query: {
+      'limit': 25,
+      before ? 'before_time' : 'after_time':
+          cursor.createdAt.toUtc().toIso8601String(),
+      before ? 'before_id' : 'after_id': cursor.id,
+    })));
+    return raw
+        .map((e) =>
+            NotificationDto.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
   /// GET /notifications/unread-count
   Future<int> unreadCount() async {
     try {

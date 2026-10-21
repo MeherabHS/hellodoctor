@@ -15,6 +15,8 @@ const _unset = Object();
 
 class NotificationState {
   const NotificationState({
+    this.hasOlder = false,
+    this.loadingOlder = false,
     this.loading = false,
     this.refreshing = false,
     this.busy = false,
@@ -23,13 +25,15 @@ class NotificationState {
     this.unreadCount = 0,
     this.lastUpdatedAt,
   });
-  final bool loading, refreshing, busy;
+  final bool loading, refreshing, busy, hasOlder, loadingOlder;
   final String? error;
   final List<NotificationDto> items;
   final int unreadCount;
   final DateTime? lastUpdatedAt;
 
   NotificationState copyWith({
+    bool? hasOlder,
+    bool? loadingOlder,
     bool? loading,
     bool? refreshing,
     bool? busy,
@@ -39,6 +43,8 @@ class NotificationState {
     DateTime? lastUpdatedAt,
   }) =>
       NotificationState(
+        hasOlder: hasOlder ?? this.hasOlder,
+        loadingOlder: loadingOlder ?? this.loadingOlder,
         loading: loading ?? this.loading,
         refreshing: refreshing ?? this.refreshing,
         busy: busy ?? this.busy,
@@ -67,8 +73,11 @@ class NotificationState {
 /// notification promptly. The poll itself is started by an explicit call to
 /// [startPolling] (see its own doc comment for why this isn't automatic).
 class NotificationCubit extends Cubit<NotificationState> {
-  NotificationCubit(this.repo, {this.doctorRepo, this.doctorId})
-      : super(const NotificationState());
+  NotificationCubit(this.repo,
+      {this.doctorRepo, this.doctorId, DateTime Function()? now})
+      : _now = now ?? DateTime.now,
+        super(const NotificationState());
+  final DateTime Function() _now;
   final NotificationRepository repo;
 
   /// Optional — supplies the appointment queue the schedule reconciler
@@ -118,10 +127,10 @@ class NotificationCubit extends Cubit<NotificationState> {
   /// before `addTearDown(cubit.close)` has had a chance to run. Call this
   /// explicitly, once, from wherever the cubit is wired up for real
   /// (a future app-bootstrap step) after construction.
-  void startPolling() {
+  void startPolling({Duration interval = const Duration(seconds: 20)}) {
     if (_pollingStarted || isClosed) return;
     _pollingStarted = true;
-    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    _pollTimer = Timer.periodic(interval, (_) {
       if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
         unawaited(_poll());
       }
@@ -131,6 +140,7 @@ class NotificationCubit extends Cubit<NotificationState> {
   /// Initial fetch — shows a full-page spinner only while there is nothing
   /// to show yet; a subsequent call (e.g. on reopening the page) refreshes
   /// quietly in the background instead of blanking an already-populated list.
+  bool _olderLoaded = false;
   Future<void> load() async {
     if (_loadInFlight) return;
     _loadInFlight = true;
@@ -144,9 +154,10 @@ class NotificationCubit extends Cubit<NotificationState> {
         loading: false,
         refreshing: false,
         error: null,
-        items: items,
+        items: _olderLoaded ? _mergeItems(state.items, items) : items,
+        hasOlder: _olderLoaded ? state.hasOlder : items.length == 25,
         unreadCount: results[1] as int,
-        lastUpdatedAt: DateTime.now().toUtc(),
+        lastUpdatedAt: _now().toUtc(),
       ));
       _processFetchedItems(items);
       // Fire-and-forget: reconciliation does its own network fetch
@@ -163,6 +174,66 @@ class NotificationCubit extends Cubit<NotificationState> {
       ));
     } finally {
       _loadInFlight = false;
+    }
+  }
+
+  List<NotificationDto> _mergeItems(
+      List<NotificationDto> old, List<NotificationDto> next) {
+    final items = {
+      for (final item in old) item.id: item,
+      for (final item in next) item.id: item
+    }.values.toList();
+    items.sort((a, b) {
+      final time = b.createdAt.compareTo(a.createdAt);
+      return time == 0 ? b.id.compareTo(a.id) : time;
+    });
+    return items;
+  }
+
+  Future<List<NotificationDto>> _delta() async {
+    var cursor = state.items.isNotEmpty
+        ? _mergeItems([], state.items).first
+        : NotificationDto(
+            id: '00000000-0000-0000-0000-000000000000',
+            userId: '',
+            type: '',
+            title: '',
+            body: '',
+            createdAt: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+            deliveryStatus: '');
+    final collected = <NotificationDto>[];
+    for (var pageNumber = 0; pageNumber < 4; pageNumber++) {
+      final page = await repo.newerThan(cursor);
+      collected.addAll(page);
+      if (page.length < 25) break;
+      cursor = page.last;
+    }
+    return collected;
+  }
+
+  bool _olderBusy = false;
+  Future<void> loadOlder() async {
+    if (_olderBusy || isClosed || !state.hasOlder || state.items.isEmpty) {
+      return;
+    }
+    _olderBusy = true;
+    emit(state.copyWith(loadingOlder: true));
+    try {
+      final older = await repo.olderThan(state.items.last);
+      if (!isClosed) {
+        _olderLoaded = true;
+        emit(state.copyWith(
+            items: _mergeItems(state.items, older),
+            hasOlder: older.length == 25));
+      }
+    } catch (e) {
+      if (!isClosed) {
+        emit(state.copyWith(
+            error: _message(e, 'Unable to load earlier notifications.')));
+      }
+    } finally {
+      _olderBusy = false;
+      if (!isClosed) emit(state.copyWith(loadingOlder: false));
     }
   }
 
@@ -185,13 +256,14 @@ class NotificationCubit extends Cubit<NotificationState> {
   /// surfaces errors exactly as before.
   Future<void> _poll() async {
     if (_loadInFlight || isClosed) return;
+    _loadInFlight = true;
     try {
-      final results = await Future.wait([repo.list(), repo.unreadCount()]);
+      final results = await Future.wait([_delta(), repo.unreadCount()]);
       if (isClosed) return;
       final items = results[0] as List<NotificationDto>;
       emit(state.copyWith(
         error: null,
-        items: items,
+        items: _mergeItems(state.items, items),
         unreadCount: results[1] as int,
         lastUpdatedAt: DateTime.now().toUtc(),
       ));
@@ -199,6 +271,8 @@ class NotificationCubit extends Cubit<NotificationState> {
       await _maybeReconcileSchedule();
     } catch (_) {
       // Swallowed — see doc comment above.
+    } finally {
+      _loadInFlight = false;
     }
   }
 
@@ -269,16 +343,34 @@ class NotificationCubit extends Cubit<NotificationState> {
   /// cadence as the realtime sync above (the initial `load()` and every
   /// poll tick). Only does anything when both [doctorRepo] and [doctorId]
   /// were supplied to the constructor; see their doc comments.
+  DateTime? _lastScheduleReconciliation;
+  Set<String> _scheduleNoticeIds = {};
   Future<void> _maybeReconcileSchedule() async {
     final repo = doctorRepo;
     final id = doctorId;
     if (repo == null || id == null || isClosed) return;
+    final notices = state.items
+        .where((item) =>
+            item.type.contains('CONSULTATION') ||
+            item.type.contains('APPOINTMENT') ||
+            item.type.contains('PAYMENT'))
+        .map((item) => item.id)
+        .toSet();
+    final now = _now().toUtc();
+    if (_lastScheduleReconciliation != null &&
+        now.difference(_lastScheduleReconciliation!) <
+            const Duration(minutes: 5) &&
+        notices.difference(_scheduleNoticeIds).isEmpty) {
+      return;
+    }
     try {
       // Generous single-page fetch (`limit: 100`) — a known simplification,
       // same as the Layer 2 background-sync worker: no pagination beyond
       // this first page of the doctor's appointment queue.
       final List<AppointmentDto> appointments = await repo.queue(limit: 100);
       if (isClosed) return;
+      _lastScheduleReconciliation = now;
+      _scheduleNoticeIds = notices;
       await ScheduleNotificationReconciler.reconcile(
         doctorId: id,
         appointments: appointments,
