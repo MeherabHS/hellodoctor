@@ -22,8 +22,49 @@ pub async fn auth_middleware(
     mut request: Request,
     next: Next,
 ) -> Response {
+    // Body is not Sync: retain only the small request metadata across awaits.
+    let proof_headers = request.headers().clone();
+    let proof_method = request.method().clone();
+    let proof_uri = request
+        .extensions()
+        .get::<axum::extract::OriginalUri>()
+        .map(|original| original.0.clone())
+        .unwrap_or_else(|| request.uri().clone());
     let authentication = match authenticate(&state, &request) {
-        Ok((ctx, family)) => check_active_session(&state, ctx, family).await,
+        Ok((ctx, family)) => {
+            let cost = crate::admission::classify(&proof_method, proof_uri.path());
+            let limit = match cost {
+                crate::admission::Cost::Consultation => 240,
+                crate::admission::Cost::Upload => 20,
+                crate::admission::Cost::Payment => 30,
+                crate::admission::Cost::Expensive => 60,
+                _ => 120,
+            };
+            if let Err(error) = crate::rate_limit::check_and_increment(
+                &state.redis,
+                &format!("ratelimit:authenticated:{}:{}", ctx.user_id, cost.label()),
+                limit,
+                60,
+            )
+            .await
+            {
+                let status = if matches!(error, AppError::RateLimitExceeded(_)) {
+                    axum::http::StatusCode::TOO_MANY_REQUESTS
+                } else {
+                    axum::http::StatusCode::SERVICE_UNAVAILABLE
+                };
+                return crate::admission::reject(status, cost, "account_budget");
+            }
+            check_active_session(
+                &state,
+                ctx,
+                family,
+                &proof_headers,
+                &proof_method,
+                &proof_uri,
+            )
+            .await
+        }
         Err(error) => Err(error),
     };
     match authentication {
@@ -80,6 +121,9 @@ async fn check_active_session(
     state: &AppState,
     mut ctx: AuthContext,
     family: Uuid,
+    headers: &axum::http::HeaderMap,
+    method: &axum::http::Method,
+    uri: &axum::http::Uri,
 ) -> Result<AuthContext, AppError> {
     if !state.config.is_development_or_test()
         && crate::seed::is_fixture_user(ctx.user_id.into_inner())
@@ -90,26 +134,63 @@ async fn check_active_session(
     }
     // No positive cache: logout/reuse revocation is authoritative at the next
     // authentication check. Rotation preserves the family and its active leaf.
-    let active: Option<Uuid> = sqlx::query_scalar(
-        "SELECT s.id FROM auth_sessions s JOIN users u ON u.id=s.user_id \
+    let active: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
+        "SELECT s.id,u.role::text,k.key_thumbprint FROM auth_sessions s JOIN users u ON u.id=s.user_id \
+         LEFT JOIN auth_session_device_keys k ON k.token_family_id=s.token_family_id \
          WHERE s.token_family_id=$1 AND s.user_id=$2 AND s.revoked_at IS NULL \
          AND s.rotated_at IS NULL AND s.expires_at>NOW() AND u.is_active \
-         AND u.deleted_at IS NULL AND u.role::text=$3 LIMIT 1",
+         AND u.deleted_at IS NULL LIMIT 1",
     )
     .bind(family)
     .bind(ctx.user_id)
-    .bind(ctx.role.as_str())
     .fetch_optional(&state.auth_db)
     .await
     .map_err(|error| {
         AppError::service_unavailable(format!("Session validation unavailable: {error}"))
     })?;
-    if active.is_none() {
+    let (session, actual_role, device_key) = active.ok_or_else(|| {
+        AppError::Unauthorized("This session is no longer available. Please sign in again.".into())
+    })?;
+    if let Some(thumbprint) = device_key {
+        let token = headers
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .ok_or_else(|| AppError::Unauthorized("Session proof is required.".into()))?;
+        crate::services::auth_service::device_proof::verify(
+            state,
+            headers,
+            method,
+            uri,
+            token,
+            Some(&thumbprint),
+        )
+        .await?;
+    }
+    ctx.session_id = Some(session);
+    ctx.request_id = Some(crate::api::middleware::request_context::request_id());
+    if actual_role != ctx.role.as_str() {
+        let mut actor = ctx.clone();
+        actor.role = UserRole::parse(&actual_role)
+            .ok_or_else(|| AppError::Unauthorized("Account role unavailable.".into()))?;
+        crate::services::AuditService::log(
+            state,
+            &actor,
+            crate::services::AuditLogEntry::new(
+                Some(actor.user_id),
+                actor.role,
+                "AUTH_ROLE_MISMATCH",
+                "AUTH_SESSION",
+                Some(session),
+                "DENIED",
+            )
+            .with_reason(Some("TOKEN_ROLE_MISMATCH".into())),
+        )
+        .await?;
         return Err(AppError::Unauthorized(
             "This session is no longer available. Please sign in again.".into(),
         ));
     }
-    ctx.session_id = active;
-    ctx.request_id = Some(Uuid::new_v4().to_string());
+    ctx.request_id = Some(crate::api::middleware::request_context::request_id());
     Ok(ctx)
 }

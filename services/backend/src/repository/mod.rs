@@ -15,8 +15,10 @@ pub mod idempotency_repo;
 pub mod legal_repo;
 pub mod notification_repo;
 pub mod otp_repo;
+pub mod patient_auth_repo;
 pub mod patient_repo;
 pub mod payment_event_repo;
+pub mod payment_methods_repo;
 pub mod prescription_repo;
 pub mod session_repo;
 pub mod system_error_repo;
@@ -26,7 +28,7 @@ pub mod wallet_repo;
 
 /// Which of the five least-privilege capability-role pools a transaction should
 /// run against. Chosen by the service/handler code based on *what operation is
-/// being performed*, never by the caller's JWT role — a FINANCE_ADMIN's request
+/// being performed*, never by the caller's JWT role — an ADMIN's request
 /// does not get to pick the finance-worker connection just by asserting that
 /// role; the service function for that specific lifecycle transition does.
 /// See migrations/20261003000001_rls_hardening for the exact per-role grants.
@@ -56,6 +58,8 @@ pub struct AppState {
     pub redis: deadpool_redis::Pool,
     pub config: Arc<AppConfig>,
     pub object_storage: Option<Arc<dyn object_store::ObjectStore>>,
+    pub admission: Arc<crate::admission::Admission>,
+    pub web_auth: Arc<crate::api::middleware::web_auth::WebAuthGate>,
 }
 
 impl AppState {
@@ -94,6 +98,18 @@ impl AppState {
                         .expect("Invalid private object-storage configuration"),
                 ) as Arc<dyn object_store::ObjectStore>
             });
+        // Five independent per-role pools (see `DbRole`) each hold
+        // `db_pool_max_connections_per_role` connections, so the combined
+        // real DB capacity behind admission is five times that value, not
+        // one role's share of it. Passing just the per-role number here
+        // under-admits concurrent traffic ~5x relative to what the pools
+        // can actually serve.
+        let admission = Arc::new(crate::admission::Admission::new(
+            config.db_pool_max_connections_per_role.saturating_mul(5),
+        ));
+        let web_auth = Arc::new(crate::api::middleware::web_auth::WebAuthGate::new(
+            !config.is_development_or_test(),
+        ));
         Self {
             db,
             auth_db,
@@ -103,6 +119,8 @@ impl AppState {
             redis,
             config,
             object_storage,
+            admission,
+            web_auth,
         }
     }
 
@@ -131,7 +149,21 @@ impl AppState {
         ctx: &AuthContext,
         role: DbRole,
     ) -> Result<Transaction<'_, Postgres>, AppError> {
-        let mut tx = self.pool_for(role).begin().await?;
+        crate::api::middleware::request_context::bind_actor(
+            ctx,
+            self.config.consultation_trace_retention_days,
+        );
+        let started = std::time::Instant::now();
+        let mut tx = tokio::time::timeout(
+            std::time::Duration::from_millis(250),
+            self.pool_for(role).begin(),
+        )
+        .await
+        .map_err(|_| {
+            metrics::counter!("db_acquire_deadline_total").increment(1);
+            AppError::service_unavailable("Database operation is temporarily unavailable.".into())
+        })??;
+        metrics::histogram!("db_acquire_seconds").record(started.elapsed().as_secs_f64());
         sqlx::query("SELECT set_config('app.current_user_id', $1, true), set_config('app.current_role', $2, true)")
             .bind(ctx.user_id.to_string())
             .bind(ctx.role.as_str())
@@ -147,6 +179,10 @@ impl AppState {
             sqlx::query("SELECT set_config('app.current_patient_id','',true),set_config('app.current_doctor_id','',true),set_config('app.current_session_id',$1,true),set_config('app.current_request_id',$2,true)")
                 .bind(ctx.session_id.map(|id| id.to_string()).unwrap_or_default()).bind(ctx.request_id.as_deref().unwrap_or_default()).execute(&mut *tx).await?;
         }
+        sqlx::query("SELECT set_config('app.trace_retention_days',$1,true)")
+            .bind(self.config.consultation_trace_retention_days.to_string())
+            .execute(&mut *tx)
+            .await?;
         Ok(tx)
     }
 

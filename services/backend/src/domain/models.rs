@@ -11,6 +11,7 @@ pub enum UserRole {
     #[default]
     Patient,
     Doctor,
+    Admin,
     PlatformAdmin,
     ClinicalAdmin,
     FinanceAdmin,
@@ -24,6 +25,7 @@ impl UserRole {
         match self {
             UserRole::Patient => "PATIENT",
             UserRole::Doctor => "DOCTOR",
+            UserRole::Admin => "ADMIN",
             UserRole::PlatformAdmin => "PLATFORM_ADMIN",
             UserRole::ClinicalAdmin => "CLINICAL_ADMIN",
             UserRole::FinanceAdmin => "FINANCE_ADMIN",
@@ -35,6 +37,7 @@ impl UserRole {
 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
+            "ADMIN" => Some(UserRole::Admin),
             "PATIENT" => Some(UserRole::Patient),
             "DOCTOR" => Some(UserRole::Doctor),
             "PLATFORM_ADMIN" => Some(UserRole::PlatformAdmin),
@@ -48,7 +51,7 @@ impl UserRole {
     }
 
     pub fn is_admin(&self) -> bool {
-        !matches!(self, UserRole::Patient | UserRole::Doctor)
+        matches!(self, UserRole::Admin)
     }
 }
 
@@ -85,28 +88,6 @@ pub struct AuthSession {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-#[sqlx(type_name = "mfa_method_enum", rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum MfaMethod {
-    Totp,
-    Passkey,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct MfaCredential {
-    pub id: Uuid,
-    pub user_id: UserId,
-    pub method: MfaMethod,
-    pub totp_secret_encrypted: Vec<u8>,
-    pub recovery_codes_hash: Option<Vec<String>>,
-    pub is_enabled: bool,
-    pub enabled_at: Option<DateTime<Utc>>,
-    pub last_verified_at: Option<DateTime<Utc>>,
-    pub revoked_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[sqlx(type_name = "gender_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Gender {
     Male,
@@ -117,7 +98,12 @@ pub enum Gender {
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct PatientProfile {
     pub id: PatientProfileId,
-    pub user_id: UserId,
+    /// `NULL` for a dependent profile (one with no login of its own) — see
+    /// `guardian_patient_id` and `patient_profiles_self_xor_dependent`
+    /// (migration `20261101000001_patient_profile_dependents`): a profile is
+    /// always exactly one of a real login-linked self profile or a
+    /// guardian-managed dependent.
+    pub user_id: Option<UserId>,
     pub full_name: String,
     pub date_of_birth: NaiveDate,
     pub gender: Gender,
@@ -125,6 +111,13 @@ pub struct PatientProfile {
     pub weight_kg: Option<BigDecimal>,
     pub emergency_contact_phone: Option<String>,
     pub emergency_contact_relation: Option<String>,
+    /// Non-null only for a dependent profile — the owning account's own
+    /// self-profile `id`. Single-level only (a dependent can never itself
+    /// guardian another dependent), enforced by a DB trigger.
+    pub guardian_patient_id: Option<PatientProfileId>,
+    /// Free-text display label for a dependent ("Spouse", "Child", ...) —
+    /// not a backend-interpreted enum, always `NULL` for a self profile.
+    pub relationship: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -141,6 +134,11 @@ pub enum ProfessionalVerificationStatus {
     Pending,
     Verified,
     Rejected,
+    /// A formerly-VERIFIED Doctor whose clinical capability was withdrawn by
+    /// an Admin (h22 remediation). Terminal, like Rejected, but reachable
+    /// only from Verified — see guard_professional_verification() in
+    /// migrations/20261107000002_doctor_verification_revocation.up.sql.
+    Revoked,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -193,6 +191,10 @@ pub enum LegalDocumentType {
     ProfessionalVerificationDeclaration,
     TelemedicinePractitionerPolicy,
     MarketingCommunications,
+    PatientDataSharingConsent,
+    PatientTerms,
+    PatientPrivacyNotice,
+    PatientDataRights,
 }
 
 impl LegalDocumentType {
@@ -205,6 +207,10 @@ impl LegalDocumentType {
             }
             LegalDocumentType::TelemedicinePractitionerPolicy => "TELEMEDICINE_PRACTITIONER_POLICY",
             LegalDocumentType::MarketingCommunications => "MARKETING_COMMUNICATIONS",
+            LegalDocumentType::PatientDataSharingConsent => "PATIENT_DATA_SHARING_CONSENT",
+            LegalDocumentType::PatientTerms => "PATIENT_TERMS",
+            LegalDocumentType::PatientPrivacyNotice => "PATIENT_PRIVACY_NOTICE",
+            LegalDocumentType::PatientDataRights => "PATIENT_DATA_RIGHTS",
         }
     }
 }
@@ -601,6 +607,11 @@ pub struct Transaction {
     pub settled_at: Option<DateTime<Utc>>,
     pub currency: String,
     pub disbursement_item_id: Option<Uuid>,
+    /// Which of the patient's saved `patient_payment_methods` rows (if any)
+    /// this transaction was paid with — nullable, since a patient may still
+    /// pay ad hoc with no saved method at all, exactly as before this
+    /// feature existed.
+    pub payment_method_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -669,7 +680,63 @@ pub struct DoctorPayoutDestination {
     pub binding_status: String,
     pub verification_status: String,
     pub payout_capable: bool,
+    /// Which `platform_payment_methods` row this was (simulated-)verified
+    /// against — `None` for rows created before this column existed or by
+    /// `create_dev_payout_destination`'s dev-only fixture.
+    pub platform_payment_method_id: Option<Uuid>,
     pub is_primary: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// A patient-saved payment method — the same multi-method/one-default shape
+/// `DoctorPayoutDestination` already proves out, applied to the paying side
+/// instead of the payout side. `provider_reference` is encrypted at rest by
+/// the service layer before insert (same as a doctor's own reference); this
+/// struct only ever holds whatever the column currently contains, exactly
+/// like `DoctorPayoutDestination` does.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct PatientPaymentMethod {
+    pub id: Uuid,
+    pub patient_id: PatientProfileId,
+    pub gateway: Gateway,
+    pub provider_code: String,
+    pub provider_reference: String,
+    pub masked_destination: String,
+    pub binding_status: String,
+    /// Result of `services::payment_provider_verification` at save time —
+    /// never `VERIFIED` until a real provider driver exists.
+    pub verification_status: String,
+    /// Which `platform_payment_methods` row this was (simulated-)verified
+    /// against — nullable only for rows saved before this column existed.
+    pub platform_payment_method_id: Option<Uuid>,
+    pub is_primary: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// The platform's own merchant/collection configuration — distinct from
+/// both of the above: not how a patient pays, nor where a doctor is paid,
+/// but the platform's own identity with its payment provider(s). More than
+/// one may be active at once (e.g. M-Pesa and a card aggregator together),
+/// so "primary" is scoped per `provider_code`, not a single platform-wide
+/// choice. `credentials_encrypted` holds a JSON blob of whatever fields that
+/// provider's real driver will eventually need (paybill number, consumer
+/// key/secret, etc.) — encrypted at rest the same way every other
+/// credential in this codebase is, never returned to any client in
+/// decrypted form.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
+pub struct PlatformPaymentMethod {
+    pub id: Uuid,
+    pub provider_code: String,
+    pub label: String,
+    pub currency: String,
+    pub masked_display: String,
+    #[serde(skip_serializing)]
+    pub credentials_encrypted: String,
+    pub is_primary: bool,
+    pub is_active: bool,
+    pub created_by: UserId,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

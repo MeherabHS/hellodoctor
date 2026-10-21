@@ -5,7 +5,7 @@ use crate::domain::ids::UserId;
 use crate::domain::models::UserRole;
 use crate::error::AppError;
 use crate::rate_limit;
-use crate::repository::{prescription_repo, AppState};
+use crate::repository::{appointment_repo, prescription_repo, AppState};
 use crate::services::{document_storage_service::DocumentStorageService, PrescriptionService};
 use axum::{
     extract::{Path, Query, State},
@@ -63,8 +63,29 @@ pub async fn upload_patient_intake(
 ) -> Result<Response, AppError> {
     abac::authorize(&ctx, Action::UploadPatientIntake)?;
     rate_limit::check_upload_limit(&state.redis, &ctx.user_id.to_string()).await?;
+    // Held for the whole handler: bounds how many of THIS account's own
+    // upload requests can run concurrently, independent of the count-based
+    // limiter above (h03-upload-tx-lock-held-across-semaphore-throttled-sanitize).
+    let _upload_concurrency_guard =
+        rate_limit::acquire_upload_concurrency(&state.redis, &ctx.user_id.to_string(), 2).await?;
 
-    let patient_id = ctx.patient_profile_id(&state).await?;
+    // The appointment itself already pins down which profile (self or a
+    // guardianed dependent) it belongs to — resolved from the appointment
+    // rather than a client-supplied field, so the caller never needs to
+    // re-assert what booking already established. `acting_patient_profile_id`
+    // is the actual authorization: a mismatched appointment's `patient_id`
+    // simply isn't the caller's own or a dependent's, so this 404s.
+    let appointment_patient_id = {
+        let mut lookup_tx = state.begin_authed(&ctx).await?;
+        let appointment = appointment_repo::find_by_id(&mut *lookup_tx, id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+        lookup_tx.commit().await?;
+        appointment.patient_id
+    };
+    let patient_id = ctx
+        .acting_patient_profile_id(&state, Some(appointment_patient_id))
+        .await?;
     if let Some(response) = idempotency.replay(&state, &ctx, Some(id)).await? {
         return Ok(response);
     }
@@ -105,6 +126,8 @@ pub async fn upload_doctor_prescription(
 ) -> Result<Response, AppError> {
     abac::authorize(&ctx, Action::UploadDoctorPrescription)?;
     rate_limit::check_upload_limit(&state.redis, &ctx.user_id.to_string()).await?;
+    let _upload_concurrency_guard =
+        rate_limit::acquire_upload_concurrency(&state.redis, &ctx.user_id.to_string(), 2).await?;
     if payload
         .doctor_notes
         .as_ref()
@@ -198,6 +221,8 @@ struct DocumentGrant {
     current_appointment_id: Uuid,
     appointment_id: Uuid,
     document_id: Uuid,
+    #[serde(default)]
+    session_id: Option<Uuid>,
 }
 
 #[derive(Deserialize)]
@@ -223,11 +248,7 @@ async fn authorized_document(
 ) -> Result<DocumentLocation, AppError> {
     if !matches!(
         ctx.role,
-        UserRole::Doctor
-            | UserRole::Patient
-            | UserRole::ClinicalAdmin
-            | UserRole::Compliance
-            | UserRole::PlatformAdmin
+        UserRole::Doctor | UserRole::Patient | UserRole::Admin
     ) {
         return Err(AppError::Forbidden(
             "This role cannot access clinical documents.".into(),
@@ -309,7 +330,9 @@ pub async fn get_document_download_url(
         current_appointment_id,
         appointment_id,
         document_id,
+        session_id: ctx.session_id,
     };
+    trace_document_access(&state, &ctx, appointment_id, document_id, false).await?;
     let key = format!(
         "document-grant:{}",
         hex::encode(Sha256::digest(token.as_bytes()))
@@ -361,7 +384,11 @@ pub async fn download_document(
         .get()
         .await
         .map_err(|_| AppError::internal("Document access unavailable.".into()))?;
-    let raw: Option<String> = deadpool_redis::redis::cmd("GET")
+    // Atomic get-and-delete: the grant is consumed on its first successful
+    // redemption attempt, never left reusable for the rest of its TTL. A
+    // plain GET here previously let the same token authorize repeated
+    // downloads for up to 300s (h02-document-grant-reusable-not-onetime).
+    let raw: Option<String> = deadpool_redis::redis::cmd("GETDEL")
         .arg(key)
         .query_async(&mut conn)
         .await
@@ -374,9 +401,22 @@ pub async fn download_document(
         user_id: grant.user_id,
         role: grant.role,
         permissions: vec![],
-        session_id: None,
-        request_id: None,
+        session_id: grant.session_id,
+        request_id: Some(crate::api::middleware::request_context::request_id()),
     };
+    // Legacy grants without an authenticated session cannot prove revocation
+    // state. Require a fresh grant rather than silently bypassing this check.
+    if ctx.session_id.is_none() {
+        return Err(AppError::NotFound(
+            "Document access expired or invalid.".into(),
+        ));
+    }
+    if let Some(session) = ctx.session_id {
+        let valid:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE s.id=$1 AND s.user_id=$2 AND s.revoked_at IS NULL AND s.expires_at>clock_timestamp() AND u.is_active AND u.deleted_at IS NULL AND u.role::text=$3)").bind(session).bind(ctx.user_id).bind(ctx.role.as_str()).fetch_one(&state.auth_db).await?;
+        if !valid {
+            return Err(AppError::Forbidden("Document access session ended.".into()));
+        }
+    }
     let location = authorized_document(
         &state,
         &ctx,
@@ -388,6 +428,7 @@ pub async fn download_document(
     let bytes =
         DocumentStorageService::get(&state, &location.key, location.hash.as_deref().unwrap())
             .await?;
+    trace_document_access(&state, &ctx, grant.appointment_id, grant.document_id, true).await?;
     let mime = location
         .mime
         .unwrap_or_else(|| "application/octet-stream".into());
@@ -407,4 +448,52 @@ pub async fn download_document(
         ],
         bytes,
     ))
+}
+
+async fn trace_document_access(
+    state: &AppState,
+    ctx: &AuthContext,
+    appointment: Uuid,
+    document: Uuid,
+    retrieved: bool,
+) -> Result<(), AppError> {
+    use crate::services::consultation_trace::{self, Event};
+    let mut tx = state.begin_authed(ctx).await?;
+    let is_rx: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM prescriptions WHERE id=$1 AND appointment_id=$2)",
+    )
+    .bind(document)
+    .bind(appointment)
+    .fetch_one(&mut *tx)
+    .await?;
+    let event = match (is_rx, retrieved) {
+        (true, true) => "RX_VIEWED",
+        (true, false) => "RX_VIEW_AUTHORIZED",
+        (false, true) => "ATTACHMENT_VIEWED",
+        (false, false) => "ATTACHMENT_VIEW_AUTHORIZED",
+    };
+    consultation_trace::record(
+        &mut tx,
+        appointment,
+        None,
+        Event::accepted(
+            event,
+            Some((if is_rx { "RX" } else { "DOCUMENT" }, document)),
+        ),
+    )
+    .await?;
+    consultation_trace::admin_read(
+        &mut tx,
+        ctx,
+        if is_rx {
+            "ADMIN_RX_VIEWED"
+        } else {
+            "ADMIN_ATTACHMENT_VIEWED"
+        },
+        if is_rx { "RX" } else { "DOCUMENT" },
+        document,
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(())
 }

@@ -8,7 +8,7 @@ edition = "2021"
 tokio = { version = "1.40", features = ["full"] }
 axum = { version = "0.7", features = ["multipart", "ws"] }
 tower = { version = "0.4", features = ["timeout", "load-shed", "limit", "util"] }
-tower-http = { version = "0.5", features = ["cors", "trace", "compression-full", "limit"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-full", "limit", "catch-panic"] }
 
 # Serialization & Validation
 serde = { version = "1.0", features = ["derive"] }
@@ -26,6 +26,11 @@ hmac = "0.12"
 hex = "0.4"
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 base64 = "0.22"
+# Agora AccessToken2's required wire format (zlib-compressed signing payload,
+# see services/agora_token_service.rs). Already present transitively via
+# tower-http's compression-full feature — this just promotes it to a direct,
+# version-pinned dependency rather than introducing new supply-chain surface.
+flate2 = "1.1"
 
 # Image Processing (Upload Security Pipeline)
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
@@ -34,8 +39,7 @@ object_store = { version = "0.14", default-features = false, features = ["aws"] 
 # Database & Migrations
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "bigdecimal", "migrate", "macros", "json"] }
 
-# MFA (admin TOTP) & encryption-at-rest for TOTP secrets
-totp-rs = { version = "5.6", features = ["gen_secret"] }
+# Encryption-at-rest for small secrets (payout/payment identifiers, etc.)
 aes-gcm = "0.10"
 
 # Telemetry
@@ -52,6 +56,7 @@ parking_lot = "0.12"
 async-trait = "0.1"
 deadpool-redis = { version = "0.23.1", features = ["rt_tokio_1"] }
 regex = "1.10"
+reqwest = { version = "0.12", features = ["json"] }
 
 [dev-dependencies]
 tower = { version = "0.4", features = ["util"] }

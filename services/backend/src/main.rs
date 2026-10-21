@@ -1,9 +1,11 @@
 pub mod abac;
+pub mod admission;
 pub mod api;
 pub mod auth_context;
 pub mod config;
 pub mod crypto;
 pub mod domain;
+pub mod email_delivery;
 pub mod error;
 pub mod ip_jail;
 pub mod migration_status;
@@ -28,6 +30,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     telemetry::init_tracing();
 
     let config = AppConfig::from_env();
+    assert!(
+        api::middleware::web_auth::WebAuthGate::new(!config.is_development_or_test()).configured(),
+        "WEB_AUTH_ASSERTION_SECRET must contain at least 32 non-whitespace characters for deployed Admin authentication"
+    );
     tracing::info!("Initializing HelloDoctor Backend Service (v2.4.0)...");
 
     // Superuser connection, used only to run migrations (including creating the

@@ -1,3 +1,4 @@
+use super::consultation_trace::{self, Event};
 use crate::auth_context::AuthContext;
 use crate::domain::ids::{DoctorProfileId, PatientProfileId};
 use crate::domain::models::*;
@@ -22,6 +23,17 @@ pub struct PrescriptionService;
 
 impl PrescriptionService {
     /// Patient multi-prescription upload intake (max 20 photos per appointment)
+    ///
+    /// Deliberately two phases, with NO database transaction held during the
+    /// first: holding a transaction + advisory lock on the shared, small
+    /// Api-role pool across up to 20 sequential, CPU-bound, adversarially-
+    /// compressible image sanitizations previously let a single account
+    /// plausibly exhaust that pool and deny DB access to all ordinary API
+    /// traffic (h03-upload-tx-lock-held-across-semaphore-throttled-sanitize).
+    /// Sanitization now runs with no transaction open at all; the
+    /// authoritative transaction only re-validates and persists already-
+    /// sanitized bytes, so its hold time is bounded by fast DB/storage work,
+    /// not by worst-case compression latency.
     pub async fn upload_patient_intake_documents(
         state: &AppState,
         ctx: &AuthContext,
@@ -29,13 +41,52 @@ impl PrescriptionService {
         patient_id: PatientProfileId,
         files: Vec<(String, Vec<u8>)>, // (mime_type, file_bytes)
     ) -> Result<Vec<PrescriptionIntakeDocument>, AppError> {
+        if files.is_empty() {
+            return Err(AppError::UnprocessableEntity(
+                "Select files for an active appointment.".into(),
+            ));
+        }
+
+        // PHASE A — no transaction held across this block's CPU-bound work.
+        // A short read-only check establishes ownership/state up front (so a
+        // request for someone else's or a cancelled appointment fails fast,
+        // before spending any sanitize-semaphore capacity on it); the
+        // authoritative check happens again under lock in Phase B, since
+        // state can change between the two.
+        {
+            let mut lookup_tx = state.begin_authed(ctx).await?;
+            let appointment = appointment_repo::find_by_id(&mut *lookup_tx, appointment_id)
+                .await?
+                .filter(|appointment| appointment.patient_id == patient_id)
+                .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+            lookup_tx.commit().await?;
+            if appointment.status == AppointmentStatus::Cancelled {
+                return Err(AppError::UnprocessableEntity(
+                    "Select files for an active appointment.".into(),
+                ));
+            }
+        }
+
+        let mut sanitized_files = Vec::new();
+        // Each file is compressed toward its OWN independent 40 KB ceiling —
+        // never a shared budget divided across however many files are in
+        // this request. See UploadSecurityService's own doc comments for the
+        // full reasoning. No DB transaction is open during this loop.
+        for (mime, bytes) in files {
+            let sanitized = UploadSecurityService::sanitize_async(bytes, mime.clone()).await?;
+            sanitized_files.push((mime, sanitized));
+        }
+
+        // PHASE B — short authoritative transaction: lock, re-validate
+        // ownership/state/quota under the lock, persist already-sanitized
+        // bytes, commit. Sanitization never happens inside this block.
         let mut tx = state.begin_authed(ctx).await?;
 
         let appointment = appointment_repo::find_by_id(&mut *tx, appointment_id)
             .await?
             .filter(|appointment| appointment.patient_id == patient_id)
             .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
-        if appointment.status == AppointmentStatus::Cancelled || files.is_empty() {
+        if appointment.status == AppointmentStatus::Cancelled {
             return Err(AppError::UnprocessableEntity(
                 "Select files for an active appointment.".into(),
             ));
@@ -44,13 +95,15 @@ impl PrescriptionService {
         // Serializes concurrent upload calls for the SAME appointment on the
         // count-check-insert sequence below — without this, two concurrent
         // calls could each read a count under the cap and together exceed
-        // it (a real race; see docs/CHECKPOINT.md §10).
+        // it (a real race; see docs/CHECKPOINT.md §10). Taken AFTER
+        // sanitization, not before, so the lock's hold time is bounded by DB
+        // work only.
         appointment_repo::lock_for_document_upload(&mut *tx, appointment_id).await?;
 
         let existing_count =
             prescription_repo::count_intake_documents(&mut *tx, appointment_id).await?;
 
-        if existing_count as usize + files.len() > PATIENT_MAX_IMAGES_PER_CONSULTATION {
+        if existing_count as usize + sanitized_files.len() > PATIENT_MAX_IMAGES_PER_CONSULTATION {
             return Err(AppError::UnprocessableEntity(format!(
                 "Maximum {PATIENT_MAX_IMAGES_PER_CONSULTATION} prescription photos allowed per appointment."
             )));
@@ -58,15 +111,6 @@ impl PrescriptionService {
 
         let mut uploaded: Vec<PrescriptionIntakeDocument> = Vec::new();
         let mut next_page = existing_count as i16;
-        let mut sanitized_files = Vec::new();
-        // Each file is compressed toward its OWN independent 40 KB ceiling —
-        // never a shared budget divided across however many files are in
-        // this request. See UploadSecurityService's own doc comments for the
-        // full reasoning.
-        for (mime, bytes) in files {
-            let sanitized = UploadSecurityService::sanitize_async(bytes, mime.clone()).await?;
-            sanitized_files.push((mime, sanitized));
-        }
         for (mime, sanitized) in sanitized_files {
             next_page += 1;
 
@@ -111,6 +155,13 @@ impl PrescriptionService {
                 }
                 return Err(error.into());
             }
+            consultation_trace::record(
+                &mut tx,
+                appointment_id,
+                None,
+                Event::accepted("ATTACHMENT_UPLOAD_COMPLETED", Some(("DOCUMENT", doc.id))),
+            )
+            .await?;
             uploaded.push(doc);
         }
 
@@ -124,6 +175,11 @@ impl PrescriptionService {
     }
 
     /// Doctor handwritten prescription photo upload
+    ///
+    /// Same two-phase shape as `upload_patient_intake_documents` and for the
+    /// same reason: sanitization (CPU-bound, semaphore-throttled) must not
+    /// happen while a transaction/lock on the shared Api-role pool is open
+    /// (h03-upload-tx-lock-held-across-semaphore-throttled-sanitize).
     pub async fn upload_doctor_prescription_photo(
         state: &AppState,
         ctx: &AuthContext,
@@ -133,6 +189,25 @@ impl PrescriptionService {
         mime_type: Option<String>,
         doctor_notes: Option<String>,
     ) -> Result<Prescription, AppError> {
+        // PHASE A — no transaction held. Mime detection and sanitization are
+        // pure CPU work with no DB dependency.
+        let mime = mime_type.unwrap_or_else(|| {
+            if photo_bytes.starts_with(b"%PDF") {
+                "application/pdf".into()
+            } else if photo_bytes.starts_with(&[0x89, 0x50, 0x4e, 0x47]) {
+                "image/png".into()
+            } else {
+                "image/jpeg".into()
+            }
+        });
+        // Same fixed 40 KB per-image ceiling as the patient side — not a
+        // divided batch budget. The doctor's own 5-page-per-appointment cap
+        // below is unrelated and unchanged.
+        let sanitized = UploadSecurityService::sanitize_async(photo_bytes, mime.clone()).await?;
+        let hash = format!("{:x}", Sha256::digest(&sanitized));
+
+        // PHASE B — short authoritative transaction: ownership, lock,
+        // consultation-window authorization, dedup/count checks, persist.
         let mut tx = state.begin_authed(ctx).await?;
 
         let apt = appointment_repo::find_by_id(&mut *tx, appointment_id)
@@ -155,21 +230,6 @@ impl PrescriptionService {
                 "Prescription access requires an active consultation authorization window.".into(),
             ));
         }
-        let mime = mime_type.unwrap_or_else(|| {
-            if photo_bytes.starts_with(b"%PDF") {
-                "application/pdf".into()
-            } else if photo_bytes.starts_with(&[0x89, 0x50, 0x4e, 0x47]) {
-                "image/png".into()
-            } else {
-                "image/jpeg".into()
-            }
-        });
-        // Same fixed 40 KB per-image ceiling as the patient side — not a
-        // divided batch budget. The doctor's own 5-page-per-appointment cap
-        // below is unrelated and unchanged.
-        let sanitized = UploadSecurityService::sanitize_async(photo_bytes, mime.clone()).await?;
-
-        let hash = format!("{:x}", Sha256::digest(&sanitized));
         if let Some(existing) = sqlx::query_as::<_, Prescription>(
             "SELECT * FROM prescriptions WHERE appointment_id=$1 AND integrity_verification_hash=$2",
         ).bind(appointment_id).bind(&hash).fetch_optional(&mut *tx).await? {
@@ -224,6 +284,13 @@ impl PrescriptionService {
             DocumentStorageService::delete(state, key).await;
             return Err(error.into());
         }
+        consultation_trace::record(
+            &mut tx,
+            appointment_id,
+            None,
+            Event::accepted("RX_CREATED", Some(("PRESCRIPTION", rx_id))),
+        )
+        .await?;
         if let Err(error) = tx.commit().await {
             DocumentStorageService::delete(state, key).await;
             return Err(error.into());

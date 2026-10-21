@@ -35,6 +35,12 @@ pub fn start(state: AppState) {
         loop {
             interval.tick().await;
             let now = Utc::now();
+            if let Err(error) = super::consultation_trace::maintenance(&state).await {
+                tracing::error!(error = ?error, "consultation trace maintenance failed");
+            }
+            if let Err(error) = run_hold_expiry_sweep(&state).await {
+                tracing::error!(error = ?error, "payment-hold expiry sweep failed");
+            }
             if let Err(e) = run_daily_summary_pass(&state, now).await {
                 tracing::error!(error = ?e, "notification scheduler: daily-summary pass failed");
             }
@@ -43,6 +49,42 @@ pub fn start(state: AppState) {
             }
         }
     });
+}
+
+/// Upper bound per transaction. A backlog is drained over successive ticks
+/// rather than in one long transaction that would hold many row locks.
+const HOLD_SWEEP_BATCH: i64 = 100;
+
+/// INV-BOOK-03: expires every abandoned payment hold whose deadline has
+/// passed, independent of whether anyone tries to book the same slot. Safe to
+/// run on several backend instances at once (`FOR UPDATE SKIP LOCKED`) and
+/// idempotent (status compare-and-set), so a crashed or duplicated tick cannot
+/// double-expire or resurrect a hold. Returns the number expired.
+pub async fn run_hold_expiry_sweep(state: &AppState) -> Result<u64, crate::error::AppError> {
+    let ctx = crate::auth_context::AuthContext::system();
+    let mut total = 0u64;
+    // Bounded number of batches per tick so one tick can never run unboundedly.
+    for _ in 0..10 {
+        let mut tx = state
+            .begin_authed_as(&ctx, crate::repository::DbRole::PaymentWorker)
+            .await?;
+        let expired = crate::repository::appointment_repo::expire_due_holds_batch(
+            &mut tx,
+            state.config.payment_reservation_window_secs,
+            HOLD_SWEEP_BATCH,
+        )
+        .await?;
+        tx.commit().await?;
+        total += expired.len() as u64;
+        if (expired.len() as i64) < HOLD_SWEEP_BATCH {
+            break;
+        }
+    }
+    if total > 0 {
+        metrics::counter!("payment_holds_expired_total").increment(total);
+        tracing::info!(expired = total, "expired abandoned payment holds");
+    }
+    Ok(total)
 }
 
 #[derive(Debug, sqlx::FromRow)]

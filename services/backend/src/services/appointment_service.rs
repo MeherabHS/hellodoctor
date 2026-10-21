@@ -1,10 +1,11 @@
+use super::consultation_trace::{self, Event};
 use crate::auth_context::AuthContext;
 use crate::domain::ids::{DoctorProfileId, PatientProfileId};
 use crate::domain::models::*;
 use crate::error::AppError;
 use crate::repository::{
     appointment_repo, chat_repo, consultation_repo, doctor_repo, payment_event_repo,
-    transaction_repo, AppState, DbRole,
+    payment_methods_repo, transaction_repo, AppState, DbRole,
 };
 use bigdecimal::BigDecimal;
 use chrono::Utc;
@@ -38,6 +39,7 @@ impl AppointmentService {
         modality: Modality,
         gateway: Gateway,
         chief_complaint: Option<String>,
+        payment_method_id: Option<Uuid>,
     ) -> Result<AppointmentBookingResult, AppError> {
         if state.config.environment != "development" {
             return Err(AppError::Conflict("Payment collection is not configured. No checkout or confirmed payment was created.".into()));
@@ -53,6 +55,34 @@ impl AppointmentService {
 
         let mut tx = state.begin_authed_as(ctx, DbRole::PaymentWorker).await?;
 
+        // INV-BOOK-02: serialize this Patient's concurrent bookings. Without
+        // it, two bookings for overlapping slots with different Doctors each
+        // hold their own slot lock and then wait on the other's uncommitted
+        // exclusion-constraint tuple - a deadlock PostgreSQL resolves by
+        // aborting one with a 500. Taken first, before any row lock.
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+            .bind(format!("patient-booking:{}", uuid::Uuid::from(patient_id)))
+            .execute(&mut *tx)
+            .await?;
+
+        // Lock order is always appointment -> slot (the payment webhook's
+        // order). Reclaiming due holds *before* locking the slot keeps that
+        // order; the previous lock-slot-then-reclaim order was inverted.
+        // Both reclaims touch only holds whose deadline has already passed,
+        // and are race-safe against a concurrent payment-success webhook (see
+        // appointment_repo::expire_abandoned_hold_for_slot). The second one
+        // frees this Patient's own abandoned checkout with another Doctor,
+        // which would otherwise keep blocking through appt_patient_no_overlap.
+        let window = state.config.payment_reservation_window_secs;
+        appointment_repo::expire_abandoned_hold_for_slot(&mut tx, slot_id, window).await?;
+        appointment_repo::expire_due_holds_overlapping_for_patient(
+            &mut tx,
+            patient_id.into(),
+            slot_id,
+            window,
+        )
+        .await?;
+
         let locked = doctor_repo::try_lock_slot(&mut tx, slot_id, doctor_id).await?;
         if !locked {
             return Err(AppError::Conflict(
@@ -64,6 +94,12 @@ impl AppointmentService {
             Modality::Video => doctor.consultation_fee_video.clone(),
             Modality::Chat => doctor.consultation_fee_chat.clone(),
         };
+
+        if fee <= 0 {
+            return Err(AppError::Conflict(
+                "This consultation modality is not offered by the Doctor.".into(),
+            ));
+        }
 
         // Compute 20% platform fee debarment
         let platform_fee = &fee * BigDecimal::from_str("0.20").unwrap();
@@ -95,7 +131,7 @@ impl AppointmentService {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
-        appointment_repo::insert(&mut *tx, &appointment).await?;
+        appointment_repo::insert_pending_hold(&mut *tx, &appointment, window).await?;
 
         appointment_repo::insert_clinical_intake(
             &mut *tx,
@@ -109,6 +145,24 @@ impl AppointmentService {
             },
         )
         .await?;
+
+        // Re-validated here, not trusted from the handler alone (the same
+        // BOLA-safe discipline every other ownership check in this service
+        // already follows): a saved method must actually belong to this
+        // patient and still be active, or booking fails outright rather
+        // than silently falling back to the raw `gateway` the client sent.
+        if let Some(method_id) = payment_method_id {
+            let method = payment_methods_repo::find_patient_payment_method(&mut *tx, method_id)
+                .await?
+                .ok_or_else(|| {
+                    AppError::NotFound("No saved payment method with that id.".into())
+                })?;
+            if method.patient_id != patient_id || method.binding_status != "ACTIVE" {
+                return Err(AppError::NotFound(
+                    "No saved payment method with that id belongs to this profile.".into(),
+                ));
+            }
+        }
 
         let payment_session_id = Uuid::new_v4();
         let txn_id = Uuid::new_v4();
@@ -129,8 +183,23 @@ impl AppointmentService {
             settled_at: None,
             currency: "KES".into(),
             disbursement_item_id: None,
+            payment_method_id,
         };
         transaction_repo::insert(&mut *tx, &transaction).await?;
+        consultation_trace::record(
+            &mut tx,
+            apt_id,
+            None,
+            Event::accepted("APPOINTMENT_CREATED", Some(("APPOINTMENT", apt_id))),
+        )
+        .await?;
+        consultation_trace::record(
+            &mut tx,
+            apt_id,
+            None,
+            Event::accepted("PAYMENT_INITIATED", Some(("TRANSACTION", txn_id))),
+        )
+        .await?;
 
         tx.commit().await?;
 
@@ -187,9 +256,33 @@ impl AppointmentService {
         gateway_reference: &str,
         provider_event_id: &str,
     ) -> Result<Appointment, AppError> {
+        if gateway_reference.trim().is_empty()
+            || gateway_reference.chars().count() > 100
+            || provider_event_id.trim().is_empty()
+            || provider_event_id.chars().count() > 150
+        {
+            return Err(AppError::Validation(
+                "Invalid payment event identity.".into(),
+            ));
+        }
         let ctx = AuthContext::system();
 
         let mut payment_tx = state.begin_authed_as(&ctx, DbRole::PaymentWorker).await?;
+        let initial_txn =
+            transaction_repo::find_by_payment_session(&mut *payment_tx, payment_session_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Transaction session not found.".into()))?;
+
+        // Completion/expiry take the appointment lock before changing payment
+        // state. Use the same order and re-read after waiting for the lock.
+        sqlx::query("SELECT id FROM appointments WHERE id=$1 FOR UPDATE")
+            .bind(initial_txn.appointment_id)
+            .fetch_one(&mut *payment_tx)
+            .await?;
+        sqlx::query("SELECT id FROM transactions WHERE id=$1 FOR UPDATE")
+            .bind(initial_txn.id)
+            .fetch_one(&mut *payment_tx)
+            .await?;
         let txn = transaction_repo::find_by_payment_session(&mut *payment_tx, payment_session_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Transaction session not found.".into()))?;
@@ -204,6 +297,15 @@ impl AppointmentService {
                 "Payment provider does not match the transaction gateway.".into(),
             ));
         }
+        if txn
+            .gateway_reference
+            .as_deref()
+            .is_some_and(|r| r != gateway_reference)
+        {
+            return Err(AppError::Conflict(
+                "Payment reference does not match the recorded payment.".into(),
+            ));
+        }
 
         let is_new_event = payment_event_repo::try_record_event(
             &mut *payment_tx,
@@ -214,29 +316,78 @@ impl AppointmentService {
         )
         .await?;
 
-        let mut apt = if !is_new_event || txn.payment_status == PaymentStatus::PaymentHeld {
+        if !is_new_event {
+            let owner: Uuid = sqlx::query_scalar("SELECT transaction_id FROM payment_events WHERE gateway=$1 AND provider_event_id=$2")
+                .bind(gateway).bind(provider_event_id).fetch_one(&mut *payment_tx).await?;
+            if owner != txn.id {
+                return Err(AppError::Conflict(
+                    "Provider event belongs to another payment.".into(),
+                ));
+            }
+        }
+        let confirmed_now = if is_new_event {
+            transaction_repo::mark_payment_held(&mut *payment_tx, txn.id, gateway_reference).await?
+        } else {
+            false
+        };
+        let apt = if !confirmed_now {
             appointment_repo::find_by_id(&mut *payment_tx, txn.appointment_id)
                 .await?
                 .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?
         } else {
-            transaction_repo::mark_payment_held(&mut *payment_tx, txn.id, gateway_reference)
-                .await?;
+            consultation_trace::record(
+                &mut payment_tx,
+                txn.appointment_id,
+                None,
+                Event::accepted("PAYMENT_CONFIRMED", Some(("TRANSACTION", txn.id))),
+            )
+            .await?;
 
-            let apt = appointment_repo::find_by_id(&mut *payment_tx, txn.appointment_id)
+            let mut apt = appointment_repo::find_by_id(&mut *payment_tx, txn.appointment_id)
                 .await?
                 .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
 
-            appointment_repo::set_status(&mut *payment_tx, apt.id, AppointmentStatus::Confirmed)
+            // h23 remediation: race-safe against expire_abandoned_hold_for_slot.
+            // If the reservation was already reclaimed (lost the race), do
+            // NOT book the slot — it may already belong to someone else.
+            let confirmed =
+                appointment_repo::confirm_payment_if_pending(&mut *payment_tx, apt.id).await?;
+            if confirmed {
+                doctor_repo::set_slot_status(&mut *payment_tx, apt.slot_id, SlotStatus::Booked)
+                    .await?;
+            } else {
+                consultation_trace::record(
+                    &mut payment_tx,
+                    txn.appointment_id,
+                    None,
+                    Event::rejected(
+                        "PAYMENT_CONFIRMED_AFTER_RESERVATION_EXPIRED",
+                        "Payment succeeded but the booking hold had already expired and the slot was reclaimed; funds captured but not booked \u{2014} requires Finance reconciliation. No refund flow exists yet (no live payment provider is configured).",
+                    ),
+                )
                 .await?;
-            doctor_repo::set_slot_status(&mut *payment_tx, apt.slot_id, SlotStatus::Booked).await?;
+            }
+            if confirmed {
+                apt.status = AppointmentStatus::Confirmed;
+            }
             apt
         };
         payment_tx.commit().await?;
-        apt.status = AppointmentStatus::Confirmed;
+
+        // Funds captured after a reservation expired require reconciliation.
+        // Do not create a consultation for an expired/cancelled obligation.
+        if !matches!(
+            apt.status,
+            AppointmentStatus::Confirmed
+                | AppointmentStatus::InConsultation
+                | AppointmentStatus::Completed
+        ) {
+            return Ok(apt);
+        }
 
         // These existence checks must run under `begin_authed` (not the raw
         // pool) — both tables are FORCE RLS, and `ctx` here is the system
-        // pseudo-identity (PlatformAdmin), which every policy's admin branch
+        // pseudo-identity (Admin), which every policy's admin branch
         // allows through. A raw-pool query would see zero rows unconditionally
         // and every retry would attempt (and fail on the unique constraint) a
         // duplicate insert instead of recognizing the existing row.
@@ -271,6 +422,14 @@ impl AppointmentService {
 
         if !conversation_exists {
             let mut system_tx = state.begin_authed_as(&ctx, DbRole::SystemWorker).await?;
+            sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+                .bind(format!("activate-chat:{}", apt.id))
+                .execute(&mut *system_tx)
+                .await?;
+            let already_active =
+                chat_repo::find_conversation_by_appointment(&mut *system_tx, apt.id)
+                    .await?
+                    .is_some();
             chat_repo::insert_conversation(
                 &mut *system_tx,
                 &ChatConversation {
@@ -284,6 +443,18 @@ impl AppointmentService {
                 },
             )
             .await?;
+            let persisted = chat_repo::find_conversation_by_appointment(&mut *system_tx, apt.id)
+                .await?
+                .ok_or_else(|| AppError::internal("Conversation activation missing".into()))?;
+            if !already_active {
+                consultation_trace::record(
+                    &mut system_tx,
+                    apt.id,
+                    Some(persisted.id),
+                    Event::accepted("CONSULTATION_ACTIVATED", Some(("CHAT", persisted.id))),
+                )
+                .await?;
+            }
             system_tx.commit().await?;
         }
 

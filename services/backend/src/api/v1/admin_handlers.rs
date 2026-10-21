@@ -1,11 +1,12 @@
 use crate::abac::{self, Action};
 use crate::auth_context::AuthContext;
+use crate::crypto;
 use crate::domain::ids::{DoctorProfileId, PatientProfileId, UserId};
 use crate::domain::models::*;
 use crate::error::AppError;
 use crate::repository::{
-    audit_repo, consultation_repo, doctor_repo, grievance_repo, patient_repo, prescription_repo,
-    system_error_repo, transaction_repo, wallet_repo, AppState, DbRole,
+    audit_repo, consultation_repo, doctor_repo, grievance_repo, patient_repo, payment_methods_repo,
+    prescription_repo, system_error_repo, transaction_repo, wallet_repo, AppState, DbRole,
 };
 use crate::services::{AuditLogEntry, AuditService, ConsultationService, DisbursementService};
 use axum::{
@@ -13,6 +14,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use base64::Engine as _;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -317,6 +319,66 @@ pub struct ProfessionalReviewRequest {
     pub note: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RevokeDoctorRequest {
+    pub reason: String,
+}
+
+/// POST /api/v1/admin/doctors/:id/revoke
+///
+/// h22 remediation: the only code path that can ever move a VERIFIED Doctor
+/// out of VERIFIED. Mirrors verify/reject's shape and audit discipline; the
+/// DB trigger (guard_professional_verification) independently re-enforces
+/// VERIFIED->REVOKED as the only allowed transition here, so this handler
+/// cannot be used to reach any other target status even if misused.
+pub async fn revoke_doctor_professional_registration(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<RevokeDoctorRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ManageProfessionalVerification)?;
+    let id = DoctorProfileId::from(id);
+    let reason =
+        crate::domain::validation::validate_text_field(&payload.reason, "Revocation reason", 1000)?;
+    let mut tx = state.begin_authed(&ctx).await?;
+    let doc = doctor_repo::find_by_id(&mut *tx, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Doctor profile not found.".into()))?;
+    if !doctor_repo::revoke_professional_registration(&mut *tx, id, ctx.user_id, &reason).await? {
+        return Err(AppError::Conflict(
+            "Only a currently verified Doctor can be revoked.".into(),
+        ));
+    }
+    crate::services::NotificationService::notify_professional_verification_revoked(
+        &mut *tx,
+        doc.user_id,
+        id.into_inner(),
+    )
+    .await?;
+    AuditService::log_in_tx(
+        &mut *tx,
+        AuditLogEntry::new(
+            Some(ctx.user_id),
+            ctx.role,
+            "DOCTOR_PROFESSIONAL_REVOKE",
+            "DOCTOR_PROFILE",
+            Some(id.into_inner()),
+            "SUCCESS",
+        )
+        .with_reason(Some(reason))
+        .with_before(serde_json::json!({"professional_verification_status": doc.professional_verification_status}))
+        .with_after(serde_json::json!({"professional_verification_status": ProfessionalVerificationStatus::Revoked})),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({"doctor_id": id, "professional_verification_status": ProfessionalVerificationStatus::Revoked, "is_verified": false}),
+    }))
+}
+
 /// GET /api/v1/admin/overview
 pub async fn get_admin_overview(
     State(state): State<AppState>,
@@ -362,11 +424,13 @@ pub async fn get_admin_overview(
     let total_patients = patient_repo::list(&mut *tx).await?.len();
     let unresolved_traces = audit_repo::count_unresolved(&mut *tx).await?;
     let active_users = crate::repository::user_repo::count_active(&mut *tx).await?;
+    let (video_count,chat_count,video_value,chat_value):(i64,i64,BigDecimal,BigDecimal)=sqlx::query_as("SELECT COUNT(*) FILTER(WHERE a.modality='VIDEO'),COUNT(*) FILTER(WHERE a.modality='CHAT'),COALESCE(SUM(a.consultation_fee) FILTER(WHERE a.modality='VIDEO'),0),COALESCE(SUM(a.consultation_fee) FILTER(WHERE a.modality='CHAT'),0) FROM appointments a JOIN doctor_profiles d ON d.id=a.doctor_id WHERE d.deleted_at IS NULL").fetch_one(&mut *tx).await?;
     tx.commit().await?;
 
     Ok(Json(ApiResponse {
         success: true,
         data: serde_json::json!({
+            "modality_split":{"videoCount":video_count,"chatCount":chat_count,"videoRevenue":video_value.to_string(),"chatRevenue":chat_value.to_string()},
             "total_doctors": total_doctors,
             "on_duty_doctors": on_duty_doctors,
             "pending_professional_verification": pending_professional_verification,
@@ -442,6 +506,8 @@ pub async fn list_admin_doctors(
             "is_verified": doc.is_professionally_verified(),
             "professional_verification_status": doc.professional_verification_status,
             "consultations_count": consult_count,
+            "video_count":appts.iter().filter(|a|a.doctor_id==doc.id&&a.modality==Modality::Video).count(),
+            "chat_count":appts.iter().filter(|a|a.doctor_id==doc.id&&a.modality==Modality::Chat).count(),
             "lifetime_gross": wallet.lifetime_gross.to_string(),
             "lifetime_fee_withheld": wallet.lifetime_fee_withheld.to_string(),
             "lifetime_net": wallet.lifetime_net.to_string(),
@@ -1220,6 +1286,9 @@ pub async fn list_admin_patients(
             "weight_kg": p.weight_kg.as_ref().map(|w| w.to_string()),
             "emergency_contact_phone": p.emergency_contact_phone,
             "consultations_count": patient_appts.len(),
+            "video_count":patient_appts.iter().filter(|a|a.modality==Modality::Video).count(),
+            "chat_count":patient_appts.iter().filter(|a|a.modality==Modality::Chat).count(),
+            "consultation_fee_total":patient_appts.iter().fold(BigDecimal::from(0),|sum,a|sum+&a.consultation_fee).to_string(),
             "last_consult_at": last_consult,
             "created_at": p.created_at,
         }));
@@ -1276,6 +1345,68 @@ pub async fn get_patient_dossier(
             "encounters": encounters,
             "vault_records": vault_records,
         }),
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DataRightsExecutionRequest {
+    pub reason: String,
+}
+
+fn validated_data_rights_reason(reason: &str) -> Result<&str, AppError> {
+    let trimmed = reason.trim();
+    if !(8..=300).contains(&trimmed.chars().count()) {
+        return Err(AppError::Validation(
+            "Provide an erasure justification of 8–300 characters.".into(),
+        ));
+    }
+    Ok(trimmed)
+}
+
+/// POST /api/v1/admin/patients/:id/data-rights/erase — Data Protection Act
+/// 2019 (Kenya) §40 erasure. See `data_rights_service` for the hard-delete
+/// vs. anonymize decision and why it is Postgres's FK constraints, not this
+/// handler, that make that call.
+pub async fn execute_patient_data_rights(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(id): Path<Uuid>,
+    Json(body): Json<DataRightsExecutionRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let reason = validated_data_rights_reason(&body.reason)?;
+    let outcome = crate::services::data_rights_service::execute_patient_erasure(
+        &state,
+        &ctx,
+        PatientProfileId::from(id),
+        reason,
+    )
+    .await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({ "outcome": outcome.outcome }),
+    }))
+}
+
+/// POST /api/v1/admin/doctors/:id/data-rights/erase — doctor-side mirror of
+/// `execute_patient_data_rights`.
+pub async fn execute_doctor_data_rights(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(id): Path<Uuid>,
+    Json(body): Json<DataRightsExecutionRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let reason = validated_data_rights_reason(&body.reason)?;
+    let outcome = crate::services::data_rights_service::execute_doctor_erasure(
+        &state,
+        &ctx,
+        DoctorProfileId::from(id),
+        reason,
+    )
+    .await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({ "outcome": outcome.outcome }),
     }))
 }
 
@@ -1820,9 +1951,7 @@ pub async fn list_admin_grievances(
     let mut tx = state.begin_authed(&ctx).await?;
 
     let grievances = grievance_repo::list_all(&mut *tx).await?;
-    // Five whole-table fetches total instead of up to five per-row queries
-    // per grievance (the N+1 that was here before: patient, session,
-    // appointment, doctor, and telemetry lookups all inside the loop).
+    // Batch related evidence; never perform an evidence query per grievance.
     let patient_name_by_id: HashMap<PatientProfileId, String> = patient_repo::list(&mut *tx)
         .await?
         .into_iter()
@@ -1839,10 +1968,10 @@ pub async fn list_admin_grievances(
             .into_iter()
             .map(|a| (a.id, a))
             .collect();
-    let doctor_name_by_id: HashMap<DoctorProfileId, String> = doctor_repo::list(&mut *tx)
+    let doctor_by_id: HashMap<DoctorProfileId, DoctorProfile> = doctor_repo::list(&mut *tx)
         .await?
         .into_iter()
-        .map(|d| (d.id, d.full_name))
+        .map(|d| (d.id, d))
         .collect();
     let telemetry_by_session: HashMap<Uuid, ConsultationTelemetry> =
         consultation_repo::list_all_telemetry(&mut *tx)
@@ -1851,6 +1980,13 @@ pub async fn list_admin_grievances(
             .map(|t| (t.session_id, t))
             .collect();
 
+    let payments: HashMap<Uuid, String> =
+        sqlx::query_as("SELECT DISTINCT ON (appointment_id) appointment_id,payment_status::text FROM transactions ORDER BY appointment_id,(payment_status<>'FAILED') DESC,created_at DESC,id DESC")
+            .fetch_all(&mut *tx)
+            .await?
+            .into_iter()
+            .collect();
+    let decisions: HashMap<Uuid,serde_json::Value> = sqlx::query_as("SELECT DISTINCT ON(grievance_id) grievance_id,jsonb_build_object('action',action_type,'date',adjudicated_at,'admin',adjudicated_by_admin_id,'notes',audit_notes) FROM grievance_adjudications ORDER BY grievance_id,adjudicated_at DESC,id DESC").fetch_all(&mut *tx).await?.into_iter().collect();
     let mut list = Vec::new();
     for g in &grievances {
         let patient_name = patient_name_by_id
@@ -1859,13 +1995,12 @@ pub async fn list_admin_grievances(
             .unwrap_or_else(|| "Patient".into());
 
         let session = session_by_id.get(&g.consultation_id);
-        let doctor_name = session
+        let doctor = session
             .and_then(|s| appt_by_id.get(&s.appointment_id))
-            .and_then(|a| doctor_name_by_id.get(&a.doctor_id))
-            .cloned()
-            .unwrap_or_else(|| "Doctor".into());
+            .and_then(|a| doctor_by_id.get(&a.doctor_id));
 
         let telemetry = telemetry_by_session.get(&g.consultation_id);
+        let appointment = session.and_then(|s| appt_by_id.get(&s.appointment_id));
 
         list.push(serde_json::json!({
             "id": g.id,
@@ -1873,7 +2008,16 @@ pub async fn list_admin_grievances(
             "patient_id": g.patient_id,
             "patient_name": patient_name,
             "consultation_id": g.consultation_id,
-            "doctor_name": doctor_name,
+            "doctor_name": doctor.map(|d|&d.full_name),
+            "doctor_license": doctor.map(|d|&d.license_number),
+            "doctor_specialty": doctor.map(|d|&d.primary_specialty),
+            "doctor_hospital": doctor.map(|d|&d.current_hospital),
+            "payment_status": appointment.and_then(|a|payments.get(&a.id)),
+            "adjudication": decisions.get(&g.id),
+            "doctor_id": appointment.map(|a|a.doctor_id),
+            "appointment_id": appointment.map(|a|a.id),
+            "modality": appointment.map(|a|a.modality),
+            "consultation_fee": appointment.map(|a|&a.consultation_fee),
             "target_type": g.target_type,
             "category": g.category,
             "claim_summary": g.claim_summary,
@@ -1911,5 +2055,162 @@ pub async fn get_consultation_timeline(
     Ok(Json(ApiResponse {
         success: true,
         data,
+    }))
+}
+
+// ---------------------------------------------------------------------
+// The platform's own merchant/collection configuration — "the body
+// waiting for the heart" (the real payment-gateway API key/driver).
+// Distinct from patient_payment_methods (how a patient pays) and
+// doctor_payout_destinations (where a doctor is paid): this is the
+// platform's own identity with its payment provider(s). More than one may
+// be active at once (e.g. M-Pesa and a card aggregator together); see
+// migrations/20261108000002_platform_payment_methods.up.sql.
+// ---------------------------------------------------------------------
+
+fn platform_payment_method_json(m: &PlatformPaymentMethod) -> serde_json::Value {
+    serde_json::json!({
+        "id": m.id, "provider_code": m.provider_code, "label": m.label,
+        "currency": m.currency, "masked_display": m.masked_display,
+        "is_primary": m.is_primary, "is_active": m.is_active,
+        "created_by": m.created_by, "created_at": m.created_at, "updated_at": m.updated_at,
+    })
+}
+
+pub async fn list_platform_payment_methods(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ManagePlatformPaymentMethod)?;
+    let mut tx = state.begin_authed(&ctx).await?;
+    let methods = payment_methods_repo::list_platform_payment_methods(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: methods
+            .iter()
+            .map(platform_payment_method_json)
+            .collect::<Vec<_>>(),
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SavePlatformPaymentMethodRequest {
+    /// E.g. "MPESA_PAYBILL", "MPESA_TILL", "CARD_AGGREGATOR" — not a closed
+    /// Rust enum on purpose ("admin may set mpesa or any kind of payment
+    /// method"): the real provider roster isn't fixed yet, and a new
+    /// provider code needs no migration to add, only a new real driver
+    /// behind it later.
+    pub provider_code: String,
+    pub label: String,
+    /// Admin-authored, not derived — this is what every list/detail view
+    /// shows, and the backend never tries to guess a presentable mask out
+    /// of an arbitrary credentials shape it can't assume the structure of.
+    pub masked_display: String,
+    /// Whatever fields the eventual real driver for this provider_code
+    /// needs (paybill number, consumer key/secret, shortcode, etc.) —
+    /// encrypted as one JSON blob before storage, the same AES-256-GCM
+    /// encryption every other credential in this codebase already uses.
+    /// Never returned to any client in decrypted form.
+    pub credentials: serde_json::Value,
+    #[serde(default)]
+    pub make_primary: Option<bool>,
+}
+
+pub async fn save_platform_payment_method(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Json(payload): Json<SavePlatformPaymentMethodRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ManagePlatformPaymentMethod)?;
+    let provider_code = payload.provider_code.trim().to_uppercase();
+    if provider_code.is_empty() || provider_code.len() > 40 {
+        return Err(AppError::Validation(
+            "provider_code must be 1-40 characters.".into(),
+        ));
+    }
+    if payload.label.trim().is_empty() || payload.label.chars().count() > 80 {
+        return Err(AppError::Validation(
+            "label must be 1-80 characters.".into(),
+        ));
+    }
+    let credentials_text = serde_json::to_string(&payload.credentials)
+        .map_err(|e| AppError::Validation(format!("credentials must be valid JSON: {e}")))?;
+    let encrypted_bytes =
+        crypto::encrypt_secret(&credentials_text, &state.config.totp_encryption_key_b64)?;
+    let credentials_encrypted = base64::engine::general_purpose::STANDARD.encode(encrypted_bytes);
+
+    let mut tx = state.begin_authed(&ctx).await?;
+    let existing = payment_methods_repo::list_platform_payment_methods(&mut *tx).await?;
+    let has_existing_for_provider = existing
+        .iter()
+        .any(|m| m.provider_code == provider_code && m.is_active);
+    let make_primary = payload.make_primary.unwrap_or(!has_existing_for_provider);
+    let method = payment_methods_repo::insert_platform_payment_method(
+        &mut tx,
+        &provider_code,
+        payload.label.trim(),
+        &payload.masked_display,
+        &credentials_encrypted,
+        ctx.user_id,
+        make_primary,
+    )
+    .await?;
+    tx.commit().await?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(ApiResponse {
+            success: true,
+            data: platform_payment_method_json(&method),
+        }),
+    ))
+}
+
+pub async fn set_primary_platform_payment_method(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ManagePlatformPaymentMethod)?;
+    let mut tx = state.begin_authed(&ctx).await?;
+    let method = payment_methods_repo::find_platform_payment_method(&mut *tx, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("No platform payment method with that id.".into()))?;
+    let updated = payment_methods_repo::set_primary_platform_payment_method(
+        &mut tx,
+        id,
+        &method.provider_code,
+    )
+    .await?;
+    if !updated {
+        return Err(AppError::Conflict(
+            "That payment method is not active and cannot be made primary.".into(),
+        ));
+    }
+    tx.commit().await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({ "id": id, "is_primary": true }),
+    }))
+}
+
+pub async fn deactivate_platform_payment_method(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ManagePlatformPaymentMethod)?;
+    let mut tx = state.begin_authed(&ctx).await?;
+    let removed = payment_methods_repo::deactivate_platform_payment_method(&mut *tx, id).await?;
+    if !removed {
+        return Err(AppError::NotFound(
+            "No active platform payment method with that id.".into(),
+        ));
+    }
+    tx.commit().await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({ "id": id, "is_active": false }),
     }))
 }

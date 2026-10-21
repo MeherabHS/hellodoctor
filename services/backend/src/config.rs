@@ -19,6 +19,13 @@ pub struct AppConfig {
     pub db_system_worker_password: String,
     pub db_finance_worker_password: String,
     pub db_pool_max_connections_per_role: u32,
+    /// h23 remediation: how long a `PendingPayment` appointment's
+    /// `LOCKED_IN_PAYMENT` slot hold may sit unpaid before `book_appointment`
+    /// opportunistically reclaims it for the next booker. No product-level
+    /// checkout-abandonment SLA exists yet in the docs this repository ships
+    /// with, so this default is a `PENDING_PRODUCT_DECISION` placeholder,
+    /// not a specified requirement — override via env for real deployments.
+    pub payment_reservation_window_secs: i64,
     /// Controlled admission cap on NEW user activation only (patient
     /// self-registration, admin-created doctor accounts) — existing users'
     /// sessions, bookings, and consultations are never affected once this is
@@ -26,6 +33,7 @@ pub struct AppConfig {
     /// is a config change, not a redesign. See docs/CHECKPOINT.md for the
     /// evidence-gated process for actually raising it in a real deployment.
     pub max_active_users: u32,
+    pub consultation_trace_retention_days: u32,
     /// See `rate_limit::check_global_ip_limit`'s doc comment — default 120
     /// matches docs/AUTH_SECURITY.md §9 and should stay that way in any real
     /// deployment; only load-testing tooling has a reason to raise it.
@@ -65,6 +73,9 @@ pub struct AppConfig {
     /// changing the delivery time is an env var, not a code change. See
     /// `notification_scheduler.rs`.
     pub doctor_daily_summary_time_local: String,
+    pub azure_email_endpoint: Option<String>,
+    pub azure_email_access_key: Option<String>,
+    pub azure_email_sender: Option<String>,
 }
 
 impl AppConfig {
@@ -137,6 +148,16 @@ impl AppConfig {
                 .ok()
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(10),
+            payment_reservation_window_secs: env::var("PAYMENT_RESERVATION_WINDOW_SECS")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(900),
+            consultation_trace_retention_days: env::var("CONSULTATION_TRACE_RETENTION_DAYS")
+                .map(|v| {
+                    v.parse::<u32>()
+                        .expect("Trace retention must be 3 to 5 days")
+                })
+                .unwrap_or(5),
             max_active_users: env::var("MAX_ACTIVE_USERS")
                 .ok()
                 .and_then(|p| p.parse().ok())
@@ -182,6 +203,15 @@ impl AppConfig {
             allowed_origins,
             doctor_daily_summary_time_local: env::var("DOCTOR_DAILY_SUMMARY_TIME_LOCAL")
                 .unwrap_or_else(|_| "07:00".into()),
+            azure_email_endpoint: env::var("AZURE_EMAIL_ENDPOINT")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
+            azure_email_access_key: env::var("AZURE_EMAIL_ACCESS_KEY")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
+            azure_email_sender: env::var("AZURE_EMAIL_SENDER")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
         };
         config
             .validate_public_exposure()
@@ -207,6 +237,9 @@ impl AppConfig {
 
     /// Called before any database/Redis connection; tests also exercise it directly.
     pub fn validate_public_exposure(&self) -> Result<(), &'static str> {
+        if !(3..=5).contains(&self.consultation_trace_retention_days) {
+            return Err("CONSULTATION_TRACE_RETENTION_DAYS must be between 3 and 5");
+        }
         validate_startup_mode(
             Some(&self.environment),
             Some(if self.seed_dev_data { "true" } else { "false" }),

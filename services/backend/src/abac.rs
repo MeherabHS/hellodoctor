@@ -1,8 +1,7 @@
 //! Attribute-Based Access Control.
 //!
-//! Role-level gating lives here, matching `docs/AUTH_SECURITY.md` §3's matrix (extended
-//! to cover every admin route the matrix doesn't name individually, using the same
-//! role-grouping logic — e.g. subsystem diagnostics stays with SECURITY_ADMIN/PLATFORM_ADMIN).
+//! Role-level gating uses the canonical human ADMIN product role. Historical
+//! legacy role values remain parseable but do not grant active capabilities.
 //! Resource-level ownership (a doctor reading only their own wallet, a patient reading
 //! only their own appointment) is NOT expressed here — it is checked in the handler
 //! after the resource is loaded, since it depends on data this function doesn't have.
@@ -22,6 +21,10 @@ pub enum Action {
     BookAppointment,
     UploadPatientIntake,
     SubmitGrievance,
+    SubmitHealthQuestion,
+    PatientRead,
+    PatientManageProfile,
+    ManagePatientPaymentMethod,
 
     CompleteConsultation,
     UploadDoctorPrescription,
@@ -70,6 +73,13 @@ pub enum Action {
     /// as the grievance queue it's built to support investigating. See
     /// docs/CHECKPOINT.md §8.2.
     ViewConsultationTimeline,
+
+    /// The platform's own merchant/collection configuration — distinct from
+    /// `ManagePatientPaymentMethod` (how a patient pays) and `ViewOwnWallet`
+    /// (where a doctor is paid): this is the platform's own identity with
+    /// its payment provider(s). Admin-only, same shape as `SimulateLog`.
+    ManagePlatformPaymentMethod,
+    ExecuteDataRightsAction,
 }
 
 pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
@@ -79,7 +89,15 @@ pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
     let allowed = match action {
         AnyAuthenticated => true,
 
-        BookAppointment | UploadPatientIntake | SubmitGrievance => matches!(ctx.role, Patient),
+        BookAppointment
+        | UploadPatientIntake
+        | SubmitGrievance
+        | SubmitHealthQuestion
+        | PatientRead
+        | PatientManageProfile
+        | ManagePatientPaymentMethod => {
+            matches!(ctx.role, Patient)
+        }
 
         CompleteConsultation | UploadDoctorPrescription | ViewOwnWallet => {
             matches!(ctx.role, Doctor)
@@ -89,58 +107,30 @@ pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
             matches!(ctx.role, Doctor)
         }
 
-        ViewGrievanceQueue | AdjudicateGrievance => {
-            matches!(ctx.role, Compliance | ClinicalAdmin | PlatformAdmin)
-        }
-
-        ViewAdminOverview => ctx.role.is_admin(),
-
-        ManageDoctorCredentialing | ManageProfessionalVerification => {
-            matches!(ctx.role, ClinicalAdmin | PlatformAdmin)
-        }
-
-        ViewDoctorDossier => matches!(
-            ctx.role,
-            ClinicalAdmin | PlatformAdmin | FinanceAdmin | Compliance
-        ),
-
-        ViewLegalAcceptances => matches!(ctx.role, Compliance | PlatformAdmin | ClinicalAdmin),
-
-        InitiateDisbursement | ViewFinanceSummary => {
-            matches!(ctx.role, FinanceAdmin | PlatformAdmin)
-        }
-
-        ViewTransactions => matches!(ctx.role, FinanceAdmin | PlatformAdmin | Compliance),
-
-        ViewCommandTelemetry => matches!(ctx.role, PlatformAdmin | SecurityAdmin | Support),
-
-        ManageSlots => matches!(ctx.role, PlatformAdmin | Support),
-
-        ViewPatientDirectory | ViewPatientDossier => {
-            matches!(
-                ctx.role,
-                Compliance | PlatformAdmin | ClinicalAdmin | Support
-            )
-        }
-
-        ViewComplianceAlerts => matches!(ctx.role, Compliance | PlatformAdmin | SecurityAdmin),
-        InvestigateIdentity => matches!(ctx.role, Compliance | PlatformAdmin),
-
-        // Narrowed to the single designated "Super Admin" authority —
-        // SECURITY_ADMIN — matching the RLS policy tightened in
-        // migrations/20261004000003_admin_audit_snapshots (see that
-        // migration's own comment for why this role was chosen and why it's
-        // a deliberately reversible judgment call). `SimulateLog` (a test/
-        // demo utility that only ever inserts a row, never reads the trail)
-        // deliberately keeps the wider PLATFORM_ADMIN access it already had.
-        ViewLogs => matches!(ctx.role, SecurityAdmin),
-        SimulateLog => matches!(ctx.role, SecurityAdmin | PlatformAdmin),
-
-        ViewSystemErrors | AcknowledgeSystemError | ResolveSystemError => {
-            matches!(ctx.role, SecurityAdmin | PlatformAdmin)
-        }
-
-        ViewConsultationTimeline => matches!(ctx.role, Compliance | ClinicalAdmin | PlatformAdmin),
+        ViewGrievanceQueue
+        | AdjudicateGrievance
+        | ViewAdminOverview
+        | ManageDoctorCredentialing
+        | ManageProfessionalVerification
+        | ViewDoctorDossier
+        | ViewLegalAcceptances
+        | InitiateDisbursement
+        | ViewFinanceSummary
+        | ViewTransactions
+        | ViewCommandTelemetry
+        | ManageSlots
+        | ViewPatientDirectory
+        | ViewPatientDossier
+        | ViewComplianceAlerts
+        | InvestigateIdentity
+        | ViewLogs
+        | SimulateLog
+        | ViewSystemErrors
+        | AcknowledgeSystemError
+        | ResolveSystemError
+        | ViewConsultationTimeline
+        | ManagePlatformPaymentMethod
+        | ExecuteDataRightsAction => matches!(ctx.role, Admin),
     };
 
     if allowed {

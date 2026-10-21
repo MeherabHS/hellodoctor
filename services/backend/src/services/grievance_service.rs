@@ -1,3 +1,4 @@
+use super::consultation_trace::{self, Event};
 use crate::auth_context::AuthContext;
 use crate::domain::ids::{PatientProfileId, UserId};
 use crate::domain::models::*;
@@ -26,9 +27,13 @@ impl GrievanceService {
     ) -> Result<GrievanceReport, AppError> {
         let mut tx = state.begin_authed(ctx).await?;
 
-        consultation_repo::find_by_id(&mut *tx, consultation_id)
+        let session = consultation_repo::find_by_id(&mut *tx, consultation_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Consultation session not found.".into()))?;
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+            .bind(format!("consultation-trace:{}", session.appointment_id))
+            .execute(&mut *tx)
+            .await?;
 
         let grv_id = Uuid::new_v4();
 
@@ -48,6 +53,18 @@ impl GrievanceService {
         };
 
         report.grievance_number = grievance_repo::insert(&mut *tx, &report).await?;
+        let appointment: Uuid =
+            sqlx::query_scalar("SELECT appointment_id FROM consultation_sessions WHERE id=$1")
+                .bind(consultation_id)
+                .fetch_one(&mut *tx)
+                .await?;
+        consultation_trace::record(
+            &mut tx,
+            appointment,
+            None,
+            Event::accepted("GRIEVANCE_CREATED", Some(("GRIEVANCE", grv_id))),
+        )
+        .await?;
         tx.commit().await?;
         Ok(report)
     }

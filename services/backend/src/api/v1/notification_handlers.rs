@@ -26,6 +26,10 @@ pub struct ApiResponse<T> {
 pub struct PageQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
+    pub after_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub after_id: Option<Uuid>,
+    pub before_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub before_id: Option<Uuid>,
 }
 
 /// GET /api/v1/notifications
@@ -35,9 +39,23 @@ pub async fn list_own_notifications(
     Query(q): Query<PageQuery>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::AnyAuthenticated)?;
-    let items =
+    let cursor = match (q.after_time, q.after_id, q.before_time, q.before_id) {
+        (Some(time), Some(id), None, None) => Some((time, id, false)),
+        (None, None, Some(time), Some(id)) => Some((time, id, true)),
+        (None, None, None, None) => None,
+        _ => {
+            return Err(AppError::Validation(
+                "Use one complete notification cursor.".into(),
+            ))
+        }
+    };
+    let items = if let Some((time, id, before)) = cursor {
+        NotificationService::list_cursor(&state, &ctx, q.limit.unwrap_or(25), time, id, before)
+            .await?
+    } else {
         NotificationService::list_own(&state, &ctx, q.limit.unwrap_or(25), q.offset.unwrap_or(0))
-            .await?;
+            .await?
+    };
     Ok(Json(ApiResponse {
         success: true,
         data: items,

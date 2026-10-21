@@ -117,13 +117,16 @@ fn normalize(p: &ClientErrorRequest, user: Uuid) -> Result<ErrorEvent, &'static 
     }
     let (subsystem, component) = match p.client.as_str() {
         "DOCTOR_FLUTTER" => ("DOCTOR_FLUTTER", "FlutterExceptionBoundary"),
+        "PATIENT_FLUTTER" => ("PATIENT_FLUTTER", "FlutterExceptionBoundary"),
         "DOCTOR_WEB" => ("DOCTOR_WEB", "DoctorWebRuntime"),
+        "ADMIN_WEB" => ("ADMIN_WEB", "AdminWebRuntime"),
         _ => return Err("Unsupported client."),
     };
     if !VERSION.is_match(&p.app_version)
         || p.build_number.is_empty()
         || !(p.build_number.bytes().all(|c| c.is_ascii_digit())
-            || (p.client == "DOCTOR_WEB" && WEB_BUILD.is_match(&p.build_number)))
+            || (matches!(p.client.as_str(), "DOCTOR_WEB" | "ADMIN_WEB")
+                && WEB_BUILD.is_match(&p.build_number)))
         || !["android", "ios", "web", "windows", "macos", "linux"].contains(&p.platform.as_str())
     {
         return Err("Invalid release metadata.");
@@ -170,7 +173,7 @@ fn normalize(p: &ClientErrorRequest, user: Uuid) -> Result<ErrorEvent, &'static 
             "CLIENT_EXCEPTION"
         },
         format!("Unexpected client exception ({kind}); arbitrary message omitted for privacy."),
-        Uuid::new_v4().to_string(),
+        crate::api::middleware::request_context::request_id(),
     )
     .with_user(user)
     .with_endpoint("/api/v1/client-errors");
@@ -204,8 +207,16 @@ pub async fn submit_client_error(
         "error": {"code": "CLIENT_INCIDENT_REJECTED", "message": message}})),
         )
     };
-    if ctx.role != UserRole::Doctor {
-        return fail(StatusCode::FORBIDDEN, "Doctor session required.");
+    if !matches!(
+        (ctx.role, payload.client.as_str()),
+        (UserRole::Doctor, "DOCTOR_WEB" | "DOCTOR_FLUTTER")
+            | (UserRole::Patient, "PATIENT_FLUTTER")
+            | (UserRole::Admin, "ADMIN_WEB")
+    ) {
+        return fail(
+            StatusCode::FORBIDDEN,
+            "Patient, Doctor, or Admin session required.",
+        );
     }
     let event = match normalize(&payload, ctx.user_id.into()) {
         Ok(event) => event,

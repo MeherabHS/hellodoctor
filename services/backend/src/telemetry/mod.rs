@@ -92,6 +92,23 @@ pub async fn metrics_endpoint(
     handle.render()
 }
 
+/// HTTP permits extension methods; never retain their caller-controlled text as
+/// a metric label, even for requests rejected by routing or admission.
+fn method_label(method: &axum::http::Method) -> &'static str {
+    match method.as_str() {
+        "GET" => "GET",
+        "HEAD" => "HEAD",
+        "POST" => "POST",
+        "PUT" => "PUT",
+        "DELETE" => "DELETE",
+        "CONNECT" => "CONNECT",
+        "OPTIONS" => "OPTIONS",
+        "TRACE" => "TRACE",
+        "PATCH" => "PATCH",
+        _ => "OTHER",
+    }
+}
+
 /// Request-count and latency instrumentation middleware.
 pub async fn track_metrics(req: Request<axum::body::Body>, next: Next) -> impl IntoResponse {
     let start = Instant::now();
@@ -99,8 +116,8 @@ pub async fn track_metrics(req: Request<axum::body::Body>, next: Next) -> impl I
         .extensions()
         .get::<MatchedPath>()
         .map(|p| p.as_str().to_owned())
-        .unwrap_or_else(|| req.uri().path().to_owned());
-    let method = req.method().clone();
+        .unwrap_or_else(|| "__unmatched".to_owned());
+    let method = method_label(req.method());
 
     let response = next.run(req).await;
 
@@ -108,7 +125,7 @@ pub async fn track_metrics(req: Request<axum::body::Body>, next: Next) -> impl I
     let status = response.status().as_u16().to_string();
 
     let labels = [
-        ("method", method.to_string()),
+        ("method", method.to_owned()),
         ("path", path),
         ("status", status),
     ];
@@ -117,4 +134,26 @@ pub async fn track_metrics(req: Request<axum::body::Body>, next: Next) -> impl I
     metrics::histogram!("http_request_duration_seconds", &labels).record(latency);
 
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::method_label;
+    use axum::http::Method;
+
+    #[test]
+    fn method_labels_have_a_fixed_vocabulary() {
+        for name in [
+            "GET", "HEAD", "POST", "PUT", "DELETE", "CONNECT", "OPTIONS", "TRACE", "PATCH",
+        ] {
+            assert_eq!(
+                method_label(&Method::from_bytes(name.as_bytes()).unwrap()),
+                name
+            );
+        }
+        for number in 0..1_000 {
+            let method = Method::from_bytes(format!("SYNTHETIC{number}").as_bytes()).unwrap();
+            assert_eq!(method_label(&method), "OTHER");
+        }
+    }
 }

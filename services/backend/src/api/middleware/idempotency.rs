@@ -75,11 +75,32 @@ impl Idempotency {
             .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
         match ctx.role {
             UserRole::Patient => {
-                let patient =
-                    crate::repository::patient_repo::find_by_user_id(&mut *tx, ctx.user_id)
-                        .await?
-                        .ok_or_else(|| AppError::NotFound("Patient profile not found.".into()))?;
-                if appointment.patient_id != patient.id {
+                // `appointment.patient_id` may be a dependent profile the
+                // caller guardians rather than their own self profile — same
+                // one-level-up resolution as
+                // `ConsultationService::mint_agora_token`/
+                // `record_telemetry_events`. Without this, retrying an
+                // idempotent booking/upload call for a dependent would be
+                // wrongly rejected as "Appointment not found."
+                let owns_appointment = match crate::repository::patient_repo::find_by_id(
+                    &mut *tx,
+                    appointment.patient_id,
+                )
+                .await?
+                {
+                    Some(p) if p.user_id == Some(ctx.user_id) => true,
+                    Some(p) => match p.guardian_patient_id {
+                        Some(guardian_id) => {
+                            crate::repository::patient_repo::find_by_id(&mut *tx, guardian_id)
+                                .await?
+                                .map(|g| g.user_id == Some(ctx.user_id))
+                                .unwrap_or(false)
+                        }
+                        None => false,
+                    },
+                    None => false,
+                };
+                if !owns_appointment {
                     return Err(AppError::NotFound("Appointment not found.".into()));
                 }
                 if expected_appointment.is_some()
