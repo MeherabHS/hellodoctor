@@ -35,7 +35,8 @@ class StubDoctorRepository extends DoctorRepository {
   }
 
   @override
-  Future<List<SlotDto>> slots({int limit = 25, int offset = 0}) async =>
+  Future<List<SlotDto>> slots(
+          {int limit = 25, int offset = 0, DateTime? day}) async =>
       slotResponse == null
           ? [SlotDto(id: 's1', status: slotStatus)]
           : await slotResponse!.future;

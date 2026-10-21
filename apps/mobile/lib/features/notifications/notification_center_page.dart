@@ -1,3 +1,5 @@
+import '../doctor/doctor_cubit.dart';
+import '../doctor/doctor_pages.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app.dart';
@@ -44,7 +46,22 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
     // recognized navigation target is the Schedule tab, for an appointment-
     // related notification (e.g. a reminder). Anything else is left as a
     // read-only inbox entry; there is nowhere else to invent a destination.
-    if (n.relatedEntityType == 'APPOINTMENT') {
+    if (n.relatedEntityType == 'CHAT' && n.relatedEntityId != null) {
+      try {
+        final chats = await context.read<DoctorCubit>().repo.allChats();
+        final found = chats.where((c) => c.id == n.relatedEntityId).firstOrNull;
+        if (found != null && mounted) {
+          await Navigator.push(context,
+              MaterialPageRoute(builder: (_) => ChatThreadPage(chat: found)));
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content:
+                  Text('Unable to open this conversation. Please retry.')));
+        }
+      }
+    } else if (n.relatedEntityType == 'APPOINTMENT') {
       Navigator.of(context).popUntil((r) => r.isFirst);
       DoctorShell.switchTab(context, 3);
     }
@@ -97,6 +114,14 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
                                       InlineError(
                                           'Notifications could not be refreshed. Please retry.',
                                           onRetry: cubit.refresh),
+                                    if (s.hasOlder)
+                                      TextButton(
+                                          onPressed: s.loadingOlder
+                                              ? null
+                                              : cubit.loadOlder,
+                                          child: Text(s.loadingOlder
+                                              ? 'Loading earlier notifications...'
+                                              : 'Load earlier notifications')),
                                     if (items.isEmpty)
                                       const Padding(
                                           padding: EdgeInsets.all(32),

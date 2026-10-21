@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hellodoctor_mobile/core/network/api_client.dart';
+import 'package:hellodoctor_mobile/core/time/kenya_time.dart';
 import 'package:hellodoctor_mobile/core/widgets/doctor_widgets.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_cubit.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_models.dart';
@@ -67,7 +68,8 @@ class _StubScheduleRepository extends DoctorRepository {
   Future<List<AppointmentDto>> queue({int limit = 25, int offset = 0}) async =>
       [];
   @override
-  Future<List<SlotDto>> slots({int limit = 25, int offset = 0}) async =>
+  Future<List<SlotDto>> slots(
+          {int limit = 25, int offset = 0, DateTime? day}) async =>
       offset == 0 ? _slots : [];
   @override
   Future<List<ChatDto>> chats({int limit = 25, int offset = 0}) async => [];
@@ -98,6 +100,19 @@ class _StubScheduleRepository extends DoctorRepository {
 }
 
 void main() {
+  testWidgets('Doctor home compose shortcut opens the existing article editor',
+      (tester) async {
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    await tester.pumpWidget(harness(const QueuePage(), const DoctorState()));
+    expect(find.byTooltip('Write an article'), findsOneWidget);
+    await tester.tap(find.byTooltip('Write an article'));
+    await tester.pumpAndSettle();
+    expect(
+        find.descendant(
+            of: find.byType(AppBar), matching: find.text('Article')),
+        findsOneWidget);
+    expect(find.byType(TextFormField), findsAtLeastNWidgets(3));
+  });
   testWidgets('status chip and card render prototype primitives',
       (tester) async {
     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
@@ -141,11 +156,14 @@ void main() {
       'id': 'a',
       'patient_id': 'p',
       'patient_display_name': 'Server patient',
-      'status': 'UPCOMING',
-      'doctor_lifecycle': 'UPCOMING'
+      'status': 'CONFIRMED',
+      'queue_actionable': true,
+      'doctor_lifecycle': 'CONFIRMED'
     });
     await tester.pumpWidget(
         harness(const QueuePage(), DoctorState(queue: [appointment])));
+    expect(find.text('Consultation History'), findsOneWidget);
+    await tester.pump();
     expect(find.text('Server patient'), findsOneWidget);
     expect(find.text('Scheduled'), findsOneWidget);
   });
@@ -169,7 +187,10 @@ void main() {
       'id': 'a',
       'patient_id': 'p',
       'patient_display_name': 'Mohammad Abdur Rahman Chowdhury',
-      'status': 'UPCOMING',
+      'status': 'CONFIRMED',
+      'queue_actionable': true,
+      'modality': 'VIDEO',
+      'conversation_id': 'shared-conversation',
       'doctor_lifecycle': 'UPCOMING',
       'chief_complaint':
           'Severe abdominal pain with recurring fever since yesterday',
@@ -180,9 +201,16 @@ void main() {
           harness(const QueuePage(), DoctorState(queue: [appointment])));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull, reason: 'width=$width');
-      expect(find.text('Call Patient'), findsOneWidget, reason: 'width=$width');
-      expect(find.text('Chat'), findsOneWidget, reason: 'width=$width');
-      expect(find.text('Write Rx'), findsOneWidget, reason: 'width=$width');
+      expect(find.text('Consultation History'), findsOneWidget);
+      await tester.pump();
+      expect(find.text('Start video consultation'), findsOneWidget,
+          reason: 'width=$width');
+      expect(find.text('Follow-up messages'), findsOneWidget,
+          reason: 'width=$width');
+      expect(find.text('Write prescription'), findsOneWidget,
+          reason: 'width=$width');
+      expect(find.text('Start chat consultation'), findsNothing,
+          reason: 'width=$width');
     }
     await tester.binding.setSurfaceSize(null);
   });
@@ -211,7 +239,8 @@ void main() {
       'id': 'a-booked',
       'patient_id': 'p1',
       'patient_display_name': 'Mohammad Abdur Rahman Chowdhury',
-      'status': 'BOOKED',
+      'status': 'CONFIRMED',
+      'modality': 'VIDEO',
       'doctor_lifecycle': 'BOOKED',
     });
 
@@ -231,7 +260,10 @@ void main() {
       expect(find.textContaining('Mohammad Abdur Rahman Chowdhury'),
           findsOneWidget,
           reason: 'width=$width');
-      expect(find.text('Call Patient'), findsOneWidget, reason: 'width=$width');
+      expect(find.text('Start video consultation'), findsOneWidget,
+          reason: 'width=$width');
+      expect(find.text('Start chat consultation'), findsNothing,
+          reason: 'width=$width');
       expect(find.text('Cancel Slot ✕'), findsOneWidget,
           reason: 'width=$width');
     }
@@ -241,8 +273,8 @@ void main() {
   testWidgets('blocked Web slots do not become mobile patient bookings',
       (tester) async {
     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day, 23);
+    final now = kenyaTime(DateTime.now());
+    final start = kenyaWallTime(now.year, now.month, now.day, 23, 0);
     final blocked = SlotDto.fromJson({
       'id': 'blocked-web-slot',
       'status': 'BLOCKED',
@@ -507,8 +539,8 @@ void main() {
   testWidgets('BLOCKED slot shows only Unblock, never Cancel or Block',
       (tester) async {
     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day, 23);
+    final now = kenyaTime(DateTime.now());
+    final start = kenyaWallTime(now.year, now.month, now.day, 23, 0);
     final blocked = SlotDto(
         id: 's-blocked',
         status: 'BLOCKED',
@@ -526,8 +558,8 @@ void main() {
       'tapping Block on an available slot calls the repository and updates '
       'the displayed status', (tester) async {
     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day, 23);
+    final now = kenyaTime(DateTime.now());
+    final start = kenyaWallTime(now.year, now.month, now.day, 23, 0);
     final available = SlotDto(
         id: 's-open',
         status: 'AVAILABLE',

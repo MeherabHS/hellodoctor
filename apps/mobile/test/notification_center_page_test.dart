@@ -95,7 +95,10 @@ void main() {
         (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      final cubit = NotificationCubit(entry.value);
+      // Freeze only the displayed refresh time. The original golden images
+      // contain 14:45; wall-clock time made their exact pixel checks flaky.
+      final cubit = NotificationCubit(entry.value,
+          now: () => DateTime(2026, 10, 5, 14, 45));
       addTearDown(cubit.close);
       await tester.pumpWidget(harness(cubit));
       await tester.pump(const Duration(milliseconds: 200));

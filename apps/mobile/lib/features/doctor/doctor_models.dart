@@ -19,7 +19,28 @@ class AppointmentDto {
       this.historyUntil,
       this.historyActive,
       this.complaint,
-      this.completedAt});
+      this.completedAt,
+      this.conversationId,
+      this.chatExpiresAt,
+      this.chatLocked,
+      this.queueActionable = true});
+  final bool queueActionable;
+  bool get isQueueActionable =>
+      queueActionable &&
+      const ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].contains(status);
+  final String? conversationId;
+  final DateTime? chatExpiresAt;
+  final bool? chatLocked;
+  bool get chatClosed =>
+      chatLocked == true || (chatExpiresAt?.isBefore(DateTime.now()) ?? false);
+  bool get isChat => modality == 'CHAT';
+  bool get canStart =>
+      const ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].contains(status) &&
+      !(modality == 'VIDEO' && status == 'WAITING') &&
+      const ['CHAT', 'VIDEO'].contains(modality) &&
+      !(isChat && chatClosed);
+  String get startLabel =>
+      isChat ? 'Start chat consultation' : 'Start video consultation';
   final String id, status, lifecycle;
   final String? number,
       patientId,
@@ -43,7 +64,11 @@ class AppointmentDto {
       historyUntil: DateTime.tryParse(textOf(j['history_access_until'])),
       historyActive: j['history_access_active'] as bool?,
       complaint: optionalText(j['chief_complaint'] ?? j['clinical_outcome']),
-      completedAt: optionalText(j['completed_at']));
+      completedAt: optionalText(j['completed_at']),
+      conversationId: optionalText(j['conversation_id']),
+      chatExpiresAt: DateTime.tryParse(textOf(j['chat_expires_at'])),
+      chatLocked: j['chat_locked'] as bool?,
+      queueActionable: j['queue_actionable'] == true);
 }
 
 class SlotDto {
@@ -54,13 +79,16 @@ class SlotDto {
       this.end,
       this.appointmentId,
       this.patientId,
-      this.patientName});
+      this.patientName,
+      this.bookable = true});
   final String id, status;
+  final bool bookable;
   final DateTime? start, end;
   final String? appointmentId, patientId, patientName;
   factory SlotDto.fromJson(Json j) => SlotDto(
       id: textOf(j['id']),
       status: textOf(j['status']),
+      bookable: j['bookable'] == true,
       start: DateTime.tryParse(textOf(j['start_time'])),
       end: DateTime.tryParse(textOf(j['end_time'])),
       appointmentId: optionalText(j['appointment_id']),
@@ -76,9 +104,22 @@ class ChatDto {
       this.patientName,
       this.lastMessageAt,
       this.expiresAt,
-      this.locked});
+      this.locked,
+      this.modality,
+      this.appointmentStatus});
   final String id;
   final String? appointmentId, patientId, patientName, lastMessageAt, expiresAt;
+  final String? modality, appointmentStatus;
+  bool get isClosed =>
+      locked == true ||
+      (DateTime.tryParse(expiresAt ?? '')?.isBefore(DateTime.now()) ?? false) ||
+      const ['CANCELLED', 'REFUNDED', 'NO_SHOW', 'PENDING_PAYMENT']
+          .contains(appointmentStatus);
+  String get actionLabel => isClosed
+      ? 'View consultation history'
+      : modality == 'CHAT' && lastMessageAt == null
+          ? 'Start chat consultation'
+          : 'Open chat';
   final bool? locked;
   factory ChatDto.fromJson(Json j) => ChatDto(
       id: textOf(j['id']),
@@ -87,7 +128,9 @@ class ChatDto {
       patientName: optionalText(j['patient_display_name']),
       lastMessageAt: optionalText(j['last_message_at']),
       expiresAt: optionalText(j['expires_at']),
-      locked: j['is_locked'] as bool?);
+      locked: j['is_locked'] as bool?,
+      modality: optionalText(j['modality']),
+      appointmentStatus: optionalText(j['appointment_status']));
 }
 
 class MessageDto {
@@ -96,15 +139,18 @@ class MessageDto {
       required this.content,
       required this.sentAt,
       this.senderId,
-      this.attachmentId});
+      this.attachmentId,
+      this.attachmentSize});
   final String id, content, sentAt;
   final String? senderId, attachmentId;
+  final int? attachmentSize;
   factory MessageDto.fromJson(Json j) => MessageDto(
       id: textOf(j['id']),
       content: textOf(j['content']),
       sentAt: textOf(j['sent_at']),
       senderId: optionalText(j['sender_id']),
-      attachmentId: optionalText(j['attachment_id']));
+      attachmentId: optionalText(j['attachment_id']),
+      attachmentSize: (j['attachment'] as Map?)?['size_bytes'] as int?);
 }
 
 class QnaDto {
@@ -207,4 +253,9 @@ class ProfileDto {
           .map((e) => e.toString())
           .toList(),
       userId: optionalText(j['user_id']));
+}
+
+int compareMessageInstants(String left, String right) {
+  final a = DateTime.tryParse(left), b = DateTime.tryParse(right);
+  return a != null && b != null ? a.compareTo(b) : left.compareTo(right);
 }
