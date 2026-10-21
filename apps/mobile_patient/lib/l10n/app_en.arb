@@ -1,0 +1,1685 @@
+{
+  "@@locale": "en",
+  "appTitle": "HelloDoctor",
+  "@appTitle": {
+    "description": "Application title shown in the OS task switcher and app launcher."
+  },
+  "loadingNetwork": "Loading HelloDoctor Health Network...",
+  "@loadingNetwork": {
+    "description": "Skeleton loading state status line (prototype view-14)."
+  },
+  "authSignInSubtitle": "Sign in with your phone number",
+  "@authSignInSubtitle": {
+    "description": "Phone entry screen subtitle."
+  },
+  "authPhoneNumberLabel": "Phone number",
+  "@authPhoneNumberLabel": {
+    "description": "Phone number field label."
+  },
+  "authPhoneNumberHint": "07XX XXX XXX",
+  "@authPhoneNumberHint": {
+    "description": "Phone number field placeholder format hint."
+  },
+  "authSendCodeButton": "Send verification code",
+  "@authSendCodeButton": {
+    "description": "Phone entry screen submit button."
+  },
+  "authEnterCodeTitle": "Enter verification code",
+  "@authEnterCodeTitle": {
+    "description": "OTP verify screen title."
+  },
+  "authCodeSentTo": "We sent a 6-digit code to {phoneNumber}.",
+  "@authCodeSentTo": {
+    "description": "OTP verify screen subtitle once the code was sent.",
+    "placeholders": {
+      "phoneNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "authEnterSixDigitCode": "Enter the 6-digit code.",
+  "@authEnterSixDigitCode": {
+    "description": "OTP verify screen subtitle before any send is recorded."
+  },
+  "authDevOnlyCode": "DEV ONLY — code: {code}",
+  "@authDevOnlyCode": {
+    "description": "Development-only OTP code reveal banner.",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "authVerificationCodeLabel": "Verification code",
+  "@authVerificationCodeLabel": {
+    "description": "OTP code field label."
+  },
+  "authVerifyButton": "Verify",
+  "@authVerifyButton": {
+    "description": "OTP verify screen submit button."
+  },
+  "authResendCodeIn": "Resend code in {seconds}s",
+  "@authResendCodeIn": {
+    "description": "Resend-code button label while the countdown is active.",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "authResendCode": "Resend code",
+  "@authResendCode": {
+    "description": "Resend-code button label once the countdown has elapsed."
+  },
+  "authProfileCompletionTitle": "Tell us about you",
+  "@authProfileCompletionTitle": {
+    "description": "Profile completion screen title."
+  },
+  "authProfileCompletionSubtitle": "A few details so your doctors and records are accurately yours.",
+  "@authProfileCompletionSubtitle": {
+    "description": "Profile completion screen subtitle."
+  },
+  "authFullNameLabel": "Full name",
+  "@authFullNameLabel": {
+    "description": "Full name field label."
+  },
+  "authDateOfBirthLabel": "Date of birth",
+  "@authDateOfBirthLabel": {
+    "description": "Date of birth field label."
+  },
+  "authGenderLabel": "Gender",
+  "@authGenderLabel": {
+    "description": "Gender field label."
+  },
+  "genderMale": "Male",
+  "@genderMale": {
+    "description": "Gender option: male."
+  },
+  "genderFemale": "Female",
+  "@genderFemale": {
+    "description": "Gender option: female."
+  },
+  "genderOther": "Other",
+  "@genderOther": {
+    "description": "Gender option: other."
+  },
+  "authEnterFullName": "Enter your full name.",
+  "@authEnterFullName": {
+    "description": "Profile completion validation error."
+  },
+  "authSelectDateOfBirth": "Select your date of birth.",
+  "@authSelectDateOfBirth": {
+    "description": "Profile completion validation error."
+  },
+  "authUnableToSaveProfile": "Unable to save your profile.",
+  "@authUnableToSaveProfile": {
+    "description": "Profile completion generic save failure."
+  },
+  "continueButton": "Continue",
+  "@continueButton": {
+    "description": "Generic Continue button label."
+  },
+  "retryButton": "Retry",
+  "@retryButton": {
+    "description": "Generic retry button label used by ErrorPanel/InlineError."
+  },
+  "notificationsTitle": "Notifications",
+  "@notificationsTitle": {
+    "description": "Notification center screen header title."
+  },
+  "notificationsSubtitle": "Account & activity updates",
+  "@notificationsSubtitle": {
+    "description": "Notification center screen header subtitle."
+  },
+  "notificationsMarkAllRead": "Mark all read",
+  "@notificationsMarkAllRead": {
+    "description": "Notification center button to mark every notification read."
+  },
+  "notificationsLoadError": "Notifications could not be loaded. Please retry.",
+  "@notificationsLoadError": {
+    "description": "Notification center full-screen load error."
+  },
+  "notificationsRefreshError": "Notifications could not be refreshed. Please retry.",
+  "@notificationsRefreshError": {
+    "description": "Notification center inline refresh error."
+  },
+  "notificationsEmpty": "No notifications yet",
+  "@notificationsEmpty": {
+    "description": "Notification center empty state."
+  },
+  "offlineGuardTitle": "{action} needs a connection",
+  "@offlineGuardTitle": {
+    "description": "Blocking offline-guard sheet title naming the attempted action.",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      }
+    }
+  },
+  "offlineGuardMessage": "You appear to be offline. Reconnect and try again.",
+  "@offlineGuardMessage": {
+    "description": "Blocking offline-guard sheet body."
+  },
+  "okButton": "OK",
+  "@okButton": {
+    "description": "Generic OK/dismiss button label."
+  },
+  "blogsTitle": "Health Blogs & Advice",
+  "@blogsTitle": {
+    "description": "Blogs feed and article-detail screen header title."
+  },
+  "blogsSubtitle": "Doctor-verified health guides & wellness",
+  "@blogsSubtitle": {
+    "description": "Blogs feed screen header subtitle."
+  },
+  "blogsSearchHint": "Search medical articles, symptoms, tips…",
+  "@blogsSearchHint": {
+    "description": "Blogs feed search field placeholder."
+  },
+  "blogsLoadError": "Unable to load articles.",
+  "@blogsLoadError": {
+    "description": "Blogs feed load error."
+  },
+  "blogsEmpty": "No articles found.",
+  "@blogsEmpty": {
+    "description": "Blogs feed empty/filtered-empty state."
+  },
+  "blogsReadMore": "Read →",
+  "@blogsReadMore": {
+    "description": "Blog article tile call-to-action."
+  },
+  "blogsDetailLoadError": "Unable to load this article.",
+  "@blogsDetailLoadError": {
+    "description": "Article detail screen load error."
+  },
+  "blogsReferences": "References",
+  "@blogsReferences": {
+    "description": "Article detail references section header."
+  },
+  "blogsByAuthor": "By {authorName} ({specialty})",
+  "@blogsByAuthor": {
+    "description": "Article tile byline.",
+    "placeholders": {
+      "authorName": {
+        "type": "String"
+      },
+      "specialty": {
+        "type": "String"
+      }
+    }
+  },
+  "bookingVideoTitle": "Book Video Consultation",
+  "@bookingVideoTitle": {
+    "description": "Booking screen title for a video consultation."
+  },
+  "bookingChatTitle": "Book 24h Chat",
+  "@bookingChatTitle": {
+    "description": "Booking screen title for a 24h chat consultation."
+  },
+  "bookingNoSlots": "This doctor has no bookable slots right now.",
+  "@bookingNoSlots": {
+    "description": "Booking screen empty-slots message."
+  },
+  "bookingSelectDate": "Select Date",
+  "@bookingSelectDate": {
+    "description": "Booking screen date-picker section header."
+  },
+  "bookingAvailableSlots": "Available Slots",
+  "@bookingAvailableSlots": {
+    "description": "Booking screen slot-grid section header."
+  },
+  "bookingReasonLabel": "Reason for Consultation (optional)",
+  "@bookingReasonLabel": {
+    "description": "Booking screen chief-complaint field label."
+  },
+  "bookingReasonHint": "e.g. Fever and sore throat for 3 days…",
+  "@bookingReasonHint": {
+    "description": "Booking screen chief-complaint field placeholder."
+  },
+  "bookingProceedToPayment": "Proceed to Payment — KES {fee} →",
+  "@bookingProceedToPayment": {
+    "description": "Booking screen submit button.",
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "bookingForLabel": "Booking for",
+  "@bookingForLabel": {
+    "description": "Family-profile selector sheet title."
+  },
+  "bookingForSelf": "Self",
+  "@bookingForSelf": {
+    "description": "Family-profile selector label for the caller's own profile."
+  },
+  "bookingForBar": "Booking for: {name}",
+  "@bookingForBar": {
+    "description": "Compact family-profile selector bar label.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "bookingNoSlotsOnDate": "No slots on this date.",
+  "@bookingNoSlotsOnDate": {
+    "description": "Slot grid empty state for the selected date."
+  },
+  "bookingFeeVideo": "Consultation Fee (10 mins)",
+  "@bookingFeeVideo": {
+    "description": "Fee summary row label for a video consultation."
+  },
+  "bookingFeeChat": "24-Hour Clinical Chat Fee",
+  "@bookingFeeChat": {
+    "description": "Fee summary row label for a chat consultation."
+  },
+  "bookingFeeAmount": "KES {fee}",
+  "@bookingFeeAmount": {
+    "description": "A fee amount with its currency prefix.",
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "bookingPlatformGatewayFee": "Platform & Payment Gateway",
+  "@bookingPlatformGatewayFee": {
+    "description": "Fee summary row label."
+  },
+  "bookingFree": "Free",
+  "@bookingFree": {
+    "description": "Fee summary row value meaning no charge."
+  },
+  "bookingTotalPayable": "Total Payable",
+  "@bookingTotalPayable": {
+    "description": "Fee summary total row label."
+  },
+  "bookingMpesaNote": "Pay seamlessly via M-Pesa mobile money",
+  "@bookingMpesaNote": {
+    "description": "Fee summary payment-method note."
+  },
+  "bookingPaymentMethodLabel": "Payment Method",
+  "@bookingPaymentMethodLabel": {
+    "description": "Payment-method picker section header."
+  },
+  "bookingPaymentMethodLoading": "Loading saved payment methods…",
+  "@bookingPaymentMethodLoading": {
+    "description": "Payment-method picker loading state."
+  },
+  "bookingPaymentMethodNone": "No saved payment method yet. Add one to continue.",
+  "@bookingPaymentMethodNone": {
+    "description": "Payment-method picker empty state."
+  },
+  "bookingPaymentMethodDefaultBadge": "Default",
+  "@bookingPaymentMethodDefaultBadge": {
+    "description": "Badge shown on the patient's primary saved payment method."
+  },
+  "bookingAddMpesaNumber": "+ Add M-Pesa Number",
+  "@bookingAddMpesaNumber": {
+    "description": "Button to add the first saved payment method."
+  },
+  "bookingAddAnotherMpesaNumber": "+ Add another M-Pesa number",
+  "@bookingAddAnotherMpesaNumber": {
+    "description": "Button to add another saved payment method when at least one already exists."
+  },
+  "bookingAddPaymentMethodTitle": "Add M-Pesa Number",
+  "@bookingAddPaymentMethodTitle": {
+    "description": "Add-payment-method bottom sheet title."
+  },
+  "bookingAddPaymentMethodDescription": "Saved securely — you can use it for future bookings too.",
+  "@bookingAddPaymentMethodDescription": {
+    "description": "Add-payment-method bottom sheet description."
+  },
+  "bookingAddPaymentMethodHint": "e.g. 0712 345 678",
+  "@bookingAddPaymentMethodHint": {
+    "description": "Add-payment-method phone field placeholder."
+  },
+  "bookingAddPaymentMethodInvalidPhone": "Enter a valid Kenyan phone number.",
+  "@bookingAddPaymentMethodInvalidPhone": {
+    "description": "Add-payment-method phone field validation error."
+  },
+  "bookingAddPaymentMethodSave": "Save Payment Method",
+  "@bookingAddPaymentMethodSave": {
+    "description": "Add-payment-method bottom sheet submit button."
+  },
+  "bookingReserved": "Appointment Reserved",
+  "@bookingReserved": {
+    "description": "Booking confirmation sheet title."
+  },
+  "bookingReference": "Reference: {appointmentNumber}",
+  "@bookingReference": {
+    "description": "Booking confirmation sheet reference number.",
+    "placeholders": {
+      "appointmentNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "bookingMpesaDevNotice": "M-Pesa payment collection runs only in this build's development environment today. Your slot is reserved pending payment confirmation — check Home for the latest status.",
+  "@bookingMpesaDevNotice": {
+    "description": "Booking confirmation sheet development-environment payment notice."
+  },
+  "bookingAttachRecords": "Attach Medical Records",
+  "@bookingAttachRecords": {
+    "description": "Booking confirmation sheet button to open the intake upload modal."
+  },
+  "doneButton": "Done",
+  "@doneButton": {
+    "description": "Generic Done button label."
+  },
+  "intakeInvalidFileType": "Only JPEG, PNG, or PDF files are accepted.",
+  "@intakeInvalidFileType": {
+    "description": "Intake modal unsupported file-type error."
+  },
+  "intakeMaxFilesReached": "You can attach up to {max} files per consultation.",
+  "@intakeMaxFilesReached": {
+    "description": "Intake modal max-attachment-count error.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "intakeUploadError": "Unable to upload these files.",
+  "@intakeUploadError": {
+    "description": "Intake modal generic upload failure."
+  },
+  "intakeInstructions": "Please upload your previous prescription, recent lab report, or diagnostic image so Dr. {doctorName} can review your case history.",
+  "@intakeInstructions": {
+    "description": "Intake modal instructions naming the assigned doctor.",
+    "placeholders": {
+      "doctorName": {
+        "type": "String"
+      }
+    }
+  },
+  "intakeSuccessMessage": "Records attached successfully.",
+  "@intakeSuccessMessage": {
+    "description": "Intake modal success state."
+  },
+  "intakeUploadPrompt": "Upload Prescription or Test Images (1 to {max})",
+  "@intakeUploadPrompt": {
+    "description": "Intake modal upload-area prompt.",
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "cameraButton": "Camera",
+  "@cameraButton": {
+    "description": "Intake modal camera-capture button."
+  },
+  "galleryButton": "Choose Photo",
+  "@galleryButton": {
+    "description": "Profile photo picker gallery-choose button."
+  },
+  "profilePhotoAdd": "Add photo",
+  "@profilePhotoAdd": {
+    "description": "Patient interface: profilePhotoAdd"
+  },
+  "profilePhotoChange": "Change photo",
+  "@profilePhotoChange": {
+    "description": "Patient interface: profilePhotoChange"
+  },
+  "profilePhotoRemove": "Remove photo",
+  "@profilePhotoRemove": {
+    "description": "Patient interface: profilePhotoRemove"
+  },
+  "profilePhotoUploadError": "Unable to upload your photo. Please try again.",
+  "@profilePhotoUploadError": {
+    "description": "Patient interface: profilePhotoUploadError"
+  },
+  "profilePhotoRemoveError": "Unable to remove your photo. Please try again.",
+  "@profilePhotoRemoveError": {
+    "description": "Patient interface: profilePhotoRemoveError"
+  },
+  "profilePhotoPermissionDenied": "Camera access was denied. You can still choose a photo from your gallery.",
+  "@profilePhotoPermissionDenied": {
+    "description": "Patient interface: profilePhotoPermissionDenied"
+  },
+  "pdfButton": "PDF",
+  "@pdfButton": {
+    "description": "Intake modal PDF-picker button."
+  },
+  "intakeAttachedPages": "Attached Pages",
+  "@intakeAttachedPages": {
+    "description": "Intake modal attached-files list header."
+  },
+  "intakeFileCountChip": "{count} of {max}",
+  "@intakeFileCountChip": {
+    "description": "Intake modal attached-file count chip.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "intakeAttachContinue": "Attach & Continue →",
+  "@intakeAttachContinue": {
+    "description": "Intake modal submit button."
+  },
+  "intakeSkipPrompt": "First consultation? Continue without existing reports",
+  "@intakeSkipPrompt": {
+    "description": "Intake modal skip-upload link."
+  },
+  "paidChatTitle": "Chat With a Doctor",
+  "@paidChatTitle": {
+    "description": "Paid chat booking modal title."
+  },
+  "paidChatSubtitle": "Paid clinical text consultation with a verified KMPDC specialist",
+  "@paidChatSubtitle": {
+    "description": "Paid chat booking modal subtitle."
+  },
+  "paidChatIncludedHeader": "Included in this consultation:",
+  "@paidChatIncludedHeader": {
+    "description": "Paid chat booking modal inclusions list header."
+  },
+  "paidChatInclusion1": "Secure messaging during the active consultation window",
+  "@paidChatInclusion1": {
+    "description": "Paid chat booking modal inclusion item."
+  },
+  "paidChatInclusion2": "Discuss your symptoms and care concerns",
+  "@paidChatInclusion2": {
+    "description": "Paid chat booking modal inclusion item."
+  },
+  "paidChatInclusion3": "Prescriptions may be issued when clinically appropriate",
+  "@paidChatInclusion3": {
+    "description": "Paid chat booking modal inclusion item."
+  },
+  "paidChatInclusion4": "Reopen your consultation history from your account",
+  "@paidChatInclusion4": {
+    "description": "Paid chat booking modal inclusion item."
+  },
+  "paidChatFeeLabel": "Consultation Fee:",
+  "@paidChatFeeLabel": {
+    "description": "Paid chat booking modal fee row label."
+  },
+  "paidChatSelectSlot": "Select a consultation slot",
+  "@paidChatSelectSlot": {
+    "description": "Paid chat booking modal submit button."
+  },
+  "apptStatusPendingPayment": "Pending Payment",
+  "@apptStatusPendingPayment": {
+    "description": "Appointment status label."
+  },
+  "apptStatusConfirmed": "Confirmed",
+  "@apptStatusConfirmed": {
+    "description": "Appointment status label."
+  },
+  "apptStatusWaiting": "Waiting",
+  "@apptStatusWaiting": {
+    "description": "Appointment status label."
+  },
+  "apptStatusInConsultation": "In Consultation",
+  "@apptStatusInConsultation": {
+    "description": "Appointment status label."
+  },
+  "apptStatusCompleted": "Completed",
+  "@apptStatusCompleted": {
+    "description": "Appointment status label."
+  },
+  "apptStatusCancelled": "Cancelled",
+  "@apptStatusCancelled": {
+    "description": "Appointment status label."
+  },
+  "apptStatusExpired": "Expired",
+  "@apptStatusExpired": {
+    "description": "Appointment status label."
+  },
+  "waitingRoomVideoTitle": "Scheduled Consultation",
+  "@waitingRoomVideoTitle": {
+    "description": "Waiting room screen title for a video consultation."
+  },
+  "waitingRoomChatTitle": "24-Hour Clinical Chat",
+  "@waitingRoomChatTitle": {
+    "description": "Waiting room screen title for a chat consultation."
+  },
+  "waitingRoomDoctorInitiated": "Doctor-initiated appointment",
+  "@waitingRoomDoctorInitiated": {
+    "description": "Waiting room screen subtitle."
+  },
+  "waitingRoomSlotLabel": "Slot: {time}",
+  "@waitingRoomSlotLabel": {
+    "description": "Waiting room booked-slot time chip.",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "waitingRoomCompletedBanner": "This consultation is complete. View your summary for the outcome and next steps.",
+  "@waitingRoomCompletedBanner": {
+    "description": "Waiting room banner once the appointment is COMPLETED."
+  },
+  "waitingRoomViewSummary": "View Consultation Summary",
+  "@waitingRoomViewSummary": {
+    "description": "Waiting room button opening the Post-Consultation screen."
+  },
+  "waitingRoomTerminalBanner": "This appointment is {status} and can no longer be joined.",
+  "@waitingRoomTerminalBanner": {
+    "description": "Waiting room banner for a non-COMPLETED terminal status (cancelled/expired).",
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+  "waitingRoomVideoCallsYou": "Doctor Calls You at Your Booked Time",
+  "@waitingRoomVideoCallsYou": {
+    "description": "Waiting room video-modality readiness banner title."
+  },
+  "waitingRoomChatMessageAnytime": "Message Your Doctor Any Time in This Window",
+  "@waitingRoomChatMessageAnytime": {
+    "description": "Waiting room chat-modality readiness banner title."
+  },
+  "waitingRoomVideoCallsYouDetail": "Patients cannot place outgoing calls. When your booked slot arrives, join from here.",
+  "@waitingRoomVideoCallsYouDetail": {
+    "description": "Waiting room video-modality readiness banner detail."
+  },
+  "waitingRoomChatWindowDetail": "Your 24-hour chat window opens around your booked slot time.",
+  "@waitingRoomChatWindowDetail": {
+    "description": "Waiting room chat-modality readiness banner detail."
+  },
+  "waitingRoomJoinVideoCall": "Join Video Call",
+  "@waitingRoomJoinVideoCall": {
+    "description": "Waiting room join-call button for video modality."
+  },
+  "waitingRoomOpenChat": "Open Chat",
+  "@waitingRoomOpenChat": {
+    "description": "Waiting room open-chat button for chat modality."
+  },
+  "waitingRoomOpen24hChat": "Open 24h Chat",
+  "@waitingRoomOpen24hChat": {
+    "description": "Waiting room secondary 24h-chat entry for video modality."
+  },
+  "waitingRoomTestCameraMic": "Test Camera & Microphone",
+  "@waitingRoomTestCameraMic": {
+    "description": "Waiting room camera/mic permission-test button."
+  },
+  "waitingRoomReportIssue": "Report Consultation Issue",
+  "@waitingRoomReportIssue": {
+    "description": "Waiting room grievance shortcut button."
+  },
+  "waitingRoomPermissionsGranted": "Camera & microphone ready for the consultation.",
+  "@waitingRoomPermissionsGranted": {
+    "description": "Waiting room permission-check success message."
+  },
+  "waitingRoomPermissionsDenied": "Camera or microphone access is not granted yet — enable it in device settings.",
+  "@waitingRoomPermissionsDenied": {
+    "description": "Waiting room permission-check failure message."
+  },
+  "chatOpensOnceConfirmed": "Chat opens once your appointment is confirmed.",
+  "@chatOpensOnceConfirmed": {
+    "description": "Waiting room 404 snackbar when chat isn't available yet."
+  },
+  "chatUnableToOpen": "Unable to open chat right now.",
+  "@chatUnableToOpen": {
+    "description": "Waiting room generic chat-open failure snackbar."
+  },
+  "todayLabel": "Today",
+  "@todayLabel": {
+    "description": "Relative date label for the current day."
+  },
+  "comingSoonSnackbar": "{feature} is coming in a future update.",
+  "@comingSoonSnackbar": {
+    "description": "Generic coming-soon snackbar for a not-yet-built feature.",
+    "placeholders": {
+      "feature": {
+        "type": "String"
+      }
+    }
+  },
+  "accountLabel": "Account",
+  "@accountLabel": {
+    "description": "Account tab/feature name used in the coming-soon fallback."
+  },
+  "chatWithDoctorLabel": "Chat with Doctor",
+  "@chatWithDoctorLabel": {
+    "description": "Chat with Doctor core-service card title and coming-soon feature name."
+  },
+  "homeManagingForYou": "Managing for: You",
+  "@homeManagingForYou": {
+    "description": "Family-profile switcher bar label for the caller's own profile."
+  },
+  "homeManagingForName": "Managing for: {name}",
+  "@homeManagingForName": {
+    "description": "Family-profile switcher bar label for a dependent profile.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeDependentFallback": "Dependent",
+  "@homeDependentFallback": {
+    "description": "Fallback relationship label when a dependent has none set."
+  },
+  "homeSwitchProfile": "Switch Profile",
+  "@homeSwitchProfile": {
+    "description": "Family profile switcher sheet title."
+  },
+  "homeWelcomeBack": "Welcome back,",
+  "@homeWelcomeBack": {
+    "description": "Home greeting line above the patient's name."
+  },
+  "homeGreetingDefault": "Patient",
+  "@homeGreetingDefault": {
+    "description": "Home greeting name fallback when no name is known yet."
+  },
+  "homeGreetingNamed": "{name}",
+  "@homeGreetingNamed": {
+    "description": "Home greeting with the patient's name.",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "homeSearchHint": "Search specialist doctors, specialties…",
+  "@homeSearchHint": {
+    "description": "Home search pill placeholder."
+  },
+  "homeServiceSpecialistBadge": "Specialist",
+  "@homeServiceSpecialistBadge": {
+    "description": "Core service card badge."
+  },
+  "homeServiceBookSpecialist": "Book Specialist",
+  "@homeServiceBookSpecialist": {
+    "description": "Core service card title."
+  },
+  "homeServiceBookSpecialistDesc": "Schedule certified doctor consultation",
+  "@homeServiceBookSpecialistDesc": {
+    "description": "Core service card description."
+  },
+  "homeServicePaidBadge": "Paid",
+  "@homeServicePaidBadge": {
+    "description": "Core service card badge."
+  },
+  "homeServiceChatDesc": "Paid clinical text & e-Rx (24h)",
+  "@homeServiceChatDesc": {
+    "description": "Core service card description."
+  },
+  "homeServiceFreeBadge": "100% Free",
+  "@homeServiceFreeBadge": {
+    "description": "Core service card badge."
+  },
+  "homeServiceQnaTitle": "Ask Free Q&A",
+  "@homeServiceQnaTitle": {
+    "description": "Core service card title."
+  },
+  "homeServiceQnaDesc": "Anonymous physician guidance",
+  "@homeServiceQnaDesc": {
+    "description": "Core service card description."
+  },
+  "homeServiceVaultBadge": "Vault",
+  "@homeServiceVaultBadge": {
+    "description": "Core service card badge."
+  },
+  "homeServiceVaultTitle": "Health Records",
+  "@homeServiceVaultTitle": {
+    "description": "Core service card title."
+  },
+  "homeServiceVaultDesc": "e-Prescriptions & lab reports",
+  "@homeServiceVaultDesc": {
+    "description": "Core service card description."
+  },
+  "homeUpcomingConsultation": "Upcoming Consultation",
+  "@homeUpcomingConsultation": {
+    "description": "Home upcoming-consultation section header."
+  },
+  "homeManageButton": "Manage",
+  "@homeManageButton": {
+    "description": "Home upcoming-consultation manage button."
+  },
+  "homeNoUpcoming": "No upcoming consultations yet.",
+  "@homeNoUpcoming": {
+    "description": "Home upcoming-consultation empty state."
+  },
+  "homeConsultCardLine": "{day}/{month} at {time} • {modality} Consultation",
+  "@homeConsultCardLine": {
+    "description": "Upcoming consultation card date/time/modality line.",
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "month": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      },
+      "modality": {
+        "type": "String"
+      }
+    }
+  },
+  "modalityVideo": "Video",
+  "@modalityVideo": {
+    "description": "Video consultation modality label."
+  },
+  "modalityChat": "Chat",
+  "@modalityChat": {
+    "description": "Chat consultation modality label."
+  },
+  "servicesTitle": "Core Services",
+  "@servicesTitle": {
+    "description": "Services screen header title."
+  },
+  "servicesSubtitle": "Comprehensive virtual care, chat triage & health vault",
+  "@servicesSubtitle": {
+    "description": "Services screen header subtitle."
+  },
+  "servicesBookSpecialist": "Book a Specialist Doctor",
+  "@servicesBookSpecialist": {
+    "description": "Services list item title."
+  },
+  "servicesBookSpecialistDesc": "Browse verified specialists",
+  "@servicesBookSpecialistDesc": {
+    "description": "Services list item description."
+  },
+  "servicesChatWithDoctor": "Chat With a Doctor",
+  "@servicesChatWithDoctor": {
+    "description": "Services list item title."
+  },
+  "servicesChatWithDoctorDesc": "24h consultation chat",
+  "@servicesChatWithDoctorDesc": {
+    "description": "Services list item description."
+  },
+  "servicesAskFreeQuestion": "Ask a Free Question",
+  "@servicesAskFreeQuestion": {
+    "description": "Services list item title."
+  },
+  "servicesAskFreeQuestionDesc": "100% free guidance",
+  "@servicesAskFreeQuestionDesc": {
+    "description": "Services list item description."
+  },
+  "servicesHealthRecords": "Health Records & Vault",
+  "@servicesHealthRecords": {
+    "description": "Services list item title."
+  },
+  "servicesHealthRecordsDesc": "e-Prescriptions & lab reports",
+  "@servicesHealthRecordsDesc": {
+    "description": "Services list item description."
+  },
+  "servicesMedicineDelivery": "Express Medicine Delivery",
+  "@servicesMedicineDelivery": {
+    "description": "Services list item title."
+  },
+  "servicesMedicineDeliveryDesc": "Order prescribed medicine",
+  "@servicesMedicineDeliveryDesc": {
+    "description": "Services list item description."
+  },
+  "servicesEmergencyDispatch": "Emergency Dispatch",
+  "@servicesEmergencyDispatch": {
+    "description": "Services list item title."
+  },
+  "servicesEmergencyDispatchDesc": "Request an ambulance",
+  "@servicesEmergencyDispatchDesc": {
+    "description": "Services list item description."
+  },
+  "emergencyContactLabel": "Emergency Contact",
+  "@emergencyContactLabel": {
+    "description": "Emergency contact banner label — must never be prefixed '24/7' (CLAUDE.md business rule), but the label text itself localizes normally."
+  },
+  "emergencyContactSubtitle": "Emergency triage & rapid physician assistance",
+  "@emergencyContactSubtitle": {
+    "description": "Emergency contact banner subtitle."
+  },
+  "emergencyContactCallButton": "Call {number}",
+  "@emergencyContactCallButton": {
+    "description": "Emergency contact banner call button.",
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "chatNoMessages": "No messages yet",
+  "@chatNoMessages": {
+    "description": "Chat screen empty state."
+  },
+  "chatWindowClosed": "Consultation window closed (24h expired). Chat is no longer available.",
+  "@chatWindowClosed": {
+    "description": "Chat screen locked/expired banner."
+  },
+  "chatNotSent": "NOT SENT — reconnect and tap send again.",
+  "@chatNotSent": {
+    "description": "Chat screen failed-send indicator."
+  },
+  "chatInputHint": "Type your message",
+  "@chatInputHint": {
+    "description": "Chat message input placeholder."
+  },
+  "chatActiveRemaining": "⏳ Consultation Active: {hours} hrs {minutes} mins remaining",
+  "@chatActiveRemaining": {
+    "description": "Chat screen remaining-time banner.",
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "chat24hSession": "24h Session",
+  "@chat24hSession": {
+    "description": "Chat screen session-type chip."
+  },
+  "grievanceDescribeWhatHappened": "Please describe what happened.",
+  "@grievanceDescribeWhatHappened": {
+    "description": "Grievance modal empty-summary validation error."
+  },
+  "grievanceNoSession": "This consultation has no recorded session yet, so there is nothing to report.",
+  "@grievanceNoSession": {
+    "description": "Grievance modal 404 error (no consultation session exists)."
+  },
+  "grievanceSubmitError": "Unable to submit this report right now.",
+  "@grievanceSubmitError": {
+    "description": "Grievance modal generic submit failure."
+  },
+  "grievanceReportSubmitted": "Report Submitted",
+  "@grievanceReportSubmitted": {
+    "description": "Grievance modal success title."
+  },
+  "grievanceReference": "Reference: {grievanceNumber}",
+  "@grievanceReference": {
+    "description": "Grievance modal success reference number.",
+    "placeholders": {
+      "grievanceNumber": {
+        "type": "String"
+      }
+    }
+  },
+  "grievanceSuccessNotice": "Your report has been sent to Central Medical Administration for review. You will not receive a star-rating-style response — outcomes are decided through the structured Clinical Grievance Redressal process.",
+  "@grievanceSuccessNotice": {
+    "description": "Grievance modal success-state explanatory notice."
+  },
+  "grievanceTitle": "Report Consultation Issue",
+  "@grievanceTitle": {
+    "description": "Grievance modal title."
+  },
+  "grievanceAuditSubtitle": "Central Medical Administration Audit",
+  "@grievanceAuditSubtitle": {
+    "description": "Grievance modal subtitle."
+  },
+  "grievanceTargetQuestion": "Who or what is this report against?",
+  "@grievanceTargetQuestion": {
+    "description": "Grievance modal target-selector section header."
+  },
+  "grievanceAgainstDoctor": "Against Doctor",
+  "@grievanceAgainstDoctor": {
+    "description": "Grievance modal target option label."
+  },
+  "grievanceAgainstDoctorDesc": "Conduct, rushed, malpractice, refused Rx",
+  "@grievanceAgainstDoctorDesc": {
+    "description": "Grievance modal target option description."
+  },
+  "grievanceAgainstSystem": "Against System",
+  "@grievanceAgainstSystem": {
+    "description": "Grievance modal target option label."
+  },
+  "grievanceAgainstSystemDesc": "Video glitch, billing, crash",
+  "@grievanceAgainstSystemDesc": {
+    "description": "Grievance modal target option description."
+  },
+  "grievanceCategoryLabel": "Specific Issue Category",
+  "@grievanceCategoryLabel": {
+    "description": "Grievance modal category-dropdown section header."
+  },
+  "grievanceCategoryRushed": "Doctor ended call abruptly / rushed consultation (< 3 mins)",
+  "@grievanceCategoryRushed": {
+    "description": "Grievance modal category option display text (sent category value stays the fixed English key)."
+  },
+  "grievanceCategoryRefusedRx": "Doctor refused to provide digital e-Prescription",
+  "@grievanceCategoryRefusedRx": {
+    "description": "Grievance modal category option display text."
+  },
+  "grievanceCategoryUnprofessional": "Unprofessional conduct / discourteous bedside manner",
+  "@grievanceCategoryUnprofessional": {
+    "description": "Grievance modal category option display text."
+  },
+  "grievanceCategoryClinicalDispute": "Clinical dispute or questionable medication prescribed",
+  "@grievanceCategoryClinicalDispute": {
+    "description": "Grievance modal category option display text."
+  },
+  "grievanceCategoryAbsentDoctor": "Doctor did not join the scheduled slot on time",
+  "@grievanceCategoryAbsentDoctor": {
+    "description": "Grievance modal category option display text."
+  },
+  "grievanceExplainLabel": "Explain what happened",
+  "@grievanceExplainLabel": {
+    "description": "Grievance modal free-text field label."
+  },
+  "grievanceExplainHint": "Please describe exactly what happened…",
+  "@grievanceExplainHint": {
+    "description": "Grievance modal free-text field placeholder."
+  },
+  "grievanceDisclaimer": "Patients submit factual reports of clinical or technical failures. All remedies (refunds, technical fixes, or conduct review) are adjudicated independently by Central Medical Administration — there is no star-rating system on this platform.",
+  "@grievanceDisclaimer": {
+    "description": "Grievance modal zero-star-rating disclaimer (CLAUDE.md §2.1)."
+  },
+  "grievanceSubmitButton": "Submit Official Report",
+  "@grievanceSubmitButton": {
+    "description": "Grievance modal submit button."
+  },
+  "grievanceCancelReturn": "Cancel & Return",
+  "@grievanceCancelReturn": {
+    "description": "Grievance modal cancel button."
+  },
+  "postConsultHeader": "Consultation Completed",
+  "@postConsultHeader": {
+    "description": "Post-consultation screen header title."
+  },
+  "postConsultSubtitle": "Your visit with {doctorName} is complete",
+  "@postConsultSubtitle": {
+    "description": "Post-consultation screen header subtitle.",
+    "placeholders": {
+      "doctorName": {
+        "type": "String"
+      }
+    }
+  },
+  "postConsultOutcomeWithRx": "Your official e-prescription has been issued and safely archived in your Health Vault.",
+  "@postConsultOutcomeWithRx": {
+    "description": "Post-consultation outcome message for COMPLETED_WITH_RX."
+  },
+  "postConsultOutcomeNoRx": "Your doctor completed this consultation without issuing a prescription.",
+  "@postConsultOutcomeNoRx": {
+    "description": "Post-consultation outcome message for COMPLETED_NO_RX."
+  },
+  "postConsultOutcomeReferred": "Your doctor has referred you to a specialist for further care.",
+  "@postConsultOutcomeReferred": {
+    "description": "Post-consultation outcome message for REFERRED."
+  },
+  "postConsultOutcomeEscalated": "This consultation was escalated for urgent clinical review.",
+  "@postConsultOutcomeEscalated": {
+    "description": "Post-consultation outcome message for ESCALATED."
+  },
+  "postConsultOutcomeDefault": "Your consultation has been completed.",
+  "@postConsultOutcomeDefault": {
+    "description": "Post-consultation outcome message fallback."
+  },
+  "postConsultReturnHome": "Return to Home",
+  "@postConsultReturnHome": {
+    "description": "Post-consultation return-to-home button."
+  },
+  "postConsultReportIssue": "Report an Issue About Consultation",
+  "@postConsultReportIssue": {
+    "description": "Post-consultation grievance shortcut button."
+  },
+  "postConsultRxIssued": "Official e-Prescription Issued",
+  "@postConsultRxIssued": {
+    "description": "Post-consultation Rx card title."
+  },
+  "postConsultDoctorAndDate": "{doctorName} • {when}",
+  "@postConsultDoctorAndDate": {
+    "description": "Post-consultation Rx card byline with completion date.",
+    "placeholders": {
+      "doctorName": {
+        "type": "String"
+      },
+      "when": {
+        "type": "String"
+      }
+    }
+  },
+  "navHome": "Home",
+  "@navHome": {
+    "description": "Patient interface: navHome"
+  },
+  "navServices": "Services",
+  "@navServices": {
+    "description": "Patient interface: navServices"
+  },
+  "navBlogs": "Blogs",
+  "@navBlogs": {
+    "description": "Patient interface: navBlogs"
+  },
+  "restoringSession": "Restoring secure session…",
+  "@restoringSession": {
+    "description": "Patient interface: restoringSession"
+  },
+  "languageTitle": "Language",
+  "@languageTitle": {
+    "description": "Patient interface: languageTitle"
+  },
+  "languageEnglish": "English",
+  "@languageEnglish": {
+    "description": "Patient interface: languageEnglish"
+  },
+  "languageSwahili": "Swahili (Kiswahili)",
+  "@languageSwahili": {
+    "description": "Patient interface: languageSwahili"
+  },
+  "languageEnglishDescription": "International Standard, Default",
+  "@languageEnglishDescription": {
+    "description": "Patient interface: languageEnglishDescription"
+  },
+  "languageSwahiliDescription": "Lugha ya Kiswahili • Rasmi ya Kenya na Afrika Mashariki",
+  "@languageSwahiliDescription": {
+    "description": "Patient interface: languageSwahiliDescription"
+  },
+  "profilePaymentMethods": "Payment Methods & M-Pesa",
+  "@profilePaymentMethods": {
+    "description": "Patient interface: profilePaymentMethods"
+  },
+  "profilePrivacySecurity": "Privacy & Security",
+  "@profilePrivacySecurity": {
+    "description": "Patient interface: profilePrivacySecurity"
+  },
+  "profileReportIssue": "Report Consultation Issue / Dispute",
+  "@profileReportIssue": {
+    "description": "Patient interface: profileReportIssue"
+  },
+  "profileLogout": "Log Out",
+  "@profileLogout": {
+    "description": "Patient interface: profileLogout"
+  },
+  "profileFamily": "Family Profiles",
+  "@profileFamily": {
+    "description": "Patient interface: profileFamily"
+  },
+  "profileManaging": "You're currently managing {name}'s consultations and records.",
+  "@profileManaging": {
+    "description": "Patient interface: profileManaging",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "profileAge": "{age} yrs",
+  "@profileAge": {
+    "description": "Patient interface: profileAge",
+    "placeholders": {
+      "age": {
+        "type": "String"
+      }
+    }
+  },
+  "profileSelf": "Self",
+  "@profileSelf": {
+    "description": "Patient interface: profileSelf"
+  },
+  "profileDependent": "Dependent",
+  "@profileDependent": {
+    "description": "Patient interface: profileDependent"
+  },
+  "profileFallback": "Profile",
+  "@profileFallback": {
+    "description": "Patient interface: profileFallback"
+  },
+  "profileEdit": "Edit Profile",
+  "@profileEdit": {
+    "description": "Patient interface: profileEdit"
+  },
+  "profileSave": "Save",
+  "@profileSave": {
+    "description": "Patient interface: profileSave"
+  },
+  "profileBloodGroup": "Blood group (optional)",
+  "@profileBloodGroup": {
+    "description": "Patient interface: profileBloodGroup"
+  },
+  "profileWeight": "Weight in kg (optional)",
+  "@profileWeight": {
+    "description": "Patient interface: profileWeight"
+  },
+  "profileEmergencyPhone": "Emergency contact phone (optional)",
+  "@profileEmergencyPhone": {
+    "description": "Patient interface: profileEmergencyPhone"
+  },
+  "profileEmergencyRelation": "Emergency contact relation (optional)",
+  "@profileEmergencyRelation": {
+    "description": "Patient interface: profileEmergencyRelation"
+  },
+  "profileInvalidEmergencyPhone": "Enter a valid Kenyan emergency contact phone number.",
+  "@profileInvalidEmergencyPhone": {
+    "description": "Patient interface: profileInvalidEmergencyPhone"
+  },
+  "dependentAdd": "Add Dependent",
+  "@dependentAdd": {
+    "description": "Patient interface: dependentAdd"
+  },
+  "dependentDescription": "They get their own consultations, prescriptions and health vault — managed by your account, with no separate login.",
+  "@dependentDescription": {
+    "description": "Patient interface: dependentDescription"
+  },
+  "dependentRelationship": "Relationship (e.g. Spouse, Child)",
+  "@dependentRelationship": {
+    "description": "Patient interface: dependentRelationship"
+  },
+  "dependentNameRequired": "Enter the dependent's full name.",
+  "@dependentNameRequired": {
+    "description": "Patient interface: dependentNameRequired"
+  },
+  "dependentDobRequired": "Select a date of birth.",
+  "@dependentDobRequired": {
+    "description": "Patient interface: dependentDobRequired"
+  },
+  "dependentRelationshipRequired": "Enter a relationship, e.g. Spouse or Child.",
+  "@dependentRelationshipRequired": {
+    "description": "Patient interface: dependentRelationshipRequired"
+  },
+  "dependentAddError": "Unable to add this dependent.",
+  "@dependentAddError": {
+    "description": "Patient interface: dependentAddError"
+  },
+  "directoryTitle": "Find a Specialist",
+  "@directoryTitle": {
+    "description": "Patient interface: directoryTitle"
+  },
+  "directoryVerifiedNotice": "All physicians are KMPDC verified & actively licensed",
+  "@directoryVerifiedNotice": {
+    "description": "Patient interface: directoryVerifiedNotice"
+  },
+  "directorySearchHint": "Search by name, department, symptom…",
+  "@directorySearchHint": {
+    "description": "Patient interface: directorySearchHint"
+  },
+  "directoryAllDoctors": "All Doctors",
+  "@directoryAllDoctors": {
+    "description": "Patient interface: directoryAllDoctors"
+  },
+  "directoryChatTab": "24h Chat",
+  "@directoryChatTab": {
+    "description": "Patient interface: directoryChatTab"
+  },
+  "directoryVideoTab": "Video Slot",
+  "@directoryVideoTab": {
+    "description": "Patient interface: directoryVideoTab"
+  },
+  "directoryAllSpecialists": "All Specialists",
+  "@directoryAllSpecialists": {
+    "description": "Patient interface: directoryAllSpecialists"
+  },
+  "specialtyInternalMedicine": "Internal Medicine",
+  "@specialtyInternalMedicine": {
+    "description": "Patient interface: specialtyInternalMedicine"
+  },
+  "specialtyCardiology": "Cardiology",
+  "@specialtyCardiology": {
+    "description": "Patient interface: specialtyCardiology"
+  },
+  "specialtyPediatrics": "Pediatrics",
+  "@specialtyPediatrics": {
+    "description": "Patient interface: specialtyPediatrics"
+  },
+  "specialtyGynecology": "Gynecology",
+  "@specialtyGynecology": {
+    "description": "Patient interface: specialtyGynecology"
+  },
+  "specialtyDermatology": "Dermatology",
+  "@specialtyDermatology": {
+    "description": "Patient interface: specialtyDermatology"
+  },
+  "directoryCount": "Available Doctors ({count})",
+  "@directoryCount": {
+    "description": "Patient interface: directoryCount",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "resetButton": "Reset",
+  "@resetButton": {
+    "description": "Patient interface: resetButton"
+  },
+  "directoryEmpty": "No Specialists Found",
+  "@directoryEmpty": {
+    "description": "Patient interface: directoryEmpty"
+  },
+  "directoryEmptyHint": "Try searching for a different symptom, department or doctor name.",
+  "@directoryEmptyHint": {
+    "description": "Patient interface: directoryEmptyHint"
+  },
+  "directoryVerified": "KMPDC Verified",
+  "@directoryVerified": {
+    "description": "Patient interface: directoryVerified"
+  },
+  "directorySpecialist": "{specialty} Specialist",
+  "@directorySpecialist": {
+    "description": "Patient interface: directorySpecialist",
+    "placeholders": {
+      "specialty": {
+        "type": "String"
+      }
+    }
+  },
+  "directoryCredentials": "{authority} #{number} • {hospital} ({years} yrs exp)",
+  "@directoryCredentials": {
+    "description": "Patient interface: directoryCredentials",
+    "placeholders": {
+      "authority": {
+        "type": "String"
+      },
+      "number": {
+        "type": "String"
+      },
+      "hospital": {
+        "type": "String"
+      },
+      "years": {
+        "type": "String"
+      }
+    }
+  },
+  "directoryActiveShift": "Active Shift",
+  "@directoryActiveShift": {
+    "description": "Patient interface: directoryActiveShift"
+  },
+  "directoryOffDuty": "Off Duty",
+  "@directoryOffDuty": {
+    "description": "Patient interface: directoryOffDuty"
+  },
+  "directoryProfile": "Profile",
+  "@directoryProfile": {
+    "description": "Patient interface: directoryProfile"
+  },
+  "directoryVideoFee": "Video (KES {fee})",
+  "@directoryVideoFee": {
+    "description": "Patient interface: directoryVideoFee",
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "directoryChatFee": "Chat (KES {fee})",
+  "@directoryChatFee": {
+    "description": "Patient interface: directoryChatFee",
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "doctorProfileTitle": "Doctor Profile",
+  "@doctorProfileTitle": {
+    "description": "Patient interface: doctorProfileTitle"
+  },
+  "doctorProfileSubtitle": "Verified HelloDoctor specialist",
+  "@doctorProfileSubtitle": {
+    "description": "Patient interface: doctorProfileSubtitle"
+  },
+  "doctorProfileLoadError": "Unable to load this doctor profile.",
+  "@doctorProfileLoadError": {
+    "description": "Patient interface: doctorProfileLoadError"
+  },
+  "doctorAboutTab": "About",
+  "@doctorAboutTab": {
+    "description": "Patient interface: doctorAboutTab"
+  },
+  "doctorAvailabilityTab": "Availability",
+  "@doctorAvailabilityTab": {
+    "description": "Patient interface: doctorAvailabilityTab"
+  },
+  "doctorExperience": "Years Experience",
+  "@doctorExperience": {
+    "description": "Patient interface: doctorExperience"
+  },
+  "doctorHospital": "Hospital",
+  "@doctorHospital": {
+    "description": "Patient interface: doctorHospital"
+  },
+  "doctorClinicalStatus": "Clinical Status",
+  "@doctorClinicalStatus": {
+    "description": "Patient interface: doctorClinicalStatus"
+  },
+  "doctorAboutTitle": "About Dr. {name}",
+  "@doctorAboutTitle": {
+    "description": "Patient interface: doctorAboutTitle",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "doctorPractice": "Practicing at {hospital}, licensed in {country}.",
+  "@doctorPractice": {
+    "description": "Patient interface: doctorPractice",
+    "placeholders": {
+      "hospital": {
+        "type": "String"
+      },
+      "country": {
+        "type": "String"
+      }
+    }
+  },
+  "doctorVideoFee": "Video Consultation Fee:",
+  "@doctorVideoFee": {
+    "description": "Patient interface: doctorVideoFee"
+  },
+  "doctorChatFee": "24-Hour Clinical Chat Fee:",
+  "@doctorChatFee": {
+    "description": "Patient interface: doctorChatFee"
+  },
+  "doctorNoSlots": "No upcoming bookable slots right now.",
+  "@doctorNoSlots": {
+    "description": "Patient interface: doctorNoSlots"
+  },
+  "doctorSlotCount": "{count} bookable slots available",
+  "@doctorSlotCount": {
+    "description": "Patient interface: doctorSlotCount",
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "doctorVideoBooking": "Video Slot (KES {fee})",
+  "@doctorVideoBooking": {
+    "description": "Patient interface: doctorVideoBooking",
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "doctorChatBooking": "24h Chat (KES {fee})",
+  "@doctorChatBooking": {
+    "description": "Patient interface: doctorChatBooking",
+    "placeholders": {
+      "fee": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultTitle": "Health Vault",
+  "@vaultTitle": {
+    "description": "Patient interface: vaultTitle"
+  },
+  "vaultSubtitle": "Digital prescriptions & your uploaded records",
+  "@vaultSubtitle": {
+    "description": "Patient interface: vaultSubtitle"
+  },
+  "vaultAllRecords": "All Records",
+  "@vaultAllRecords": {
+    "description": "Patient interface: vaultAllRecords"
+  },
+  "vaultPrescriptions": "e-Prescriptions",
+  "@vaultPrescriptions": {
+    "description": "Patient interface: vaultPrescriptions"
+  },
+  "vaultUploads": "My Uploads",
+  "@vaultUploads": {
+    "description": "Patient interface: vaultUploads"
+  },
+  "vaultEmpty": "No records yet",
+  "@vaultEmpty": {
+    "description": "Patient interface: vaultEmpty"
+  },
+  "vaultEmptyHint": "Prescriptions and uploaded documents will appear here.",
+  "@vaultEmptyHint": {
+    "description": "Patient interface: vaultEmptyHint"
+  },
+  "vaultPrescriptionTitle": "e-Prescription #{number}",
+  "@vaultPrescriptionTitle": {
+    "description": "Patient interface: vaultPrescriptionTitle",
+    "placeholders": {
+      "number": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultUploadedDocument": "Uploaded document",
+  "@vaultUploadedDocument": {
+    "description": "Patient interface: vaultUploadedDocument"
+  },
+  "vaultUploadedPage": "Uploaded document (page {page})",
+  "@vaultUploadedPage": {
+    "description": "Patient interface: vaultUploadedPage",
+    "placeholders": {
+      "page": {
+        "type": "String"
+      }
+    }
+  },
+  "vaultUploadSource": "From your pre-consultation upload",
+  "@vaultUploadSource": {
+    "description": "Patient interface: vaultUploadSource"
+  },
+  "vaultUploadBadge": "Upload",
+  "@vaultUploadBadge": {
+    "description": "Patient interface: vaultUploadBadge"
+  },
+  "vaultPrescriptionBadge": "e-Rx",
+  "@vaultPrescriptionBadge": {
+    "description": "Patient interface: vaultPrescriptionBadge"
+  },
+  "vaultOpenError": "Unable to open this document.",
+  "@vaultOpenError": {
+    "description": "Patient interface: vaultOpenError"
+  },
+  "vaultOpenNowError": "Unable to open this document right now.",
+  "@vaultOpenNowError": {
+    "description": "Patient interface: vaultOpenNowError"
+  },
+  "vaultImageError": "Unable to load this image.",
+  "@vaultImageError": {
+    "description": "Patient interface: vaultImageError"
+  },
+  "qnaTitle": "Ask Free Health Q&A",
+  "@qnaTitle": {
+    "description": "Patient interface: qnaTitle"
+  },
+  "qnaSubtitle": "100% Free · Anonymous physician guidance",
+  "@qnaSubtitle": {
+    "description": "Patient interface: qnaSubtitle"
+  },
+  "qnaEmpty": "No answered questions yet.",
+  "@qnaEmpty": {
+    "description": "Patient interface: qnaEmpty"
+  },
+  "qnaAsk": "Ask a Question",
+  "@qnaAsk": {
+    "description": "Patient interface: qnaAsk"
+  },
+  "qnaAnonymous": "Anonymous",
+  "@qnaAnonymous": {
+    "description": "Patient interface: qnaAnonymous"
+  },
+  "qnaSubmitted": "Question Submitted",
+  "@qnaSubmitted": {
+    "description": "Patient interface: qnaSubmitted"
+  },
+  "qnaSubmittedNotice": "Your question has been submitted for a verified doctor to answer. Answered questions appear in the feed for everyone, with your identity never shared.",
+  "@qnaSubmittedNotice": {
+    "description": "Patient interface: qnaSubmittedNotice"
+  },
+  "qnaAskTitle": "Ask Your Medical Question",
+  "@qnaAskTitle": {
+    "description": "Patient interface: qnaAskTitle"
+  },
+  "qnaAskingAs": "Asking as",
+  "@qnaAskingAs": {
+    "description": "Patient interface: qnaAskingAs"
+  },
+  "qnaSelectTopic": "Topic",
+  "@qnaSelectTopic": {
+    "description": "Patient interface: qnaSelectTopic"
+  },
+  "qnaDescribe": "Describe your question",
+  "@qnaDescribe": {
+    "description": "Patient interface: qnaDescribe"
+  },
+  "qnaHint": "What would you like to ask a doctor?",
+  "@qnaHint": {
+    "description": "Patient interface: qnaHint"
+  },
+  "qnaPrivacyNotice": "A licensed doctor will answer within the Free Q&A feed. Your identity is never shared — doctors only see the question itself.",
+  "@qnaPrivacyNotice": {
+    "description": "Patient interface: qnaPrivacyNotice"
+  },
+  "qnaSubmit": "Submit Free Question",
+  "@qnaSubmit": {
+    "description": "Patient interface: qnaSubmit"
+  },
+  "qnaTopicGeneral": "General Health",
+  "@qnaTopicGeneral": {
+    "description": "Patient interface: qnaTopicGeneral"
+  },
+  "qnaTopicFevers": "Fevers & Infections",
+  "@qnaTopicFevers": {
+    "description": "Patient interface: qnaTopicFevers"
+  },
+  "qnaTopicChild": "Child Health",
+  "@qnaTopicChild": {
+    "description": "Patient interface: qnaTopicChild"
+  },
+  "qnaTopicDiet": "Diet & Diabetes",
+  "@qnaTopicDiet": {
+    "description": "Patient interface: qnaTopicDiet"
+  },
+  "qnaTopicSkin": "Skin & Allergy",
+  "@qnaTopicSkin": {
+    "description": "Patient interface: qnaTopicSkin"
+  },
+  "callTitle": "Consultation call",
+  "@callTitle": {
+    "description": "Patient interface: callTitle"
+  },
+  "callUnavailable": "Live video is temporarily unavailable",
+  "@callUnavailable": {
+    "description": "Patient interface: callUnavailable"
+  },
+  "callUnavailableNotice": "Your consultation is authorized, but live video is unavailable in this version. Please return to the waiting room for consultation updates.",
+  "@callUnavailableNotice": {
+    "description": "Patient interface: callUnavailableNotice"
+  },
+  "callDelayed": "This consultation is running later than its scheduled time.",
+  "@callDelayed": {
+    "description": "Patient interface: callDelayed"
+  },
+  "callAuthorizationError": "The consultation call could not be authorized.",
+  "@callAuthorizationError": {
+    "description": "Patient interface: callAuthorizationError"
+  },
+  "callRequestingPermissions": "Requesting camera and microphone access…",
+  "@callRequestingPermissions": {
+    "description": "Patient interface: callRequestingPermissions"
+  },
+  "callPermissionDenied": "Camera and microphone access is required to join this call.",
+  "@callPermissionDenied": {
+    "description": "Patient interface: callPermissionDenied"
+  },
+  "callOpenSettings": "Open Settings",
+  "@callOpenSettings": {
+    "description": "Patient interface: callOpenSettings"
+  },
+  "callPreparing": "Preparing your call…",
+  "@callPreparing": {
+    "description": "Patient interface: callPreparing"
+  },
+  "callConnecting": "Connecting…",
+  "@callConnecting": {
+    "description": "Patient interface: callConnecting"
+  },
+  "callReconnecting": "Reconnecting…",
+  "@callReconnecting": {
+    "description": "Patient interface: callReconnecting"
+  },
+  "callWaitingForOther": "Waiting for the doctor to join…",
+  "@callWaitingForOther": {
+    "description": "Patient interface: callWaitingForOther"
+  },
+  "callEnded": "Call ended.",
+  "@callEnded": {
+    "description": "Patient interface: callEnded"
+  },
+  "callConnectionLost": "The connection was lost and could not be recovered. Please try again.",
+  "@callConnectionLost": {
+    "description": "Patient interface: callConnectionLost"
+  },
+  "cacheOffline": "Offline — showing saved data",
+  "@cacheOffline": {
+    "description": "Patient interface: cacheOffline"
+  },
+  "cacheOfflineUpdated": "Offline — showing saved data · Last updated {time}",
+  "@cacheOfflineUpdated": {
+    "description": "Patient interface: cacheOfflineUpdated",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheLastUpdated": "Last updated {time}",
+  "@cacheLastUpdated": {
+    "description": "Patient interface: cacheLastUpdated",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "authDataConsentTitle": "Patient data and health information",
+  "authDataConsentSummary": "Review the data-sharing consent required to create your HelloDoctor account.",
+  "authDataConsentView": "Read the full consent",
+  "authDataConsentAccept": "I have read and accept this consent",
+  "authDataConsentRequired": "Read and accept the Patient data-sharing consent before continuing.",
+  "authDataConsentLoadError": "Unable to load the consent notice. Please retry.",
+  "discoveryTitle": "Find a doctor",
+  "discoverySubtitle": "Choose a verified clinician for your care.",
+  "discoverySearch": "Search doctors or specialties",
+  "filterSpecialty": "Specialty",
+  "filterAvailability": "Availability",
+  "filterVisitType": "Visit type",
+  "filterAllAvailability": "Any duty status",
+  "filterOnDuty": "On duty",
+  "filterAllVisits": "All consultation types",
+  "consultChoose": "Choose consultation",
+  "consultVideo": "Video consultation",
+  "consultChat": "24-hour chat",
+  "consultBookVideo": "Book video",
+  "consultBookChat": "Book chat",
+  "consultAction": "Consult",
+  "consultProfile": "View profile",
+  "consultSlotNotice": "Choose an available slot, then complete payment.",
+  "consultUnavailable": "Consultations not offered",
+  "consultOffDuty": "Off duty",
+  "profileVerified": "Verified clinician",
+  "profileCredentials": "Credentials",
+  "qnaScreenTitle": "Ask a Doctor",
+  "qnaScreenSubtitle": "Get general health guidance from verified HelloDoctor clinicians.",
+  "qnaAskAction": "Ask a health question",
+  "qnaRecent": "Recent questions",
+  "qnaAwaiting": "Awaiting answer",
+  "qnaAnsweredBy": "Answered by",
+  "qnaReadFull": "Read full answer",
+  "qnaPrivacyGuide": "Keep your question general. Do not include names, phone numbers, addresses or other identifying information.",
+  "qnaAnonymousNotice": "Your question will be posted anonymously.",
+  "qnaQuestionLabel": "Your question",
+  "qnaSubmitAction": "Submit question",
+  "qnaSuccessTitle": "Question submitted",
+  "qnaSuccessBody": "A verified doctor can now respond.",
+  "qnaBackToFeed": "Back to questions",
+  "qnaEmptyTitle": "No questions yet",
+  "qnaEmptyBody": "Ask a general health question. Your pending questions and published answers will appear here.",
+  "qnaValidation": "Enter a question with 1 to 4,000 characters.",
+  "qnaSubmitting": "Submitting...",
+  "profileExperienceLine": "{years} years experience",
+  "@profileExperienceLine": {
+    "placeholders": {
+      "years": {
+        "type": "String"
+      }
+    }
+  },
+  "filterDoctorsCount": "{count, plural, =1{1 doctor} other{{count} doctors}}",
+  "@filterDoctorsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
+}
