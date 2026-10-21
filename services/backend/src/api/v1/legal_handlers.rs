@@ -51,6 +51,23 @@ pub async fn get_own_acceptances(
     }))
 }
 
+/// GET /api/v1/patients/legal/acceptances — a Patient's own immutable
+/// onboarding-consent history. The same ledger is shared with Doctor legal
+/// acceptance evidence, but the Patient path uses PatientRead authorization.
+pub async fn get_patient_acceptances(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::PatientRead)?;
+    let mut tx = state.begin_authed(&ctx).await?;
+    let acceptances = legal_repo::list_for_user(&mut *tx, ctx.user_id).await?;
+    tx.commit().await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: acceptances,
+    }))
+}
+
 /// GET /api/v1/admin/legal/acceptances/:user_id — Compliance/ClinicalAdmin/
 /// PlatformAdmin evidence view of a specific user's acceptance history.
 pub async fn admin_list_acceptances(

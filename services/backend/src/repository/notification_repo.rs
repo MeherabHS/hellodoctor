@@ -103,7 +103,7 @@ pub async fn list_for_user<'e, E: PgExecutor<'e>>(
 ) -> Result<Vec<Notification>, sqlx::Error> {
     sqlx::query_as::<_, Notification>(
         "SELECT * FROM notifications WHERE user_id = $1 \
-         ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+         ORDER BY created_at DESC,id DESC LIMIT $2 OFFSET $3",
     )
     .bind(user_id)
     .bind(limit)
@@ -257,4 +257,26 @@ pub mod device_tokens {
         .fetch_all(executor)
         .await
     }
+}
+
+pub async fn list_cursor<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: UserId,
+    limit: i64,
+    time: chrono::DateTime<chrono::Utc>,
+    id: Uuid,
+    before: bool,
+) -> Result<Vec<Notification>, sqlx::Error> {
+    let query = if before {
+        "SELECT * FROM notifications WHERE user_id=$1 AND (created_at,id)<($3,$4) ORDER BY created_at DESC,id DESC LIMIT $2"
+    } else {
+        "SELECT * FROM notifications WHERE user_id=$1 AND (created_at,id)>($3,$4) ORDER BY created_at ASC,id ASC LIMIT $2"
+    };
+    sqlx::query_as::<_, Notification>(query)
+        .bind(user_id)
+        .bind(limit)
+        .bind(time)
+        .bind(id)
+        .fetch_all(executor)
+        .await
 }

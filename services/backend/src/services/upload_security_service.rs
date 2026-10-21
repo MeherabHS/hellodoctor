@@ -77,6 +77,28 @@ const PDF_DANGEROUS_MARKERS: &[&[u8]] = &[
 
 pub struct UploadSecurityService;
 
+fn decoder_semaphore() -> std::sync::Arc<tokio::sync::Semaphore> {
+    static DECODERS: std::sync::OnceLock<std::sync::Arc<tokio::sync::Semaphore>> =
+        std::sync::OnceLock::new();
+    DECODERS
+        .get_or_init(|| std::sync::Arc::new(tokio::sync::Semaphore::new(4)))
+        .clone()
+}
+
+struct SanitizeWork;
+impl SanitizeWork {
+    fn start() -> Self {
+        metrics::gauge!("upload_sanitize_active_workers").increment(1.0);
+        metrics::counter!("upload_sanitize_operations_total").increment(1);
+        Self
+    }
+}
+impl Drop for SanitizeWork {
+    fn drop(&mut self) {
+        metrics::gauge!("upload_sanitize_active_workers").decrement(1.0);
+    }
+}
+
 impl UploadSecurityService {
     /// Every image is compressed toward the same fixed per-image budget
     /// (`MAX_PRESCRIPTION_IMAGE_BYTES`) regardless of how many images are
@@ -84,16 +106,17 @@ impl UploadSecurityService {
     /// pre-consultation intake upload (now up to 20 images) and the doctor's
     /// one-photo-per-call Rx upload both call this the same way.
     pub async fn sanitize_async(bytes: Vec<u8>, mime: String) -> Result<Vec<u8>, AppError> {
-        static DECODERS: std::sync::OnceLock<std::sync::Arc<tokio::sync::Semaphore>> =
-            std::sync::OnceLock::new();
-        let permit = DECODERS
-            .get_or_init(|| std::sync::Arc::new(tokio::sync::Semaphore::new(4)))
-            .clone()
-            .acquire_owned()
-            .await
-            .map_err(|_| AppError::internal("Upload validation unavailable.".into()))?;
+        // Reject cheap size/MIME/magic failures before reserving a decoder or
+        // scheduling blocking work. Full decoding remains inside the bulkhead.
+        Self::validated_format(&bytes, &mime)?;
+        let permit = decoder_semaphore().try_acquire_owned().map_err(|_| {
+            AppError::RateLimitExceeded(
+                "Too many uploads in progress. Please try again shortly.".into(),
+            )
+        })?;
         tokio::task::spawn_blocking(move || {
             let _permit = permit;
+            let _work = SanitizeWork::start();
             Self::validate_and_sanitize(&bytes, &mime)
         })
         .await
@@ -110,6 +133,34 @@ impl UploadSecurityService {
     /// construction. That column exists for a *future* async re-scan path,
     /// not because this function can itself produce anything else yet.
     pub fn validate_and_sanitize(bytes: &[u8], mime_type: &str) -> Result<Vec<u8>, AppError> {
+        let Some(format) = Self::validated_format(bytes, mime_type)? else {
+            Self::validate_pdf_structure(bytes)?;
+            return Ok(bytes.to_vec());
+        };
+        let mut reader = image::ImageReader::with_format(Cursor::new(bytes), format);
+        let mut limits = image::Limits::default();
+        limits.max_alloc = Some(128 * 1024 * 1024);
+        limits.max_image_width = Some(8192);
+        limits.max_image_height = Some(8192);
+        reader.limits(limits);
+        let decoded = reader.decode().map_err(|_| {
+            AppError::UnprocessableEntity(
+                "File claims to be an image but could not be decoded.".into(),
+            )
+        })?;
+
+        let decoded = Self::downscale_if_needed(decoded, MAX_IMAGE_DIMENSION);
+        let sanitized = Self::compress_to_target(decoded, format, MAX_PRESCRIPTION_IMAGE_BYTES)?;
+
+        if sanitized.len() > MAX_UPLOAD_BYTES {
+            return Err(AppError::PayloadTooLarge(
+                "Sanitized image exceeds maximum limit of 10 MB.".into(),
+            ));
+        }
+        Ok(sanitized)
+    }
+
+    fn validated_format(bytes: &[u8], mime_type: &str) -> Result<Option<ImageFormat>, AppError> {
         if bytes.len() > MAX_UPLOAD_BYTES {
             return Err(AppError::PayloadTooLarge(
                 "Uploaded file exceeds maximum limit of 10 MB.".into(),
@@ -139,8 +190,7 @@ impl UploadSecurityService {
         }
 
         if is_pdf {
-            Self::validate_pdf_structure(bytes)?;
-            return Ok(bytes.to_vec());
+            return Ok(None);
         }
 
         if !is_jpeg && !is_png {
@@ -149,32 +199,11 @@ impl UploadSecurityService {
             ));
         }
 
-        let format = if is_jpeg {
+        Ok(Some(if is_jpeg {
             ImageFormat::Jpeg
         } else {
             ImageFormat::Png
-        };
-        let mut reader = image::ImageReader::with_format(Cursor::new(bytes), format);
-        let mut limits = image::Limits::default();
-        limits.max_alloc = Some(128 * 1024 * 1024);
-        limits.max_image_width = Some(8192);
-        limits.max_image_height = Some(8192);
-        reader.limits(limits);
-        let decoded = reader.decode().map_err(|_| {
-            AppError::UnprocessableEntity(
-                "File claims to be an image but could not be decoded.".into(),
-            )
-        })?;
-
-        let decoded = Self::downscale_if_needed(decoded, MAX_IMAGE_DIMENSION);
-        let sanitized = Self::compress_to_target(decoded, format, MAX_PRESCRIPTION_IMAGE_BYTES)?;
-
-        if sanitized.len() > MAX_UPLOAD_BYTES {
-            return Err(AppError::PayloadTooLarge(
-                "Sanitized image exceeds maximum limit of 10 MB.".into(),
-            ));
-        }
-        Ok(sanitized)
+        }))
     }
 
     /// Downscales an image whose long edge exceeds `max_dim`, preserving
@@ -293,14 +322,25 @@ impl UploadSecurityService {
     /// rather than passed through blindly) and PDFs containing active-content
     /// dictionary keys. Checks the real file structure, not the client-
     /// supplied `Content-Type` header.
+    ///
+    /// Matching runs against the name-escape-*normalized* bytes
+    /// (`normalize_pdf_name_escapes`), not the raw file bytes: PDF name
+    /// objects permit `#xx` hex-character escaping (ISO 32000-1 §7.3.5), and
+    /// a marker written as `/J#61vaScript` or `/En#63rypt` is spec-valid and
+    /// decodes identically to the unescaped form in any conforming parser,
+    /// but previously never matched this literal-byte scan
+    /// (h03-pdf-dangerous-marker-hex-escape-bypass). This remains a
+    /// structural heuristic, not a substitute for real antivirus/malware
+    /// scanning — no such integration exists in this codebase.
     fn validate_pdf_structure(bytes: &[u8]) -> Result<(), AppError> {
-        if contains_subsequence(bytes, b"/Encrypt") {
+        let normalized = normalize_pdf_name_escapes(bytes);
+        if contains_subsequence(&normalized, b"/Encrypt") {
             return Err(AppError::UnprocessableEntity(
                 "Encrypted PDFs are not accepted.".into(),
             ));
         }
         for marker in PDF_DANGEROUS_MARKERS {
-            if contains_subsequence(bytes, marker) {
+            if contains_subsequence(&normalized, marker) {
                 return Err(AppError::UnprocessableEntity(
                     "This PDF contains active content (scripts, actions, or embedded files) and cannot be accepted.".into(),
                 ));
@@ -312,6 +352,215 @@ impl UploadSecurityService {
 
 fn contains_subsequence(haystack: &[u8], needle: &[u8]) -> bool {
     haystack.windows(needle.len()).any(|w| w == needle)
+}
+
+/// Decodes PDF name-object `#xx` hex-character escapes (ISO 32000-1 §7.3.5)
+/// within name tokens only (a token starting at `/` and running until a PDF
+/// delimiter/whitespace byte) — not arbitrary `#xx` sequences anywhere in the
+/// file, so this stays bounded to actual name-token syntax rather than
+/// blindly decoding file-wide. Output is never longer than the input (every
+/// decode step replaces 3 input bytes with 1 output byte; everything else is
+/// copied 1:1), so this performs a single bounded linear pass with no
+/// unbounded allocation. A malformed escape (a `#` not followed by two hex
+/// digits, including truncation at end of input) fails safe: the `#` is kept
+/// as a literal byte, so detection can only ever widen, never be evaded by a
+/// deliberately-broken escape.
+fn normalize_pdf_name_escapes(bytes: &[u8]) -> Vec<u8> {
+    fn is_name_delimiter(b: u8) -> bool {
+        matches!(
+            b,
+            b' ' | b'\t'
+                | b'\r'
+                | b'\n'
+                | 0x0c
+                | 0x00
+                | b'('
+                | b')'
+                | b'<'
+                | b'>'
+                | b'['
+                | b']'
+                | b'{'
+                | b'}'
+                | b'/'
+                | b'%'
+        )
+    }
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        out.push(b);
+        i += 1;
+        if b != b'/' {
+            continue;
+        }
+        // Inside a name token now: decode #xx escapes until a delimiter.
+        while i < bytes.len() && !is_name_delimiter(bytes[i]) {
+            if bytes[i] == b'#' {
+                let decoded = bytes
+                    .get(i + 1..i + 3)
+                    .and_then(|h| std::str::from_utf8(h).ok())
+                    .and_then(|s| u8::from_str_radix(s, 16).ok());
+                match decoded {
+                    Some(byte) => {
+                        out.push(byte);
+                        i += 3;
+                    }
+                    None => {
+                        out.push(b'#');
+                        i += 1;
+                    }
+                }
+            } else {
+                out.push(bytes[i]);
+                i += 1;
+            }
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod async_capacity_tests {
+    use super::*;
+
+    static SANITIZER_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    fn tiny_png() -> Vec<u8> {
+        let mut output = Cursor::new(Vec::new());
+        DynamicImage::ImageRgb8(image::RgbImage::new(2, 2))
+            .write_to(&mut output, ImageFormat::Png)
+            .unwrap();
+        output.into_inner()
+    }
+
+    #[tokio::test]
+    async fn four_decoder_permits_reject_excess_without_waiting_and_recover() {
+        let _serial = SANITIZER_TEST_LOCK.lock().await;
+        let decoders = decoder_semaphore();
+        let busy = decoders.try_acquire_many(4).unwrap();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            UploadSecurityService::sanitize_async(tiny_png(), "image/png".into()),
+        )
+        .await
+        .expect("excess decoders must fail fast instead of queuing");
+        assert!(matches!(result, Err(AppError::RateLimitExceeded(_))));
+        assert_eq!(decoders.available_permits(), 0);
+        drop(busy);
+
+        let sanitized = UploadSecurityService::sanitize_async(tiny_png(), "image/png".into())
+            .await
+            .expect("released decoder capacity must be usable");
+        let image = image::load_from_memory_with_format(&sanitized, ImageFormat::Png).unwrap();
+        assert_eq!((image.width(), image.height()), (2, 2));
+        assert!(sanitized.len() <= MAX_PRESCRIPTION_IMAGE_BYTES);
+        assert_eq!(decoders.available_permits(), 4);
+    }
+
+    #[tokio::test]
+    async fn invalid_mime_and_magic_reject_before_decoder_reservation() {
+        let _serial = SANITIZER_TEST_LOCK.lock().await;
+        let decoders = decoder_semaphore();
+        let _busy = decoders.try_acquire_many(4).unwrap();
+        for (bytes, mime) in [
+            (tiny_png(), "application/pdf"),
+            (b"not-an-image".to_vec(), "image/jpeg"),
+            (vec![0, 1], "image/png"),
+        ] {
+            let result = tokio::time::timeout(
+                std::time::Duration::from_millis(100),
+                UploadSecurityService::sanitize_async(bytes, mime.into()),
+            )
+            .await
+            .expect("cheap invalid input must not queue for decoder capacity");
+            assert!(matches!(result, Err(AppError::UnprocessableEntity(_))));
+            assert_eq!(decoders.available_permits(), 0);
+        }
+    }
+
+    #[test]
+    fn cancelled_sanitizer_keeps_permit_until_blocking_work_finishes() {
+        let _serial = SANITIZER_TEST_LOCK.blocking_lock();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .max_blocking_threads(1)
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            struct ReleaseWorker(Option<std::sync::mpsc::Sender<()>>);
+            impl Drop for ReleaseWorker {
+                fn drop(&mut self) {
+                    if let Some(sender) = self.0.take() {
+                        let _ = sender.send(());
+                    }
+                }
+            }
+
+            let deadline = std::time::Duration::from_secs(30);
+            let decoders = decoder_semaphore();
+            let held = decoders.try_acquire_many(3).unwrap();
+            let (release, wait) = std::sync::mpsc::channel();
+            let mut release = ReleaseWorker(Some(release));
+            let (started, started_rx) = tokio::sync::oneshot::channel();
+            let blocker = tokio::task::spawn_blocking(move || {
+                let _ = started.send(());
+                wait.recv().unwrap();
+            });
+            tokio::time::timeout(deadline, started_rx)
+                .await
+                .expect("controlled blocking worker must start")
+                .unwrap();
+
+            let (polled, polled_rx) = tokio::sync::oneshot::channel();
+            let caller = tokio::spawn(async move {
+                let mut work = Box::pin(UploadSecurityService::sanitize_async(
+                    tiny_png(),
+                    "image/png".into(),
+                ));
+                let mut polled = Some(polled);
+                std::future::poll_fn(|context| {
+                    let result = std::future::Future::poll(work.as_mut(), context);
+                    if let Some(sender) = polled.take() {
+                        let _ = sender.send(result.is_pending());
+                    }
+                    result
+                })
+                .await
+            });
+            assert!(tokio::time::timeout(deadline, polled_rx)
+                .await
+                .expect("real sanitizer must reserve capacity")
+                .unwrap());
+            assert_eq!(decoders.available_permits(), 0);
+            caller.abort();
+            assert!(matches!(caller.await, Err(error) if error.is_cancelled()));
+            assert_eq!(
+                decoders.available_permits(),
+                0,
+                "caller cancellation must not release queued decoder capacity"
+            );
+            assert!(matches!(
+                UploadSecurityService::sanitize_async(tiny_png(), "image/png".into()).await,
+                Err(AppError::RateLimitExceeded(_))
+            ));
+
+            release.0.take().unwrap().send(()).unwrap();
+            tokio::time::timeout(deadline, blocker)
+                .await
+                .expect("controlled worker must finish")
+                .unwrap();
+            let recovered = tokio::time::timeout(deadline, decoders.acquire())
+                .await
+                .expect("real decoder must finish after caller cancellation")
+                .unwrap();
+            assert_eq!(decoders.available_permits(), 0);
+            drop(recovered);
+            drop(held);
+            assert_eq!(decoders.available_permits(), 4);
+        });
+    }
 }
 
 #[cfg(test)]
@@ -346,6 +595,66 @@ mod tests {
     #[test]
     fn rejects_encrypted_pdf() {
         let pdf = minimal_pdf(b"trailer << /Encrypt 3 0 R >>");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_err());
+    }
+
+    // h03-pdf-dangerous-marker-hex-escape-bypass regression coverage: PDF
+    // name objects permit `#xx` hex-escaping (ISO 32000-1 §7.3.5); every one
+    // of these is spec-valid and must be caught exactly like its unescaped
+    // literal form.
+
+    #[test]
+    fn rejects_hex_escaped_javascript_name() {
+        // /J#61vaScript decodes to /JavaScript ('a' = 0x61).
+        let pdf = minimal_pdf(b"1 0 obj << /S /J#61vaScript /JS (app.alert('x')) >> endobj");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_err());
+    }
+
+    #[test]
+    fn rejects_hex_escaped_openaction_name() {
+        // /O#70enAction decodes to /OpenAction ('p' = 0x70).
+        let pdf = minimal_pdf(b"<< /Type /Catalog /O#70enAction 5 0 R >>");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_err());
+    }
+
+    #[test]
+    fn rejects_hex_escaped_encrypt_name() {
+        // /En#63rypt decodes to /Encrypt ('c' = 0x63).
+        let pdf = minimal_pdf(b"trailer << /En#63rypt 3 0 R >>");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_err());
+    }
+
+    #[test]
+    fn rejects_multiple_escapes_in_one_name() {
+        // Every character of JavaScript escaped, not just one.
+        let pdf =
+            minimal_pdf(b"<< /S /#4a#61#76#61#53#63#72#69#70#74 /JS (app.alert('x')) >> endobj");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_err());
+    }
+
+    #[test]
+    fn malformed_escape_fails_safe_without_panicking() {
+        // A '#' not followed by two valid hex digits (here: 'zz', non-hex)
+        // must never panic and must never cause the scanner to lose sync —
+        // the literal '#' is kept verbatim, so this does not spell out a
+        // real dangerous marker and the file is accepted, not misread into
+        // something it isn't.
+        let pdf = minimal_pdf(b"1 0 obj << /S /J#zzvaScript >> endobj");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_ok());
+    }
+
+    #[test]
+    fn malformed_escape_truncated_at_end_of_name_fails_safe() {
+        // '#' with fewer than two bytes remaining before end-of-input.
+        let pdf = minimal_pdf(b"1 0 obj << /S /Foo#");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_ok());
+    }
+
+    #[test]
+    fn literal_marker_still_rejected_after_normalization_change() {
+        // Non-regression: ordinary unescaped markers (no '#' at all) must
+        // still be caught exactly as before.
+        let pdf = minimal_pdf(b"1 0 obj << /S /JavaScript /JS (app.alert('x')) >> endobj");
         assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_err());
     }
 

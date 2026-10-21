@@ -38,7 +38,7 @@ pub async fn list_payout_destinations<'e, E: PgExecutor<'e>>(
     doctor_id: DoctorProfileId,
 ) -> Result<Vec<DoctorPayoutDestination>, sqlx::Error> {
     sqlx::query_as::<_, DoctorPayoutDestination>(
-        "SELECT id, doctor_id, provider_code, method_type, currency, provider_reference, masked_destination, binding_status, verification_status, payout_capable, is_primary, created_at, updated_at FROM doctor_payout_destinations WHERE doctor_id = $1 ORDER BY is_primary DESC, created_at DESC",
+        "SELECT id, doctor_id, provider_code, method_type, currency, provider_reference, masked_destination, binding_status, verification_status, payout_capable, platform_payment_method_id, is_primary, created_at, updated_at FROM doctor_payout_destinations WHERE doctor_id = $1 ORDER BY is_primary DESC, created_at DESC",
     )
     .bind(doctor_id)
     .fetch_all(executor)
@@ -50,7 +50,7 @@ pub async fn get_primary_payout_destination<'e, E: PgExecutor<'e>>(
     doctor_id: DoctorProfileId,
 ) -> Result<Option<DoctorPayoutDestination>, sqlx::Error> {
     sqlx::query_as::<_, DoctorPayoutDestination>(
-        "SELECT id, doctor_id, provider_code, method_type, currency, provider_reference, masked_destination, binding_status, verification_status, payout_capable, is_primary, created_at, updated_at FROM doctor_payout_destinations WHERE doctor_id = $1 AND currency = 'KES' AND is_primary = TRUE AND binding_status = 'ACTIVE' AND payout_capable = TRUE LIMIT 1",
+        "SELECT id, doctor_id, provider_code, method_type, currency, provider_reference, masked_destination, binding_status, verification_status, payout_capable, platform_payment_method_id, is_primary, created_at, updated_at FROM doctor_payout_destinations WHERE doctor_id = $1 AND currency = 'KES' AND is_primary = TRUE AND binding_status = 'ACTIVE' AND payout_capable = TRUE LIMIT 1",
     )
     .bind(doctor_id)
     .fetch_optional(executor)
@@ -76,13 +76,93 @@ pub async fn create_dev_payout_destination(
     sqlx::query_as::<_, DoctorPayoutDestination>(
         "INSERT INTO doctor_payout_destinations (doctor_id, provider_code, method_type, currency, provider_reference, masked_destination, binding_status, verification_status, payout_capable, is_primary)
          VALUES ($1, 'DEV_SIMULATED', $2, 'KES', 'dev-payout-' || gen_random_uuid()::text, $3, 'ACTIVE', 'DEV_SIMULATED', TRUE, TRUE)
-         RETURNING id, doctor_id, provider_code, method_type, currency, provider_reference, masked_destination, binding_status, verification_status, payout_capable, is_primary, created_at, updated_at",
+         RETURNING id, doctor_id, provider_code, method_type, currency, provider_reference, masked_destination, binding_status, verification_status, payout_capable, platform_payment_method_id, is_primary, created_at, updated_at",
     )
     .bind(doctor_id)
     .bind(method_type)
     .bind(masked_destination)
     .fetch_one(connection)
     .await
+}
+
+/// The production-grade binding this codebase's own `set_payout_method`
+/// error message refers to ("use the configured Kenya provider binding
+/// flow") but which never existed — confirmed by grepping the entire
+/// codebase for any such flow before writing this. Deliberately targets
+/// `doctor_payout_destinations` (the table `list_payout_routing` and the
+/// whole disbursement pipeline actually read), NOT the separate legacy
+/// `doctor_payout_methods` table `set_payout_method` writes to — that
+/// table has no live reader at all, confirmed directly, which is the real
+/// reason a doctor's saved legacy method never appeared in Admin's payout
+/// routing view regardless of any readiness-badge bug on the frontend.
+///
+/// `verification_status` is deliberately `AWAITING_PROVIDER_INTEGRATION`,
+/// not `DEV_SIMULATED` — this accepts the doctor's real, caller-supplied
+/// reference (encrypted, same as every other secret in this codebase), it
+/// is simply not yet verified against a live provider API because none is
+/// wired up ("the body waiting for the heart"). `payout_capable=TRUE`
+/// matches how every other payout-destination row already behaves in this
+/// pre-real-provider system — real money movement remains simulated
+/// platform-wide regardless of this flag, not specifically gated by it.
+#[allow(clippy::too_many_arguments)]
+pub async fn bind_payout_destination(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    doctor_id: DoctorProfileId,
+    provider_code: &str,
+    method_type: &str,
+    provider_reference_encrypted: &str,
+    masked_destination: &str,
+    verification_status: &str,
+    platform_payment_method_id: Uuid,
+    make_primary: bool,
+) -> Result<DoctorPayoutDestination, sqlx::Error> {
+    sqlx::query("SELECT id FROM doctor_profiles WHERE id=$1 FOR UPDATE")
+        .bind(doctor_id)
+        .execute(&mut **tx)
+        .await?;
+    if make_primary {
+        sqlx::query("UPDATE doctor_payout_destinations SET is_primary=FALSE, updated_at=NOW() WHERE doctor_id=$1 AND currency='KES'")
+            .bind(doctor_id).execute(&mut **tx).await?;
+    }
+    sqlx::query_as::<_, DoctorPayoutDestination>(
+        "INSERT INTO doctor_payout_destinations (doctor_id, provider_code, method_type, currency, provider_reference, masked_destination, binding_status, verification_status, payout_capable, platform_payment_method_id, is_primary)
+         VALUES ($1, $2, $3, 'KES', $4, $5, 'ACTIVE', $6, TRUE, $7, $8)
+         RETURNING id, doctor_id, provider_code, method_type, currency, provider_reference, masked_destination, binding_status, verification_status, payout_capable, platform_payment_method_id, is_primary, created_at, updated_at",
+    )
+    .bind(doctor_id)
+    .bind(provider_code)
+    .bind(method_type)
+    .bind(provider_reference_encrypted)
+    .bind(masked_destination)
+    .bind(verification_status)
+    .bind(platform_payment_method_id)
+    .bind(make_primary)
+    .fetch_one(&mut **tx)
+    .await
+}
+
+pub async fn set_primary_payout_destination(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    doctor_id: DoctorProfileId,
+    destination_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query("SELECT id FROM doctor_profiles WHERE id=$1 FOR UPDATE")
+        .bind(doctor_id)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("UPDATE doctor_payout_destinations SET is_primary=FALSE, updated_at=NOW() WHERE doctor_id=$1 AND currency='KES'")
+        .bind(doctor_id)
+        .execute(&mut **tx)
+        .await?;
+    let result = sqlx::query(
+        "UPDATE doctor_payout_destinations SET is_primary=TRUE, updated_at=NOW() \
+         WHERE id=$1 AND doctor_id=$2 AND binding_status='ACTIVE'",
+    )
+    .bind(destination_id)
+    .bind(doctor_id)
+    .execute(&mut **tx)
+    .await?;
+    Ok(result.rows_affected() == 1)
 }
 
 pub async fn list_all<'e, E: PgExecutor<'e>>(

@@ -48,6 +48,41 @@ impl AuthContext {
         Ok(profile.id)
     }
 
+    /// Resolves which `patient_profiles.id` a patient-initiated write
+    /// (booking, intake upload, grievance submission, the appointment list)
+    /// should act as: the caller's own self profile when `requested` is
+    /// `None`, or — if `requested` names a different profile — that profile,
+    /// authorized by confirming it's a dependent the caller actually
+    /// guardians. The RLS-scoped `find_by_id` below is the actual
+    /// authorization check: a profile_id that isn't the caller's own self
+    /// profile and isn't one of their dependents simply isn't visible under
+    /// RLS (`patient_profiles_access`), so it comes back `None` here and this
+    /// returns a `NotFound`, not a specially-worded "forbidden" — the caller
+    /// cannot distinguish "doesn't exist" from "not yours" either way, which
+    /// is the correct non-leaky behavior.
+    pub async fn acting_patient_profile_id(
+        &self,
+        state: &AppState,
+        requested: Option<PatientProfileId>,
+    ) -> Result<PatientProfileId, AppError> {
+        let self_id = self.patient_profile_id(state).await?;
+        let Some(requested) = requested else {
+            return Ok(self_id);
+        };
+        if requested == self_id {
+            return Ok(self_id);
+        }
+        let mut tx = state.begin_authed(self).await?;
+        let profile = crate::repository::patient_repo::find_by_id(&mut *tx, requested)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Patient profile not found.".into()))?;
+        tx.commit().await?;
+        if profile.guardian_patient_id != Some(self_id) {
+            return Err(AppError::NotFound("Patient profile not found.".into()));
+        }
+        Ok(requested)
+    }
+
     /// Resolves the canonical private Doctor profile under transaction-local RLS.
     pub async fn doctor_profile_id(&self, state: &AppState) -> Result<DoctorProfileId, AppError> {
         if self.role != UserRole::Doctor {
@@ -88,10 +123,10 @@ impl AuthContext {
     pub fn system() -> Self {
         AuthContext {
             user_id: UserId::from(Uuid::nil()),
-            role: UserRole::PlatformAdmin,
+            role: UserRole::Admin,
             permissions: vec!["admin:*".into()],
             session_id: None,
-            request_id: None,
+            request_id: crate::api::middleware::request_context::current().map(|c| c.id),
         }
     }
 }

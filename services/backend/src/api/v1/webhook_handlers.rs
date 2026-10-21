@@ -114,7 +114,7 @@ pub async fn handle_payment_webhook(
             "provider": provider,
             "appointment_id": apt.id,
             "status": apt.status,
-            "message": "Payment confirmed and consultation slot locked."
+            "message": "Payment event processed. Refer to the authoritative appointment status."
         }),
     }))
 }

@@ -105,9 +105,32 @@ pub enum AppError {
     Database(#[source] sqlx::Error),
 }
 
+/// Maps the PostgreSQL exclusion violations that enforce appointment interval
+/// exclusivity (migration 20261111000001) to an intentional 409. The messages
+/// are fixed strings: they never echo the conflicting appointment, the other
+/// party or the offending interval.
+fn schedule_conflict(e: &sqlx::Error) -> Option<AppError> {
+    let db = e.as_database_error()?;
+    if db.code().as_deref() != Some("23P01") {
+        return None;
+    }
+    match db.constraint() {
+        Some("appt_patient_no_overlap") => Some(AppError::Conflict(
+            "This time overlaps another appointment for the same patient.".into(),
+        )),
+        Some("appt_doctor_no_overlap") => Some(AppError::Conflict(
+            "The selected time is no longer available.".into(),
+        )),
+        _ => None,
+    }
+}
+
 impl From<sqlx::Error> for AppError {
     #[track_caller]
     fn from(e: sqlx::Error) -> Self {
+        if let Some(conflict) = schedule_conflict(&e) {
+            return conflict;
+        }
         record_error_location(Location::caller());
         AppError::Database(e)
     }
@@ -177,7 +200,7 @@ pub struct ResponseMeta {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let request_id = uuid::Uuid::new_v4().to_string();
+        let request_id = crate::api::middleware::request_context::request_id();
         let mut details: Option<Vec<ErrorDetail>> = None;
         let (status, code, message) = match &self {
             AppError::Validation(msg) => (
@@ -323,7 +346,18 @@ impl IntoResponse for AppError {
             },
         };
 
-        (status, Json(body)).into_response()
+        let mut response = (status, Json(body)).into_response();
+        if status == StatusCode::TOO_MANY_REQUESTS || status == StatusCode::SERVICE_UNAVAILABLE {
+            response.headers_mut().insert(
+                axum::http::header::RETRY_AFTER,
+                axum::http::HeaderValue::from_static(if status == StatusCode::TOO_MANY_REQUESTS {
+                    "60"
+                } else {
+                    "1"
+                }),
+            );
+        }
+        response
     }
 }
 

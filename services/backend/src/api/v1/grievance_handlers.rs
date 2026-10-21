@@ -3,7 +3,7 @@ use crate::auth_context::AuthContext;
 use crate::domain::models::*;
 use crate::error::AppError;
 use crate::rate_limit;
-use crate::repository::AppState;
+use crate::repository::{appointment_repo, consultation_repo, AppState};
 use crate::services::GrievanceService;
 use axum::{
     extract::{Path, State},
@@ -53,7 +53,27 @@ pub async fn submit_grievance(
         ));
     }
 
-    let patient_id = ctx.patient_profile_id(&state).await?;
+    // The consultation's own appointment already pins down which profile
+    // (self or a guardianed dependent) this grievance is about — resolved
+    // here rather than trusted from a client-supplied field, consistent
+    // with `prescription_handlers::upload_patient_intake`. The DB trigger
+    // `guard_grievance_subject` independently enforces this same
+    // consistency at the database level regardless of what's passed here.
+    let consultation_patient_id = {
+        let mut lookup_tx = state.begin_authed(&ctx).await?;
+        let consultation = consultation_repo::find_by_id(&mut *lookup_tx, payload.consultation_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Consultation session not found.".into()))?;
+        let appointment =
+            appointment_repo::find_by_id(&mut *lookup_tx, consultation.appointment_id)
+                .await?
+                .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+        lookup_tx.commit().await?;
+        appointment.patient_id
+    };
+    let patient_id = ctx
+        .acting_patient_profile_id(&state, Some(consultation_patient_id))
+        .await?;
     let report = GrievanceService::submit_grievance(
         &state,
         &ctx,

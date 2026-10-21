@@ -1,19 +1,24 @@
 use crate::api::middleware::{auth_middleware, global_guard_middleware, idempotency_middleware};
 use crate::api::v1::*;
+use crate::domain::models::ErrorSeverity;
+use crate::error::{ErrorBody, ErrorResponse, ResponseMeta};
 use crate::repository::AppState;
+use crate::system_error::{self, ErrorEvent};
 use crate::telemetry;
 use axum::{
     error_handling::HandleErrorLayer,
     extract::State,
     http::{HeaderValue, Method, StatusCode},
     middleware::{from_fn, from_fn_with_state},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{get, post},
     BoxError, Json, Router,
 };
 use metrics_exporter_prometheus::PrometheusHandle;
+use std::any::Any;
 use std::time::Duration;
 use tower::ServiceBuilder;
+use tower_http::catch_panic::CatchPanicLayer;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
@@ -23,20 +28,102 @@ use tower_http::trace::TraceLayer;
 const MAX_REQUEST_BODY_BYTES: usize = 15 * 1024 * 1024;
 const REQUEST_TIMEOUT_SECS: u64 = 10;
 
+fn error_envelope(status: StatusCode, code: &'static str, message: String) -> Response {
+    let body = ErrorResponse {
+        success: false,
+        error: ErrorBody {
+            code: code.to_string(),
+            message,
+            details: None,
+        },
+        meta: ResponseMeta {
+            timestamp: chrono::Utc::now(),
+            request_id: crate::api::middleware::request_context::request_id(),
+        },
+    };
+    (status, Json(body)).into_response()
+}
+
 /// Converts a timeout or load-shed rejection (the only ways this stage can fail) into
 /// a real HTTP response, since axum requires the outermost service to be infallible.
-async fn handle_overload_error(err: BoxError) -> (StatusCode, String) {
-    if err.is::<tower::timeout::error::Elapsed>() {
+/// Both are genuine backend-distress signals — something hung past
+/// `REQUEST_TIMEOUT_SECS`, or the server is rejecting work outright under
+/// load — so both are reported into the same `system_error_logs` pipeline
+/// every other backend failure uses, instead of only ever being visible as
+/// a client-side timeout with nothing to correlate it against admin-side.
+pub async fn handle_overload_error(err: BoxError) -> Response {
+    let (status, code, message, subsystem, severity) = if err.is::<tower::timeout::error::Elapsed>()
+    {
         (
             StatusCode::REQUEST_TIMEOUT,
+            "REQUEST_TIMEOUT",
             "Request timed out.".to_string(),
+            "INTERNAL",
+            ErrorSeverity::Error,
         )
     } else {
         (
             StatusCode::SERVICE_UNAVAILABLE,
+            "SERVICE_OVERLOADED",
             "Server is under heavy load — please retry shortly.".to_string(),
+            "INTERNAL",
+            ErrorSeverity::Warning,
         )
+    };
+    tracing::warn!("Request stage failure: {code}");
+    let event = ErrorEvent::new(
+        severity,
+        subsystem,
+        "RequestStage::Overload",
+        code,
+        message.clone(),
+        crate::api::middleware::request_context::request_id(),
+    )
+    .with_http_status(status.as_u16());
+    system_error::report(event);
+    error_envelope(status, code, message)
+}
+
+/// Converts an unwinding panic from inside any handler into a normal 500
+/// response and a `system_error_logs` row, instead of the connection simply
+/// dropping with nothing recorded anywhere. Every *handled* failure
+/// (`AppError`'s `Internal`/`Database`/`ServiceUnavailable` variants) already
+/// reports into this same pipeline (see `error.rs`) — a genuine code bug
+/// (an unexpected `None`/`unwrap`, an out-of-bounds index) previously had no
+/// equivalent path at all and was invisible to the admin panel.
+pub fn handle_panic(payload: Box<dyn Any + Send + 'static>) -> Response {
+    let message = if let Some(s) = payload.downcast_ref::<&str>() {
+        s.to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        "Handler panicked with a non-string payload.".to_string()
+    };
+    tracing::error!("Handler panicked: {}", system_error::redact(&message));
+    // `CatchPanicLayer`'s callback is only ever given the panic's message
+    // payload — never its `PanicInfo` (confirmed by reading tower-http's own
+    // source, not assumed) — so the real file:line has to come from the
+    // sidecar panic hook `system_error::ensure_panic_location_capture`
+    // installs, read here on this same thread immediately after
+    // `catch_unwind` returns, before anything else can touch it.
+    let mut event = ErrorEvent::new(
+        ErrorSeverity::Critical,
+        "INTERNAL",
+        "HandlerPanic",
+        "HANDLER_PANIC",
+        message,
+        crate::api::middleware::request_context::request_id(),
+    )
+    .with_http_status(500);
+    if let Some(loc) = system_error::take_last_panic_location() {
+        event = event.with_stack_trace(loc);
     }
+    system_error::report(event);
+    error_envelope(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "INTERNAL_SERVER_ERROR",
+        "An unexpected error occurred.".to_string(),
+    )
 }
 
 pub fn create_router(state: AppState) -> Router {
@@ -87,7 +174,9 @@ pub fn create_router_with_metrics(state: AppState, metrics_handle: PrometheusHan
         .merge(health_router)
         .nest("/api/v1", api_v1)
         .merge(metrics_router)
+        .layer(from_fn_with_state(state.clone(), crate::api::middleware::web_auth::middleware))
         .layer(from_fn_with_state(state.clone(), global_guard_middleware))
+        .layer(from_fn_with_state(state.clone(), crate::admission::middleware))
         .layer(from_fn_with_state(state.clone(), crate::api::middleware::transport_guard))
         .layer(cors)
         .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<axum::body::Body>| {
@@ -95,6 +184,12 @@ pub fn create_router_with_metrics(state: AppState, metrics_handle: PrometheusHan
         }))
         .layer(from_fn(telemetry::track_metrics))
         .layer(RequestBodyLimitLayer::new(MAX_REQUEST_BODY_BYTES))
+        // Placed inside (closer to the handler than) `request_context`'s
+        // layer below, so a caught panic still runs while that request's
+        // task-local context is active — `handle_panic` calling
+        // `request_id()` resolves the real per-request id, not a fallback.
+        .layer(CatchPanicLayer::custom(handle_panic))
+        .layer(from_fn(crate::api::middleware::request_context::middleware))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_overload_error))
@@ -105,23 +200,51 @@ pub fn create_router_with_metrics(state: AppState, metrics_handle: PrometheusHan
 
 /// `GET /healthz` — a real readiness check, not a static "OK". Verifies the
 /// live database's applied migrations actually match what this compiled
-/// binary's embedded migrator expects (see `migration_status` module doc
+/// binary's embedded migrator expects, and checks the required Redis dependency
+/// with a bounded PING (see `migration_status` module doc
 /// comment for the incident — B-01 — this closes). Never leaks raw SQL
 /// errors or schema internals in the response body; any underlying DB error
 /// is logged via `tracing` instead.
 async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
-    match crate::migration_status::check(&state.db, &crate::migration_status::MIGRATOR).await {
-        Ok(status) if status.schema_ready => (
-            StatusCode::OK,
-            Json(serde_json::json!({
-                "status": "ready",
-                "database": "ready",
-                "migrations": "current",
-                "binary_latest_migration": status.binary_latest.to_string(),
-                "database_latest_migration": status.database_latest.map(|v| v.to_string()),
-            })),
-        ),
-        Ok(status) => (
+    match tokio::time::timeout(
+        Duration::from_millis(250),
+        crate::migration_status::check(&state.db, &crate::migration_status::MIGRATOR),
+    )
+    .await
+    {
+        Ok(Ok(status)) if status.schema_ready => {
+            let redis_ready = matches!(
+                tokio::time::timeout(Duration::from_millis(250), async {
+                    let mut connection = state.redis.get().await.ok()?;
+                    let reply: String = deadpool_redis::redis::cmd("PING")
+                        .query_async(&mut connection)
+                        .await
+                        .ok()?;
+                    Some(reply == "PONG")
+                })
+                .await,
+                Ok(Some(true))
+            );
+            if !redis_ready {
+                metrics::counter!("readiness_dependency_failures_total").increment(1);
+            }
+            (
+                if redis_ready {
+                    StatusCode::OK
+                } else {
+                    StatusCode::SERVICE_UNAVAILABLE
+                },
+                Json(serde_json::json!({
+                    "status": if redis_ready { "ready" } else { "not_ready" },
+                    "database": "ready",
+                    "redis": if redis_ready { "ready" } else { "unreachable" },
+                    "migrations": "current",
+                    "binary_latest_migration": status.binary_latest.to_string(),
+                    "database_latest_migration": status.database_latest.map(|v| v.to_string()),
+                })),
+            )
+        }
+        Ok(Ok(status)) => (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(serde_json::json!({
                 "status": "not_ready",
@@ -131,8 +254,10 @@ async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
                 "database_latest_migration": status.database_latest.map(|v| v.to_string()),
             })),
         ),
-        Err(e) => {
-            tracing::error!("healthz: database unreachable or migration-status query failed: {e}");
+        _ => {
+            metrics::counter!("readiness_dependency_failures_total").increment(1);
+            // A readiness probe remains cheap during an outage; do not write a
+            // database error per probe or wait the full pool acquisition timeout.
             (
                 StatusCode::SERVICE_UNAVAILABLE,
                 Json(serde_json::json!({
@@ -171,6 +296,18 @@ fn public_routes() -> Router<AppState> {
             axum::routing::post(auth_handlers::register_otp),
         )
         .route(
+            "/auth/patient/register",
+            axum::routing::post(auth_handlers::patient_register),
+        )
+        .route(
+            "/auth/patient/login",
+            axum::routing::post(auth_handlers::patient_login),
+        )
+        .route(
+            "/auth/patient/verify-otp",
+            axum::routing::post(auth_handlers::patient_verify_otp),
+        )
+        .route(
             "/auth/verify-otp-and-login",
             axum::routing::post(auth_handlers::verify_otp_and_login),
         )
@@ -193,6 +330,10 @@ fn public_routes() -> Router<AppState> {
         .route(
             "/auth/admin/login",
             axum::routing::post(auth_handlers::admin_login),
+        )
+        .route(
+            "/auth/admin/verify-otp",
+            axum::routing::post(auth_handlers::admin_verify_otp),
         )
         .route(
             "/auth/refresh",
@@ -224,10 +365,17 @@ fn protected_routes() -> Router<AppState> {
         .route("/doctors/:id", get(doctor_handlers::get_doctor))
         .route("/doctors/:id/slots", get(doctor_handlers::get_doctor_slots))
         .route("/doctor/profile", get(doctor_handlers::get_own_profile).patch(doctor_handlers::update_own_profile))
+        .route("/doctor/profile/photo", axum::routing::post(crate::api::v1::profile_picture_handlers::upload_doctor_photo)
+            .get(crate::api::v1::profile_picture_handlers::get_own_doctor_photo)
+            .delete(crate::api::v1::profile_picture_handlers::delete_doctor_photo))
+        .route("/doctors/:id/photo", get(crate::api::v1::profile_picture_handlers::get_directory_doctor_photo))
         .route("/doctor/duty", get(doctor_handlers::get_own_duty).put(doctor_handlers::update_own_duty))
         .route("/doctor/slots", get(doctor_handlers::list_own_slots).post(doctor_handlers::create_own_slot))
         .route("/doctor/slots/:slot_id", axum::routing::delete(doctor_handlers::cancel_own_slot).patch(doctor_handlers::update_own_slot))
         .route("/doctor/appointments", get(doctor_handlers::list_own_appointments))
+        .route("/appointments/:id/trace-ack", axum::routing::post(crate::api::v1::trace_handlers::acknowledge))
+        .route("/admin/grievances/:id/timeline", get(crate::api::v1::trace_handlers::grievance_timeline))
+        .route("/admin/appointments/:id/reschedule", axum::routing::post(crate::api::v1::trace_handlers::reschedule))
         // Notifications (own-inbox only; see notification_handlers.rs)
         .route("/notifications", get(notification_handlers::list_own_notifications))
         .route("/notifications/unread-count", get(notification_handlers::unread_count))
@@ -242,6 +390,26 @@ fn protected_routes() -> Router<AppState> {
         .route("/doctor/qna/questions", get(doctor_handlers::list_open_questions))
         .route("/doctor/qna/questions/:question_id/answers", axum::routing::post(doctor_handlers::answer_question))
         .route("/doctor/legal/acceptances", get(legal_handlers::get_own_acceptances))
+        .route(
+            "/patients/legal/acceptances",
+            get(legal_handlers::get_patient_acceptances),
+        )
+        // Patients
+        .route("/patients/me/data-requests", get(crate::api::v1::data_rights_handlers::list_own).post(crate::api::v1::data_rights_handlers::create))
+        .route("/admin/patient-data-requests", get(crate::api::v1::data_rights_handlers::list_for_review))
+        .route("/admin/patient-data-requests/:id", axum::routing::patch(crate::api::v1::data_rights_handlers::review))
+        .route("/patients/me", get(patient_handlers::get_own_profile).patch(patient_handlers::update_own_profile))
+        .route("/patients/me/photo", axum::routing::post(crate::api::v1::profile_picture_handlers::upload_patient_photo)
+            .get(crate::api::v1::profile_picture_handlers::get_patient_photo)
+            .delete(crate::api::v1::profile_picture_handlers::delete_patient_photo))
+        .route("/patients/me/appointments", get(patient_handlers::list_own_appointments))
+        .route("/patients/me/documents", get(patient_handlers::list_own_documents))
+        .route("/patients/me/qna/questions", get(patient_handlers::list_answered_questions).post(patient_handlers::submit_question))
+        .route("/patients/me/profiles", get(patient_handlers::list_profiles).post(patient_handlers::create_dependent_profile))
+        .route("/patients/me/profiles/:id", axum::routing::patch(patient_handlers::update_dependent_profile))
+        .route("/patients/me/payment-methods", axum::routing::get(patient_handlers::list_own_payment_methods).post(patient_handlers::save_payment_method))
+        .route("/patients/me/payment-methods/:id", axum::routing::delete(patient_handlers::remove_payment_method))
+        .route("/patients/me/payment-methods/:id/set-primary", axum::routing::post(patient_handlers::set_primary_payment_method))
         // Appointments
         .route(
             "/appointments/book",
@@ -252,6 +420,14 @@ fn protected_routes() -> Router<AppState> {
             get(appointment_handlers::get_appointment),
         )
         .route(
+            "/appointments/:id/conversation",
+            get(appointment_handlers::get_conversation_for_appointment),
+        )
+        .route(
+            "/appointments/:id/consultation",
+            get(appointment_handlers::get_consultation_for_appointment),
+        )
+        .route(
             "/appointments/:id/prescriptions",
             axum::routing::post(prescription_handlers::upload_patient_intake),
         )
@@ -259,6 +435,9 @@ fn protected_routes() -> Router<AppState> {
             "/appointments/:id/documents/:document_id",
             get(prescription_handlers::get_document_download_url),
         )
+        .route("/appointments/:id/payment", axum::routing::post(appointment_handlers::initiate_payment))
+        .route("/chat/:id/attachments", axum::routing::post(crate::api::v1::chat_attachment_handlers::upload))
+        .route("/chat/:id/messages/:message_id/attachment", get(crate::api::v1::chat_attachment_handlers::view))
         // Consultations & Agora
         .route(
             "/consultations/:appointment_id/rtc-token",
@@ -307,6 +486,14 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/doctor/wallet/payout-methods/dev-bind",
             axum::routing::post(wallet_handlers::dev_bind_payout_method),
+        )
+        .route(
+            "/doctor/wallet/payout-methods/bind",
+            axum::routing::post(wallet_handlers::bind_payout_destination),
+        )
+        .route(
+            "/doctor/wallet/payout-methods/set-primary",
+            axum::routing::post(wallet_handlers::set_primary_payout_destination),
         )
         .route(
             "/doctor/wallet/statements",
@@ -388,6 +575,14 @@ fn protected_routes() -> Router<AppState> {
             "/admin/patients/:id/dossier",
             get(admin_handlers::get_patient_dossier),
         )
+        .route(
+            "/admin/patients/:id/data-rights/erase",
+            axum::routing::post(admin_handlers::execute_patient_data_rights),
+        )
+        .route(
+            "/admin/doctors/:id/data-rights/erase",
+            axum::routing::post(admin_handlers::execute_doctor_data_rights),
+        )
         .route("/admin/doctors/pending-verification", get(admin_handlers::list_pending_doctor_verifications))
         .route(
             "/admin/doctors/:id/verify",
@@ -396,6 +591,10 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/admin/doctors/:id/reject",
             axum::routing::post(admin_handlers::reject_doctor_professional_registration),
+        )
+        .route(
+            "/admin/doctors/:id/revoke",
+            axum::routing::post(admin_handlers::revoke_doctor_professional_registration),
         )
         .route(
             "/admin/compliance/alerts",
@@ -435,5 +634,18 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/admin/consultations/:session_id/timeline",
             get(admin_handlers::get_consultation_timeline),
+        )
+        .route(
+            "/admin/platform-payment-methods",
+            axum::routing::get(admin_handlers::list_platform_payment_methods)
+                .post(admin_handlers::save_platform_payment_method),
+        )
+        .route(
+            "/admin/platform-payment-methods/:id/set-primary",
+            axum::routing::post(admin_handlers::set_primary_platform_payment_method),
+        )
+        .route(
+            "/admin/platform-payment-methods/:id",
+            axum::routing::delete(admin_handlers::deactivate_platform_payment_method),
         )
 }

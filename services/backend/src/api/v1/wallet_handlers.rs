@@ -11,6 +11,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use base64::Engine as _;
 use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -223,6 +224,132 @@ pub async fn dev_bind_payout_method(
             "payout_capable": destination.payout_capable, "is_primary": destination.is_primary,
             "message": "Development payout destination connected (simulated)."
         }),
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BindPayoutDestinationRequest {
+    pub method_type: PayoutMethodType,
+    pub account_identifier: String,
+    /// Defaults to true for a doctor's very first destination (nothing else
+    /// to be primary over); the service layer below applies that default,
+    /// this field only needs to be explicit when a doctor already has at
+    /// least one destination and is choosing whether the new one replaces
+    /// it as primary.
+    #[serde(default)]
+    pub make_primary: Option<bool>,
+}
+
+/// The production-grade "configured Kenya provider binding flow" —
+/// previously referenced by `set_payout_method`'s own error message but
+/// never implemented anywhere (confirmed by searching the codebase before
+/// writing this), and distinct from `dev_bind_payout_method` above (which
+/// is dev-only and writes a server-generated fake reference). This accepts
+/// a doctor's real account identifier, reachable in every environment, and
+/// writes to `doctor_payout_destinations` — the table Admin's payout
+/// routing and the disbursement pipeline actually read from (unlike the
+/// legacy `set_payout_method` above, which writes to the separate,
+/// unread `doctor_payout_methods` table). Real provider verification is not
+/// yet wired up (`verification_status: AWAITING_PROVIDER_INTEGRATION`)
+/// — this is the complete body the mission is waiting to attach a real
+/// payment-provider driver to, not a partial stub.
+pub async fn bind_payout_destination(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Json(payload): Json<BindPayoutDestinationRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ViewOwnWallet)?;
+    let doctor_id = ctx.doctor_profile_id(&state).await?;
+    let clean = validate_payout_identifier(payload.method_type, &payload.account_identifier)?;
+    let last4: String = clean
+        .chars()
+        .rev()
+        .take(4)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    let masked_destination = format!(
+        "{} \u{2022}\u{2022}\u{2022}\u{2022} {}",
+        method_display_name(payload.method_type),
+        last4
+    );
+    let encrypted_bytes = crypto::encrypt_secret(&clean, &state.config.totp_encryption_key_b64)?;
+    let encrypted = base64::engine::general_purpose::STANDARD.encode(encrypted_bytes);
+    let provider_code = match payload.method_type {
+        PayoutMethodType::Mpesa => "MPESA",
+        PayoutMethodType::Bkash => "BKASH",
+        PayoutMethodType::BankCard => "CARD",
+        PayoutMethodType::BankTransfer => "BANK_TRANSFER",
+    };
+
+    let mut tx = state.begin_authed(&ctx).await?;
+    // Requires the platform to actually have a provider configured for this
+    // method type before anything is bound — see
+    // services::payment_provider_verification for why this is a hard stop,
+    // not a warning.
+    let verification =
+        crate::services::payment_provider_verification::verify_doctor_payout_destination(
+            &mut *tx,
+            payload.method_type,
+        )
+        .await?;
+    let existing = wallet_repo::list_payout_destinations(&mut *tx, doctor_id).await?;
+    let make_primary = payload.make_primary.unwrap_or(existing.is_empty());
+    let destination = wallet_repo::bind_payout_destination(
+        &mut tx,
+        doctor_id,
+        provider_code,
+        &format!("{:?}", payload.method_type),
+        &encrypted,
+        &masked_destination,
+        verification.verification_status,
+        verification.platform_payment_method_id,
+        make_primary,
+    )
+    .await?;
+    tx.commit().await?;
+
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({
+            "id": destination.id, "provider_code": destination.provider_code,
+            "method_type": destination.method_type, "currency": destination.currency,
+            "masked_destination": destination.masked_destination,
+            "binding_status": destination.binding_status,
+            "verification_status": destination.verification_status,
+            "payout_capable": destination.payout_capable, "is_primary": destination.is_primary,
+        }),
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SetPrimaryPayoutDestinationRequest {
+    pub destination_id: Uuid,
+}
+
+pub async fn set_primary_payout_destination(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Json(payload): Json<SetPrimaryPayoutDestinationRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ViewOwnWallet)?;
+    let doctor_id = ctx.doctor_profile_id(&state).await?;
+    let mut tx = state.begin_authed(&ctx).await?;
+    let updated =
+        wallet_repo::set_primary_payout_destination(&mut tx, doctor_id, payload.destination_id)
+            .await?;
+    if !updated {
+        return Err(AppError::NotFound(
+            "No active payout destination with that id belongs to this account.".into(),
+        ));
+    }
+    tx.commit().await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({ "id": payload.destination_id, "is_primary": true }),
     }))
 }
 

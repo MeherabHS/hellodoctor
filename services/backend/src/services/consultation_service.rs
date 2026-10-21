@@ -5,7 +5,9 @@ use crate::repository::{
     appointment_repo, consultation_repo, doctor_repo, grievance_repo, patient_repo,
     system_error_repo, transaction_repo, AppState,
 };
-use crate::services::agora_token_service::{AgoraTokenResponse, AgoraTokenService};
+use crate::services::agora_token_service::{
+    AgoraTokenResponse, AgoraTokenService, DEFAULT_TOKEN_EXPIRE_SECS,
+};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
@@ -79,10 +81,26 @@ impl ConsultationService {
         // unreachable, caught only by testing with a genuinely distinct
         // user_id vs. profile_id rather than a demo context where the two
         // happened to be conflated).
-        let is_patient = patient_repo::find_by_user_id(&mut *tx, user_id)
-            .await?
-            .map(|p| p.id == apt.patient_id)
-            .unwrap_or(false);
+        //
+        // `apt.patient_id` may be a dependent profile (no `user_id` of its
+        // own, no login) — in that case the real authorized participant is
+        // whoever guardians it, so this walks up exactly one level
+        // (dependents cannot nest) rather than only matching a direct self
+        // profile. Without this, a guardian joining their dependent's own
+        // consultation would be wrongly rejected as "not an authorized
+        // participant" — caught directly by this service's own test, not
+        // just reasoned about.
+        let is_patient = match patient_repo::find_by_id(&mut *tx, apt.patient_id).await? {
+            Some(p) if p.user_id == Some(user_id) => true,
+            Some(p) => match p.guardian_patient_id {
+                Some(guardian_id) => patient_repo::find_by_id(&mut *tx, guardian_id)
+                    .await?
+                    .map(|g| g.user_id == Some(user_id))
+                    .unwrap_or(false),
+                None => false,
+            },
+            None => false,
+        };
         let is_doctor = doctor_repo::find_by_id(&mut *tx, apt.doctor_id)
             .await?
             .map(|d| d.user_id == user_id && d.is_professionally_verified())
@@ -91,6 +109,12 @@ impl ConsultationService {
         if !is_patient && !is_doctor {
             return Err(AppError::Forbidden(
                 "Caller is not an authorized participant in this consultation.".into(),
+            ));
+        }
+
+        if apt.modality != Modality::Video {
+            return Err(AppError::Forbidden(
+                "Video access is only available for video consultations.".into(),
             ));
         }
 
@@ -144,17 +168,36 @@ impl ConsultationService {
                     created_at: Utc::now(),
                 };
                 consultation_repo::insert_session(&mut *tx, &s).await?;
-                s
+                // Another authorized participant may have created the session
+                // concurrently. Always mint for the stored shared channel.
+                consultation_repo::find_by_appointment(&mut *tx, appointment_id)
+                    .await?
+                    .ok_or_else(|| {
+                        AppError::internal("Consultation session was not persisted.".into())
+                    })?
             }
         };
 
         tx.commit().await?;
+
+        // Bound the token's real cryptographic expiry (and every privilege it
+        // grants) to whatever remains of the already-verified authorization
+        // window, capped at `DEFAULT_TOKEN_EXPIRE_SECS` — a token must never
+        // outlive the appointment window that justified minting it. The
+        // window check above already guarantees `now <= window_end`; the
+        // `max(60, ...)` floor only guards the boundary instant where that
+        // remainder would otherwise round down to a useless near-zero token.
+        let remaining_secs = (window_end - now).num_seconds();
+        let expire_secs = remaining_secs
+            .clamp(0, DEFAULT_TOKEN_EXPIRE_SECS as i64)
+            .max(60) as u32;
 
         AgoraTokenService::mint(
             &session.agora_channel_name,
             user_id,
             agora_app_id,
             agora_certificate,
+            expire_secs,
         )
     }
 
@@ -213,10 +256,21 @@ impl ConsultationService {
             .await?
             .ok_or_else(|| AppError::NotFound("Appointment record not found.".into()))?;
 
-        let is_patient = patient_repo::find_by_user_id(&mut *tx, ctx.user_id)
-            .await?
-            .map(|p| p.id == apt.patient_id)
-            .unwrap_or(false);
+        // Same guardian-aware ownership resolution as `mint_agora_token` —
+        // `apt.patient_id` may be a dependent profile with no `user_id` of
+        // its own, so the real authorized participant is whoever guardians
+        // it.
+        let is_patient = match patient_repo::find_by_id(&mut *tx, apt.patient_id).await? {
+            Some(p) if p.user_id == Some(ctx.user_id) => true,
+            Some(p) => match p.guardian_patient_id {
+                Some(guardian_id) => patient_repo::find_by_id(&mut *tx, guardian_id)
+                    .await?
+                    .map(|g| g.user_id == Some(ctx.user_id))
+                    .unwrap_or(false),
+                None => false,
+            },
+            None => false,
+        };
         let perspective = if is_patient {
             "PATIENT"
         } else {
@@ -302,7 +356,23 @@ impl ConsultationService {
 
         let mut participant_user_ids = Vec::new();
         if let Some(p) = patient_repo::find_by_id(&mut *tx, apt.patient_id).await? {
-            participant_user_ids.push(p.user_id);
+            match p.user_id {
+                Some(uid) => participant_user_ids.push(uid),
+                // A dependent profile has no login of its own — the real
+                // authenticated participant is whoever guardians it. Walk up
+                // exactly one level (dependents cannot nest, enforced by a DB
+                // trigger) so a dependent-booked consultation's incidents are
+                // still correlated to the account that actually joined.
+                None => {
+                    if let Some(guardian_id) = p.guardian_patient_id {
+                        if let Some(g) = patient_repo::find_by_id(&mut *tx, guardian_id).await? {
+                            if let Some(uid) = g.user_id {
+                                participant_user_ids.push(uid);
+                            }
+                        }
+                    }
+                }
+            }
         }
         if let Some(d) = doctor_repo::find_by_id(&mut *tx, apt.doctor_id).await? {
             participant_user_ids.push(d.user_id);
@@ -352,16 +422,9 @@ impl ConsultationService {
         appointment_id: Uuid,
         outcome: ClinicalOutcome,
     ) -> Result<(), AppError> {
-        // Captured *before* calling the atomic completion function below:
-        // `doctor_complete_consultation` only performs the authoritative
-        // wallet credit when the transaction is still `PAYMENT_HELD` at that
-        // exact moment (see the SQL function's own `IF payment_row.
-        // payment_status='PAYMENT_HELD'` guard) — on a retried/duplicate
-        // completion call the status has already moved on, so the credit
-        // (and therefore this notification) naturally never fires twice.
-        // Deliberately does not modify the already-tested, security-definer
-        // SQL function itself to report this — reading the pre-call state in
-        // Rust is less invasive and keeps that frozen function untouched.
+        // This snapshot supplies notification amounts only. The SQL function's
+        // locked ALREADY_COMPLETED decision below is the concurrency gate;
+        // an unlocked pre-call status cannot decide who earned the effect.
         let pre_call_payment_held =
             transaction_repo::find_by_appointment(&mut **tx, appointment_id)
                 .await?
@@ -374,6 +437,9 @@ impl ConsultationService {
             .await?;
         match result.as_str() {
             "COMPLETED" => {}
+            // The SQL function decides this while holding authoritative rows.
+            // A stale pre-call snapshot must not repeat semantic side effects.
+            "ALREADY_COMPLETED" => return Ok(()),
             "NOT_FOUND" => return Err(AppError::NotFound("Appointment not found.".into())),
             "FORBIDDEN" => {
                 return Err(AppError::Forbidden(
@@ -397,12 +463,18 @@ impl ConsultationService {
             }
         }
 
-        // `EARNING_CREDITED` — only when this exact call was the one that
-        // held `PAYMENT_HELD` beforehand (see the capture above), so it
-        // fires once per appointment regardless of how many times
-        // completion is retried, in the same transaction as the credit
-        // itself (a rollback here means no notification, matching the spec's
-        // "cannot fabricate a credit that rolled back" requirement).
+        crate::services::consultation_trace::record(
+            tx,
+            appointment_id,
+            None,
+            crate::services::consultation_trace::Event::accepted(
+                "CONSULTATION_COMPLETED",
+                Some(("APPOINTMENT", appointment_id)),
+            ),
+        )
+        .await?;
+        // Only the authoritative first completion reaches this point. Its
+        // notification commits/rolls back with the wallet credit and audit.
         if let Some(txn) = pre_call_payment_held {
             if let Some(appointment) =
                 appointment_repo::find_by_id(&mut **tx, appointment_id).await?

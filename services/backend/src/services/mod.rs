@@ -4,12 +4,15 @@ pub mod audit_service;
 pub mod auth_service;
 pub mod chat_service;
 pub mod consultation_service;
+pub mod data_rights_service;
 pub mod disbursement_service;
 pub mod grievance_service;
 pub mod notification_scheduler;
 pub mod notification_service;
 pub mod notification_transport;
+pub mod payment_provider_verification;
 pub mod prescription_service;
+pub mod profile_picture_service;
 pub mod upload_security_service;
 
 pub use agora_token_service::AgoraTokenService;
@@ -22,5 +25,8 @@ pub use disbursement_service::DisbursementService;
 pub use grievance_service::GrievanceService;
 pub use notification_service::NotificationService;
 pub use prescription_service::PrescriptionService;
+pub use profile_picture_service::ProfilePictureService;
 pub use upload_security_service::UploadSecurityService;
 pub mod document_storage_service;
+
+pub mod consultation_trace;

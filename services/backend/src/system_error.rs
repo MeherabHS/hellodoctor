@@ -25,6 +25,57 @@ use uuid::Uuid;
 static SENDER: RwLock<Option<UnboundedSender<ErrorEvent>>> = RwLock::new(None);
 const DEDUP_WINDOW_MINUTES: i64 = 60;
 
+thread_local! {
+    /// Mirrors `error.rs`'s `LAST_ERROR_LOCATION` pattern for the one case
+    /// `#[track_caller]` cannot reach: a genuine unwinding panic. `router.rs`'s
+    /// `CatchPanicLayer::custom(handle_panic)` callback only ever receives the
+    /// panic's message payload (`Box<dyn Any + Send + 'static>`) — tower-http
+    /// gives it no access to `PanicInfo::location()` at all (confirmed by
+    /// reading `catch_panic.rs` directly, not assumed) — so without this, a
+    /// real code bug would be logged with a message but no file:line, a
+    /// strictly worse result than every handled `AppError` already gets.
+    /// Safe despite being thread-local rather than task-local for the exact
+    /// reason `LAST_ERROR_LOCATION` is: the panic hook below runs
+    /// synchronously, on the same OS thread, in the same call stack frame
+    /// that `catch_unwind` returns from — no `.await` point separates the
+    /// hook firing from `handle_panic` reading this immediately after.
+    static LAST_PANIC_LOCATION: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+static PANIC_HOOK_INSTALLED: std::sync::Once = std::sync::Once::new();
+
+/// Installs a panic hook that records the panic's real source location
+/// before delegating to whatever hook was already installed (the default
+/// one in production, so the familiar "thread '...' panicked at file:line"
+/// stderr line callers already rely on — this test suite's own output
+/// included — is never lost; this only adds a side channel, not a
+/// replacement). Idempotent: safe to call from every `init()` call across
+/// every test in this process, but only ever installs once.
+fn ensure_panic_location_capture() {
+    PANIC_HOOK_INSTALLED.call_once(|| {
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            if let Some(location) = info.location() {
+                LAST_PANIC_LOCATION.with(|cell| {
+                    *cell.borrow_mut() = Some(format!(
+                        "{}:{}:{}",
+                        location.file(),
+                        location.line(),
+                        location.column()
+                    ));
+                });
+            }
+            previous(info);
+        }));
+    });
+}
+
+/// Read-and-clear, matching `error.rs`'s `take_last_error_location` —
+/// called by `router.rs`'s `handle_panic` immediately after `catch_unwind`
+/// returns on this same thread.
+pub fn take_last_panic_location() -> Option<String> {
+    LAST_PANIC_LOCATION.with(|cell| cell.borrow_mut().take())
+}
+
 #[derive(Debug, Clone)]
 pub struct ErrorEvent {
     pub severity: ErrorSeverity,
@@ -50,6 +101,7 @@ pub struct ErrorEvent {
     /// Sanitized, bounded client metadata. Backend events leave this empty.
     pub client_context: Option<serde_json::Value>,
     pub fingerprint_context: Option<String>,
+    pub consultation_evidence: Option<crate::api::middleware::request_context::RequestEvidence>,
 }
 
 impl ErrorEvent {
@@ -75,6 +127,7 @@ impl ErrorEvent {
             stack_trace: None,
             client_context: None,
             fingerprint_context: None,
+            consultation_evidence: crate::api::middleware::request_context::evidence(),
         }
     }
 
@@ -109,6 +162,7 @@ impl ErrorEvent {
 /// is dropped, so the old consumer task drains whatever was already queued
 /// and exits cleanly rather than leaking.
 pub fn init(pool: PgPool) {
+    ensure_panic_location_capture();
     let (tx, mut rx) = mpsc::unbounded_channel::<ErrorEvent>();
     *SENDER.write().unwrap() = Some(tx);
 
@@ -147,20 +201,30 @@ async fn persist(pool: &PgPool, event: ErrorEvent) -> Result<Uuid, sqlx::Error> 
         hasher.update(context.as_bytes());
         fp = hex::encode(hasher.finalize());
     }
+    // Transaction-scoped evidence context must never leak through the system pool.
+    let mut tx = pool.begin().await?;
     if event.client_context.is_some() {
-        // Concurrent browser/device reports of the same incident must group
-        // atomically. Only the new client path takes this per-fingerprint lock.
-        let mut tx = pool.begin().await?;
-        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
             .bind(&fp)
             .execute(&mut *tx)
             .await?;
-        let id = persist_row(&mut tx, event, safe_message, fp).await?;
-        tx.commit().await?;
-        return Ok(id);
     }
-    let mut connection = pool.acquire().await?;
-    persist_row(&mut connection, event, safe_message, fp).await
+    let scope = event.consultation_evidence.clone();
+    let request = event.request_id.clone();
+    let code = event.error_code;
+    let id = persist_row(&mut tx, event, safe_message, fp).await?;
+    if let Some(scope) = scope {
+        if let (Some(actor), Some(appointment)) = (scope.actor, scope.appointment) {
+            sqlx::query("SELECT set_config('app.current_user_id',$1,true),set_config('app.current_role',$2,true),set_config('app.current_session_id',$3,true),set_config('app.current_request_id',$4,true),set_config('app.trace_retention_days',$5,true)")
+              .bind(actor.user_id.to_string()).bind(actor.role.as_str()).bind(actor.session_id.map(|s|s.to_string()).unwrap_or_default()).bind(&request).bind(scope.retention_days.clamp(3,5).to_string()).execute(&mut *tx).await?;
+            // Failed booking transactions may have rolled back the appointment;
+            // no trace reference is created for a resource that never committed.
+            sqlx::query("INSERT INTO consultation_trace_events(appointment_id,conversation_id,actor_role,event_type,resource_type,resource_id,result,reason_code) SELECT id,$2,'SYSTEM','CONSULTATION_REQUEST_FAILED','SYSTEM_ERROR',$3,'REJECTED',$4 FROM appointments WHERE id=$1")
+              .bind(appointment).bind(scope.conversation).bind(id).bind(code).execute(&mut *tx).await?;
+        }
+    }
+    tx.commit().await?;
+    Ok(id)
 }
 
 async fn persist_row(

@@ -82,6 +82,8 @@ pub async fn get_doctor_slots(
 
 #[derive(Debug, Deserialize)]
 pub struct PageQuery {
+    pub day: Option<chrono::NaiveDate>,
+    pub view: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
     pub status: Option<String>,
@@ -175,10 +177,10 @@ pub async fn list_own_slots(
     let id = ctx.doctor_profile_id(&state).await?;
     let (limit, offset) = page(&q);
     let mut tx = state.begin_authed(&ctx).await?;
-    let rows = sqlx::query("SELECT s.id, s.doctor_id, s.start_time, s.end_time, s.status::text AS status, s.created_at, a.id AS appointment_id, a.patient_id, p.full_name AS patient_display_name FROM doctor_schedule_slots s LEFT JOIN appointments a ON a.slot_id = s.id AND a.status <> 'CANCELLED' LEFT JOIN patient_profiles p ON p.id = a.patient_id WHERE s.doctor_id = $1 ORDER BY s.start_time LIMIT $2 OFFSET $3")
-        .bind(id).bind(limit).bind(offset).fetch_all(&mut *tx).await?;
+    let rows = sqlx::query("SELECT (s.status='AVAILABLE' AND s.start_time > clock_timestamp()) AS bookable, s.id, s.doctor_id, s.start_time, s.end_time, s.status::text AS status, s.created_at, a.id AS appointment_id, a.patient_id, COALESCE(p.full_name,doctor_encounter_patient_name(a.id)) AS patient_display_name FROM doctor_schedule_slots s LEFT JOIN appointments a ON a.slot_id = s.id AND a.status <> 'CANCELLED' LEFT JOIN patient_profiles p ON p.id = a.patient_id WHERE s.doctor_id = $1 AND ($4::DATE IS NULL OR (s.start_time >= ($4::DATE::TIMESTAMP AT TIME ZONE 'Africa/Nairobi') AND s.start_time < (($4::DATE+1)::TIMESTAMP AT TIME ZONE 'Africa/Nairobi'))) ORDER BY s.start_time,s.id LIMIT $2 OFFSET $3")
+        .bind(id).bind(limit).bind(offset).bind(q.day).fetch_all(&mut *tx).await?;
     tx.commit().await?;
-    let data: Vec<_> = rows.into_iter().map(|r| json!({"id": r.get::<Uuid,_>("id"), "doctor_id": r.get::<Uuid,_>("doctor_id"), "start_time": r.get::<DateTime<Utc>,_>("start_time"), "end_time": r.get::<DateTime<Utc>,_>("end_time"), "status": r.get::<String,_>("status"), "created_at": r.get::<DateTime<Utc>,_>("created_at"), "appointment_id": r.get::<Option<Uuid>,_>("appointment_id"), "patient_id": r.get::<Option<Uuid>,_>("patient_id"), "patient_display_name": r.get::<Option<String>,_>("patient_display_name")})).collect();
+    let data: Vec<_> = rows.into_iter().map(|r| json!({"bookable":r.get::<bool,_>("bookable"), "id": r.get::<Uuid,_>("id"), "doctor_id": r.get::<Uuid,_>("doctor_id"), "start_time": r.get::<DateTime<Utc>,_>("start_time"), "end_time": r.get::<DateTime<Utc>,_>("end_time"), "status": r.get::<String,_>("status"), "created_at": r.get::<DateTime<Utc>,_>("created_at"), "appointment_id": r.get::<Option<Uuid>,_>("appointment_id"), "patient_id": r.get::<Option<Uuid>,_>("patient_id"), "patient_display_name": r.get::<Option<String>,_>("patient_display_name")})).collect();
     Ok(Json(ApiResponse {
         success: true,
         data,
@@ -312,20 +314,53 @@ pub async fn list_own_appointments(
     let id = ctx.verified_doctor_profile_id(&state).await?;
     let (limit, offset) = page(&q);
     let mut tx = state.begin_authed(&ctx).await?;
-    // Default Queue ordering (approved product rule, not just a Flutter sort):
-    // eligible UPCOMING consultations (CONFIRMED/WAITING/IN_CONSULTATION) always
-    // come first, nearest-start-time first; everything else (COMPLETED,
-    // CANCELLED, EXPIRED, PREMATURE_TERMINATION, DISPUTED, REFUNDED) follows,
-    // newest-first, and can never displace an upcoming item regardless of its
-    // own start_time. `a.id` is the deterministic tie-break for two
-    // consultations sharing the same `start_time`. Applied unconditionally
-    // (not just when `$4` is NULL) — with a single status filter active this
-    // same CASE collapses to a plain ASC or DESC ordering for that one status,
-    // so there's no need to branch the query shape.
-    let rows = sqlx::query("SELECT a.id, a.appointment_number, a.patient_id, a.doctor_id, a.slot_id, a.modality::text AS modality, a.status::text AS status, a.consultation_fee, a.clinical_outcome, a.completed_at, a.created_at, a.updated_at, s.start_time, s.end_time, s.start_time - INTERVAL '15 minutes' AS history_access_from, CASE WHEN a.status='COMPLETED' THEN COALESCE(cs.ended_at,a.completed_at) + INTERVAL '24 hours' END AS history_access_until, doctor_history_context_allowed(a.id,$5) AS history_access_active, CASE WHEN a.status='COMPLETED' AND (COALESCE(cs.ended_at,a.completed_at) IS NULL OR CURRENT_TIMESTAMP >= COALESCE(cs.ended_at,a.completed_at) + INTERVAL '24 hours') THEN 'DONE' ELSE a.status::text END AS doctor_lifecycle, p.full_name AS patient_display_name FROM appointments a JOIN doctor_schedule_slots s ON s.id=a.slot_id JOIN patient_profiles p ON p.id=a.patient_id LEFT JOIN consultation_sessions cs ON cs.appointment_id=a.id WHERE a.doctor_id=$1 AND ($4::text IS NULL OR a.status::text=$4) ORDER BY CASE WHEN a.status::text IN ('CONFIRMED','WAITING','IN_CONSULTATION') THEN 0 ELSE 1 END ASC, CASE WHEN a.status::text IN ('CONFIRMED','WAITING','IN_CONSULTATION') THEN s.start_time END ASC, CASE WHEN a.status::text NOT IN ('CONFIRMED','WAITING','IN_CONSULTATION') THEN s.start_time END DESC, a.id ASC LIMIT $2 OFFSET $3")
-        .bind(id).bind(limit).bind(offset).bind(q.status).bind(ctx.user_id).fetch_all(&mut *tx).await?;
+    // PostgreSQL evaluates current work independently of device clocks. The
+    // complete list remains available for history; view=upcoming selects only
+    // actionable work. Active clinical chats retain their real server window.
+    if q.view
+        .as_deref()
+        .is_some_and(|v| !matches!(v, "all" | "upcoming" | "history" | "schedule"))
+    {
+        return Err(AppError::Validation("Unknown consultation view.".into()));
+    }
+    let rows = sqlx::query(r#"
+      WITH encounters AS (
+        SELECT a.id,a.appointment_number,a.patient_id,a.doctor_id,a.slot_id,
+          a.modality::text AS modality,a.status::text AS status,a.consultation_fee,
+          a.clinical_outcome,a.completed_at,a.created_at,a.updated_at,
+          s.start_time,s.end_time,c.id AS conversation_id,c.is_locked AS chat_locked,c.expires_at AS chat_expires_at,
+          s.start_time-INTERVAL '15 minutes' AS history_access_from,
+          CASE WHEN a.status='COMPLETED' THEN COALESCE(cs.ended_at,a.completed_at)+INTERVAL '24 hours' END AS history_access_until,
+          doctor_history_context_allowed(a.id,$5) AS history_access_active,
+          CASE WHEN a.status='COMPLETED' AND (COALESCE(cs.ended_at,a.completed_at) IS NULL OR clock_timestamp()>=COALESCE(cs.ended_at,a.completed_at)+INTERVAL '24 hours') THEN 'DONE' ELSE a.status::text END AS doctor_lifecycle,
+          COALESCE(p.full_name,doctor_encounter_patient_name(a.id),'Patient') AS patient_display_name,
+          (a.status='IN_CONSULTATION' OR (
+            a.status IN ('CONFIRMED','WAITING')
+            AND (s.start_time AT TIME ZONE 'Africa/Nairobi')::date=(clock_timestamp() AT TIME ZONE 'Africa/Nairobi')::date
+            AND ((a.modality='VIDEO' AND s.end_time>clock_timestamp()) OR
+              (a.modality='CHAT' AND COALESCE(NOT c.is_locked AND c.expires_at>clock_timestamp(),false)))
+          )) AS queue_actionable
+        FROM appointments a JOIN doctor_schedule_slots s ON s.id=a.slot_id
+        LEFT JOIN patient_profiles p ON p.id=a.patient_id
+        LEFT JOIN consultation_sessions cs ON cs.appointment_id=a.id
+        LEFT JOIN chat_conversations c ON c.appointment_id=a.id
+        WHERE a.doctor_id=$1 AND ($4::text IS NULL OR a.status::text=$4)
+      )
+      SELECT * FROM encounters WHERE
+        ($6::text<>'upcoming' OR queue_actionable)
+        AND ($6::text<>'schedule' OR (status IN ('CONFIRMED','WAITING') AND
+          (start_time AT TIME ZONE 'Africa/Nairobi')::date>(clock_timestamp() AT TIME ZONE 'Africa/Nairobi')::date))
+        AND ($6::text<>'history' OR status IN ('COMPLETED','CANCELLED','REFUNDED','EXPIRED','PREMATURE_TERMINATION','DISPUTED') OR
+          (NOT queue_actionable AND (end_time<=clock_timestamp() OR (modality='CHAT' AND (chat_locked OR chat_expires_at<=clock_timestamp())))))
+      ORDER BY CASE WHEN status='IN_CONSULTATION' THEN 0 WHEN queue_actionable THEN 1
+          WHEN status IN ('CONFIRMED','WAITING') AND start_time>clock_timestamp() THEN 2 ELSE 3 END,
+        CASE WHEN queue_actionable OR (status IN ('CONFIRMED','WAITING') AND start_time>clock_timestamp()) THEN start_time END ASC,
+        CASE WHEN NOT queue_actionable AND NOT(status IN ('CONFIRMED','WAITING') AND start_time>clock_timestamp()) THEN start_time END DESC,id ASC
+      LIMIT $2 OFFSET $3
+    "#)
+        .bind(id).bind(limit).bind(offset).bind(q.status).bind(ctx.user_id).bind(q.view.unwrap_or_else(||"upcoming".into())).fetch_all(&mut *tx).await?;
     tx.commit().await?;
-    let data: Vec<_> = rows.into_iter().map(|r| json!({"id": r.get::<Uuid,_>("id"), "appointment_number": r.get::<String,_>("appointment_number"), "patient_id": r.get::<Uuid,_>("patient_id"), "patient_display_name": r.get::<String,_>("patient_display_name"), "modality": r.get::<String,_>("modality"), "status": r.get::<String,_>("status"), "doctor_lifecycle": r.get::<String,_>("doctor_lifecycle"), "history_access_from": r.get::<DateTime<Utc>,_>("history_access_from"), "history_access_until": r.get::<Option<DateTime<Utc>>,_>("history_access_until"), "history_access_active": r.get::<bool,_>("history_access_active"), "consultation_fee": r.get::<bigdecimal::BigDecimal,_>("consultation_fee"), "clinical_outcome": r.get::<Option<String>,_>("clinical_outcome"), "completed_at": r.get::<Option<DateTime<Utc>>,_>("completed_at"), "start_time": r.get::<DateTime<Utc>,_>("start_time"), "end_time": r.get::<DateTime<Utc>,_>("end_time")})).collect();
+    let data: Vec<_> = rows.into_iter().map(|r| json!({"queue_actionable":r.get::<bool,_>("queue_actionable"), "id": r.get::<Uuid,_>("id"), "appointment_number": r.get::<String,_>("appointment_number"), "patient_id": r.get::<Uuid,_>("patient_id"), "patient_display_name": r.get::<String,_>("patient_display_name"), "conversation_id":r.get::<Option<Uuid>,_>("conversation_id"), "chat_locked":r.get::<Option<bool>,_>("chat_locked"), "chat_expires_at":r.get::<Option<DateTime<Utc>>,_>("chat_expires_at"), "modality": r.get::<String,_>("modality"), "status": r.get::<String,_>("status"), "doctor_lifecycle": r.get::<String,_>("doctor_lifecycle"), "history_access_from": r.get::<DateTime<Utc>,_>("history_access_from"), "history_access_until": r.get::<Option<DateTime<Utc>>,_>("history_access_until"), "history_access_active": r.get::<bool,_>("history_access_active"), "consultation_fee": r.get::<bigdecimal::BigDecimal,_>("consultation_fee"), "clinical_outcome": r.get::<Option<String>,_>("clinical_outcome"), "completed_at": r.get::<Option<DateTime<Utc>>,_>("completed_at"), "start_time": r.get::<DateTime<Utc>,_>("start_time"), "end_time": r.get::<DateTime<Utc>,_>("end_time")})).collect();
     Ok(Json(ApiResponse {
         success: true,
         data,
@@ -341,10 +376,10 @@ pub async fn list_own_chats(
     let id = ctx.verified_doctor_profile_id(&state).await?;
     let (limit, offset) = page(&q);
     let mut tx = state.begin_authed(&ctx).await?;
-    let rows = sqlx::query("SELECT c.id, c.appointment_id, c.patient_id, c.doctor_id, c.expires_at, c.is_locked, c.created_at, p.full_name AS patient_display_name, MAX(m.sent_at) AS last_message_at FROM chat_conversations c JOIN patient_profiles p ON p.id=c.patient_id LEFT JOIN chat_messages m ON m.conversation_id=c.id WHERE c.doctor_id=$1 GROUP BY c.id, p.full_name ORDER BY COALESCE(MAX(m.sent_at), c.created_at) DESC LIMIT $2 OFFSET $3")
+    let rows = sqlx::query("SELECT c.id, c.appointment_id, c.patient_id, c.doctor_id, c.expires_at, c.is_locked, c.created_at, a.modality::text AS modality, a.status::text AS appointment_status, COALESCE(p.full_name,doctor_encounter_patient_name(a.id),'Patient') AS patient_display_name, MAX(m.sent_at) AS last_message_at FROM chat_conversations c JOIN appointments a ON a.id=c.appointment_id LEFT JOIN patient_profiles p ON p.id=c.patient_id LEFT JOIN chat_messages m ON m.conversation_id=c.id WHERE c.doctor_id=$1 GROUP BY c.id, p.full_name, a.id ORDER BY COALESCE(MAX(m.sent_at), c.created_at) DESC LIMIT $2 OFFSET $3")
         .bind(id).bind(limit).bind(offset).fetch_all(&mut *tx).await?;
     tx.commit().await?;
-    let data: Vec<_> = rows.into_iter().map(|r| json!({"id": r.get::<Uuid,_>("id"), "appointment_id": r.get::<Uuid,_>("appointment_id"), "patient_id": r.get::<Uuid,_>("patient_id"), "patient_display_name": r.get::<String,_>("patient_display_name"), "expires_at": r.get::<DateTime<Utc>,_>("expires_at"), "is_locked": r.get::<bool,_>("is_locked"), "created_at": r.get::<DateTime<Utc>,_>("created_at"), "last_message_at": r.get::<Option<DateTime<Utc>>,_>("last_message_at")})).collect();
+    let data: Vec<_> = rows.into_iter().map(|r| json!({"id": r.get::<Uuid,_>("id"), "appointment_id": r.get::<Uuid,_>("appointment_id"), "patient_id": r.get::<Uuid,_>("patient_id"), "patient_display_name": r.get::<String,_>("patient_display_name"), "expires_at": r.get::<DateTime<Utc>,_>("expires_at"), "is_locked": r.get::<bool,_>("is_locked"), "created_at": r.get::<DateTime<Utc>,_>("created_at"), "last_message_at": r.get::<Option<DateTime<Utc>>,_>("last_message_at"), "modality":r.get::<String,_>("modality"), "appointment_status":r.get::<String,_>("appointment_status")})).collect();
     Ok(Json(ApiResponse {
         success: true,
         data,
@@ -360,7 +395,7 @@ pub async fn list_patient_history(
     abac::authorize(&ctx, Action::DoctorRead)?;
     let (limit, offset) = page(&q);
     let mut tx = state.begin_authed(&ctx).await?;
-    let allowed = sqlx::query_scalar::<_, bool>("SELECT doctor_history_context_allowed($1,$2)")
+    let allowed = sqlx::query_scalar::<_, bool>("SELECT doctor_own_encounter_allowed($1,$2)")
         .bind(current_appointment_id)
         .bind(ctx.user_id)
         .fetch_one(&mut *tx)
@@ -541,22 +576,26 @@ pub async fn consultation_summary(
     abac::authorize(&ctx, Action::DoctorRead)?;
     let doctor_id = ctx.verified_doctor_profile_id(&state).await?;
     let mut tx = state.begin_authed(&ctx).await?;
-    let allowed: bool = sqlx::query_scalar("SELECT doctor_history_context_allowed($1,$2)")
+    let allowed: bool = sqlx::query_scalar("SELECT doctor_own_encounter_allowed($1,$2)")
         .bind(appointment_id)
         .bind(ctx.user_id)
         .fetch_one(&mut *tx)
         .await?;
     if !allowed {
         return Err(AppError::Forbidden(
-            "Patient history access is unavailable outside the consultation access window.".into(),
+            "This encounter is not available to this account.".into(),
         ));
     }
+    crate::api::middleware::request_context::bind_consultation(appointment_id, None);
     let row = sqlx::query("SELECT a.id, a.patient_id, a.status::text AS status, a.clinical_outcome, a.completed_at, i.chief_complaint, i.clinical_notes, cs.id AS consultation_id, cs.started_at, cs.ended_at FROM appointments a LEFT JOIN appointment_clinical_intake i ON i.appointment_id=a.id LEFT JOIN consultation_sessions cs ON cs.appointment_id=a.id WHERE a.id=$1 AND a.doctor_id=$2")
         .bind(appointment_id).bind(doctor_id).fetch_optional(&mut *tx).await?;
+    let documents:Vec<serde_json::Value>=sqlx::query_scalar("SELECT jsonb_build_object('id',id,'mime_type',mime_type,'security_status',security_status,'created_at',created_at) FROM prescription_intake_documents WHERE appointment_id=$1 ORDER BY created_at,id").bind(appointment_id).fetch_all(&mut *tx).await?;
+    let prescriptions:Vec<serde_json::Value>=sqlx::query_scalar("SELECT jsonb_build_object('id',id,'mime_type',mime_type,'security_status',security_status,'is_no_rx_required',is_no_rx_required,'page_number',page_number,'created_at',created_at) FROM prescriptions WHERE appointment_id=$1 ORDER BY page_number").bind(appointment_id).fetch_all(&mut *tx).await?;
     tx.commit().await?;
     let r = row.ok_or_else(|| AppError::NotFound("Consultation not found.".into()))?;
     let data = json!({
         "appointment_id": r.get::<Uuid, _>("id"),
+        "documents":documents,"prescriptions":prescriptions,
         "patient_id": r.get::<Uuid, _>("patient_id"),
         "status": r.get::<String, _>("status"),
         "clinical_outcome": r.get::<Option<String>, _>("clinical_outcome"),
@@ -582,7 +621,7 @@ pub async fn wallet_ledger(
     let doctor_id = ctx.doctor_profile_id(&state).await?;
     let (limit, offset) = page(&q);
     let mut tx = state.begin_authed(&ctx).await?;
-    let rows = sqlx::query("SELECT t.id, t.transaction_number, t.appointment_id, t.gateway::text AS gateway, t.gross_amount, t.platform_fee_amount, t.net_amount, t.payment_status::text AS payment_status, t.created_at, t.settled_at, p.full_name AS patient_display_name FROM transactions t JOIN appointments a ON a.id=t.appointment_id JOIN patient_profiles p ON p.id=a.patient_id WHERE a.doctor_id=$1 ORDER BY t.created_at DESC LIMIT $2 OFFSET $3")
+    let rows = sqlx::query("SELECT t.id, t.transaction_number, t.appointment_id, t.gateway::text AS gateway, t.gross_amount, t.platform_fee_amount, t.net_amount, t.payment_status::text AS payment_status, t.created_at, t.settled_at, COALESCE(p.full_name,doctor_encounter_patient_name(a.id),'Patient') AS patient_display_name FROM transactions t JOIN appointments a ON a.id=t.appointment_id LEFT JOIN patient_profiles p ON p.id=a.patient_id WHERE a.doctor_id=$1 ORDER BY t.created_at DESC LIMIT $2 OFFSET $3")
         .bind(doctor_id).bind(limit).bind(offset).fetch_all(&mut *tx).await?;
     tx.commit().await?;
     let data: Vec<_> = rows.into_iter().map(|r| json!({"id": r.get::<Uuid,_>("id"), "transaction_number": r.get::<String,_>("transaction_number"), "appointment_id": r.get::<Uuid,_>("appointment_id"), "patient_display_name": r.get::<String,_>("patient_display_name"), "gateway": r.get::<String,_>("gateway"), "gross_amount": r.get::<bigdecimal::BigDecimal,_>("gross_amount"), "platform_fee_amount": r.get::<bigdecimal::BigDecimal,_>("platform_fee_amount"), "net_amount": r.get::<bigdecimal::BigDecimal,_>("net_amount"), "payment_status": r.get::<String,_>("payment_status"), "created_at": r.get::<DateTime<Utc>,_>("created_at"), "settled_at": r.get::<Option<DateTime<Utc>>,_>("settled_at")})).collect();

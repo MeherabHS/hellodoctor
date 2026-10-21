@@ -9,7 +9,8 @@ use crate::rate_limit;
 use crate::repository::{doctor_repo, legal_repo, wallet_repo, AppState, DbRole};
 use crate::services::AuthService;
 use axum::{
-    extract::{ConnectInfo, State},
+    extract::{ConnectInfo, OriginalUri, State},
+    http::{HeaderMap, Method},
     response::IntoResponse,
     Json,
 };
@@ -25,9 +26,34 @@ pub struct RegisterOtpRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct PatientRegistrationRequest {
+    #[serde(flatten)]
+    pub profile: crate::repository::patient_auth_repo::PatientRegistrationProfile,
+    pub email: String,
+    pub phone_number: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PatientLoginRequest {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PatientVerifyOtpRequest {
+    pub challenge_token: String,
+    pub otp_code: String,
+    #[serde(default)]
+    pub accepted_documents: Vec<AcceptedDocument>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct VerifyOtpRequest {
     pub phone_number: String,
     pub otp_code: String,
+    #[serde(default)]
+    pub accepted_documents: Vec<AcceptedDocument>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -73,7 +99,13 @@ pub struct AcceptedDocument {
 pub struct AdminLoginRequest {
     pub email: String,
     pub password: String,
-    pub totp_code: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminVerifyOtpRequest {
+    pub session_token: String,
+    pub otp_code: String,
+    pub totp_code: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,11 +140,143 @@ pub async fn register_otp(
 
 pub async fn verify_otp_and_login(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    method: Method,
+    OriginalUri(uri): OriginalUri,
     Json(payload): Json<VerifyOtpRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let login_resp =
-        AuthService::verify_otp_and_login(&state, &payload.phone_number, &payload.otp_code).await?;
+    let device_key = crate::services::auth_service::device_proof::establishment_proof(
+        &state,
+        &headers,
+        &method,
+        &uri,
+        &payload.phone_number,
+    )
+    .await?;
+    let login_resp = AuthService::verify_otp_and_login_with_device(
+        &state,
+        &payload.phone_number,
+        &payload.otp_code,
+        &payload.accepted_documents,
+        device_key,
+    )
+    .await?;
 
+    Ok(Json(ApiResponse {
+        success: true,
+        data: login_resp,
+    }))
+}
+
+pub async fn patient_register(
+    State(state): State<AppState>,
+    Json(payload): Json<PatientRegistrationRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    rate_limit::check_and_increment(
+        &state.redis,
+        &format!(
+            "ratelimit:patient-registration:{}",
+            payload.email.trim().to_lowercase()
+        ),
+        5,
+        900,
+    )
+    .await?;
+    let (token, expires_in, debug) = AuthService::request_patient_email_otp(
+        &state,
+        &payload.email,
+        &payload.password,
+        Some(&crate::domain::validation::normalize_kenya_phone_number(
+            &payload.phone_number,
+        )?),
+        true,
+        Some(&payload.profile),
+    )
+    .await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({"challenge_token": token, "expires_in": expires_in, "debug_otp_code": debug}),
+    }))
+}
+
+/// Patient password-login step. Mirrors `doctor_login`/`admin_login`'s
+/// two-dimensional `ip_jail` abuse control (see that function's doc comment)
+/// — previously this endpoint had only the per-IP `rate_limit` counter, so an
+/// attacker rotating across more than a handful of source IPs could make
+/// unlimited password guesses against one named patient account. The
+/// mandatory emailed-OTP second factor (`patient_verify_otp`) still gates
+/// actual session issuance; this closes the account-level guessing gap on
+/// the password step itself.
+pub async fn patient_login(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Json(payload): Json<PatientLoginRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let ip = addr.ip().to_string();
+    let normalized_email = payload.email.trim().to_lowercase();
+    let account_key = format!("patient:{normalized_email}");
+
+    if ip_jail::is_account_jailed(&state.redis, &account_key).await? {
+        return Err(AppError::Forbidden(
+            "Too many failed login attempts for this account. Try again later.".into(),
+        ));
+    }
+    if ip_jail::is_ip_jailed(&state.redis, &ip).await? {
+        return Err(AppError::Forbidden(
+            "Too many failed login attempts from this network. Try again later.".into(),
+        ));
+    }
+    rate_limit::check_login_attempt_limit(&state.redis, &ip).await?;
+
+    match AuthService::request_patient_email_otp(
+        &state,
+        &payload.email,
+        &payload.password,
+        None,
+        false,
+        None,
+    )
+    .await
+    {
+        Ok((token, expires_in, debug)) => {
+            ip_jail::record_success(&state.redis, &account_key).await?;
+            Ok(Json(ApiResponse {
+                success: true,
+                data: serde_json::json!({"challenge_token": token, "expires_in": expires_in, "debug_otp_code": debug}),
+            }))
+        }
+        Err(e) => {
+            if crate::services::auth_service::abuse::credential_failure(&e) {
+                ip_jail::record_failure(&state.redis, &ip, &account_key).await?;
+            }
+            Err(e)
+        }
+    }
+}
+
+pub async fn patient_verify_otp(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    method: Method,
+    OriginalUri(uri): OriginalUri,
+    Json(payload): Json<PatientVerifyOtpRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let device_key = crate::services::auth_service::device_proof::establishment_proof(
+        &state,
+        &headers,
+        &method,
+        &uri,
+        &payload.challenge_token,
+    )
+    .await?;
+    let login_resp = AuthService::verify_patient_email_otp_with_device(
+        &state,
+        &payload.challenge_token,
+        &payload.otp_code,
+        &payload.accepted_documents,
+        device_key,
+    )
+    .await?;
     Ok(Json(ApiResponse {
         success: true,
         data: login_resp,
@@ -396,7 +560,9 @@ pub async fn doctor_login(
             }))
         }
         Err(e) => {
-            ip_jail::record_failure(&state.redis, &ip, &account_key).await?;
+            if crate::services::auth_service::abuse::credential_failure(&e) {
+                ip_jail::record_failure(&state.redis, &ip, &account_key).await?;
+            }
             Err(e)
         }
     }
@@ -405,12 +571,28 @@ pub async fn doctor_login(
 pub async fn doctor_verify_otp(
     State(state): State<AppState>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    method: Method,
+    OriginalUri(uri): OriginalUri,
     Json(payload): Json<DoctorVerifyOtpRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    let device_key = crate::services::auth_service::device_proof::establishment_proof(
+        &state,
+        &headers,
+        &method,
+        &uri,
+        &payload.session_token,
+    )
+    .await?;
     let ip = addr.ip().to_string();
-    let login_resp =
-        AuthService::doctor_verify_otp(&state, &ip, &payload.session_token, &payload.otp_code)
-            .await?;
+    let login_resp = AuthService::doctor_verify_otp_with_device(
+        &state,
+        &ip,
+        &payload.session_token,
+        &payload.otp_code,
+        device_key,
+    )
+    .await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -424,7 +606,8 @@ pub async fn admin_login(
     Json(payload): Json<AdminLoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let ip = addr.ip().to_string();
-    let account_key = format!("admin:{}", payload.email);
+    let normalized_email = payload.email.trim().to_lowercase();
+    let account_key = format!("admin:{normalized_email}");
 
     if ip_jail::is_account_jailed(&state.redis, &account_key).await? {
         return Err(AppError::Forbidden(
@@ -438,34 +621,62 @@ pub async fn admin_login(
     }
     rate_limit::check_login_attempt_limit(&state.redis, &ip).await?;
 
-    match AuthService::admin_login(
-        &state,
-        &payload.email,
-        &payload.password,
-        &payload.totp_code,
-    )
-    .await
-    {
-        Ok(login_resp) => {
+    match AuthService::admin_login_step1(&state, &normalized_email, &payload.password).await {
+        Ok((session_token, debug_code)) => {
             ip_jail::record_success(&state.redis, &account_key).await?;
             Ok(Json(ApiResponse {
                 success: true,
-                data: login_resp,
+                data: serde_json::json!({
+                    "session_token": session_token,
+                    "requires_otp": true,
+                    "requires_totp": !(state.config.environment == "development" && state.config.dev_auth_otp_enabled),
+                    "debug_otp_code": debug_code
+                }),
             }))
         }
         Err(e) => {
-            ip_jail::record_failure(&state.redis, &ip, &account_key).await?;
+            if crate::services::auth_service::abuse::credential_failure(&e) {
+                ip_jail::record_failure(&state.redis, &ip, &account_key).await?;
+            }
             Err(e)
         }
     }
 }
 
+pub async fn admin_verify_otp(
+    State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Json(payload): Json<AdminVerifyOtpRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    let ip = addr.ip().to_string();
+    let login_resp = AuthService::admin_verify_otp_with_totp(
+        &state,
+        &ip,
+        &payload.session_token,
+        &payload.otp_code,
+        payload.totp_code.as_deref(),
+    )
+    .await?;
+
+    Ok(Json(ApiResponse {
+        success: true,
+        data: login_resp,
+    }))
+}
+
 pub async fn refresh_token(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    method: Method,
+    OriginalUri(uri): OriginalUri,
     Json(payload): Json<RefreshRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let (access_token, new_refresh_token) =
-        AuthService::refresh_session(&state, &payload.refresh_token).await?;
+    let (access_token, new_refresh_token) = AuthService::refresh_session_with_proof(
+        &state,
+        &payload.refresh_token,
+        Some((&headers, &method, &uri)),
+    )
+    .await?;
 
     Ok(Json(ApiResponse {
         success: true,
@@ -480,9 +691,17 @@ pub async fn refresh_token(
 /// refresh because the browser may no longer have a usable access token.
 pub async fn logout(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    method: Method,
+    OriginalUri(uri): OriginalUri,
     Json(payload): Json<RefreshRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    AuthService::logout(&state, &payload.refresh_token).await?;
+    AuthService::logout_with_proof(
+        &state,
+        &payload.refresh_token,
+        Some((&headers, &method, &uri)),
+    )
+    .await?;
     Ok(Json(ApiResponse {
         success: true,
         data: serde_json::json!({ "logged_out": true }),

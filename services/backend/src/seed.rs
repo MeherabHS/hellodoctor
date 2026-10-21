@@ -1,7 +1,7 @@
 use crate::crypto;
 use crate::domain::ids::{DoctorProfileId, PatientProfileId, UserId};
 use crate::domain::models::*;
-use crate::repository::{doctor_repo, patient_repo, session_repo, user_repo, wallet_repo};
+use crate::repository::{doctor_repo, patient_repo, user_repo, wallet_repo};
 use bigdecimal::BigDecimal;
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
@@ -12,7 +12,6 @@ use uuid::Uuid;
 /// Only ever called when `ENVIRONMENT=development`.
 pub const SEED_ADMIN_EMAIL: &str = "admin@hellodoctor.health";
 pub const SEED_ADMIN_PASSWORD: &str = "AdminPass123!";
-pub const SEED_ADMIN_TOTP_SECRET_BASE32: &str = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
 pub const SEED_DOCTOR1_LICENSE: &str = "SYNTH-KE-0001";
 pub const SEED_DOCTOR1_EMAIL: &str = "sabrina.akter@hellodoctor.health";
 pub const SEED_DOCTOR1_PASSWORD: &str = "Password123!";
@@ -49,7 +48,7 @@ pub async fn seed_dev_data(pool: &PgPool) -> Result<(), sqlx::Error> {
             phone_number: "+254700000001".into(),
             email: Some(SEED_ADMIN_EMAIL.into()),
             password_hash: Some(password_hash),
-            role: UserRole::PlatformAdmin,
+            role: UserRole::Admin,
             preferred_language: "en".into(),
             is_active: true,
             is_verified: true,
@@ -58,27 +57,6 @@ pub async fn seed_dev_data(pool: &PgPool) -> Result<(), sqlx::Error> {
             deleted_at: None,
         };
         user_repo::insert_user(pool, &admin_user).await?;
-
-        let encrypted_secret =
-            crypto::encrypt_totp_secret(SEED_ADMIN_TOTP_SECRET_BASE32, &totp_key_for_seed())
-                .expect("seed TOTP secret encryption");
-
-        session_repo::upsert_mfa_credential(
-            pool,
-            &MfaCredential {
-                id: Uuid::new_v4(),
-                user_id: UserId::from(uid(ADMIN_USER_ID)),
-                method: MfaMethod::Totp,
-                totp_secret_encrypted: encrypted_secret,
-                recovery_codes_hash: None,
-                is_enabled: true,
-                enabled_at: Some(now),
-                last_verified_at: None,
-                revoked_at: None,
-                created_at: now,
-            },
-        )
-        .await?;
     }
 
     // ---- Demo patient (the fixed id every patient-facing handler currently assumes) ----
@@ -105,7 +83,7 @@ pub async fn seed_dev_data(pool: &PgPool) -> Result<(), sqlx::Error> {
             pool,
             &PatientProfile {
                 id: PatientProfileId::from(uid(PATIENT_PROFILE_ID)),
-                user_id: UserId::from(uid(PATIENT_USER_ID)),
+                user_id: Some(UserId::from(uid(PATIENT_USER_ID))),
                 full_name: "Patient User".into(),
                 date_of_birth: chrono::NaiveDate::from_ymd_opt(1995, 1, 1).unwrap(),
                 gender: Gender::Other,
@@ -113,6 +91,8 @@ pub async fn seed_dev_data(pool: &PgPool) -> Result<(), sqlx::Error> {
                 weight_kg: None,
                 emergency_contact_phone: None,
                 emergency_contact_relation: None,
+                guardian_patient_id: None,
+                relationship: None,
                 created_at: now,
                 updated_at: now,
             },
@@ -275,13 +255,6 @@ pub async fn seed_dev_data(pool: &PgPool) -> Result<(), sqlx::Error> {
     }
 
     Ok(())
-}
-
-/// The TOTP-secret-at-rest encryption key must come from config in production; seeding
-/// runs before a request-scoped `AppState` exists, so it re-reads the same env var directly.
-fn totp_key_for_seed() -> String {
-    std::env::var("TOTP_ENCRYPTION_KEY_B64")
-        .unwrap_or_else(|_| "zjw5FesMAwveYp3JKXqYJhbZ4O1s2yHgTAp9xgvfqq0=".into())
 }
 
 /// Stable development-only identities must never authenticate in deployed modes,

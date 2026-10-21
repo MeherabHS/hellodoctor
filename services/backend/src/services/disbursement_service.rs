@@ -65,7 +65,18 @@ impl DisbursementService {
             platform_charge_percent: 20.0,
             withheld_fee: wallet.lifetime_fee_withheld,
             final_net: wallet.lifetime_net,
-            pending_disbursement: wallet.pending_disbursement,
+            // h05 remediation: doctor_wallets.pending_disbursement is a
+            // write-once-incremented counter with no reachable decrement path
+            // (wallet_repo::mark_disbursed has zero callers; see its own doc
+            // comment and docs/audit/DOCTOR_BUSINESS_LOGIC_GAP_AUDIT.md
+            // GAP-C01). finalized_unpaid+scheduled_unpaid, computed live two
+            // lines above from current disbursement_items/statement status,
+            // is the authoritative figure Admin's own views already use —
+            // derived fresh each call, so it decrements automatically and
+            // exactly once as an item moves to PAID, stays unchanged while
+            // PROCESSING/APPROVED/etc., and is idempotent against a
+            // duplicate payout-confirmation callback by construction.
+            pending_disbursement: finalized_unpaid.clone() + scheduled_unpaid.clone(),
             finalized_unpaid,
             scheduled_unpaid,
             total_paid,
@@ -196,6 +207,11 @@ impl DisbursementService {
             });
         }
 
+        if items.is_empty() {
+            return Err(AppError::Conflict(
+                "No unallocated finalized statements are ready for disbursement.".into(),
+            ));
+        }
         let batch = DisbursementBatch {
             id: batch_id,
             batch_number: batch_num,

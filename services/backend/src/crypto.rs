@@ -27,14 +27,28 @@ fn password_semaphore() -> &'static Semaphore {
     SEMAPHORE.get_or_init(|| Semaphore::new(4))
 }
 
+struct PasswordWorkGuard;
+impl PasswordWorkGuard {
+    fn start() -> Self {
+        metrics::gauge!("argon2_active_workers").increment(1.0);
+        metrics::counter!("argon2_operations_total").increment(1);
+        Self
+    }
+}
+impl Drop for PasswordWorkGuard {
+    fn drop(&mut self) {
+        metrics::gauge!("argon2_active_workers").decrement(1.0);
+    }
+}
+
 /// Runs Argon2 on a bounded blocking pool so password work cannot starve the
 /// async request runtime under registration/login load.
 pub async fn hash_password_async(password: String) -> Result<String, AppError> {
-    let permit = password_semaphore()
-        .acquire()
-        .await
-        .map_err(|_| AppError::internal("Password hashing capacity unavailable.".into()))?;
+    let permit = password_semaphore().try_acquire().map_err(|_| {
+        AppError::CapacityLimitReached("Sign-in is temporarily busy. Please retry shortly.".into())
+    })?;
     tokio::task::spawn_blocking(move || {
+        let _work = PasswordWorkGuard::start();
         let result = hash_password(&password);
         drop(permit);
         result
@@ -44,11 +58,11 @@ pub async fn hash_password_async(password: String) -> Result<String, AppError> {
 }
 
 pub async fn verify_password_async(password: String, hash: String) -> Result<bool, AppError> {
-    let permit = password_semaphore()
-        .acquire()
-        .await
-        .map_err(|_| AppError::internal("Password verification capacity unavailable.".into()))?;
+    let permit = password_semaphore().try_acquire().map_err(|_| {
+        AppError::CapacityLimitReached("Sign-in is temporarily busy. Please retry shortly.".into())
+    })?;
     tokio::task::spawn_blocking(move || {
+        let _work = PasswordWorkGuard::start();
         let result = verify_password(&password, &hash);
         drop(permit);
         Ok(result)
@@ -64,6 +78,186 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
     Argon2::default()
         .verify_password(password.as_bytes(), &parsed)
         .is_ok()
+}
+
+static DUMMY_PASSWORD_HASH: OnceLock<String> = OnceLock::new();
+
+/// A real Argon2id hash of a fixed, non-secret placeholder password, computed
+/// once per process (not per request, and not a real user's hash).
+fn dummy_password_hash() -> &'static str {
+    DUMMY_PASSWORD_HASH.get_or_init(|| {
+        hash_password("hellodoctor-constant-time-login-padding-placeholder")
+            .expect("dummy password hashing must succeed")
+    })
+}
+
+/// Runs a real Argon2id verification against the precomputed dummy hash, at
+/// the same cost and on the same bounded worker pool as a genuine
+/// `verify_password_async` call. Call this on every login fast-exit path
+/// (account not found, wrong role, inactive, no password hash set) so those
+/// paths cost comparable CPU time to a real wrong-password check instead of
+/// returning near-instantly — removing the obvious
+/// "Argon2id-ran vs. did-not-run" branch that an account-enumeration timing
+/// oracle would otherwise exploit. This does not guarantee perfect
+/// network-observed constant time, only that the deterministic backend-side
+/// cost gap is closed.
+pub async fn verify_password_dummy_async() -> Result<(), AppError> {
+    let permit = password_semaphore().try_acquire().map_err(|_| {
+        AppError::CapacityLimitReached("Sign-in is temporarily busy. Please retry shortly.".into())
+    })?;
+    tokio::task::spawn_blocking(move || {
+        let _work = PasswordWorkGuard::start();
+        // First-use dummy initialization is itself Argon2 work. Keep it inside
+        // the admitted blocking worker, including under concurrent cold login.
+        let _ = verify_password("not-the-real-password", dummy_password_hash());
+        drop(permit);
+    })
+    .await
+    .map_err(|_| AppError::internal("Password verification worker failed.".into()))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod password_capacity_tests {
+    use super::*;
+
+    // These tests deliberately saturate the process-wide admission semaphore.
+    // Serialize only this test module, without changing production admission.
+    static PASSWORD_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[tokio::test]
+    async fn all_password_paths_fail_fast_without_worker_queue() {
+        let _serial = PASSWORD_TEST_LOCK.lock().await;
+        let _busy = password_semaphore().try_acquire_many(4).unwrap();
+        let result = tokio::time::timeout(std::time::Duration::from_millis(100), async {
+            assert!(matches!(
+                hash_password_async("synthetic".into()).await,
+                Err(AppError::CapacityLimitReached(_))
+            ));
+            assert!(matches!(
+                verify_password_async("synthetic".into(), "not-a-hash".into()).await,
+                Err(AppError::CapacityLimitReached(_))
+            ));
+            assert!(matches!(
+                verify_password_dummy_async().await,
+                Err(AppError::CapacityLimitReached(_))
+            ));
+        })
+        .await;
+        assert!(
+            result.is_ok(),
+            "excess password work must not queue on permits"
+        );
+    }
+
+    fn assert_cancelled_caller_keeps_worker_permit<F, T>(work: F)
+    where
+        F: std::future::Future<Output = Result<T, AppError>> + Send + 'static,
+        T: Send + 'static,
+    {
+        let _serial = PASSWORD_TEST_LOCK.blocking_lock();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .max_blocking_threads(1)
+            .build()
+            .unwrap();
+        runtime.block_on(async move {
+            // A drop guard releases the controlled worker even if an assertion
+            // fails, so shutting down this private runtime cannot hang.
+            struct ReleaseWorker(Option<std::sync::mpsc::Sender<()>>);
+            impl Drop for ReleaseWorker {
+                fn drop(&mut self) {
+                    if let Some(sender) = self.0.take() {
+                        let _ = sender.send(());
+                    }
+                }
+            }
+
+            let deadline = std::time::Duration::from_secs(30);
+            let held = password_semaphore().try_acquire_many(3).unwrap();
+            let (release, wait) = std::sync::mpsc::channel();
+            let mut release = ReleaseWorker(Some(release));
+            let (started, started_rx) = tokio::sync::oneshot::channel();
+            let blocker = tokio::task::spawn_blocking(move || {
+                let _ = started.send(());
+                wait.recv().unwrap();
+            });
+            tokio::time::timeout(deadline, started_rx)
+                .await
+                .expect("controlled blocking worker must start")
+                .unwrap();
+
+            // Signal only after polling the actual production future. It has
+            // acquired the fourth permit and queued its blocking closure while
+            // the sole blocking thread remains under our control.
+            let (polled, polled_rx) = tokio::sync::oneshot::channel();
+            let caller = tokio::spawn(async move {
+                let mut work = Box::pin(work);
+                let mut polled = Some(polled);
+                std::future::poll_fn(|context| {
+                    let result = std::future::Future::poll(work.as_mut(), context);
+                    if let Some(sender) = polled.take() {
+                        let _ = sender.send(result.is_pending());
+                    }
+                    result
+                })
+                .await
+            });
+            assert!(tokio::time::timeout(deadline, polled_rx)
+                .await
+                .expect("password future must be polled")
+                .unwrap());
+            assert_eq!(password_semaphore().available_permits(), 0);
+
+            caller.abort();
+            assert!(matches!(caller.await, Err(error) if error.is_cancelled()));
+            assert_eq!(
+                password_semaphore().available_permits(),
+                0,
+                "cancelled request must not release its queued blocking work permit"
+            );
+            assert!(matches!(
+                hash_password_async("synthetic excess request".into()).await,
+                Err(AppError::CapacityLimitReached(_))
+            ));
+
+            // Wait on the permit-release event itself, after allowing the real
+            // blocking computation to finish. No scheduler sleeps are needed.
+            release.0.take().unwrap().send(()).unwrap();
+            tokio::time::timeout(deadline, blocker)
+                .await
+                .expect("controlled worker must finish")
+                .unwrap();
+            let recovered = tokio::time::timeout(deadline, password_semaphore().acquire())
+                .await
+                .expect("actual password work must complete after caller cancellation")
+                .unwrap();
+            assert_eq!(password_semaphore().available_permits(), 0);
+            drop(recovered);
+            assert_eq!(password_semaphore().available_permits(), 1);
+            drop(held);
+            assert_eq!(password_semaphore().available_permits(), 4);
+        });
+    }
+
+    #[test]
+    fn cancelled_hash_request_keeps_permit_until_blocking_work_finishes() {
+        assert_cancelled_caller_keeps_worker_permit(hash_password_async("synthetic".into()));
+    }
+
+    #[test]
+    fn cancelled_verify_request_keeps_permit_until_blocking_work_finishes() {
+        let hash = hash_password("synthetic").unwrap();
+        assert_cancelled_caller_keeps_worker_permit(verify_password_async(
+            "synthetic".into(),
+            hash,
+        ));
+    }
+
+    #[test]
+    fn cancelled_dummy_request_keeps_permit_until_blocking_work_finishes() {
+        assert_cancelled_caller_keeps_worker_permit(verify_password_dummy_async());
+    }
 }
 
 // ---------------- Short-lived numeric code hashing (OTP / pending MFA challenge) ----------------
@@ -86,12 +280,9 @@ pub fn verify_code(code: &str, hash: &str) -> bool {
 }
 
 // ---------------- Generic at-rest encryption (AES-256-GCM) ----------------
-// Originally written for TOTP secrets; the scheme and key are not actually
-// TOTP-specific, so it's reused as-is (not reimplemented) for any other
-// small secret that needs to be encrypted at rest, e.g. a doctor's payout
-// account identifier. `encrypt_totp_secret`/`decrypt_totp_secret` below are
-// kept as named wrappers so existing call sites and the TOTP_ENCRYPTION_KEY_B64
-// config name don't need to change.
+// Shared by Admin TOTP enrollment and small financial identifiers such as
+// Doctor payout accounts. TOTP_ENCRYPTION_KEY_B64 remains the established
+// configuration name for this at-rest encryption key.
 
 fn aes_key_from_b64(key_b64: &str) -> Result<Key<Aes256Gcm>, AppError> {
     let bytes = STANDARD
@@ -143,34 +334,6 @@ pub fn decrypt_bytes(encrypted: &[u8], key_b64: &str) -> Result<Vec<u8>, AppErro
     Ok(plaintext)
 }
 
-pub fn encrypt_totp_secret(plaintext_secret: &str, key_b64: &str) -> Result<Vec<u8>, AppError> {
-    encrypt_secret(plaintext_secret, key_b64)
-}
-
-pub fn decrypt_totp_secret(encrypted: &[u8], key_b64: &str) -> Result<String, AppError> {
-    decrypt_secret(encrypted, key_b64)
-}
-
-// ---------------- TOTP (admin second factor) ----------------
-
-pub fn generate_totp_secret_base32() -> String {
-    totp_rs::Secret::generate_secret().to_encoded().to_string()
-}
-
-pub fn build_totp(secret_base32: &str) -> Result<totp_rs::TOTP, AppError> {
-    let bytes = totp_rs::Secret::Encoded(secret_base32.to_string())
-        .to_bytes()
-        .map_err(|e| AppError::internal(format!("Invalid TOTP secret: {e:?}")))?;
-    totp_rs::TOTP::new(totp_rs::Algorithm::SHA1, 6, 1, 30, bytes)
-        .map_err(|e| AppError::internal(format!("Failed to build TOTP: {e}")))
-}
-
-pub fn verify_totp(secret_base32: &str, code: &str) -> Result<bool, AppError> {
-    let totp = build_totp(secret_base32)?;
-    totp.check_current(code)
-        .map_err(|e| AppError::internal(format!("TOTP time error: {e}")))
-}
-
 // ---------------- Payment webhook HMAC-SHA256 signature verification ----------------
 
 /// Verifies `signature_hex` against HMAC-SHA256(secret, raw_body), in constant
@@ -216,12 +379,7 @@ pub fn default_permissions_for_role(role: &str) -> Vec<String> {
     match role {
         "PATIENT" => vec!["patient:self".into()],
         "DOCTOR" => vec!["doctor:self".into(), "consultation:conduct".into()],
-        "PLATFORM_ADMIN" => vec!["admin:*".into()],
-        "FINANCE_ADMIN" => vec!["admin:finance".into()],
-        "CLINICAL_ADMIN" => vec!["admin:clinical".into()],
-        "COMPLIANCE" => vec!["admin:compliance".into()],
-        "SECURITY_ADMIN" => vec!["admin:security".into()],
-        "SUPPORT" => vec!["admin:support".into()],
+        "ADMIN" => vec!["admin:*".into()],
         _ => vec![],
     }
 }

@@ -90,6 +90,28 @@ impl NotificationService {
         Ok(items)
     }
 
+    pub async fn list_cursor(
+        state: &AppState,
+        ctx: &AuthContext,
+        limit: i64,
+        time: chrono::DateTime<chrono::Utc>,
+        id: Uuid,
+        before: bool,
+    ) -> Result<Vec<Notification>, AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        let items = notification_repo::list_cursor(
+            &mut *tx,
+            ctx.user_id,
+            limit.clamp(1, 100),
+            time,
+            id,
+            before,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(items)
+    }
+
     pub async fn unread_count(state: &AppState, ctx: &AuthContext) -> Result<i64, AppError> {
         let mut tx = state.begin_authed(ctx).await?;
         let count = notification_repo::count_unread(&mut *tx, ctx.user_id).await?;
@@ -180,6 +202,36 @@ impl NotificationService {
             Some(doctor_profile_id),
             None,
             &format!("registration-rejected:{doctor_profile_id}"),
+            None,
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// h22 remediation: notify a Doctor whose professional verification was
+    /// revoked by an Admin. Mirrors notify_registration_rejected's shape;
+    /// deliberately no PHI/reason text in the push payload body (CLAUDE.md
+    /// Sec.1.7) — the reason lives only in the audit trail and the admin
+    /// portal, which the Doctor can view via their own account status.
+    pub async fn notify_professional_verification_revoked<
+        'e,
+        A: Acquire<'e, Database = Postgres> + Send,
+    >(
+        executor: A,
+        doctor_user_id: UserId,
+        doctor_profile_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        notification_repo::insert_if_new(
+            executor,
+            Uuid::new_v4(),
+            doctor_user_id,
+            "PROFESSIONAL_VERIFICATION_REVOKED",
+            "Professional verification revoked",
+            "HelloDoctor has revoked your professional verification. Please review your account status.",
+            Some("DOCTOR_PROFILE"),
+            Some(doctor_profile_id),
+            None,
+            &format!("professional-verification-revoked:{doctor_profile_id}"),
             None,
         )
         .await?;

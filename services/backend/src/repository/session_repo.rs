@@ -1,5 +1,5 @@
 use crate::domain::ids::UserId;
-use crate::domain::models::{AuthSession, MfaCredential, MfaMethod, PendingMfaChallenge};
+use crate::domain::models::{AuthSession, PendingMfaChallenge};
 use chrono::{DateTime, Utc};
 use sqlx::PgExecutor;
 use uuid::Uuid;
@@ -79,59 +79,6 @@ pub async fn consume_refresh_token(
         .execute(&mut **tx)
         .await?;
     Ok(result.rows_affected() == 1)
-}
-
-pub async fn find_mfa_credential<'e, E: PgExecutor<'e>>(
-    executor: E,
-    user_id: UserId,
-    method: MfaMethod,
-) -> Result<Option<MfaCredential>, sqlx::Error> {
-    sqlx::query_as::<_, MfaCredential>(
-        "SELECT id, user_id, method, totp_secret_encrypted, recovery_codes_hash, is_enabled, enabled_at, last_verified_at, revoked_at, created_at \
-         FROM mfa_credentials WHERE user_id = $1 AND method = $2 AND revoked_at IS NULL",
-    )
-    .bind(user_id)
-    .bind(method)
-    .fetch_optional(executor)
-    .await
-}
-
-pub async fn upsert_mfa_credential<'e, E: PgExecutor<'e>>(
-    executor: E,
-    cred: &MfaCredential,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "INSERT INTO mfa_credentials (id, user_id, method, totp_secret_encrypted, recovery_codes_hash, is_enabled, enabled_at, last_verified_at, revoked_at, created_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) \
-         ON CONFLICT (user_id, method) WHERE revoked_at IS NULL DO UPDATE SET \
-         totp_secret_encrypted = EXCLUDED.totp_secret_encrypted, is_enabled = EXCLUDED.is_enabled, enabled_at = EXCLUDED.enabled_at",
-    )
-    .bind(cred.id)
-    .bind(cred.user_id)
-    .bind(cred.method)
-    .bind(&cred.totp_secret_encrypted)
-    .bind(&cred.recovery_codes_hash)
-    .bind(cred.is_enabled)
-    .bind(cred.enabled_at)
-    .bind(cred.last_verified_at)
-    .bind(cred.revoked_at)
-    .bind(cred.created_at)
-    .execute(executor)
-    .await?;
-    Ok(())
-}
-
-pub async fn touch_mfa_verified<'e, E: PgExecutor<'e>>(
-    executor: E,
-    id: Uuid,
-    at: DateTime<Utc>,
-) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE mfa_credentials SET last_verified_at = $2 WHERE id = $1")
-        .bind(id)
-        .bind(at)
-        .execute(executor)
-        .await?;
-    Ok(())
 }
 
 // ---- Pending (step-1-verified, awaiting-second-factor) MFA challenges ----

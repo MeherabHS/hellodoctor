@@ -10,7 +10,7 @@ pub async fn insert_session<'e, E: PgExecutor<'e>>(
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
         "INSERT INTO consultation_sessions (id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7)",
+         VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (appointment_id) DO NOTHING",
     )
     .bind(session.id)
     .bind(session.appointment_id)

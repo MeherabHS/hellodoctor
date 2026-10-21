@@ -1,0 +1,1 @@
+ALTER TYPE legal_document_type_enum ADD VALUE 'PATIENT_DATA_SHARING_CONSENT';

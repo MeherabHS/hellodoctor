@@ -7,7 +7,7 @@ pub async fn insert_conversation<'e, E: PgExecutor<'e>>(
     conv: &ChatConversation,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO chat_conversations (id, appointment_id, patient_id, doctor_id, expires_at, is_locked, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+        "INSERT INTO chat_conversations (id, appointment_id, patient_id, doctor_id, expires_at, is_locked, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (appointment_id) DO NOTHING",
     )
     .bind(conv.id)
     .bind(conv.appointment_id)
@@ -83,12 +83,22 @@ pub async fn insert_message<'e, E: PgExecutor<'e>>(
 pub async fn list_messages<'e, E: PgExecutor<'e>>(
     executor: E,
     conversation_id: Uuid,
+    before: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
+    after: Option<(chrono::DateTime<chrono::Utc>, Uuid)>,
 ) -> Result<Vec<ChatMessage>, sqlx::Error> {
-    sqlx::query_as::<_, ChatMessage>(
-        "SELECT id, conversation_id, sender_id, content, attachment_bucket, attachment_object_key, attachment_mime, attachment_size, attachment_hash, is_read, sent_at \
-         FROM chat_messages WHERE conversation_id = $1 ORDER BY sent_at",
-    )
-    .bind(conversation_id)
-    .fetch_all(executor)
-    .await
+    let (before_time, before_id) = before.map_or((None, None), |(t, id)| (Some(t), Some(id)));
+    let (after_time, after_id) = after.map_or((None, None), |(t, id)| (Some(t), Some(id)));
+    // Ordering direction is a server-chosen constant; all cursor values are bound.
+    let direction = if after_time.is_some() { "ASC" } else { "DESC" };
+    sqlx::query_as::<_,ChatMessage>(&format!("SELECT id,conversation_id,sender_id,content,attachment_bucket,attachment_object_key,attachment_mime,attachment_size,attachment_hash,is_read,sent_at FROM chat_messages WHERE conversation_id=$1 AND ($2::timestamptz IS NULL OR (sent_at,id)<($2,$3)) AND ($4::timestamptz IS NULL OR (sent_at,id)>($4,$5)) ORDER BY sent_at {direction},id {direction} LIMIT 50"))
+        .bind(conversation_id).bind(before_time).bind(before_id).bind(after_time).bind(after_id).fetch_all(executor).await
+}
+
+pub async fn find_message<'e, E: PgExecutor<'e>>(
+    executor: E,
+    conversation_id: Uuid,
+    id: Uuid,
+) -> Result<Option<ChatMessage>, sqlx::Error> {
+    sqlx::query_as::<_,ChatMessage>("SELECT id, conversation_id, sender_id, content, attachment_bucket, attachment_object_key, attachment_mime, attachment_size, attachment_hash, is_read, sent_at FROM chat_messages WHERE conversation_id=$1 AND id=$2")
+        .bind(conversation_id).bind(id).fetch_optional(executor).await
 }

@@ -4,6 +4,28 @@ use chrono::Utc;
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
+/// Data-rights erasure/anonymization of the login row: scrubs every
+/// personally-identifying column and deactivates the account outright.
+/// `hellodoctor_api` has no grant on `users` at all beyond a column-scoped
+/// `SELECT` — only `hellodoctor_auth_worker` has `UPDATE`
+/// (migration 20261003000001), so every caller must run this against
+/// `DbRole::AuthWorker`, never the default `Api` pool.
+pub async fn anonymize_and_deactivate<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: UserId,
+    anonymized_phone: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE users SET phone_number=$2, email=NULL, password_hash=NULL, \
+         is_active=FALSE, deleted_at=NOW(), updated_at=NOW() WHERE id=$1",
+    )
+    .bind(id)
+    .bind(anonymized_phone)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
 pub async fn find_by_phone<'e, E: PgExecutor<'e>>(
     executor: E,
     phone_number: &str,
@@ -55,6 +77,28 @@ pub async fn create_patient_user<'e, E: PgExecutor<'e>>(
     )
     .bind(Uuid::new_v4())
     .bind(phone_number)
+    .bind(UserRole::Patient)
+    .bind(now)
+    .fetch_one(executor)
+    .await
+}
+
+pub async fn create_patient_user_with_credentials<'e, E: PgExecutor<'e>>(
+    executor: E,
+    email: &str,
+    phone_number: &str,
+    password_hash: &str,
+) -> Result<User, sqlx::Error> {
+    let now = Utc::now();
+    sqlx::query_as::<_, User>(
+        "INSERT INTO users (id, phone_number, email, password_hash, role, preferred_language, is_active, is_verified, created_at, updated_at, deleted_at) \
+         VALUES ($1, $2, $3, $4, $5, 'en', TRUE, TRUE, $6, $6, NULL) \
+         RETURNING id, phone_number, email, password_hash, role, preferred_language, is_active, is_verified, created_at, updated_at, deleted_at",
+    )
+    .bind(Uuid::new_v4())
+    .bind(phone_number)
+    .bind(email)
+    .bind(password_hash)
     .bind(UserRole::Patient)
     .bind(now)
     .fetch_one(executor)
