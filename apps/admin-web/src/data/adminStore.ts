@@ -65,6 +65,14 @@ export interface PatientRecordItem {
   videoVisits?: number;
   chatSessions?: number;
   totalSpend?: number;
+  vaultRecords?: {
+    id: string;
+    appointmentId: string;
+    mimeType: string;
+    fileSizeBytes: number;
+    securityStatus: string;
+    createdAt: string;
+  }[];
   encounters: {
     date: string;
     doctor: string;
@@ -114,6 +122,7 @@ export interface AppErrorLogItem {
 
 export interface GrievanceItem {
   id: string;
+  backendId?: string;
   timestamp: string;
   timeFormatted: string;
   relativeTime: string;
@@ -135,7 +144,7 @@ export interface GrievanceItem {
   consultationType: string;
   target: 'DOCTOR' | 'SYSTEM';
   category: string;
-  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM';
+  severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'UNASSESSED';
   claimSummary: string;
   patientStatement: string;
   boardRemedy: string;

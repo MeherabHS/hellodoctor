@@ -27,6 +27,9 @@ async function forward(req: NextRequest, path: string[]): Promise<NextResponse> 
       headers: {
         ...(await backendHeaders()),
         Authorization: `Bearer ${token}`,
+        'X-Request-Id': req.headers.get('X-Request-Id') || crypto.randomUUID(),
+        'X-Client-Type': 'ADMIN_WEB',
+        ...(req.headers.get('Idempotency-Key') ? {'Idempotency-Key':req.headers.get('Idempotency-Key')!} : {}),
         ...(hasBody ? { 'Content-Type': 'application/json' } : {}),
       },
       body: bodyText,
@@ -44,7 +47,7 @@ async function forward(req: NextRequest, path: string[]): Promise<NextResponse> 
     const refreshToken = await getRefreshToken();
     if (refreshToken) {
       try {
-        const tokens = await coordinatedRefresh(refreshToken, async () => {
+        const result = await coordinatedRefresh(refreshToken, async () => {
           const refreshRes = await fetch(`${backendUrl()}/api/v1/auth/refresh`, {
             method: 'POST', headers: { ...(await backendHeaders()), 'Content-Type': 'application/json' },
             body: JSON.stringify({ refresh_token: refreshToken }), cache: 'no-store',
@@ -53,12 +56,20 @@ async function forward(req: NextRequest, path: string[]): Promise<NextResponse> 
           const payload = await refreshRes.json().catch(() => null);
           return refreshRes.ok && payload?.success ? payload.data : null;
         });
-        if (tokens) {
-          await setSessionCookies(tokens.access_token, tokens.refresh_token);
-          backendRes = await doFetch(tokens.access_token);
-        } else {
+        if (result.outcome === 'rotated') {
+          await setSessionCookies(result.tokens.access_token, result.tokens.refresh_token);
+          backendRes = await doFetch(result.tokens.access_token);
+        } else if (result.outcome === 'failed') {
+          // The backend authoritatively rejected this refresh token (invalid,
+          // expired, or already reused) — the session is genuinely over.
           await clearSessionCookies();
         }
+        // 'raced': a different admin-web instance already rotated this exact
+        // token. We never attempted our own rotate() call, so the backend's
+        // reuse-detection was never triggered and the session is intact —
+        // leave cookies untouched and fall through with the original 401.
+        // The browser will carry the other instance's freshly-set cookie on
+        // its next request.
       } catch {
         // Backend unreachable for the refresh attempt — fall through and
         // return the original 401 rather than masking it as something else.
@@ -69,7 +80,7 @@ async function forward(req: NextRequest, path: string[]): Promise<NextResponse> 
   const responseBody = await backendRes.text();
   return new NextResponse(responseBody, {
     status: backendRes.status,
-    headers: { 'Content-Type': backendRes.headers.get('Content-Type') || 'application/json', 'Cache-Control': 'private, no-store' },
+    headers: { 'X-Request-Id': backendRes.headers.get('X-Request-Id') || '', 'Content-Type': backendRes.headers.get('Content-Type') || 'application/json', 'Cache-Control': 'private, no-store' },
   });
 }
 

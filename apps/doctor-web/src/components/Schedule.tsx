@@ -1,4 +1,5 @@
-﻿'use client';
+'use client';
+import { consultationAction, consultationActionLabel } from '../lib/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, errorText, runtimeGeneration } from '../lib/client';
 import { Appointment, Slot } from '../lib/contracts';
@@ -13,15 +14,15 @@ function SlotIcon({status}:{status:string}) {
     {status==='AVAILABLE'?<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>:status==='LOCKED_IN_PAYMENT'?<path d="M6 3h12M6 21h12M7 3v4l5 5 5-5V3M7 21v-4l5-5 5 5v4"/>:status==='CANCELLED'?<><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M9 13l6 5M15 13l-6 5"/></>:<><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4M12 14v3"/></>}
   </svg></span>;
 }
-function useScheduleSlots() {
+function useScheduleSlots(day: string) {
   const [data,setData]=useState<Slot[]>([]);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [updatedAt,setUpdatedAt]=useState('');const epoch=useRef(0);
   const refresh=useCallback(async()=>{
     const job=++epoch.current;const version=runtimeGeneration();const current=()=>job===epoch.current&&version===runtimeGeneration();
     setLoading(true);setError('');
-    try {const rows=await loadDoctorSlots(path=>api<Slot[]>(path),current);if(current()){setData(rows);setUpdatedAt(new Date().toISOString());}}
+    try {const rows=await loadDoctorSlots(path=>api<Slot[]>(path),current,day);if(current()){setData(rows);setUpdatedAt(new Date().toISOString());}}
     catch(e){if(current()&&!(e instanceof DOMException&&e.name==='AbortError'))setError('Schedule refresh failed. Displayed slots may be out of date. '+errorText(e));}
     finally {if(current())setLoading(false);}
-  },[]);
+  },[day]);
   useEffect(()=>{
     void refresh();
     const stop=startScheduleSync(refresh,{window,document,online:()=>navigator.onLine,
@@ -31,7 +32,7 @@ function useScheduleSlots() {
   return {data,loading,error,updatedAt,refresh};
 }
 export function Schedule({ appointments, action, addSlot, gap, initialDate }: { appointments:Appointment[]; action:ClinicalAction; addSlot:()=>void; gap:(message:string)=>void; initialDate?:string }) {
-  const slots=useScheduleSlots();const [filter,setFilter]=useState('all');const [selectedDay,setDay]=useState(initialDate||dayKey(new Date().toISOString()));
+  const [filter,setFilter]=useState('all');const [selectedDay,setDay]=useState(initialDate||dayKey(new Date().toISOString()));const slots=useScheduleSlots(selectedDay);
   const [pending,setPending]=useState('');const lock=useRef(false);const [confirm,setConfirm]=useState<{slot:Slot;intent:Intent}|null>(null);const [error,setError]=useState('');const [visible,setVisible]=useState(50);
   const close=useCallback(()=>{if(!lock.current)setConfirm(null);},[]);
   useEffect(()=>setVisible(50),[filter,selectedDay]);
@@ -60,8 +61,8 @@ export function Schedule({ appointments, action, addSlot, gap, initialDate }: { 
     {confirm&&<Modal title={confirm.intent==='block'?'Block this slot?':confirm.intent==='unblock'?'Make this slot available?':'Cancel this slot?'} onClose={close}><p className="sheet-desc">{time(confirm.slot.start_time)}–{time(confirm.slot.end_time)} · {date(confirm.slot.start_time)}</p><p className="sheet-desc">{confirm.intent==='block'?'Patients will not be able to book this slot until you make it available again.':confirm.intent==='unblock'?'Patients will be able to book this slot again.':'This removes the slot from your active schedule. Cancellation is separate from temporarily blocking availability.'}</p><div className="web-action-row"><button className="dw-btn-outline" onClick={close} disabled={!!pending}>Keep unchanged</button><button className={`dw-btn-primary ${confirm.intent==='cancel'?'web-slot-cancel-action':''}`} onClick={()=>void mutate(confirm.slot,confirm.intent)} disabled={!!pending}>{pending?'Updating…':confirm.intent==='block'?'Block slot':confirm.intent==='unblock'?'Make available':'Confirm cancellation'}</button></div></Modal>}
     <div className="dw-card-grid"><State loading={slots.loading} error={slots.error} empty={!slots.loading&&!slots.error&&filtered.length===0?'No slots for this date':undefined} retry={()=>void slots.refresh()}/>{filtered.slice(0,visible).map(s=>{
       const a=appointments.find(a=>a.id===s.appointment_id);
-      const meaning=s.status==='AVAILABLE'?'Open for booking':s.status==='BLOCKED'?'Blocked – unavailable for booking':s.status==='LOCKED_IN_PAYMENT'?'Booking in progress':s.status==='CANCELLED'?'Slot cancelled':s.patient_display_name??'Booked consultation';
-      return <article className={`dw-pt-card web-slot-${s.status.toLowerCase()}`} key={s.id} data-slot-id={s.id} data-slot-status={s.status}><div className="web-slot-heading"><strong>{time(s.start_time)} &ndash; {time(s.end_time)}</strong><span className={`badge web-slot-badge-${s.status.toLowerCase()}`}>{s.status==='LOCKED_IN_PAYMENT'?'PAYMENT PENDING':s.status==='BOOKED'?'BOOKED / LOCKED':s.status.replaceAll('_',' ')}</span></div><div className="web-slot-context">{s.status==='BOOKED'&&s.patient_display_name?<span className="dw-doc-avatar-img">{initials(s.patient_display_name)}</span>:<SlotIcon status={s.status}/>}<div><strong>{meaning}</strong><p className="sheet-desc">{date(s.start_time)}</p>{s.status==='BOOKED'&&a&&<p className="sheet-desc">{a.modality==='VIDEO'?'Video consultation':'Consultation chat'} · {a.appointment_number}</p>}</div></div>{s.status==='LOCKED_IN_PAYMENT'&&<p className="sheet-desc">This slot is temporarily reserved while booking is completed.</p>}<div className="web-action-row">{s.status==='AVAILABLE'||s.status==='BLOCKED'?<><button className="dw-btn-outline-sm" disabled={!!pending} onClick={()=>setConfirm({slot:s,intent:s.status==='AVAILABLE'?'block':'unblock'})}>{s.status==='AVAILABLE'?'Block slot':'Make available'}</button><button className="dw-btn-outline-sm web-slot-cancel-link" onClick={()=>setConfirm({slot:s,intent:'cancel'})} disabled={!!pending}>Cancel slot</button></>:s.status==='BOOKED'?<><button className="dw-btn-primary" disabled={!a} onClick={()=>a?action('call',a):gap('Refresh appointments to load the authorized consultation context.')}>Open consultation</button><button className="dw-btn-outline-sm" disabled={!a} onClick={()=>a&&action('chat',a)}>Chat</button></>:null}</div></article>;
+      const meaning=s.status==='AVAILABLE'?(s.bookable?'Open for booking':'Past opening'):s.status==='BLOCKED'?'Blocked – unavailable for booking':s.status==='LOCKED_IN_PAYMENT'?'Booking in progress':s.status==='CANCELLED'?'Slot cancelled':s.patient_display_name??'Booked consultation';
+      return <article className={`dw-pt-card web-slot-${s.status.toLowerCase()}`} key={s.id} data-slot-id={s.id} data-slot-status={s.status}><div className="web-slot-heading"><strong>{time(s.start_time)} &ndash; {time(s.end_time)}</strong><span className={`badge web-slot-badge-${s.status.toLowerCase()}`}>{s.status==='LOCKED_IN_PAYMENT'?'PAYMENT PENDING':s.status==='BOOKED'?'BOOKED / LOCKED':s.status.replaceAll('_',' ')}</span></div><div className="web-slot-context">{s.status==='BOOKED'&&s.patient_display_name?<span className="dw-doc-avatar-img">{initials(s.patient_display_name)}</span>:<SlotIcon status={s.status}/>}<div><strong>{meaning}</strong><p className="sheet-desc">{date(s.start_time)}</p>{s.status==='BOOKED'&&a&&<p className="sheet-desc">{a.modality==='VIDEO'?'Video consultation':'Consultation chat'} · {a.appointment_number}</p>}</div></div>{s.status==='LOCKED_IN_PAYMENT'&&<p className="sheet-desc">This slot is temporarily reserved while booking is completed.</p>}<div className="web-action-row">{s.status==='AVAILABLE'||s.status==='BLOCKED'?<><button className="dw-btn-outline-sm" disabled={!!pending} onClick={()=>setConfirm({slot:s,intent:s.status==='AVAILABLE'?'block':'unblock'})}>{s.status==='AVAILABLE'?'Block slot':'Make available'}</button><button className="dw-btn-outline-sm web-slot-cancel-link" onClick={()=>setConfirm({slot:s,intent:'cancel'})} disabled={!!pending}>Cancel slot</button></>:s.status==='BOOKED'?<><button className="dw-btn-primary" disabled={!a || !consultationAction(a)} onClick={()=>a&&consultationAction(a)?action(consultationAction(a)!,a):gap('Refresh appointments to load the authorized consultation context.')}>{a?consultationActionLabel(a):'Load consultation'}</button>{a?.modality==='VIDEO'&&<button className="dw-btn-outline-sm" onClick={()=>action('chat',a)}>Follow-up messages</button>}</>:null}</div></article>;
     })}</div>
     {filtered.length>visible&&<button className="dw-btn-outline" onClick={()=>setVisible(v=>v+50)}>Load more slots</button>}
   </section>;

@@ -3,6 +3,7 @@
 // merge backend records into the stores WITHOUT touching any UI markup.
 
 import { useEffect, useCallback, useRef } from 'react';
+import { startScheduleSync } from './polling';
 import type {
   DoctorHistoryItem,
   PatientRecordItem,
@@ -60,8 +61,8 @@ export function backendDocToStoreItem(doc: any, idx: number): DoctorHistoryItem 
     avatar: initials,
     bgColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
     meta: `${doc.primary_specialty} • ${doc.current_hospital} • KMPDC registration`,
-    kpiVisits: String(videoCount),
-    kpiChats: String(chatCount),
+    kpiVisits: String(doc.video_count ?? videoCount),
+    kpiChats: String(doc.chat_count ?? chatCount),
     kpiGross: `KES  ${Number(doc.lifetime_gross || 0).toLocaleString()}`,
     kpiPlatformCut: `KES  ${Number(doc.lifetime_fee_withheld || 0).toLocaleString()}`,
     kpiDisbursed: `${doc.currency || doc.wallet?.currency || 'KES'} ${Number(doc.total_paid || doc.wallet?.total_paid || 0).toLocaleString()}`,
@@ -116,16 +117,24 @@ export function backendPatientToStoreItem(pt: any, idx: number): PatientRecordIt
     key: pt.id,
     id: `#PT-${pt.id.slice(0, 5).toUpperCase()}`,
     name: pt.full_name,
-    chatActive: chatSessions > 0,
+    chatActive: (pt.chat_count ?? chatSessions) > 0,
     avatar: initials,
     bgColor: AVATAR_COLORS[(idx + 2) % AVATAR_COLORS.length],
     meta: `${pt.date_of_birth || '30'} • ${pt.gender || 'F'} • ${pt.emergency_contact_phone || 'Kenya'}`,
     cohort: pt.blood_group ? `Blood ${pt.blood_group}` : 'General Patient',
     labs: `${(pt.vault_records || []).length} Documents in Vault`,
+    vaultRecords: (pt.vault_records || []).map((v: any) => ({
+      id: v.id,
+      appointmentId: v.appointment_id,
+      mimeType: v.mime_type,
+      fileSizeBytes: v.file_size_bytes,
+      securityStatus: v.security_status,
+      createdAt: v.created_at,
+    })),
     category: 'general chat',
-    videoVisits,
-    chatSessions,
-    totalSpend,
+    videoVisits: pt.video_count ?? videoVisits,
+    chatSessions: pt.chat_count ?? chatSessions,
+    totalSpend: Number(pt.consultation_fee_total ?? totalSpend),
     encounters: encounters.map((enc: any) => ({
       date: enc.created_at ? new Date(enc.created_at).toLocaleDateString() : 'Recent',
       doctor: enc.doctor_name || 'Attending Physician',
@@ -194,28 +203,29 @@ export function backendSystemErrorToStoreItem(log: SystemErrorLog): AppErrorLogI
 export function backendGrievanceToStoreItem(g: any): GrievanceItem {
   return {
     id: g.grievance_number || g.id,
-    timestamp: g.created_at || new Date().toISOString(),
-    timeFormatted: g.created_at ? new Date(g.created_at).toLocaleTimeString() : 'Today',
-    relativeTime: 'Recent',
+    backendId: g.id,
+    timestamp: g.created_at || '',
+    timeFormatted: g.created_at ? new Date(g.created_at).toLocaleTimeString() : 'Not supplied',
+    relativeTime: g.created_at ? new Date(g.created_at).toLocaleDateString() : 'Not supplied',
     patient: {
       id: g.patient_id,
-      name: g.patient_name || 'Patient',
+      name: g.patient_name || 'Not supplied',
       phone: 'Not provided',
-      ageGender: 'Adult',
+      ageGender: 'Demographics not supplied',
     },
     doctor: {
-      id: g.consultation_id,
-      name: g.doctor_name || 'Doctor',
+      id: g.doctor_id || 'Not supplied',
+      name: g.doctor_name || 'Not supplied',
       registrationNumber: g.doctor_license || 'Not provided',
-      specialty: 'Clinical Medicine',
-      hospital: 'Hospital',
-      fee: 'Not supplied by this API',
+      specialty: g.doctor_specialty || 'Not supplied',
+      hospital: g.doctor_hospital || 'Not supplied',
+      fee: g.consultation_fee == null ? 'Not supplied' : `KES ${g.consultation_fee}`,
     },
     consultationId: g.consultation_id,
-    consultationType: 'Video Consultation (10 min)',
+    consultationType: g.modality === 'CHAT' ? 'Chat consultation' : g.modality === 'VIDEO' ? 'Video consultation' : 'Consultation',
     target: g.target_type || 'DOCTOR',
-    category: g.category || 'Consultation Quality',
-    severity: 'HIGH',
+    category: g.category || 'Not supplied',
+    severity: ['CRITICAL', 'HIGH', 'MEDIUM'].includes(g.severity) ? g.severity : 'UNASSESSED',
     claimSummary: g.claim_summary,
     patientStatement: g.claim_summary,
     boardRemedy:
@@ -231,10 +241,10 @@ export function backendGrievanceToStoreItem(g: any): GrievanceItem {
         ? 'Under Active Investigation'
         : 'Under Governance Review',
     telemetryEvidence: {
-      callDuration: g.telemetry ? `${g.telemetry.duration_seconds}s` : 'Unknown',
-      connectionStatus: g.telemetry?.connection_state || 'Unmeasured',
-      rxIssued: g.telemetry ? (g.telemetry.prescription_issued ? 'Rx Synced' : 'Not Issued') : 'Unmeasured',
-      paymentStatus: 'Recorded',
+      callDuration: 'Media not implemented',
+      connectionStatus: 'No provider evidence',
+      rxIssued: 'See prescription records in investigation timeline',
+      paymentStatus: g.payment_status || 'See investigation timeline',
       webrtcDiagnostics: {
         iceConnectionState: g.telemetry?.connection_state || 'Unmeasured',
         audioQuality: 'Unmeasured',
@@ -249,7 +259,7 @@ export function backendGrievanceToStoreItem(g: any): GrievanceItem {
       g.status === 'REFUND_APPROVED' || g.status === 'REFUNDED' || g.status === 'WARNED' || g.status === 'DISMISSED' || g.status === 'UNDER_INVESTIGATION'
         ? g.status
         : 'PENDING_REVIEW',
-    adjudication: null,
+    adjudication: g.adjudication || null,
   };
 }
 
@@ -319,132 +329,79 @@ interface BackendSyncCallbacks {
   onRefundRequestsUpdate: (requests: FinancialRefundRequest[]) => void;
 }
 
-export function useBackendSync(callbacks: BackendSyncCallbacks, statementMonth: string) {
-  const cbRef = useRef(callbacks);
-  cbRef.current = callbacks;
-  const criticalEpoch = useRef(0);
-  const activeMonthRef = useRef(statementMonth);
-  activeMonthRef.current = statementMonth;
-
-  const fetchAll = useCallback(async () => {
-    const criticalJob = ++criticalEpoch.current;
-    // Incidents must not depend on unrelated Finance/dossier requests succeeding.
-    // Scheduling has a separate lifecycle in useSlotSync.
-    await Promise.allSettled([
-      getSystemErrors().then(feed => { if (criticalJob === criticalEpoch.current) cbRef.current.onLogsUpdate(feed.items.map(backendSystemErrorToStoreItem)); }),
-    ]);
-    try {
-      // 1. Fetch doctors with dossier
-      let backendDocs;
-      try {
-        backendDocs = await getAdminDoctors();
-      } catch {
-        // Finance has no credential-management permission. Its dashboard is
-        // built from the safe financial read model, without broadening PHI access.
-        const routing = await getPayoutRouting(statementMonth);
-        if (activeMonthRef.current !== statementMonth) return;
-        const financeDoctors: Record<string, DoctorHistoryItem> = {};
-        routing.forEach((row, idx) => {
-          financeDoctors[row.doctor_id] = backendDocToStoreItem({
-            id: row.doctor_id, full_name: row.doctor, license_number: row.license,
-            verified_phone: 'Not available in Finance view',
-            primary_specialty: 'Financial record', current_hospital: '',
-            payout_routing: row,
-          }, idx);
-        });
-        cbRef.current.onDoctorsUpdate(financeDoctors);
-        cbRef.current.onFinanceSummaryUpdate(await getFinanceSummary(statementMonth));
-        cbRef.current.onTransactionsUpdate((await getAdminTransactions(statementMonth)).map(backendTransactionToStoreItem));
-        try {
-          cbRef.current.onRefundRequestsUpdate(await getRefundRequests());
-        } catch { /* FinanceAdmin should always have this permission; degrade quietly if not */ }
-        return;
-      }
-      const docStore: Record<string, DoctorHistoryItem> = {};
-      let payoutRouting: any[] = [];
-      try {
-        payoutRouting = await getPayoutRouting(statementMonth);
-      } catch { /* the doctor dossier remains usable if Finance routing is unavailable */ }
-      const routingByDoctor = new Map(payoutRouting.map((r: any) => [r.doctor_id, r]));
-      let videoRevenue = 0;
-      let chatRevenue = 0;
-      let videoCount = 0;
-      let chatCount = 0;
-
-      for (let i = 0; i < backendDocs.length; i++) {
-        const doc = backendDocs[i];
-        try {
-          const dossier = await getDoctorDossier(doc.id);
-          for (const enc of dossier.encounters || []) {
-            const fee = Number((enc as any).consultation_fee || 0);
-            if (enc.modality === 'VIDEO') {
-              videoRevenue += fee;
-              videoCount += 1;
-            } else if (enc.modality === 'CHAT') {
-              chatRevenue += fee;
-              chatCount += 1;
-            }
-          }
-          docStore[doc.id] = backendDocToStoreItem({ ...doc, ...dossier, payout_routing: routingByDoctor.get(doc.id) }, i);
-        } catch {
-          docStore[doc.id] = backendDocToStoreItem({ ...doc, payout_routing: routingByDoctor.get(doc.id) }, i);
-        }
-      }
-      // Replace (not merge) — once the backend answers, its data is the truth,
-      // including a correctly-empty result, instead of layering onto mock seed data.
-      if (activeMonthRef.current !== statementMonth) return;
-      cbRef.current.onDoctorsUpdate(docStore);
-      cbRef.current.onModalitySplitUpdate({ videoRevenue, chatRevenue, videoCount, chatCount });
-
-      // 2. Fetch patients
-      const backendPts = await getAdminPatients();
-      const ptStore: Record<string, PatientRecordItem> = {};
-      for (let i = 0; i < backendPts.length; i++) {
-        const pt = backendPts[i];
-        try {
-          const dossier = await getPatientDossier(pt.id);
-          const merged = { ...pt, ...(dossier.patient || {}), encounters: dossier.encounters || [], vault_records: dossier.vault_records || [] };
-          ptStore[pt.id] = backendPatientToStoreItem(merged, i);
-        } catch {
-          ptStore[pt.id] = backendPatientToStoreItem(pt, i);
-        }
-      }
-      cbRef.current.onPatientsUpdate(ptStore);
-
-      // 3. Fetch system-error incidents (the dedicated error/crash log, not
-      // the audit trail — see backendSystemErrorToStoreItem's doc comment).
-      // The independent critical reads above already refreshed incidents.
-
-      // 4. Fetch grievances
-      const backendGrvs = await getAdminGrievances();
-      cbRef.current.onGrievancesUpdate(backendGrvs.map(backendGrievanceToStoreItem));
-
-      // 5. Fetch transactions (month-filtered, matching the Finance page's
-      // own statement-month picker — this previously ignored the picker
-      // entirely and always showed all-time data).
-      const backendTxs = await getAdminTransactions(statementMonth);
-      cbRef.current.onTransactionsUpdate(backendTxs.map(backendTransactionToStoreItem));
-
-      // 6. Fetch platform-wide aggregates
-      cbRef.current.onOverviewUpdate(await getAdminOverview());
-      cbRef.current.onFinanceSummaryUpdate(await getFinanceSummary(statementMonth));
-      cbRef.current.onCommandTelemetryUpdate(await getCommandTelemetry());
-      cbRef.current.onVerificationQueueUpdate(await getPendingDoctorVerifications());
-      cbRef.current.onComplianceAlertsUpdate(await getComplianceAlerts());
-
-      // 7. Fetch Finance refund requests (post-grievance-approval lifecycle —
-      // not month-scoped; a refund stays actionable until resolved).
-      cbRef.current.onRefundRequestsUpdate(await getRefundRequests());
-    } catch (err) {
-      // Keep the last successful backend snapshot when another dashboard read fails.
-      console.warn('[useBackendSync] Backend unreachable, keeping last known data:', err);
-    }
-  }, [statementMonth]);
-
-  useEffect(() => {
-    fetchAll();
-    const interval = setInterval(fetchAll, 15000);
-    return () => { criticalEpoch.current++; clearInterval(interval); };
-  }, [fetchAll]);
-  return fetchAll;
+export function useBackendSync(callbacks:BackendSyncCallbacks,statementMonth:string,activePage='doctors',selectedDoctor:string|null=null,selectedPatient:string|null=null) {
+ const cbRef=useRef(callbacks);
+ useEffect(()=>{cbRef.current=callbacks;},[callbacks]);
+ const epoch=useRef(0),pending=useRef<Promise<void>|null>(null),roundFailed=useRef(false);
+ const rawDoctors=useRef<Record<string,any>>({}),rawPatients=useRef<Record<string,any>>({});
+ const doctors=useRef<Record<string,DoctorHistoryItem>>({}),patients=useRef<Record<string,PatientRecordItem>>({});
+ const fetchPage=useCallback(()=>{
+  if(document.visibilityState!=='visible'||!navigator.onLine)return Promise.resolve();
+  if(pending.current)return pending.current;
+  const version=epoch.current;
+  roundFailed.current=false;
+  const apply=(job:()=>Promise<void>)=>job().catch(()=>{ roundFailed.current=true; /* Keep the last successful snapshot; protected actions still reauthorize. */ });
+  const current=()=>version===epoch.current;
+  const jobs:Array<()=>Promise<void>>=[];
+  if(['doctors','finance','command'].includes(activePage))jobs.push(async()=>{
+   const overview=await getAdminOverview();if(!current())return;
+   cbRef.current.onOverviewUpdate(overview);
+   if(overview.modality_split)cbRef.current.onModalitySplitUpdate({videoCount:overview.modality_split.videoCount,chatCount:overview.modality_split.chatCount,videoRevenue:Number(overview.modality_split.videoRevenue),chatRevenue:Number(overview.modality_split.chatRevenue)});
+  });
+  if(activePage==='doctors')jobs.push(async()=>{
+   const [rows,routing]=await Promise.all([getAdminDoctors(),getPayoutRouting(statementMonth)]);if(!current())return;
+   const routingByDoctor=new Map(routing.map(r=>[r.doctor_id,r]));
+   rawDoctors.current=Object.fromEntries(rows.map(row=>[row.id,{...row,payout_routing:routingByDoctor.get(row.id)}]));
+   doctors.current=Object.fromEntries(rows.map((row,index)=>{const mapped=backendDocToStoreItem(rawDoctors.current[row.id],index);return [row.id,{...mapped,encounters:doctors.current[row.id]?.encounters??mapped.encounters}];}));
+   cbRef.current.onDoctorsUpdate(doctors.current);
+  });
+  if(activePage==='patients')jobs.push(async()=>{
+   const rows=await getAdminPatients();if(!current())return;
+   rawPatients.current=Object.fromEntries(rows.map(row=>[row.id,row]));
+   patients.current=Object.fromEntries(rows.map((row,index)=>{const mapped=backendPatientToStoreItem(row,index);return [row.id,{...mapped,encounters:patients.current[row.id]?.encounters??mapped.encounters}];}));
+   cbRef.current.onPatientsUpdate(patients.current);
+  });
+  // Unconditional, not gated by activePage: the sidebar's unresolved-error
+  // badge (adminLogsNavBadge) is always rendered regardless of which page is
+  // open, but was only ever populated while actively viewing the Logs or
+  // Command page — on every other page it silently showed a false "All
+  // Clear" default rather than the real count. This keeps that badge (and
+  // any other consumer of the logs feed) accurate everywhere, matching the
+  // backend's own system_error_logs state rather than whatever page the
+  // admin last happened to visit.
+  jobs.push(async()=>{const feed=await getSystemErrors();if(current())cbRef.current.onLogsUpdate(feed.items.map(backendSystemErrorToStoreItem));});
+  if(activePage==='grievances')jobs.push(async()=>{const rows=await getAdminGrievances();if(current())cbRef.current.onGrievancesUpdate(rows.map(backendGrievanceToStoreItem));});
+  if(activePage==='finance')jobs.push(async()=>{const rows=await getAdminTransactions(statementMonth);if(current())cbRef.current.onTransactionsUpdate(rows.map(backendTransactionToStoreItem));});
+  if(['finance','doctors'].includes(activePage))jobs.push(async()=>{const result=await getFinanceSummary(statementMonth);if(current())cbRef.current.onFinanceSummaryUpdate(result);});
+  if(activePage==='command')jobs.push(async()=>{const result=await getCommandTelemetry();if(current())cbRef.current.onCommandTelemetryUpdate(result);});
+  // Unconditional, same reasoning as the system-errors job above: the
+  // sidebar nav badge and the header notification bell both need the real
+  // pending-verification count on every page, not only while the admin has
+  // the Verification tab itself open.
+  jobs.push(async()=>{const result=await getPendingDoctorVerifications();if(current())cbRef.current.onVerificationQueueUpdate(result);});
+  if(activePage==='compliance')jobs.push(async()=>{const result=await getComplianceAlerts();if(current())cbRef.current.onComplianceAlertsUpdate(result);});
+  if(activePage==='finance')jobs.push(async()=>{const result=await getRefundRequests();if(current())cbRef.current.onRefundRequestsUpdate(result);});
+  const work=Promise.all(jobs.map(apply)).then(()=>{}).finally(()=>{if(pending.current===work)pending.current=null;});
+  pending.current=work;return work;
+ },[activePage,statementMonth]);
+ useEffect(()=>{
+  const activeEpoch=epoch;
+  epoch.current++;pending.current=null;
+  const stop=startScheduleSync(fetchPage,{
+   window,document,online:()=>navigator.onLine,
+   every:(callback,ms)=>window.setTimeout(callback,ms),cancel:timer=>window.clearTimeout(timer as number),
+  },30000,{hasError:()=>roundFailed.current,initial:true});
+  return()=>{activeEpoch.current++;stop();};
+ },[fetchPage]);
+ useEffect(()=>{
+  if(!selectedDoctor)return;let active=true;
+  getDoctorDossier(selectedDoctor).then(dossier=>{if(!active)return;const mapped=backendDocToStoreItem({...rawDoctors.current[selectedDoctor],...dossier},0);doctors.current={...doctors.current,[selectedDoctor]:mapped};cbRef.current.onDoctorsUpdate(doctors.current);}).catch(()=>{});
+  return()=>{active=false;};
+ },[selectedDoctor]);
+ useEffect(()=>{
+  if(!selectedPatient)return;let active=true;
+  getPatientDossier(selectedPatient).then(dossier=>{if(!active)return;const mapped=backendPatientToStoreItem({...rawPatients.current[selectedPatient],...(dossier.patient||{}),encounters:dossier.encounters||[],vault_records:dossier.vault_records||[]},0);patients.current={...patients.current,[selectedPatient]:mapped};cbRef.current.onPatientsUpdate(patients.current);}).catch(()=>{});
+  return()=>{active=false;};
+ },[selectedPatient]);
+ return fetchPage;
 }

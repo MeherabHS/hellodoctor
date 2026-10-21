@@ -23,10 +23,10 @@ export function middleware(req: NextRequest) {
   // script-src 'self' prevents hydration (the app becomes a native GET form).
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const dev = process.env.NODE_ENV !== 'production';
-  const csp = ["default-src 'self'", `script-src 'self' 'nonce-${nonce}'${dev ? " 'unsafe-eval'" : ''}`,
+  const csp = ["default-src 'self'", `script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com${dev ? " 'unsafe-eval'" : ''}`,
     "style-src 'self' 'unsafe-inline'", "img-src 'self' data: blob:", "font-src 'self'",
     `connect-src 'self'${dev ? ' ws://127.0.0.1:3001' : ''}`, "object-src 'none'",
-    "base-uri 'none'", "frame-ancestors 'none'", "form-action 'self'"].join('; ');
+    "base-uri 'none'", "frame-src https://challenges.cloudflare.com", "frame-ancestors 'none'", "form-action 'self'"].join('; ');
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('Content-Security-Policy', csp);
