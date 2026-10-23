@@ -4379,6 +4379,13 @@ async fn test_unclosed_historical_statement_remains_estimated(pool: PgPool) {
     let data = json_body(response).await;
     assert_eq!(data["data"]["status"], "IN_PROGRESS");
     assert_eq!(data["data"]["amount_label"], "ESTIMATED_PAYOUT");
+    // CLAUDE.md Core Business Rule #2: every earnings view must render this
+    // exact disclosure. The Wallet summary endpoint already did; this
+    // statement endpoint silently omitted it until this field was added.
+    assert_eq!(
+        data["data"]["basis_note"],
+        "Total calculation is based including the platform charge 20%."
+    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -4622,6 +4629,10 @@ async fn test_financial_close_snapshot_adjustment_routing_and_approval(pool: PgP
     assert_eq!(statement["data"]["status"], "FINALIZED");
     assert_eq!(statement["data"]["payout_status"], "APPROVED");
     assert_money_eq(&statement["data"]["payable"], "600");
+    assert_eq!(
+        statement["data"]["basis_note"],
+        "Total calculation is based including the platform charge 20%."
+    );
     let foreign_statement = json_body(
         get(
             &app,

@@ -54,6 +54,20 @@ void main() {
       expect(cubit.state.terminal, isTrue);
       cubit.close();
     });
+
+    test('a REFUNDED appointment starts terminal', () {
+      final cubit = WaitingRoomCubit(repo,
+          appointmentId: 'apt-1', initialStatus: 'REFUNDED');
+      expect(cubit.state.terminal, isTrue);
+      cubit.close();
+    });
+
+    test('a DISPUTED appointment starts terminal', () {
+      final cubit = WaitingRoomCubit(repo,
+          appointmentId: 'apt-1', initialStatus: 'DISPUTED');
+      expect(cubit.state.terminal, isTrue);
+      cubit.close();
+    });
   });
 
   group('poll', () {

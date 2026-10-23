@@ -49,8 +49,14 @@ jobs:
 
       redis:
         image: redis:7-alpine
+        # Host-mapped to a non-default port deliberately: tests/api_tests.rs's
+        # own `is_disposable_redis_endpoint` safety check refuses to run any
+        # Redis-touching test against the default port 6379, specifically so
+        # a misconfigured TEST_REDIS_URL can never point at a real shared
+        # Redis instance. The container's internal port (used by the
+        # redis-cli health check below) is unaffected.
         ports:
-          - 6379:6379
+          - 16380:6379
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
@@ -65,6 +71,15 @@ jobs:
       # needs. See tests/api_tests.rs's own `test_config()` doc comments for
       # why nothing else from .env.example is required here.
       DATABASE_URL: postgres://hellodoctor:hellodoctor_dev_password@localhost:5432/hellodoctor
+      # Required by tests/api_tests.rs's `test_redis_url()`/`reset_owned_redis`:
+      # Redis-backed tests refuse to run against anything that isn't an
+      # explicitly owned, non-default-port fixture (see the comment on the
+      # service above). TEST_REDIS_FIXTURE_ID must start with
+      # "final-remediation-" — `reset_owned_redis`'s own hardcoded prefix
+      # check — and is written as this fixture's ownership marker below
+      # before any test runs.
+      TEST_REDIS_URL: redis://127.0.0.1:16380/0
+      TEST_REDIS_FIXTURE_ID: final-remediation-ci
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.x
@@ -72,6 +87,21 @@ jobs:
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master @ 2026-10-17
         with:
           toolchain: stable
+          components: clippy
+
+      - name: cargo fmt --check
+        working-directory: services/backend
+        run: cargo fmt --all -- --check
+
+      - name: cargo clippy -- -D warnings
+        # CLAUDE.md documents this as the project's lint gate, but nothing
+        # in CI actually ran it before this — a plain cargo build/test only
+        # ever treats lint-level issues (including the rust_2024_compatibility
+        # lints that would have caught this session's dropped-Result-value
+        # bugs) as non-fatal warnings, so a regression of that exact class
+        # could land without CI ever noticing.
+        working-directory: services/backend
+        run: cargo clippy --all-targets --locked -- -D warnings
 
       - name: cargo test --lib (unit tests, no database)
         # --locked: fails closed if this resolves a dependency graph that
@@ -80,6 +110,15 @@ jobs:
         # security-scan.yml (fixes h18-cargo-audit-unaudited-drift).
         working-directory: services/backend
         run: cargo test --lib --locked
+
+      - name: Bootstrap the disposable test-Redis fixture ownership marker
+        # One-time safety handshake `reset_owned_redis` requires before it
+        # will ever FLUSHDB this fixture — see the comment on the Redis
+        # service above. Never touches the real dev Redis (there isn't one
+        # in this job).
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y redis-tools
+          redis-cli -h 127.0.0.1 -p 16380 SET hd:test-fixture:owner "final-remediation-ci"
 
       - name: cargo test --test api_tests (every migration applied fresh, real HTTP against it)
         working-directory: services/backend
