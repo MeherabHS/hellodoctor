@@ -101,6 +101,17 @@ function InvestigationEvidence({ grievanceId }: { grievanceId: string }) {
       {Object.entries(data.record_page?.totals??{}).some(([kind,total])=>(data.records[kind]?.length??0)<total)&&<button className="admin-btn-sec" disabled={busy} onClick={()=>void moreReferences()}>Load more record references</button>}
       <details><summary>Preservation hold records</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(data.preservation_holds, null, 2)}</pre></details>
       <details><summary>Client-reported telemetry and correlated error references</summary><p>Client telemetry is not proof of provider joins, media, delivery, or human comprehension.</p><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(data.telemetry, null, 2)}</pre></details>
+      <details><summary>Provider-confirmed presence evidence</summary><p>Signed Agora provider callbacks are authoritative for presence. The client telemetry above and reconnect windows are supplementary only.</p><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify({
+        recovery_state: data.telemetry?.recovery_state,
+        empty_room_deadline: data.telemetry?.empty_room_deadline,
+        interruption_reason: data.telemetry?.interruption_reason,
+        patient_present: data.telemetry?.patient_present,
+        doctor_present: data.telemetry?.doctor_present,
+        patient_presence_sequence: data.telemetry?.patient_presence_sequence,
+        doctor_presence_sequence: data.telemetry?.doctor_presence_sequence,
+        provider_presence_events: data.telemetry?.provider_presence_events,
+        recovery_resolution: data.telemetry?.recovery_resolution,
+      }, null, 2)}</pre></details>
       {['CONFIRMED', 'WAITING'].includes(String(data.facts.status)) && <form onSubmit={e => { e.preventDefault(); void reschedule(); }}>
         <h4>Admin-controlled reschedule</h4>
         <p>The original and replacement time, your account, and this grievance are preserved in the change history.</p>
