@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+import 'dart:math';
 import '../../core/network/api_client.dart';
 import '../../core/network/client_error_reporter.dart';
 import 'notification_models.dart';
@@ -9,8 +11,10 @@ import 'notification_models.dart';
 /// dependency either (same honest "no real push provider configured" state
 /// the Doctor app documents), and this pass is scoped to the in-app inbox.
 class NotificationRepository {
-  NotificationRepository(this.api);
+  NotificationRepository(this.api, {TokenStore? deviceIdStore})
+      : _deviceIdStore = deviceIdStore ?? SecureTokenStore();
   final ApiClient api;
+  final TokenStore _deviceIdStore;
 
   dynamic _data(dynamic r) {
     final body = r.data;
@@ -99,5 +103,56 @@ class NotificationRepository {
           screen: 'Notifications', operation: 'update');
       rethrow;
     }
+  }
+
+  Future<Json> registerDevice(
+      {required String platform,
+      required String pushToken,
+      String? deviceId}) async {
+    try {
+      return _mapData(_data(await api.post('/notifications/devices', data: {
+        'platform': platform,
+        'push_token': pushToken,
+        if (deviceId != null) 'device_id': deviceId,
+      })));
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Notifications', operation: 'register_device');
+      rethrow;
+    }
+  }
+
+  Future<void> revokeDevice({String? deviceId, String? pushToken}) async {
+    try {
+      await api.post('/notifications/devices/revoke', data: {
+        if (deviceId != null) 'device_id': deviceId,
+        if (pushToken != null) 'push_token': pushToken,
+      });
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Notifications', operation: 'revoke_device');
+      rethrow;
+    }
+  }
+
+  static String currentPlatformLabel() {
+    if (Platform.isAndroid) return 'ANDROID';
+    if (Platform.isIOS) return 'IOS';
+    return 'WEB';
+  }
+
+  Future<String> deviceId() async {
+    const key = 'notification_device_id';
+    final existing = await _deviceIdStore.read(key);
+    if (existing != null && existing.isNotEmpty) return existing;
+    final rand = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rand.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final generated = '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+    await _deviceIdStore.write(key, generated);
+    return generated;
   }
 }

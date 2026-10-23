@@ -24,6 +24,11 @@ class AppointmentSummaryDto {
     this.fee,
     this.chatExpiresAt,
     this.chatLocked,
+    this.consultationSessionStatus,
+    this.consultationRecoveryState,
+    this.emptyRoomDeadline,
+    this.patientPresent,
+    this.doctorPresent,
   });
 
   final String id,
@@ -36,6 +41,16 @@ class AppointmentSummaryDto {
   final DateTime startTime, endTime;
   final DateTime? chatExpiresAt;
   final bool? chatLocked;
+  final String? consultationSessionStatus, consultationRecoveryState;
+  final DateTime? emptyRoomDeadline;
+  final bool? patientPresent, doctorPresent;
+  bool get hasActiveConsultation =>
+      modality == 'VIDEO' &&
+      status == 'IN_CONSULTATION' &&
+      consultationRecoveryState != 'NEEDS_REVIEW' &&
+      const ['INITIALIZED', 'ACTIVE'].contains(consultationSessionStatus);
+  bool get isWaitingForReconnect =>
+      hasActiveConsultation && consultationRecoveryState == 'GRACE_PERIOD';
   final String? clinicalOutcome, completedAt, fee;
 
   factory AppointmentSummaryDto.fromJson(Json j) => AppointmentSummaryDto(
@@ -49,6 +64,11 @@ class AppointmentSummaryDto {
         fee: _optionalText(j['consultation_fee']),
         chatExpiresAt: DateTime.tryParse(_textOf(j['chat_expires_at'])),
         chatLocked: j['chat_locked'] as bool?,
+        consultationSessionStatus: _optionalText(j['consultation_session_status']),
+        consultationRecoveryState: _optionalText(j['consultation_recovery_state']),
+        emptyRoomDeadline: DateTime.tryParse(_textOf(j['empty_room_deadline']))?.toLocal(),
+        patientPresent: j['patient_present'] as bool?,
+        doctorPresent: j['doctor_present'] as bool?,
         startTime: DateTime.tryParse(_textOf(j['start_time']))?.toLocal() ??
             DateTime.fromMillisecondsSinceEpoch(0),
         endTime: DateTime.tryParse(_textOf(j['end_time']))?.toLocal() ??

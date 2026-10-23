@@ -4,7 +4,12 @@ import 'booking_repository.dart';
 
 /// Appointment statuses a Waiting Room session can no longer act on — no
 /// further polling or joining makes sense once here.
-const kWaitingRoomTerminalStatuses = {'CANCELLED', 'COMPLETED', 'EXPIRED'};
+const kWaitingRoomTerminalStatuses = {
+  'CANCELLED',
+  'COMPLETED',
+  'EXPIRED',
+  'PREMATURE_TERMINATION',
+};
 
 class WaitingRoomState {
   const WaitingRoomState({

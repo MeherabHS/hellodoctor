@@ -39,16 +39,30 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
   String? paymentError;
   late final ScreenRefresh _screenRefresh;
   final _openAcknowledgement = CancelToken();
+  Timer? _holdTimer;
+  Stopwatch? _holdStopwatch;
+  int? _holdBaseSeconds;
+  int? _remainingHoldSeconds;
   @override
   void initState() {
     super.initState();
     refresh();
+    _holdTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      _updateHoldCountdown();
+    });
     unawaited(_ackOpen());
     _screenRefresh = ScreenRefresh(refresh,
         interval: const Duration(seconds: 15),
         networkChanges: widget.repo.connectivity?.changes,
         hasError: () => error != null,
-        enabled: () => !const ['COMPLETED', 'CANCELLED', 'REFUNDED', 'NO_SHOW']
+        enabled: () => !const [
+          'COMPLETED',
+          'CANCELLED',
+          'REFUNDED',
+          'NO_SHOW',
+          'EXPIRED'
+        ]
             .contains(detail?.status ?? widget.appointment.status));
   }
 
@@ -68,6 +82,8 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
   @override
   void dispose() {
     _screenRefresh.dispose();
+    _holdTimer?.cancel();
+    _holdStopwatch?.stop();
     _openAcknowledgement.cancel();
     super.dispose();
   }
@@ -75,13 +91,28 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
   Future<void> refresh() async {
     if (loading) return;
     loading = true;
+    final requestClock = Stopwatch()..start();
     try {
       final value = await widget.repo.appointment(widget.appointment.id);
       if (mounted) {
         setState(() {
           detail = value;
+          if (value.holdExpiresAt != null && value.serverTime != null) {
+            _holdBaseSeconds = value.holdExpiresAt!
+                .difference(value.serverTime!)
+                .inSeconds
+                .clamp(0, 600)
+                .toInt();
+            // Start from request initiation. This makes network latency reduce
+            // the displayed hold, never extend a server deadline.
+            _holdStopwatch = requestClock;
+          } else {
+            _holdBaseSeconds = null;
+            _holdStopwatch = null;
+          }
           error = null;
         });
+        _updateHoldCountdown();
       }
     } catch (e) {
       if (mounted) {
@@ -94,6 +125,33 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
     } finally {
       loading = false;
     }
+  }
+
+  void _updateHoldCountdown() {
+    final expires = detail?.holdExpiresAt;
+    final stopwatch = _holdStopwatch;
+    final baseSeconds = _holdBaseSeconds;
+    if (expires == null ||
+        detail?.status != 'PENDING_PAYMENT' ||
+        stopwatch == null ||
+        baseSeconds == null) {
+      if (_remainingHoldSeconds != null && mounted) {
+        setState(() => _remainingHoldSeconds = null);
+      }
+      return;
+    }
+    final seconds = (baseSeconds - stopwatch.elapsed.inSeconds)
+        .clamp(0, 600)
+        .toInt();
+    if (!mounted || seconds == _remainingHoldSeconds) return;
+    setState(() => _remainingHoldSeconds = seconds);
+    if (seconds == 0) unawaited(refresh());
+  }
+
+  String _formatHold(int seconds) {
+    final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
+    final remaining = (seconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$remaining';
   }
 
   Future<void> pay() async {
@@ -122,6 +180,7 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
   }
 
   Future<void> open() async {
+    if (detail?.status == 'EXPIRED') return;
     final history = const [
       'CANCELLED',
       'REFUNDED',
@@ -193,6 +252,7 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
       'PREMATURE_TERMINATION',
       'DISPUTED'
     ].contains(detail?.status);
+    final expired = detail?.status == 'EXPIRED';
     return Scaffold(
         appBar: AppBar(title: const Text('Your consultation')),
         body: SafeArea(
@@ -217,7 +277,9 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                       child: Text('KES ${a.fee}')),
                 const SizedBox(height: 16),
                 Text(
-                    ended
+                    expired
+                        ? 'Reservation expired'
+                        : ended
                         ? 'Consultation ${detail!.status.toLowerCase()}'
                         : ready
                             ? 'Consultation confirmed'
@@ -228,7 +290,9 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                                     : 'Payment required',
                     style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                Text(ended
+                Text(expired
+                    ? 'The unpaid reservation has expired. Make a new booking and upload your records again.'
+                    : ended
                     ? 'Messaging and calling are unavailable for this booking.'
                     : ready
                         ? 'Your consultation is available.'
@@ -243,7 +307,12 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(paymentError!,
                     style: const TextStyle(color: PatientTokens.danger))),
-          if (ready || ended)
+          if (expired)
+            FilledButton(
+                onPressed: () => Navigator.of(context)
+                    .popUntil((route) => route.isFirst),
+                child: const Text('Choose a new booking'))
+          else if (ready || ended)
             FilledButton(
                 onPressed: error == null && !opening ? open : null,
                 child: Text(opening
@@ -253,15 +322,29 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                         : a.modality == 'CHAT'
                             ? 'Open consultation'
                             : 'Open waiting room'))
-          else if (detail?.status == 'PENDING_PAYMENT')
+          else if (detail?.status == 'PENDING_PAYMENT') ...[
+            if ((_remainingHoldSeconds ?? 0) > 0)
+              Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                      'Reservation expires in ${_formatHold(_remainingHoldSeconds!)}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: PatientTokens.danger))),
             FilledButton(
-                onPressed: paying ? null : pay,
+                onPressed: paying ||
+                        (detail?.holdExpiresAt != null &&
+                            (_remainingHoldSeconds ?? 0) == 0)
+                    ? null
+                    : pay,
                 child: Text(paying
                     ? 'Starting payment...'
                     : 'Proceed to payment method')),
+          ],
           if (!ready && !ended)
             TextButton(onPressed: refresh, child: const Text('Refresh status')),
-          OutlinedButton(
+          if (!expired)
+            OutlinedButton(
               onPressed: () => showModalBottomSheet<void>(
                   context: context,
                   isScrollControlled: true,

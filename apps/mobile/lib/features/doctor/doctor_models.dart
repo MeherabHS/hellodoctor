@@ -23,6 +23,11 @@ class AppointmentDto {
       this.conversationId,
       this.chatExpiresAt,
       this.chatLocked,
+      this.consultationSessionStatus,
+      this.consultationRecoveryState,
+      this.emptyRoomDeadline,
+      this.patientPresent,
+      this.doctorPresent,
       this.queueActionable = true});
   final bool queueActionable;
   bool get isQueueActionable =>
@@ -31,6 +36,16 @@ class AppointmentDto {
   final String? conversationId;
   final DateTime? chatExpiresAt;
   final bool? chatLocked;
+  final String? consultationSessionStatus, consultationRecoveryState;
+  final DateTime? emptyRoomDeadline;
+  final bool? patientPresent, doctorPresent;
+  bool get hasActiveConsultation =>
+      modality == 'VIDEO' &&
+      status == 'IN_CONSULTATION' &&
+      consultationRecoveryState != 'NEEDS_REVIEW' &&
+      const ['INITIALIZED', 'ACTIVE'].contains(consultationSessionStatus);
+  bool get isWaitingForReconnect =>
+      hasActiveConsultation && consultationRecoveryState == 'GRACE_PERIOD';
   bool get chatClosed =>
       chatLocked == true || (chatExpiresAt?.isBefore(DateTime.now()) ?? false);
   bool get isChat => modality == 'CHAT';
@@ -68,6 +83,11 @@ class AppointmentDto {
       conversationId: optionalText(j['conversation_id']),
       chatExpiresAt: DateTime.tryParse(textOf(j['chat_expires_at'])),
       chatLocked: j['chat_locked'] as bool?,
+      consultationSessionStatus: optionalText(j['consultation_session_status']),
+      consultationRecoveryState: optionalText(j['consultation_recovery_state']),
+      emptyRoomDeadline: DateTime.tryParse(textOf(j['empty_room_deadline'])),
+      patientPresent: j['patient_present'] as bool?,
+      doctorPresent: j['doctor_present'] as bool?,
       queueActionable: j['queue_actionable'] == true);
 }
 

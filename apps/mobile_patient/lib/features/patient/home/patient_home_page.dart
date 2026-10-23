@@ -581,7 +581,8 @@ class _UpcomingConsultationSection extends StatelessWidget {
                   style: const TextStyle(color: PatientTokens.textSub)),
             )
           else
-            _ConsultCard(appointment: state.nextUpcoming!),
+            _ConsultCard(
+                appointment: state.nextUpcoming!, onOpen: onManage),
         ],
       ),
     );
@@ -589,8 +590,9 @@ class _UpcomingConsultationSection extends StatelessWidget {
 }
 
 class _ConsultCard extends StatelessWidget {
-  const _ConsultCard({required this.appointment});
+  const _ConsultCard({required this.appointment, required this.onOpen});
   final AppointmentSummaryDto appointment;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -599,8 +601,30 @@ class _ConsultCard extends StatelessWidget {
     final time =
         '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
     return PatientCard(
-      child: Row(
-        children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        if (appointment.hasActiveConsultation)
+          Container(
+              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF86EFAC))),
+              child: Row(children: [
+                const Icon(Icons.videocam, color: Color(0xFF166534)),
+                const SizedBox(width: 8),
+                const Expanded(
+                    child: Text('Active Consultation',
+                        style: TextStyle(
+                            color: Color(0xFF166534),
+                            fontWeight: FontWeight.w800))),
+                FilledButton(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A)),
+                    onPressed: onOpen,
+                    child: const Text('Rejoin'))
+              ])),
+        Row(children: [
           const CircleAvatar(
             radius: 22,
             backgroundColor: PatientTokens.primaryLight,
@@ -633,8 +657,21 @@ class _ConsultCard extends StatelessWidget {
             ),
           ),
           StatusChip(_statusLabel(l10n, appointment.status)),
-        ],
-      ),
+        ]),
+        if (appointment.isWaitingForReconnect)
+          Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                  appointment.doctorPresent == false && appointment.patientPresent == true
+                      ? 'Doctor is reconnecting. Your consultation remains active.'
+                      : appointment.doctorPresent == true && appointment.patientPresent == false
+                          ? 'You are disconnected. Rejoin to continue the consultation.'
+                          : 'The room is empty. Either participant can rejoin now.',
+                  style: const TextStyle(
+                      color: Color(0xFF166534),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600))),
+      ]),
     );
   }
 

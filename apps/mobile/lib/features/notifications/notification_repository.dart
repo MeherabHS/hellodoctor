@@ -116,13 +116,32 @@ class NotificationRepository {
   /// result instead. This call only records a registration row for whenever a
   /// real push provider is wired up later.
   Future<Json> registerDevice(
-      {required String platform, required String pushToken}) async {
+      {required String platform,
+      required String pushToken,
+      String? deviceId}) async {
     try {
       return _mapData(_data(await api.post('/notifications/devices',
-          data: {'platform': platform, 'push_token': pushToken})));
+          data: {
+            'platform': platform,
+            'push_token': pushToken,
+            if (deviceId != null) 'device_id': deviceId,
+          })));
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'Notifications', operation: 'register_device');
+      rethrow;
+    }
+  }
+
+  Future<void> revokeDevice({String? deviceId, String? pushToken}) async {
+    try {
+      await api.post('/notifications/devices/revoke', data: {
+        if (deviceId != null) 'device_id': deviceId,
+        if (pushToken != null) 'push_token': pushToken,
+      });
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Notifications', operation: 'revoke_device');
       rethrow;
     }
   }
@@ -136,6 +155,20 @@ class NotificationRepository {
   }
 
   static const _deviceIdKey = 'notification_device_placeholder_id';
+
+  Future<String> deviceId() async {
+    final existing = await _deviceIdStore.read(_deviceIdKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+    final rand = Random.secure();
+    final bytes = List<int>.generate(16, (_) => rand.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final generated = '${hex.substring(0, 8)}-${hex.substring(8, 12)}-'
+        '${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20)}';
+    await _deviceIdStore.write(_deviceIdKey, generated);
+    return generated;
+  }
 
   /// A stable, locally-generated, non-cryptographic placeholder device
   /// identifier — explicitly NOT a real push token. The backend upserts a
