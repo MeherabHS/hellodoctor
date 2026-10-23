@@ -155,7 +155,26 @@ export interface CommandTelemetry {
     packet_loss_percent: string | null;
     rtt_ms: number | null;
     connection_state: string;
+    session_status?: string;
+    recovery_state?: string;
+    empty_room_deadline?: string | null;
+    interruption_time?: string | null;
+    patient_present?: boolean;
+    doctor_present?: boolean;
+    patient_presence_sequence?: number;
+    doctor_presence_sequence?: number;
+    needs_review?: boolean;
+    payment_status?: string | null;
+    timeline_url?: string;
+    provider_presence_summary?: {
+      source: string;
+      patient_present: boolean;
+      doctor_present: boolean;
+      patient_sequence: number;
+      doctor_sequence: number;
+    };
   }>;
+  needs_review_count?: number;
 }
 
 export interface AdminSlot {
@@ -415,6 +434,17 @@ export async function transitionRefundRequest(
 
 export async function getCommandTelemetry(): Promise<CommandTelemetry> {
   return request<CommandTelemetry>("/admin/command/telemetry");
+}
+
+export async function resolveConsultationRecovery(
+  sessionId: string,
+  outcome: "RESOLVED_NO_SETTLEMENT" | "PENDING_FINANCE_ACTION",
+  reason: string
+): Promise<{ resolution_id: string; result: string }> {
+  return request<{ resolution_id: string; result: string }>(`/admin/consultations/${encodeURIComponent(sessionId)}/recovery-resolution`, {
+    method: "POST",
+    body: JSON.stringify({ outcome, reason }),
+  });
 }
 
 export async function getAdminSlots(): Promise<AdminSlot[]> {

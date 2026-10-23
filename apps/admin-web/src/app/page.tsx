@@ -32,6 +32,9 @@ import {
   AdminOverview,
   FinanceSummary,
   CommandTelemetry,
+  API_BASE,
+  resolveConsultationRecovery,
+  getCommandTelemetry,
   PendingDoctorVerification,
   AdminSlot,
   ComplianceAlert,
@@ -86,6 +89,25 @@ export default function AdminPortalPage() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
   const [commandTelemetry, setCommandTelemetry] = useState<CommandTelemetry | null>(null);
+  const [commandNeedsReviewOnly, setCommandNeedsReviewOnly] = useState(false);
+  const [recoveryResolutionBusy, setRecoveryResolutionBusy] = useState<string | null>(null);
+
+  async function handleRecoveryResolution(sessionId: string) {
+    const reason = window.prompt('Required resolution reason (at least 8 characters):')?.trim();
+    if (!reason || reason.length < 8) return;
+    const pendingFinance = window.confirm('Choose OK to record PENDING_FINANCE_ACTION. Cancel records RESOLVED_NO_SETTLEMENT. No payment is changed by this action.');
+    setRecoveryResolutionBusy(sessionId);
+    try {
+      await resolveConsultationRecovery(sessionId, pendingFinance ? 'PENDING_FINANCE_ACTION' : 'RESOLVED_NO_SETTLEMENT', reason);
+      showToast('Recovery Recorded', 'The audited decision was saved; appointment and payment state were unchanged.', '✓', 'success');
+      const refreshed = await getCommandTelemetry();
+      setCommandTelemetry(refreshed);
+    } catch (error) {
+      showToast('Recovery Not Recorded', error instanceof Error ? error.message : 'The session may already have a decision.', '⚠️', 'warning');
+    } finally {
+      setRecoveryResolutionBusy(null);
+    }
+  }
   const [verificationQueue, setVerificationQueue] = useState<PendingDoctorVerification[]>([]);
   const [modalitySplit, setModalitySplit] = useState<ModalitySplit>({ videoRevenue: 0, chatRevenue: 0, videoCount: 0, chatCount: 0 });
   const [adminSlots, setAdminSlots] = useState<AdminSlot[]>([]);
@@ -1312,21 +1334,33 @@ export default function AdminPortalPage() {
                     <div className="admin-card-title">Live WebRTC Stream Monitor</div>
                     <div className="admin-card-subtitle">Real-time Agora RTC sessions currently in progress</div>
                   </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: '#475569' }}>
+                    <input type="checkbox" checked={commandNeedsReviewOnly} onChange={event => setCommandNeedsReviewOnly(event.target.checked)} />
+                    Needs Review ({commandTelemetry?.needs_review_count ?? 0})
+                  </label>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {(commandTelemetry?.active_streams ?? []).length === 0 ? (
+                  {(commandTelemetry?.active_streams ?? []).filter(s => !commandNeedsReviewOnly || s.needs_review).length === 0 ? (
                     <div style={{ padding: '24px', textAlign: 'center', color: '#64748B', fontSize: '12.5px' }}>No consultations are currently in progress.</div>
                   ) : (
-                    commandTelemetry!.active_streams.map((s) => (
+                    commandTelemetry!.active_streams.filter(s => !commandNeedsReviewOnly || s.needs_review).map((s) => (
                       <div className="webrtc-stream-card" key={s.session_id}>
                         <div>
                           <strong style={{ fontSize: '12px', color: '#0F172A' }}>{s.channel_name} • {s.doctor_name}</strong>
                           <div style={{ fontSize: '10.5px', color: '#64748B', marginTop: '2px' }}>
                             Patient: {s.patient_name} • Started: <b>{s.started_at ? new Date(s.started_at).toLocaleTimeString() : 'Unknown'}</b>
                           </div>
+                          <div style={{ fontSize: '10.5px', color: s.needs_review ? '#B45309' : '#64748B', marginTop: '4px' }}>
+                            {s.needs_review ? `Needs review • ${s.session_status ?? 'INTERRUPTED'} • payment ${s.payment_status ?? 'unknown'}` : `Session ${s.session_status ?? 'ACTIVE'}`}
+                            {' • Provider presence: '}{s.provider_presence_summary?.patient_present ? 'Patient present' : 'Patient absent'} / {s.provider_presence_summary?.doctor_present ? 'Doctor present' : 'Doctor absent'}
+                          </div>
                         </div>
-                        <span className={`webrtc-ping-badge ${s.rtt_ms != null && s.rtt_ms < 60 ? 'good' : 'moderate'}`}>{s.rtt_ms == null ? 'Unmeasured RTT' : `${s.rtt_ms}ms`} • {s.connection_state}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {s.timeline_url && <a href={`${API_BASE}${s.timeline_url}`} target="_blank" rel="noreferrer" style={{ fontSize: '11px', color: '#2563EB' }}>Timeline</a>}
+                          {s.needs_review && <button type="button" disabled={recoveryResolutionBusy === s.session_id} onClick={() => void handleRecoveryResolution(s.session_id)} style={{ fontSize: '11px' }}>{recoveryResolutionBusy === s.session_id ? 'Saving…' : 'Record decision'}</button>}
+                          <span className={`webrtc-ping-badge ${s.rtt_ms != null && s.rtt_ms < 60 ? 'good' : 'moderate'}`}>{s.rtt_ms == null ? 'Unmeasured RTT' : `${s.rtt_ms}ms`} • {s.connection_state}</span>
+                        </div>
                       </div>
                     ))
                   )}
