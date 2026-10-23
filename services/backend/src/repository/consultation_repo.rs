@@ -29,7 +29,7 @@ pub async fn find_by_appointment<'e, E: PgExecutor<'e>>(
     appointment_id: Uuid,
 ) -> Result<Option<ConsultationSession>, sqlx::Error> {
     sqlx::query_as::<_, ConsultationSession>(
-        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at FROM consultation_sessions WHERE appointment_id = $1",
+        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at, recovery_state, empty_room_deadline, patient_present, doctor_present, patient_presence_sequence, doctor_presence_sequence FROM consultation_sessions WHERE appointment_id = $1",
     )
     .bind(appointment_id)
     .fetch_optional(executor)
@@ -41,7 +41,7 @@ pub async fn find_by_id<'e, E: PgExecutor<'e>>(
     id: Uuid,
 ) -> Result<Option<ConsultationSession>, sqlx::Error> {
     sqlx::query_as::<_, ConsultationSession>(
-        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at FROM consultation_sessions WHERE id = $1",
+        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at, recovery_state, empty_room_deadline, patient_present, doctor_present, patient_presence_sequence, doctor_presence_sequence FROM consultation_sessions WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(executor)
@@ -52,7 +52,25 @@ pub async fn list_active<'e, E: PgExecutor<'e>>(
     executor: E,
 ) -> Result<Vec<ConsultationSession>, sqlx::Error> {
     sqlx::query_as::<_, ConsultationSession>(
-        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at FROM consultation_sessions WHERE status IN ('ACTIVE', 'INITIALIZED')",
+        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at, recovery_state, empty_room_deadline, patient_present, doctor_present, patient_presence_sequence, doctor_presence_sequence FROM consultation_sessions WHERE status IN ('ACTIVE', 'INITIALIZED')",
+    )
+    .fetch_all(executor)
+    .await
+}
+
+/// Sessions visible in the Admin command monitor. Interrupted sessions stay
+/// discoverable until their review decision is recorded; they must not be
+/// hidden just because the RTC channel is no longer active.
+pub async fn list_monitoring<'e, E: PgExecutor<'e>>(
+    executor: E,
+) -> Result<Vec<ConsultationSession>, sqlx::Error> {
+    sqlx::query_as::<_, ConsultationSession>(
+        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, created_at, status, recovery_state, empty_room_deadline, patient_present, doctor_present, patient_presence_sequence, doctor_presence_sequence
+         FROM consultation_sessions
+         WHERE status IN ('ACTIVE', 'INITIALIZED', 'PREMATURE_TERMINATION')
+            OR recovery_state = 'NEEDS_REVIEW'
+         ORDER BY (recovery_state = 'NEEDS_REVIEW') DESC, COALESCE(ended_at, started_at, created_at) DESC
+         LIMIT 200",
     )
     .fetch_all(executor)
     .await
@@ -66,7 +84,7 @@ pub async fn list_all<'e, E: PgExecutor<'e>>(
     executor: E,
 ) -> Result<Vec<ConsultationSession>, sqlx::Error> {
     sqlx::query_as::<_, ConsultationSession>(
-        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at FROM consultation_sessions",
+        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at, recovery_state, empty_room_deadline, patient_present, doctor_present, patient_presence_sequence, doctor_presence_sequence FROM consultation_sessions",
     )
     .fetch_all(executor)
     .await

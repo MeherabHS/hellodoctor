@@ -64,13 +64,24 @@ impl DocumentStorageService {
     }
 
     pub async fn delete(state: &AppState, key: &str) {
+        let _ = Self::delete_strict(state, key).await;
+    }
+
+    /// Deletes one private object and reports failures so durable cleanup jobs
+    /// can retry. Missing objects are already in the desired state and count
+    /// as success; callers never receive a key that was not persisted for the
+    /// same appointment.
+    pub async fn delete_strict(state: &AppState, key: &str) -> Result<(), AppError> {
         let Some(storage) = state.object_storage.as_ref() else {
-            return;
+            return Err(AppError::Conflict(
+                "Document storage is not configured.".into(),
+            ));
         };
-        // Best-effort rollback cleanup. An orphaned private ciphertext object
-        // grants no access because no authorized database document refers to it.
-        if storage.delete(&Path::from(key)).await.is_err() {
-            tracing::warn!("Private document rollback cleanup needs storage reconciliation");
+        match storage.delete(&Path::from(key)).await {
+            Ok(()) | Err(object_store::Error::NotFound { .. }) => Ok(()),
+            Err(_) => Err(AppError::internal(
+                "Private document cleanup is temporarily unavailable.".into(),
+            )),
         }
     }
 }

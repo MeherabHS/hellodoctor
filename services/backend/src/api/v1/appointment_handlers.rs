@@ -124,7 +124,9 @@ pub async fn book_appointment(
                     "status": res.status,
                     "payment_session_id": res.payment_session_id,
                     "payment_redirect_url": res.payment_redirect_url,
-                    "amount": res.amount
+                    "amount": res.amount,
+                    "hold_expires_at": res.hold_expires_at,
+                    "server_time": res.server_time
                 }),
             }),
         )
@@ -149,9 +151,25 @@ pub async fn get_appointment(
             .bind(id)
             .fetch_optional(&mut *tx)
             .await?;
+    let consultation = consultation_repo::find_by_appointment(&mut *tx, id).await?;
+    let (hold_expires_at, server_time): (
+        Option<chrono::DateTime<chrono::Utc>>,
+        chrono::DateTime<chrono::Utc>,
+    ) = sqlx::query_as("SELECT hold_expires_at, clock_timestamp() FROM appointments WHERE id=$1")
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
     tx.commit().await?;
     let mut data = serde_json::to_value(apt).map_err(|e| AppError::internal(e.to_string()))?;
     data["payment_status"] = serde_json::json!(payment);
+    data["hold_expires_at"] = serde_json::json!(hold_expires_at);
+    data["server_time"] = serde_json::json!(server_time);
+    data["consultation_recovery_state"] =
+        serde_json::json!(consultation.as_ref().map(|s| s.recovery_state.clone()));
+    data["empty_room_deadline"] =
+        serde_json::json!(consultation.as_ref().and_then(|s| s.empty_room_deadline));
+    data["patient_present"] = serde_json::json!(consultation.as_ref().map(|s| s.patient_present));
+    data["doctor_present"] = serde_json::json!(consultation.as_ref().map(|s| s.doctor_present));
     Ok(Json(ApiResponse {
         success: true,
         data,
@@ -321,6 +339,10 @@ pub async fn get_consultation_for_appointment(
             "status": session.status,
             "started_at": session.started_at,
             "ended_at": session.ended_at,
+            "recovery_state": session.recovery_state,
+            "empty_room_deadline": session.empty_room_deadline,
+            "patient_present": session.patient_present,
+            "doctor_present": session.doctor_present,
         }),
     }))
 }

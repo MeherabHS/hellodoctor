@@ -17,7 +17,17 @@ use uuid::Uuid;
 /// this cap also bounds aggregate per-consultation storage at
 /// 20 * 40 KB = 800 KB. See
 /// docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md.
-const PATIENT_MAX_IMAGES_PER_CONSULTATION: usize = 20;
+pub const PATIENT_MAX_IMAGES_PER_CONSULTATION: usize = 20;
+
+fn patient_intake_status_allowed(status: AppointmentStatus) -> bool {
+    matches!(
+        status,
+        AppointmentStatus::PendingPayment
+            | AppointmentStatus::Confirmed
+            | AppointmentStatus::Waiting
+            | AppointmentStatus::InConsultation
+    )
+}
 
 pub struct PrescriptionService;
 
@@ -46,6 +56,11 @@ impl PrescriptionService {
                 "Select files for an active appointment.".into(),
             ));
         }
+        if files.len() > PATIENT_MAX_IMAGES_PER_CONSULTATION {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Maximum {PATIENT_MAX_IMAGES_PER_CONSULTATION} prescription photos allowed per appointment."
+            )));
+        }
 
         // PHASE A — no transaction held across this block's CPU-bound work.
         // A short read-only check establishes ownership/state up front (so a
@@ -59,8 +74,16 @@ impl PrescriptionService {
                 .await?
                 .filter(|appointment| appointment.patient_id == patient_id)
                 .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+            if !patient_intake_status_allowed(appointment.status) {
+                lookup_tx.commit().await?;
+                return Err(AppError::UnprocessableEntity(
+                    "Select files for an active appointment.".into(),
+                ));
+            }
+            let upload_allowed =
+                appointment_repo::intake_upload_allowed(&mut *lookup_tx, appointment_id).await?;
             lookup_tx.commit().await?;
-            if appointment.status == AppointmentStatus::Cancelled {
+            if !upload_allowed {
                 return Err(AppError::UnprocessableEntity(
                     "Select files for an active appointment.".into(),
                 ));
@@ -82,11 +105,19 @@ impl PrescriptionService {
         // bytes, commit. Sanitization never happens inside this block.
         let mut tx = state.begin_authed(ctx).await?;
 
+        // Serialize upload and expiry before the authoritative appointment read.
+        appointment_repo::lock_for_document_upload(&mut *tx, appointment_id).await?;
+
         let appointment = appointment_repo::find_by_id(&mut *tx, appointment_id)
             .await?
             .filter(|appointment| appointment.patient_id == patient_id)
             .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
-        if appointment.status == AppointmentStatus::Cancelled {
+        if !patient_intake_status_allowed(appointment.status) {
+            return Err(AppError::UnprocessableEntity(
+                "Select files for an active appointment.".into(),
+            ));
+        }
+        if !appointment_repo::intake_upload_allowed(&mut *tx, appointment_id).await? {
             return Err(AppError::UnprocessableEntity(
                 "Select files for an active appointment.".into(),
             ));
@@ -98,8 +129,6 @@ impl PrescriptionService {
         // it (a real race; see docs/CHECKPOINT.md §10). Taken AFTER
         // sanitization, not before, so the lock's hold time is bounded by DB
         // work only.
-        appointment_repo::lock_for_document_upload(&mut *tx, appointment_id).await?;
-
         let existing_count =
             prescription_repo::count_intake_documents(&mut *tx, appointment_id).await?;
 
@@ -148,6 +177,15 @@ impl PrescriptionService {
                 }
                 return Err(error);
             }
+            if !appointment_repo::intake_upload_allowed(&mut *tx, appointment_id).await? {
+                DocumentStorageService::delete(state, &doc.object_key).await;
+                for previous in &uploaded {
+                    DocumentStorageService::delete(state, &previous.object_key).await;
+                }
+                return Err(AppError::UnprocessableEntity(
+                    "Select files for an active appointment.".into(),
+                ));
+            }
             if let Err(error) = prescription_repo::insert_intake_document(&mut *tx, &doc).await {
                 DocumentStorageService::delete(state, &doc.object_key).await;
                 for previous in &uploaded {
@@ -155,13 +193,20 @@ impl PrescriptionService {
                 }
                 return Err(error.into());
             }
-            consultation_trace::record(
+            if let Err(error) = consultation_trace::record(
                 &mut tx,
                 appointment_id,
                 None,
                 Event::accepted("ATTACHMENT_UPLOAD_COMPLETED", Some(("DOCUMENT", doc.id))),
             )
-            .await?;
+            .await
+            {
+                DocumentStorageService::delete(state, &doc.object_key).await;
+                for previous in &uploaded {
+                    DocumentStorageService::delete(state, &previous.object_key).await;
+                }
+                return Err(error);
+            }
             uploaded.push(doc);
         }
 
@@ -284,13 +329,17 @@ impl PrescriptionService {
             DocumentStorageService::delete(state, key).await;
             return Err(error.into());
         }
-        consultation_trace::record(
+        if let Err(error) = consultation_trace::record(
             &mut tx,
             appointment_id,
             None,
             Event::accepted("RX_CREATED", Some(("PRESCRIPTION", rx_id))),
         )
-        .await?;
+        .await
+        {
+            DocumentStorageService::delete(state, key).await;
+            return Err(error);
+        }
         if let Err(error) = tx.commit().await {
             DocumentStorageService::delete(state, key).await;
             return Err(error.into());

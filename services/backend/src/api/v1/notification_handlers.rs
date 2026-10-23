@@ -104,13 +104,15 @@ pub async fn mark_all_read(
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterDeviceRequest {
+    pub device_id: Option<Uuid>,
     pub platform: String,
     pub push_token: String,
 }
 
 /// POST /api/v1/notifications/devices — device-token registration contract
-/// (see `notification_transport.rs`: no real push provider is configured,
-/// this only stores the registration for whenever one is).
+/// The token is treated as a provider credential belonging to this account;
+/// the database's global uniqueness guard prevents reassignment to another
+/// account without an explicit provider-side token rotation.
 pub async fn register_device(
     State(state): State<AppState>,
     ctx: AuthContext,
@@ -124,13 +126,62 @@ pub async fn register_device(
         ));
     }
     let push_token = crate::sanitize::sanitize_text(&payload.push_token, 4096)?;
-    NotificationService::register_device(&state, &ctx, Uuid::new_v4(), &platform, &push_token)
-        .await?;
+    if push_token.trim().is_empty() {
+        return Err(AppError::Validation("push_token must not be empty.".into()));
+    }
+    let device_id = payload.device_id.unwrap_or_else(Uuid::new_v4);
+    NotificationService::register_device(&state, &ctx, device_id, &platform, &push_token)
+        .await
+        .map_err(|error| match error {
+            AppError::Database(sqlx::Error::Database(database_error))
+                if database_error.code().as_deref() == Some("23505") =>
+            {
+                AppError::Conflict(
+                    "This push token is already registered to another account.".into(),
+                )
+            }
+            other => other,
+        })?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(ApiResponse {
             success: true,
-            data: serde_json::json!({ "status": "REGISTERED", "push_provider": "CONFIGURATION_REQUIRED" }),
+            data: serde_json::json!({
+                "status": "REGISTERED",
+                "push_provider": if state.notification_transport.is_configured() { "FCM_HTTP_V1" } else { "NOOP_DEVELOPMENT" }
+            }),
         }),
     ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RevokeDeviceRequest {
+    pub device_id: Option<Uuid>,
+    pub push_token: Option<String>,
+}
+
+/// POST /api/v1/notifications/devices/revoke
+pub async fn revoke_device(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Json(payload): Json<RevokeDeviceRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let push_token = payload
+        .push_token
+        .as_deref()
+        .map(|token| crate::sanitize::sanitize_text(token, 4096))
+        .transpose()?;
+    if payload.device_id.is_none() && push_token.as_deref().is_none() {
+        return Err(AppError::Validation(
+            "device_id or push_token is required.".into(),
+        ));
+    }
+    let disabled =
+        NotificationService::revoke_device(&state, &ctx, payload.device_id, push_token.as_deref())
+            .await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({ "status": "REVOKED", "disabled_count": disabled }),
+    }))
 }

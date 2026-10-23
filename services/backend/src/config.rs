@@ -53,6 +53,10 @@ pub struct AppConfig {
     pub agora_token_window_before_mins: i64,
     pub agora_token_window_after_mins: i64,
     pub webhook_hmac_secret: String,
+    /// Dedicated HMAC key for provider-confirmed Agora presence callbacks.
+    /// Empty in development means callback ingestion fails closed until the
+    /// provider integration is actually configured.
+    pub agora_webhook_hmac_secret: String,
     pub storage_bucket: String,
     pub storage_endpoint: String,
     pub storage_access_key: String,
@@ -76,6 +80,12 @@ pub struct AppConfig {
     pub azure_email_endpoint: Option<String>,
     pub azure_email_access_key: Option<String>,
     pub azure_email_sender: Option<String>,
+    /// FCM HTTP v1 service-account material. These values are server-only and
+    /// are intentionally optional in development/test, where NoopTransport
+    /// remains the safe default.
+    pub fcm_project_id: Option<String>,
+    pub fcm_client_email: Option<String>,
+    pub fcm_private_key_b64: Option<String>,
 }
 
 impl AppConfig {
@@ -151,7 +161,7 @@ impl AppConfig {
             payment_reservation_window_secs: env::var("PAYMENT_RESERVATION_WINDOW_SECS")
                 .ok()
                 .and_then(|p| p.parse().ok())
-                .unwrap_or(900),
+                .unwrap_or(600),
             consultation_trace_retention_days: env::var("CONSULTATION_TRACE_RETENTION_DAYS")
                 .map(|v| {
                     v.parse::<u32>()
@@ -181,6 +191,7 @@ impl AppConfig {
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(60),
             webhook_hmac_secret: require("WEBHOOK_HMAC_SECRET"),
+            agora_webhook_hmac_secret: env::var("AGORA_WEBHOOK_HMAC_SECRET").unwrap_or_default(),
             storage_bucket: env::var("STORAGE_BUCKET")
                 .unwrap_or_else(|_| "helodoc-medical-records".into()),
             storage_endpoint: storage_setting("STORAGE_ENDPOINT"),
@@ -210,6 +221,15 @@ impl AppConfig {
                 .ok()
                 .filter(|v| !v.trim().is_empty()),
             azure_email_sender: env::var("AZURE_EMAIL_SENDER")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
+            fcm_project_id: env::var("FCM_PROJECT_ID")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
+            fcm_client_email: env::var("FCM_CLIENT_EMAIL")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
+            fcm_private_key_b64: env::var("FCM_PRIVATE_KEY_B64")
                 .ok()
                 .filter(|v| !v.trim().is_empty()),
         };
@@ -251,6 +271,20 @@ impl AppConfig {
             return Err("DEV_SIMULATION_ENABLED is forbidden in production.");
         }
         if self.requires_https() {
+            let fcm_configured = self.fcm_project_id.is_some()
+                && self.fcm_client_email.is_some()
+                && self.fcm_private_key_b64.is_some();
+            let fcm_any_configured = self.fcm_project_id.is_some()
+                || self.fcm_client_email.is_some()
+                || self.fcm_private_key_b64.is_some();
+            if fcm_any_configured && !fcm_configured {
+                return Err("FCM_PROJECT_ID, FCM_CLIENT_EMAIL and FCM_PRIVATE_KEY_B64 must be configured together.");
+            }
+            if !fcm_configured {
+                return Err(
+                    "FCM HTTP v1 push delivery must be configured outside development/test.",
+                );
+            }
             if self.trusted_proxy_ips.is_empty()
                 || self
                     .trusted_proxy_ips

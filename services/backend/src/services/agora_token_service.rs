@@ -104,7 +104,7 @@ fn validate_credential_format(name: &str, value: &str) -> Result<(), AppError> {
 /// ~1-in-4-billion-collision-odds values rather than 1-in-100,000. Doesn't
 /// need a new table: only two participants ever share a given channel, so a
 /// full 32-bit hash is already a huge margin for that birthday problem.
-fn derive_uid(channel_name: &str, user_id: UserId) -> u32 {
+pub fn derive_uid(channel_name: &str, user_id: UserId) -> u32 {
     let mut hasher = Sha256::new();
     hasher.update(channel_name.as_bytes());
     hasher.update(user_id.into_inner().as_bytes());

@@ -40,10 +40,14 @@ use uuid::Uuid;
 
 #[path = "cases/admission_capacity_bench.rs"]
 mod admission_capacity_bench;
+#[path = "cases/consultation_recovery.rs"]
+mod consultation_recovery;
 #[path = "cases/pool_pressure.rs"]
 mod pool_pressure;
 #[path = "cases/profile_pictures.rs"]
 mod profile_pictures;
+#[path = "cases/push_notification_delivery.rs"]
+mod push_notification_delivery;
 #[path = "cases/schedule_exclusivity.rs"]
 mod schedule_exclusivity;
 #[path = "cases/security_acceptance.rs"]
@@ -170,7 +174,7 @@ fn test_config() -> AppConfig {
         db_system_worker_password: TEST_ROLE_PASSWORD.into(),
         db_finance_worker_password: TEST_ROLE_PASSWORD.into(),
         db_pool_max_connections_per_role: 2,
-        payment_reservation_window_secs: 900,
+        payment_reservation_window_secs: 600,
         max_active_users: 1200,
         consultation_trace_retention_days: 5,
         global_ip_rate_limit_per_min: 120,
@@ -188,6 +192,7 @@ fn test_config() -> AppConfig {
         agora_token_window_before_mins: 1440,
         agora_token_window_after_mins: 1440,
         webhook_hmac_secret: TEST_WEBHOOK_SECRET.into(),
+        agora_webhook_hmac_secret: TEST_WEBHOOK_SECRET.into(),
         storage_bucket: "helodoc-medical-records".into(),
         storage_endpoint: String::new(),
         storage_access_key: String::new(),
@@ -205,6 +210,9 @@ fn test_config() -> AppConfig {
         azure_email_endpoint: None,
         azure_email_access_key: None,
         azure_email_sender: None,
+        fcm_project_id: None,
+        fcm_client_email: None,
+        fcm_private_key_b64: None,
     }
 }
 
@@ -1319,6 +1327,16 @@ fn deployed_config() -> AppConfig {
     config.metrics_scrape_token = "synthetic-monitoring-credential-for-tests-only".into();
     config.public_api_base_url = "https://api.example.test".into();
     config.allowed_origins = vec!["https://doctor.example.test".into()];
+    // Synthetic presence only: this test config never starts an FCM transport
+    // and never sends a provider request. Production values are injected by
+    // secret management, never committed to the repository.
+    config.fcm_project_id = Some("synthetic-fcm-project".into());
+    config.fcm_client_email = Some("synthetic-fcm-service@example.invalid".into());
+    // A throwaway, locally-generated RSA key (never any real provider's key)
+    // that must parse as valid PKCS#1 so `AppState::new` doesn't hard-panic —
+    // these tests never actually sign/send a push, they only exercise other
+    // production-mode guards (TLS proxy trust, metrics token, origin allowlist).
+    config.fcm_private_key_b64 = Some("LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQ0KTUlJRXBBSUJBQUtDQVFFQXFoUGFrTmRzYjhFbHRyeWxQVzB4U0lqVGJESW83azc3ZERxWDNmcTV4SVpnVGhQTQ0KMzc1eVlIZlYxdmJUSGZROE5acGo5NWNIdTFLTW5VeUFnbG8xbXJES2p3WUs5VXVIRFlWL290N2tIMVhYZ2R2NQ0KbzB6YUJQMC9FNUg3eGN2SmVJUzdEcEZNWUJpOWxWdjVSWi9TTGVWanFDT3N2cnhwWUIvSnpTU2VrNjV4dzdKNA0KMkw0NDFkajZUT0hTY2pqQVZuWkhnVU9pc0RseWFyMTA5cm41TERZUldhR1JCb1Q5WFZQWFo2a2xXdFNJczlVdg0KT2FuazJmSkExZkJwQUVKMlRRNFpVV1ZBRnVCMk9aQ2JlVHdWeitjRUlBZUR2SGEvWlcwVHRNR0szVjA4aGZUNQ0KTGVpbkczemZmL2ZVWEdPNjE3UDlEZ1Y2VEpvb3dmZmVNc0ZyVHdJREFRQUJBb0lCQUVYQmlkbnhPUnptNDdCOA0KMCtzTFAzVG9CWXJ4VWI5WUxxTC9xeTBVdWgrRUc3aTZQME9mYVdydWk0cTB4bWNaTnA2bm1ZdkJhcDdtWHh6ZQ0KOVRCQmpvM0pKL01jUDk5V29HZ24wbTg3S3VZOVAzd1gvRjRCVmNSSkdCZFBQeXZqaHRrQzIzUEFuVW9tcTQ4NA0KWDFjeWt6Sld6Slo0TjFBdGw2eWdyUlNTQ2VZNHNMdDBKdmZUNFZRWkQ1YW5QbnNZcUhZRmhka0RzM01UZ2ljcw0KQW9IY1dCOFVYS1I5MXloOFNYQTg2eXYwUExqTWE5WDI3VmlxRi9mZEpybUlvTjNOZlN1ODZrUWQwS3RKS1I5UQ0KRGt1UWJ4Z010RWREOHdLeU00WFJuczhzRDUyMFY0cEo0SkZnUUFLQitNTzJXKzJKdUxzeEFZelhjcnpCSlgwTg0KM296MTJ2RUNnWUVBNUc4SkJWd0lITGxRKzA2MjVhYmpIeVdNQ3p1ajB6NVNTVGJYOE0yYTIySkRhbjU5R3hPWQ0KRFA4ZmIwcGVQZHBiL1o2MkljWEZERkpBYUd0bW9tRENlSC9UY05UNnZWMFhrQmlONTFocVZBUElJRlRzVEhjNw0KRkQ1NkZMMXRHbmxFc2tMUEhUY2p2dXhQZlFqZ016enhsRmZwUml3eEJSTHZ1YVhLSWRiMG1QRUNnWUVBdnBvSA0KN2doUXZwbXpoMGR2OHVRaU5ZZThYVWxaQVMweWhHNW4xZ1ZCY09RaEpCa01hbjk4WHZObEFpcUc3RHdqd1RWYQ0KVEY0SEJYbGlQM0NzUytnNS9GQlRkQ3phRmhESzhvMmhReit2TmthZXZ3ZjFLUUhEWFQ3cEFrTnV0N3pIWTMwbw0KeG1LTFdZOWt2clo1SjFjeGNSMmR5RjFvamg1NG0yS2E2YnBNU0Q4Q2dZRUFqYUVPTGNWK3ZoaGp6anhpaDRadQ0KUU94dHBMVklnSHVlVndocTRFRUo1MFZJV1NtdGRYRXpqN05LRVIxQnl3V3NqVld1eE1leXdVM3A0eFBiNFljdQ0KYTdtTkplTFd4enVGbFhDejRxRGQ0OU1vYkd0YXlwb09CaUlxWE51SlhxV2JZdzZyRFFrWDM1THlRYXFVSHhDRg0KRTUxaDQ0RVlyM1dyTGlaTmFhZTFwWEVDZ1lCZTJUM2ErUzVkT3hWNDIxYmRVeU9tNmM0VnlodE5sNVZOQzdnRw0KYkFVZHpaaWtZd2FudEp0S2tPcVNBbUcwQzFWcm4wWTVQSTFYN3dpeU16cTZaMno3bjJsNEpaMjlYMHZ2R2dYRw0KOWxrVnRGenBDV2U1cVZQMEFndG9BZkNGNUo2QVp0YzBxZk5ZZFNBWU82dmNwT3BJdFFsQW5TTWJuaFE4bHZ3cQ0KRlhoQ2R3S0JnUURITExDbXA0cFZKSU13dmk4VTRFZUtXSG9CdUUzci9iQ2hNMHdZVVI3Uko3OUpQYkREWkhJcg0KWTN2QTdHRXAxQkhscDBlS3R4b3hxdUJuL3VPVEt2WW8yenAybjJnYXRFaHNlZnJyU3E1UVYvZ2k1UDlmU3V0eQ0KeEE0Mm16Q2ZxZndhcUg1RjY5bFliS0tmb0tXeVVXSmcrakZZQzM4ZU10ekxNNTJUVDBhU0J3PT0NCi0tLS0tRU5EIFJTQSBQUklWQVRFIEtFWS0tLS0tDQo=".into());
     config
 }
 
@@ -3476,6 +3494,46 @@ async fn test_multi_prescription_intake_and_20_photo_limit(pool: PgPool) {
         count_after, 20,
         "a rejected 21st-image upload must not partially persist"
     );
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_patient_intake_rejects_terminal_appointment_states(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let (appointment, _) = book_and_confirm(&app, &patient_token).await;
+    let path = format!("/api/v1/appointments/{appointment}/prescriptions");
+    let payload = serde_json::json!({
+        "files": [{
+            "mime_type": "image/jpeg",
+            "base64_content": minimal_jpeg_base64()
+        }]
+    });
+
+    for status in ["COMPLETED", "EXPIRED", "REFUNDED", "PREMATURE_TERMINATION"] {
+        sqlx::query("UPDATE appointments SET status=$1::appointment_status_enum WHERE id=$2")
+            .bind(status)
+            .bind(appointment)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let response = post(&app, &path, Some(&patient_token), &payload).await;
+        assert_eq!(
+            response.status(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "patient intake must be unavailable while appointment status is {status}"
+        );
+        assert_eq!(
+            hellodoctor_backend::repository::prescription_repo::count_intake_documents(
+                &pool,
+                appointment
+            )
+            .await
+            .unwrap(),
+            0,
+            "rejected {status} intake must not persist metadata"
+        );
+    }
 }
 
 #[sqlx::test(migrations = "./migrations")]

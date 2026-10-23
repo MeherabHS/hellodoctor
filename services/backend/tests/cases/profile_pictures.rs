@@ -59,6 +59,10 @@ fn minimal_png_base64() -> String {
     STANDARD.encode(buf.into_inner())
 }
 
+fn minimal_pdf_base64() -> String {
+    STANDARD.encode(b"%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\n%%EOF")
+}
+
 /// A high-frequency synthetic photo whose naive encoding comfortably exceeds
 /// `MAX_PRESCRIPTION_IMAGE_BYTES` (40KB) — a deterministic, fast-to-generate
 /// stand-in for `upload_security_service.rs`'s own private RNG-based
@@ -303,6 +307,27 @@ async fn test_spoofed_mime_type_rejected(pool: PgPool) {
             .await
             .unwrap();
     assert!(object_key.is_none());
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_profile_photo_rejects_pdf_content(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let (patient_id, token) = new_patient(&pool).await;
+
+    let upload =
+        upload_patient_photo(&app, &token, "application/pdf", &minimal_pdf_base64(), None).await;
+    assert_eq!(upload.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    let object_key: Option<String> =
+        sqlx::query_scalar("SELECT profile_picture_object_key FROM patient_profiles WHERE id=$1")
+            .bind(patient_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        object_key.is_none(),
+        "a PDF must never become a profile photo"
+    );
 }
 
 // ============================================================================

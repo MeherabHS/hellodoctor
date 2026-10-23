@@ -60,6 +60,8 @@ pub struct AppState {
     pub object_storage: Option<Arc<dyn object_store::ObjectStore>>,
     pub admission: Arc<crate::admission::Admission>,
     pub web_auth: Arc<crate::api::middleware::web_auth::WebAuthGate>,
+    pub notification_transport:
+        Arc<dyn crate::services::notification_transport::NotificationTransport>,
 }
 
 impl AppState {
@@ -110,6 +112,13 @@ impl AppState {
         let web_auth = Arc::new(crate::api::middleware::web_auth::WebAuthGate::new(
             !config.is_development_or_test(),
         ));
+        let notification_transport: Arc<
+            dyn crate::services::notification_transport::NotificationTransport,
+        > = match crate::services::notification_transport::FcmTransport::from_config(&config) {
+            Ok(Some(transport)) => Arc::new(transport),
+            Ok(None) => Arc::new(crate::services::notification_transport::NoopTransport),
+            Err(error) => panic!("FATAL: invalid FCM configuration: {error}"),
+        };
         Self {
             db,
             auth_db,
@@ -121,6 +130,7 @@ impl AppState {
             object_storage,
             admission,
             web_auth,
+            notification_transport,
         }
     }
 

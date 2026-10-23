@@ -277,12 +277,16 @@ async fn upload_authorized(
         }
         return Err(e.into());
     }
-    sqlx::query("SELECT bind_chat_message_key($1,$2)")
+    if let Err(error) = sqlx::query("SELECT bind_chat_message_key($1,$2)")
         .bind(message_id)
         .bind(replay_hash)
         .execute(&mut *tx)
-        .await?;
-    consultation_trace::record(
+        .await
+    {
+        DocumentStorageService::delete(&state, &object_key).await;
+        return Err(error.into());
+    }
+    if let Err(error) = consultation_trace::record(
         &mut tx,
         appointment.id,
         Some(conversation_id),
@@ -291,9 +295,19 @@ async fn upload_authorized(
             Some(("DOCUMENT", message_id)),
         ),
     )
-    .await?;
-    crate::services::ChatService::record_committed_message(&mut tx, &ctx, &conv, &message, first)
-        .await?;
+    .await
+    {
+        DocumentStorageService::delete(&state, &object_key).await;
+        return Err(error);
+    }
+    if let Err(error) = crate::services::ChatService::record_committed_message(
+        &mut tx, &ctx, &conv, &message, first,
+    )
+    .await
+    {
+        DocumentStorageService::delete(&state, &object_key).await;
+        return Err(error);
+    }
     if let Err(e) = tx.commit().await {
         // A transport error can arrive after COMMIT succeeded. Deleting here
         // could destroy an authoritative attachment. Preserve private ciphertext

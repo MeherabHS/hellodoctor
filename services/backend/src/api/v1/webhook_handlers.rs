@@ -2,6 +2,9 @@ use crate::crypto;
 use crate::domain::models::Gateway;
 use crate::error::AppError;
 use crate::repository::AppState;
+use crate::services::consultation_presence_service::{
+    self, ProviderPresenceEvent, ProviderPresenceKind,
+};
 use crate::services::AppointmentService;
 use axum::{
     body::Bytes,
@@ -10,7 +13,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -52,6 +55,97 @@ pub struct ApiResponse<T> {
 }
 
 const MAX_WEBHOOK_AGE_SECONDS: i64 = 300;
+
+#[derive(Debug, Deserialize)]
+struct AgoraNotificationPayload {
+    #[serde(rename = "channelName")]
+    channel_name: String,
+    uid: u32,
+    #[serde(rename = "clientSeq")]
+    client_sequence: i64,
+    /// Agora RTC server event time, Unix seconds.
+    ts: i64,
+}
+
+#[derive(Debug, Deserialize)]
+struct AgoraNotification {
+    #[serde(rename = "noticeId")]
+    notice_id: String,
+    #[serde(rename = "productId")]
+    product_id: i64,
+    #[serde(rename = "eventType")]
+    event_type: i64,
+    #[serde(rename = "notifyMs")]
+    notify_ms: i64,
+    payload: AgoraNotificationPayload,
+}
+
+/// Provider-only callback. The client applications never call this route and
+/// client Agora callbacks remain telemetry. This follows Agora Notification
+/// Service's documented RTC communication-mode events (107 join, 108 leave),
+/// verifies the raw body with the Agora-issued `Agora-Signature-V2` header,
+/// and requires the deployment to enforce HTTPS and Agora's published source
+/// IP allowlist at the edge.
+pub async fn handle_agora_presence_webhook(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    raw_body: Bytes,
+) -> Result<impl IntoResponse, AppError> {
+    if state.config.agora_webhook_hmac_secret.is_empty() {
+        return Err(AppError::ServiceUnavailable(
+            "Agora provider presence verification is not configured.".into(),
+        ));
+    }
+    let signature = headers
+        .get("Agora-Signature-V2")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| AppError::Unauthorized("Missing Agora signature header.".into()))?;
+    if !crypto::verify_webhook_signature(
+        &raw_body,
+        signature,
+        &state.config.agora_webhook_hmac_secret,
+    ) {
+        return Err(AppError::Unauthorized("Invalid provider signature.".into()));
+    }
+    let notification: AgoraNotification = serde_json::from_slice(&raw_body)
+        .map_err(|e| AppError::UnprocessableEntity(format!("Malformed presence payload: {e}")))?;
+    if notification.product_id != 1 {
+        return Err(AppError::Validation(
+            "Unsupported Agora product callback.".into(),
+        ));
+    }
+    let age_ms = Utc::now().timestamp_millis() - notification.notify_ms;
+    if !(0..=MAX_WEBHOOK_AGE_SECONDS * 1000).contains(&age_ms) {
+        return Err(AppError::Unauthorized(
+            "Provider event timestamp is outside the acceptable freshness window.".into(),
+        ));
+    }
+    let kind = match notification.event_type {
+        107 => ProviderPresenceKind::Joined,
+        108 => ProviderPresenceKind::Left,
+        _ => return Err(AppError::Validation("Unsupported Agora RTC event.".into())),
+    };
+    let provider_event_at = Utc
+        .timestamp_opt(notification.payload.ts, 0)
+        .single()
+        .ok_or_else(|| AppError::Validation("Invalid Agora event timestamp.".into()))?;
+    let applied = consultation_presence_service::apply_provider_event(
+        &state,
+        ProviderPresenceEvent {
+            provider_event_id: notification.notice_id,
+            channel_name: notification.payload.channel_name,
+            participant_uid: notification.payload.uid,
+            kind,
+            provider_sequence: notification.payload.client_sequence,
+            provider_event_at,
+        },
+    )
+    .await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({"applied": applied}),
+    }))
+}
 
 /// Verifies `X-Signature: hex(hmac_sha256(WEBHOOK_HMAC_SECRET, raw_body))`
 /// against the *exact raw bytes* of the request — before any JSON parsing —

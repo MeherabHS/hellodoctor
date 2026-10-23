@@ -166,6 +166,12 @@ impl ConsultationService {
                     ended_at: None,
                     status: SessionStatus::Active,
                     created_at: Utc::now(),
+                    recovery_state: "NONE".into(),
+                    empty_room_deadline: None,
+                    patient_present: false,
+                    doctor_present: false,
+                    patient_presence_sequence: 0,
+                    doctor_presence_sequence: 0,
                 };
                 consultation_repo::insert_session(&mut *tx, &s).await?;
                 // Another authorized participant may have created the session
@@ -177,6 +183,12 @@ impl ConsultationService {
                     })?
             }
         };
+
+        if session.recovery_state == "NEEDS_REVIEW" {
+            return Err(AppError::Conflict(
+                "This consultation needs review before it can be rejoined.".into(),
+            ));
+        }
 
         tx.commit().await?;
 
@@ -353,6 +365,32 @@ impl ConsultationService {
             consultation_repo::list_telemetry_events_for_session(&mut *tx, session_id).await?;
         let aggregate = consultation_repo::find_by_session(&mut *tx, session_id).await?;
         let grievances = grievance_repo::find_by_consultation_id(&mut *tx, session_id).await?;
+        let provider_presence_events: Vec<serde_json::Value> = sqlx::query_scalar(
+            "SELECT jsonb_build_object(
+                'provider_event_id', provider_event_id,
+                'event_type', event_type,
+                'participant_uid', participant_uid,
+                'participant_role', participant_role,
+                'provider_sequence', provider_sequence,
+                'provider_event_at', provider_event_at,
+                'received_at', received_at
+             )
+             FROM consultation_provider_presence_events
+             WHERE session_id = $1
+             ORDER BY provider_sequence, received_at, id
+             LIMIT 500",
+        )
+        .bind(session_id)
+        .fetch_all(&mut *tx)
+        .await?;
+        let recovery_resolution: Option<serde_json::Value> = sqlx::query_scalar(
+            "SELECT jsonb_build_object('resolution_id', id, 'outcome', outcome,
+                    'reason', reason, 'admin_user_id', admin_user_id, 'created_at', created_at)
+             FROM consultation_recovery_resolutions WHERE session_id=$1",
+        )
+        .bind(session_id)
+        .fetch_optional(&mut *tx)
+        .await?;
 
         let mut participant_user_ids = Vec::new();
         if let Some(p) = patient_repo::find_by_id(&mut *tx, apt.patient_id).await? {
@@ -392,6 +430,20 @@ impl ConsultationService {
             "started_at": session.started_at,
             "ended_at": session.ended_at,
             "status": session.status,
+            "interruption_reason": if session.recovery_state == "NEEDS_REVIEW" {
+                Some("EMPTY_ROOM_GRACE_EXPIRED")
+            } else {
+                None::<&str>
+            },
+            "recovery_state": session.recovery_state,
+            "empty_room_deadline": session.empty_room_deadline,
+            "patient_present": session.patient_present,
+            "doctor_present": session.doctor_present,
+            "patient_presence_sequence": session.patient_presence_sequence,
+            "doctor_presence_sequence": session.doctor_presence_sequence,
+            "provider_presence_events": provider_presence_events,
+            "provider_presence_semantics": "Signed Agora provider callbacks are authoritative for presence. Client telemetry and reconnect_windows below are supplementary and cannot change recovery state.",
+            "recovery_resolution": recovery_resolution,
             "events": events,
             "reconnect_windows": reconnect_windows,
             "aggregate_telemetry": aggregate,
@@ -449,6 +501,17 @@ impl ConsultationService {
             "PAYMENT_NOT_CONFIRMED" => {
                 return Err(AppError::Conflict(
                     "Payment has not been confirmed; completion was not recorded.".into(),
+                ))
+            }
+            "INVALID_SESSION_STATE" => {
+                return Err(AppError::Conflict(
+                    "This consultation was interrupted and requires review before completion."
+                        .into(),
+                ))
+            }
+            "SESSION_NOT_FOUND" => {
+                return Err(AppError::Conflict(
+                    "The consultation session is not available for completion.".into(),
                 ))
             }
             "PERIOD_CLOSED" => {
