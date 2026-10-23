@@ -1,0 +1,5 @@
+REVOKE EXECUTE ON FUNCTION admin_resolve_consultation_recovery(UUID,TEXT,TEXT,UUID) FROM hellodoctor_api;
+DROP FUNCTION admin_resolve_consultation_recovery(UUID,TEXT,TEXT,UUID);
+DROP TABLE consultation_recovery_resolutions;
+DROP POLICY consultation_provider_presence_events_admin_read ON consultation_provider_presence_events;
+REVOKE SELECT ON consultation_provider_presence_events FROM hellodoctor_api;

@@ -344,6 +344,10 @@ fn public_routes() -> Router<AppState> {
             "/webhooks/payment/:provider",
             axum::routing::post(webhook_handlers::handle_payment_webhook),
         )
+        .route(
+            "/webhooks/agora/presence",
+            axum::routing::post(webhook_handlers::handle_agora_presence_webhook),
+        )
 }
 
 /// Everything else. Gated as a group by `auth_middleware` (see
@@ -382,6 +386,7 @@ fn protected_routes() -> Router<AppState> {
         .route("/notifications/read-all", axum::routing::post(notification_handlers::mark_all_read))
         .route("/notifications/:id/read", axum::routing::post(notification_handlers::mark_read))
         .route("/notifications/devices", axum::routing::post(notification_handlers::register_device))
+        .route("/notifications/devices/revoke", axum::routing::post(notification_handlers::revoke_device))
         .route("/doctor/chats", get(doctor_handlers::list_own_chats))
         .route("/doctor/appointments/:current_appointment_id/patient-history", get(doctor_handlers::list_patient_history))
         .route("/doctor/appointments/:current_appointment_id/patient-history/:historical_consultation_id", get(doctor_handlers::get_patient_history_detail))
@@ -634,6 +639,10 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/admin/consultations/:session_id/timeline",
             get(admin_handlers::get_consultation_timeline),
+        )
+        .route(
+            "/admin/consultations/:session_id/recovery-resolution",
+            axum::routing::post(admin_handlers::resolve_consultation_recovery),
         )
         .route(
             "/admin/platform-payment-methods",

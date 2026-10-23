@@ -1045,7 +1045,7 @@ pub async fn get_command_telemetry(
     let doc_name_by_id: HashMap<DoctorProfileId, String> =
         docs.iter().map(|d| (d.id, d.full_name.clone())).collect();
 
-    let sessions = consultation_repo::list_active(&mut *tx).await?;
+    let sessions = consultation_repo::list_monitoring(&mut *tx).await?;
     // Scoped to just the (typically small) set of appointments/patients/
     // telemetry rows behind *active* sessions, not a whole-table fetch —
     // this is an "active now" dashboard, and its cost must scale with how
@@ -1073,6 +1073,20 @@ pub async fn get_command_telemetry(
             .into_iter()
             .map(|t| (t.session_id, t))
             .collect();
+    let payment_by_appointment: HashMap<Uuid, String> = if session_appointment_ids.is_empty() {
+        HashMap::new()
+    } else {
+        sqlx::query_as::<_, (Uuid, String)>(
+            "SELECT DISTINCT ON (appointment_id) appointment_id, payment_status::text
+             FROM transactions WHERE appointment_id = ANY($1)
+             ORDER BY appointment_id, (payment_status = 'FAILED') ASC, created_at DESC, id DESC",
+        )
+        .bind(&session_appointment_ids)
+        .fetch_all(&mut *tx)
+        .await?
+        .into_iter()
+        .collect()
+    };
 
     let mut active_streams = Vec::new();
     for session in &sessions {
@@ -1086,6 +1100,8 @@ pub async fn get_command_telemetry(
             .cloned()
             .unwrap_or_else(|| "Patient".into());
         let telemetry = telemetry_by_session.get(&session.id);
+        let needs_review = session.recovery_state == "NEEDS_REVIEW"
+            || matches!(session.status, SessionStatus::PrematureTermination);
 
         active_streams.push(serde_json::json!({
             "session_id": session.id,
@@ -1097,12 +1113,35 @@ pub async fn get_command_telemetry(
             "packet_loss_percent": telemetry.as_ref().and_then(|t| t.packet_loss_percent.as_ref().map(|p| p.to_string())),
             "rtt_ms": telemetry.as_ref().and_then(|t| t.round_trip_time_ms),
             "connection_state": telemetry.as_ref().map(|t| t.connection_state.clone()).unwrap_or_else(|| "Unmeasured".into()),
+            "session_status": session.status,
+            "recovery_state": session.recovery_state,
+            "empty_room_deadline": session.empty_room_deadline,
+            "interruption_time": session.ended_at,
+            "interruption_reason": if needs_review { Some("EMPTY_ROOM_GRACE_EXPIRED") } else { None::<&str> },
+            "patient_present": session.patient_present,
+            "doctor_present": session.doctor_present,
+            "patient_presence_sequence": session.patient_presence_sequence,
+            "doctor_presence_sequence": session.doctor_presence_sequence,
+            "needs_review": needs_review,
+            "payment_status": appt.and_then(|a| payment_by_appointment.get(&a.id)).cloned(),
+            "timeline_url": format!("/admin/consultations/{}/timeline", session.id),
+            "provider_presence_summary": {
+                "source": "AGORA_PROVIDER_CALLBACK",
+                "patient_present": session.patient_present,
+                "doctor_present": session.doctor_present,
+                "patient_sequence": session.patient_presence_sequence,
+                "doctor_sequence": session.doctor_presence_sequence,
+            },
         }));
     }
 
     let completed_today = appts
         .iter()
         .filter(|a| a.status == AppointmentStatus::Completed)
+        .count();
+    let active_count = active_streams
+        .iter()
+        .filter(|stream| stream["needs_review"] != true)
         .count();
     tx.commit().await?;
 
@@ -1111,7 +1150,8 @@ pub async fn get_command_telemetry(
         data: serde_json::json!({
             "active_specialists": active_specialists,
             "completed_today": completed_today,
-            "active_sessions_count": active_streams.len(),
+            "active_sessions_count": active_count,
+            "needs_review_count": active_streams.iter().filter(|s| s["needs_review"] == true).count(),
             "active_streams": active_streams,
         }),
     }))
@@ -2055,6 +2095,89 @@ pub async fn get_consultation_timeline(
     Ok(Json(ApiResponse {
         success: true,
         data,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConsultationRecoveryResolutionRequest {
+    pub outcome: String,
+    pub reason: String,
+}
+
+/// POST /api/v1/admin/consultations/:session_id/recovery-resolution
+///
+/// This is an adjudication record, not a completion/refund operation. The
+/// database function locks the session at the same boundary as the B4 expiry
+/// worker and leaves appointment, session and payment state untouched.
+pub async fn resolve_consultation_recovery(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(session_id): Path<Uuid>,
+    Json(body): Json<ConsultationRecoveryResolutionRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ViewConsultationTimeline)?;
+    let reason = crate::domain::validation::validate_text_field(&body.reason, "Reason", 1000)?;
+    if reason.chars().count() < 8 {
+        return Err(AppError::Validation(
+            "A resolution reason of at least 8 characters is required.".into(),
+        ));
+    }
+    if !matches!(
+        body.outcome.as_str(),
+        "RESOLVED_NO_SETTLEMENT" | "PENDING_FINANCE_ACTION"
+    ) {
+        return Err(AppError::Validation(
+            "Unsupported recovery resolution outcome.".into(),
+        ));
+    }
+    let mut tx = state.begin_authed(&ctx).await?;
+    let result = sqlx::query_as::<_, (Uuid, String)>(
+        "SELECT resolution_id, result FROM admin_resolve_consultation_recovery($1,$2,$3,$4)",
+    )
+    .bind(session_id)
+    .bind(&body.outcome)
+    .bind(&reason)
+    .bind(ctx.user_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|error| {
+        let code = error
+            .as_database_error()
+            .and_then(|database| database.code())
+            .map(|value| value.to_string());
+        match code.as_deref() {
+            Some("42501") => AppError::Forbidden("Admin role required.".into()),
+            Some("P0002") => AppError::NotFound("Consultation session not found.".into()),
+            Some("40001") => {
+                AppError::Conflict("A different resolution is already recorded.".into())
+            }
+            Some("55000") => AppError::Conflict("The consultation is not awaiting review.".into()),
+            _ => AppError::Database(error),
+        }
+    })?;
+    AuditService::log_in_tx(
+        &mut *tx,
+        AuditLogEntry::new(
+            Some(ctx.user_id),
+            ctx.role,
+            "CONSULTATION_RECOVERY_RESOLVED",
+            "CONSULTATION_SESSION",
+            Some(session_id),
+            "SUCCESS",
+        )
+        .with_reason(Some(reason))
+        .with_after(serde_json::json!({
+            "outcome": body.outcome,
+            "resolution_id": result.0,
+            "financial_state_unchanged": true,
+        })),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({"resolution_id": result.0, "result": result.1}),
     }))
 }
 

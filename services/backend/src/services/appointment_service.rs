@@ -19,6 +19,8 @@ pub struct AppointmentBookingResult {
     pub payment_session_id: Uuid,
     pub payment_redirect_url: String,
     pub amount: BigDecimal,
+    pub hold_expires_at: chrono::DateTime<Utc>,
+    pub server_time: chrono::DateTime<Utc>,
 }
 
 pub struct AppointmentService;
@@ -73,7 +75,7 @@ impl AppointmentService {
         // appointment_repo::expire_abandoned_hold_for_slot). The second one
         // frees this Patient's own abandoned checkout with another Doctor,
         // which would otherwise keep blocking through appt_patient_no_overlap.
-        let window = state.config.payment_reservation_window_secs;
+        let window = appointment_repo::BOOKING_HOLD_SECONDS;
         appointment_repo::expire_abandoned_hold_for_slot(&mut tx, slot_id, window).await?;
         appointment_repo::expire_due_holds_overlapping_for_patient(
             &mut tx,
@@ -131,7 +133,8 @@ impl AppointmentService {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         };
-        appointment_repo::insert_pending_hold(&mut *tx, &appointment, window).await?;
+        let (hold_expires_at, server_time) =
+            appointment_repo::insert_pending_hold(&mut *tx, &appointment, window).await?;
 
         appointment_repo::insert_clinical_intake(
             &mut *tx,
@@ -203,6 +206,16 @@ impl AppointmentService {
 
         tx.commit().await?;
 
+        // Notification creation is post-commit so an inbox failure cannot
+        // roll back an otherwise valid reservation. The scheduler retries the
+        // same deduplicated event if this attempt is interrupted.
+        if let Err(error) =
+            crate::services::notification_scheduler::ensure_hold_created_notification(state, apt_id)
+                .await
+        {
+            tracing::warn!(error = ?error, appointment_id = %apt_id, "booking hold notification deferred to scheduler");
+        }
+
         let gateway_str = match gateway {
             Gateway::Bkash => "bkash",
             Gateway::Nagad => "nagad",
@@ -224,6 +237,8 @@ impl AppointmentService {
             payment_session_id,
             payment_redirect_url,
             amount: fee,
+            hold_expires_at,
+            server_time,
         })
     }
 
@@ -335,14 +350,6 @@ impl AppointmentService {
                 .await?
                 .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?
         } else {
-            consultation_trace::record(
-                &mut payment_tx,
-                txn.appointment_id,
-                None,
-                Event::accepted("PAYMENT_CONFIRMED", Some(("TRANSACTION", txn.id))),
-            )
-            .await?;
-
             let mut apt = appointment_repo::find_by_id(&mut *payment_tx, txn.appointment_id)
                 .await?
                 .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
@@ -350,9 +357,20 @@ impl AppointmentService {
             // h23 remediation: race-safe against expire_abandoned_hold_for_slot.
             // If the reservation was already reclaimed (lost the race), do
             // NOT book the slot — it may already belong to someone else.
-            let confirmed =
-                appointment_repo::confirm_payment_if_pending(&mut *payment_tx, apt.id).await?;
+            let confirmed = appointment_repo::confirm_payment_if_pending(
+                &mut *payment_tx,
+                apt.id,
+                appointment_repo::BOOKING_HOLD_SECONDS,
+            )
+            .await?;
             if confirmed {
+                consultation_trace::record(
+                    &mut payment_tx,
+                    txn.appointment_id,
+                    None,
+                    Event::accepted("PAYMENT_CONFIRMED", Some(("TRANSACTION", txn.id))),
+                )
+                .await?;
                 doctor_repo::set_slot_status(&mut *payment_tx, apt.slot_id, SlotStatus::Booked)
                     .await?;
             } else {
@@ -414,6 +432,12 @@ impl AppointmentService {
                     ended_at: None,
                     status: SessionStatus::Initialized,
                     created_at: Utc::now(),
+                    recovery_state: "NONE".into(),
+                    empty_room_deadline: None,
+                    patient_present: false,
+                    doctor_present: false,
+                    patient_presence_sequence: 0,
+                    doctor_presence_sequence: 0,
                 },
             )
             .await?;

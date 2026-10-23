@@ -24,6 +24,15 @@ use std::collections::BTreeSet;
 /// The migrator this binary was compiled with — the single source of truth
 /// for "which migrations does this process expect to exist." Never hardcode
 /// a version number in application logic; derive it from here instead.
+///
+/// `sqlx::migrate!` re-scans `./migrations` only when this file is actually
+/// recompiled; a new migration file added to disk does not by itself force
+/// that (hit directly while adding 20261118000001/20261118000002 — a prior
+/// `cargo build` left this macro's embedded list stale until this file's own
+/// content changed too). If `/healthz` ever reports `binary_latest_migration`
+/// behind the newest file on disk after a real `cargo build`, touch this
+/// comment to force re-expansion rather than assuming the migration itself
+/// is wrong. (Re-touched again for 20261118000003.)
 pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 #[derive(Debug, Clone, PartialEq, Eq)]

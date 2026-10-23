@@ -1,0 +1,1 @@
+DROP POLICY patient_profiles_system_worker_read ON patient_profiles;

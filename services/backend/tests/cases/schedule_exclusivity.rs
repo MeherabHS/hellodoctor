@@ -37,6 +37,12 @@
 use super::*;
 use chrono::SubsecRound;
 use hellodoctor_backend::error::AppError;
+use hellodoctor_backend::services::{
+    document_storage_service::DocumentStorageService,
+    notification_scheduler::{
+        run_expired_upload_cleanup, run_hold_expiry_sweep, run_hold_notification_pass,
+    },
+};
 
 // ============================================================================
 // Local fixtures (kept separate from api_tests.rs's own fixtures because these
@@ -958,6 +964,160 @@ async fn test_concurrent_hold_expiry_workers_partition_without_double_processing
 }
 
 // ============================================================================
+// 10b. Expired unpaid clinical records are purged from DB and storage.
+// ============================================================================
+#[sqlx::test(migrations = "./migrations")]
+async fn test_expired_unpaid_hold_purges_intake_metadata_and_objects(pool: PgPool) {
+    let (_app, pool, state) = test_app_and_state(pool).await;
+    let (patient_id, _) = new_patient(&pool).await;
+    let start = Utc::now() + Duration::days(51);
+    let slot = raw_slot(&pool, doctor1(), start, start + Duration::minutes(30)).await;
+    let appointment_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, created_at, updated_at, hold_expires_at) \
+         VALUES ($1,$2,$3,$4,$5,'VIDEO','PENDING_PAYMENT',100.00,clock_timestamp()-interval '1 hour',clock_timestamp()-interval '1 hour',clock_timestamp()-interval '1 minute')",
+    )
+    .bind(appointment_id)
+    .bind(format!("APT-TEST-{}", &appointment_id.to_string()[0..8]))
+    .bind(patient_id)
+    .bind(doctor1())
+    .bind(slot)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE doctor_schedule_slots SET status='LOCKED_IN_PAYMENT' WHERE id=$1")
+        .bind(slot)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let key = format!("intake/{appointment_id}/purge-test.bin");
+    DocumentStorageService::put(&state, &key, b"temporary clinical record")
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO appointment_clinical_intake (appointment_id,patient_id,chief_complaint,created_at,updated_at) VALUES ($1,$2,'temporary',$3,$3)",
+    )
+    .bind(appointment_id)
+    .bind(patient_id)
+    .bind(Utc::now())
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO prescription_intake_documents (id,appointment_id,patient_id,page_number,object_bucket,object_key,content_hash,file_size_bytes,mime_type,security_status) VALUES ($1,$2,$3,1,$4,$5,'hash',24,'image/jpeg','CLEAN')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(appointment_id)
+    .bind(patient_id)
+    .bind(&state.config.storage_bucket)
+    .bind(&key)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    assert_eq!(run_hold_expiry_sweep(&state).await.unwrap(), 1);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM appointment_clinical_intake WHERE appointment_id=$1",
+        )
+        .bind(appointment_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        0
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM prescription_intake_documents WHERE appointment_id=$1",
+        )
+        .bind(appointment_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        0
+    );
+
+    run_expired_upload_cleanup(&state).await.unwrap();
+    run_hold_notification_pass(&state).await.unwrap();
+    run_hold_notification_pass(&state).await.unwrap();
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM notifications WHERE dedup_key=$1",)
+            .bind(format!("booking-hold-expired:{appointment_id}"))
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        1
+    );
+    let storage = state.object_storage.as_ref().unwrap();
+    let missing = storage.get(&object_store::path::Path::from(key)).await;
+    assert!(matches!(missing, Err(object_store::Error::NotFound { .. })));
+    assert_eq!(
+        sqlx::query_scalar::<_, String>("SELECT status::text FROM appointments WHERE id=$1")
+            .bind(appointment_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap(),
+        "EXPIRED"
+    );
+
+    // A confirmed appointment's clinical record is outside the expiry job's
+    // predicate and must remain in both stores.
+    let confirmed_id = Uuid::new_v4();
+    let confirmed_slot = raw_slot(
+        &pool,
+        doctor1(),
+        start + Duration::days(1),
+        start + Duration::days(1) + Duration::minutes(30),
+    )
+    .await;
+    let confirmed_key = format!("intake/{confirmed_id}/retained.bin");
+    sqlx::query(
+        "INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, created_at, updated_at, hold_expires_at) VALUES ($1,$2,$3,$4,$5,'VIDEO','CONFIRMED',100.00,NOW(),NOW(),NULL)",
+    )
+    .bind(confirmed_id)
+    .bind(format!("APT-TEST-{}", &confirmed_id.to_string()[0..8]))
+    .bind(patient_id)
+    .bind(doctor1())
+    .bind(confirmed_slot)
+    .execute(&pool)
+    .await
+    .unwrap();
+    DocumentStorageService::put(&state, &confirmed_key, b"confirmed clinical record")
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO prescription_intake_documents (id,appointment_id,patient_id,page_number,object_bucket,object_key,content_hash,file_size_bytes,mime_type,security_status) VALUES ($1,$2,$3,1,$4,$5,'hash',25,'image/jpeg','CLEAN')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(confirmed_id)
+    .bind(patient_id)
+    .bind(&state.config.storage_bucket)
+    .bind(&confirmed_key)
+    .execute(&pool)
+    .await
+    .unwrap();
+    run_expired_upload_cleanup(&state).await.unwrap();
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM prescription_intake_documents WHERE appointment_id=$1",
+        )
+        .bind(confirmed_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap(),
+        1
+    );
+    assert!(state
+        .object_storage
+        .as_ref()
+        .unwrap()
+        .get(&object_store::path::Path::from(confirmed_key))
+        .await
+        .is_ok());
+}
+
+// ============================================================================
 // 11. Payment confirmation racing hold expiration.
 // ============================================================================
 #[sqlx::test(migrations = "./migrations")]
@@ -991,7 +1151,7 @@ async fn test_payment_confirmation_races_hold_expiration_exactly_one_outcome(poo
         let expire_pool = pool.clone();
         let confirm = tokio::spawn(async move {
             let mut tx = confirm_pool.begin().await.unwrap();
-            let confirmed = appointment_repo::confirm_payment_if_pending(&mut *tx, apt_id)
+            let confirmed = appointment_repo::confirm_payment_if_pending(&mut *tx, apt_id, 900)
                 .await
                 .unwrap();
             tx.commit().await.unwrap();

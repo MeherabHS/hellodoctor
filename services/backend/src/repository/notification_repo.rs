@@ -199,30 +199,153 @@ pub async fn cancel_pending_reminders_for_appointment<'e, E: PgExecutor<'e>>(
     Ok(result.rows_affected())
 }
 
+/// A bounded, claimed notification ready for provider delivery. Claiming and
+/// incrementing `delivery_attempts` happen in one worker transaction so two
+/// backend instances cannot send the same due row concurrently.
+#[derive(Debug, sqlx::FromRow)]
+pub struct DueNotification {
+    pub id: Uuid,
+    pub user_id: UserId,
+    #[sqlx(rename = "type")]
+    pub notification_type: String,
+    pub title: String,
+    pub body: String,
+    pub related_entity_type: Option<String>,
+    pub related_entity_id: Option<Uuid>,
+    pub dedup_key: String,
+    pub delivery_attempts: i32,
+    pub collapse_key: Option<String>,
+    pub ttl_seconds: Option<i32>,
+}
+
+/// Claims at most `limit` due rows. `scheduled_for` is nullable for events
+/// that are immediately eligible; `next_delivery_at` is the durable retry
+/// gate. A failed worker leaves rows in DUE, which the next pass can safely
+/// reclaim after the bounded claim window because all state changes are
+/// compare-and-set updates.
+pub async fn claim_due_notifications<'e, E: PgExecutor<'e>>(
+    executor: E,
+    limit: i64,
+) -> Result<Vec<DueNotification>, sqlx::Error> {
+    sqlx::query_as::<_, DueNotification>(
+        "WITH due AS ( \
+            SELECT id FROM notifications \
+             WHERE delivery_status IN ('CREATED','DUE','FAILED') \
+               AND (scheduled_for IS NULL OR scheduled_for <= clock_timestamp()) \
+               AND (next_delivery_at IS NULL OR next_delivery_at <= clock_timestamp()) \
+               AND delivery_attempts < 5 \
+             ORDER BY COALESCE(scheduled_for, created_at), created_at, id \
+             FOR UPDATE SKIP LOCKED \
+             LIMIT $1 \
+        ) \
+        UPDATE notifications n \
+           SET delivery_status = 'DUE', \
+               delivery_attempts = n.delivery_attempts + 1, \
+               last_delivery_error = NULL \
+          FROM due \
+         WHERE n.id = due.id \
+        RETURNING n.id, n.user_id, n.type, n.title, n.body, \
+                  n.related_entity_type, n.related_entity_id, n.dedup_key, \
+                  n.delivery_attempts, n.collapse_key, n.ttl_seconds",
+    )
+    .bind(limit.clamp(1, 100))
+    .fetch_all(executor)
+    .await
+}
+
+pub async fn mark_delivery_sent<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    provider_message_id: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE notifications SET delivery_status='SENT_TO_PROVIDER', \
+                delivered_at=clock_timestamp(), provider_message_id=$2, \
+                next_delivery_at=NULL, last_delivery_error=NULL \
+           WHERE id=$1 AND delivery_status='DUE'",
+    )
+    .bind(id)
+    .bind(provider_message_id)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+pub async fn mark_delivery_retry<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    error: &str,
+    next_delivery_at: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE notifications SET delivery_status='FAILED', \
+                last_delivery_error=$2, next_delivery_at=$3 \
+           WHERE id=$1 AND delivery_status='DUE'",
+    )
+    .bind(id)
+    .bind(error.chars().take(500).collect::<String>())
+    .bind(next_delivery_at)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+pub async fn mark_delivery_permanent<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    error: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE notifications SET delivery_status='FAILED', \
+                last_delivery_error=$2, next_delivery_at=NULL \
+           WHERE id=$1 AND delivery_status='DUE'",
+    )
+    .bind(id)
+    .bind(error.chars().take(500).collect::<String>())
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
 pub mod device_tokens {
     use crate::domain::ids::UserId;
-    use sqlx::PgExecutor;
+    use sqlx::{PgConnection, PgExecutor};
     use uuid::Uuid;
 
-    pub async fn upsert<'e, E: PgExecutor<'e>>(
-        executor: E,
+    pub async fn upsert(
+        executor: &mut PgConnection,
         device_id: Uuid,
         user_id: UserId,
         platform: &str,
         push_token: &str,
     ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "INSERT INTO notification_device_tokens \
-             (device_id, user_id, platform, push_token, enabled, last_seen_at, updated_at) \
-             VALUES ($1,$2,$3,$4,TRUE,now(),now()) \
-             ON CONFLICT (user_id, push_token) DO UPDATE SET \
-               enabled = TRUE, platform = EXCLUDED.platform, last_seen_at = now(), updated_at = now()",
+        let updated = sqlx::query(
+            "UPDATE notification_device_tokens SET push_token=$4, platform=$3,\
+                    enabled=TRUE, last_seen_at=clock_timestamp(), updated_at=clock_timestamp() \
+               WHERE device_id=$1 AND user_id=$2",
         )
         .bind(device_id)
         .bind(user_id)
         .bind(platform)
         .bind(push_token)
-        .execute(executor)
+        .execute(&mut *executor)
+        .await?;
+        if updated.rows_affected() > 0 {
+            return Ok(());
+        }
+        sqlx::query(
+            "INSERT INTO notification_device_tokens \
+             (device_id, user_id, platform, push_token, enabled, last_seen_at, updated_at) \
+             VALUES ($1,$2,$3,$4,TRUE,now(),now()) \
+             ON CONFLICT (user_id, push_token) DO UPDATE SET \
+               device_id = EXCLUDED.device_id, enabled = TRUE,\
+               platform = EXCLUDED.platform, last_seen_at = now(), updated_at = now()",
+        )
+        .bind(device_id)
+        .bind(user_id)
+        .bind(platform)
+        .bind(push_token)
+        .execute(&mut *executor)
         .await?;
         Ok(())
     }
@@ -245,12 +368,46 @@ pub mod device_tokens {
         Ok(())
     }
 
+    pub async fn disable_device<'e, E: PgExecutor<'e>>(
+        executor: E,
+        user_id: UserId,
+        device_id: Option<Uuid>,
+        push_token: Option<&str>,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE notification_device_tokens SET enabled=FALSE, updated_at=clock_timestamp() \
+               WHERE user_id=$1 AND (($2::uuid IS NOT NULL AND device_id=$2)\
+                                  OR ($3::text IS NOT NULL AND push_token=$3))",
+        )
+        .bind(user_id)
+        .bind(device_id)
+        .bind(push_token)
+        .execute(executor)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn token_owned_by_other_user<'e, E: PgExecutor<'e>>(
+        executor: E,
+        push_token: &str,
+        user_id: UserId,
+    ) -> Result<bool, sqlx::Error> {
+        let owner: Option<UserId> = sqlx::query_scalar(
+            "SELECT user_id FROM notification_device_tokens WHERE push_token=$1 AND user_id<>$2 LIMIT 1",
+        )
+        .bind(push_token)
+        .bind(user_id)
+        .fetch_optional(executor)
+        .await?;
+        Ok(owner.is_some())
+    }
+
     pub async fn find_enabled_for_user<'e, E: PgExecutor<'e>>(
         executor: E,
         user_id: UserId,
-    ) -> Result<Vec<String>, sqlx::Error> {
-        sqlx::query_scalar(
-            "SELECT push_token FROM notification_device_tokens \
+    ) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT device_id, push_token FROM notification_device_tokens \
              WHERE user_id = $1 AND enabled = TRUE",
         )
         .bind(user_id)

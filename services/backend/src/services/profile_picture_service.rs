@@ -27,6 +27,16 @@ use uuid::Uuid;
 
 pub struct ProfilePictureService;
 
+fn validate_profile_photo_mime(mime_type: &str) -> Result<(), AppError> {
+    if matches!(mime_type, "image/jpeg" | "image/png") {
+        Ok(())
+    } else {
+        Err(AppError::UnprocessableEntity(
+            "Profile pictures must be JPEG or PNG images.".into(),
+        ))
+    }
+}
+
 pub struct StoredProfilePicture {
     pub bytes: Vec<u8>,
     pub mime_type: String,
@@ -61,6 +71,7 @@ impl ProfilePictureService {
         mime_type: String,
         bytes: Vec<u8>,
     ) -> Result<(), AppError> {
+        validate_profile_photo_mime(&mime_type)?;
         // PHASE A — no transaction held across this CPU-bound work.
         let sanitized = UploadSecurityService::sanitize_async(bytes, mime_type.clone()).await?;
         let hash = format!("{:x}", Sha256::digest(&sanitized));
@@ -165,6 +176,7 @@ impl ProfilePictureService {
         mime_type: String,
         bytes: Vec<u8>,
     ) -> Result<(), AppError> {
+        validate_profile_photo_mime(&mime_type)?;
         // PHASE A
         let sanitized = UploadSecurityService::sanitize_async(bytes, mime_type.clone()).await?;
         let hash = format!("{:x}", Sha256::digest(&sanitized));

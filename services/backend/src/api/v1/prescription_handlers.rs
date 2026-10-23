@@ -6,7 +6,9 @@ use crate::domain::models::UserRole;
 use crate::error::AppError;
 use crate::rate_limit;
 use crate::repository::{appointment_repo, prescription_repo, AppState};
-use crate::services::{document_storage_service::DocumentStorageService, PrescriptionService};
+use crate::services::{
+    document_storage_service::DocumentStorageService, prescription_service, PrescriptionService,
+};
 use axum::{
     extract::{Path, Query, State},
     response::{IntoResponse, Response},
@@ -86,6 +88,12 @@ pub async fn upload_patient_intake(
     let patient_id = ctx
         .acting_patient_profile_id(&state, Some(appointment_patient_id))
         .await?;
+    if payload.files.len() > prescription_service::PATIENT_MAX_IMAGES_PER_CONSULTATION {
+        return Err(AppError::UnprocessableEntity(format!(
+            "Maximum {} prescription photos allowed per appointment.",
+            prescription_service::PATIENT_MAX_IMAGES_PER_CONSULTATION
+        )));
+    }
     if let Some(response) = idempotency.replay(&state, &ctx, Some(id)).await? {
         return Ok(response);
     }

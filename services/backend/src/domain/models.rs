@@ -422,6 +422,12 @@ pub struct ConsultationSession {
     pub ended_at: Option<DateTime<Utc>>,
     pub status: SessionStatus,
     pub created_at: DateTime<Utc>,
+    pub recovery_state: String,
+    pub empty_room_deadline: Option<DateTime<Utc>>,
+    pub patient_present: bool,
+    pub doctor_present: bool,
+    pub patient_presence_sequence: i64,
+    pub doctor_presence_sequence: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

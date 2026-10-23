@@ -1,5 +1,5 @@
 use crate::domain::models::{Appointment, AppointmentClinicalIntake, AppointmentStatus};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
@@ -36,10 +36,11 @@ pub async fn insert_pending_hold<'e, E: PgExecutor<'e>>(
     executor: E,
     apt: &Appointment,
     window_secs: i64,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
+) -> Result<(DateTime<Utc>, DateTime<Utc>), sqlx::Error> {
+    sqlx::query_as(
         "INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, clinical_outcome, completed_at, created_at, updated_at, hold_expires_at) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, clock_timestamp() + make_interval(secs => $13))",
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, clock_timestamp() + make_interval(secs => $13)) \
+         RETURNING hold_expires_at, clock_timestamp() AS server_time",
     )
     .bind(apt.id)
     .bind(&apt.appointment_number)
@@ -54,9 +55,8 @@ pub async fn insert_pending_hold<'e, E: PgExecutor<'e>>(
     .bind(apt.created_at)
     .bind(apt.updated_at)
     .bind(window_secs as f64)
-    .execute(executor)
-    .await?;
-    Ok(())
+    .fetch_one(executor)
+    .await
 }
 
 pub async fn find_by_id<'e, E: PgExecutor<'e>>(
@@ -92,12 +92,28 @@ pub async fn lock_for_document_upload<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
 ) -> Result<(), sqlx::Error> {
-    let key = i64::from_be_bytes(id.as_bytes()[0..8].try_into().unwrap());
-    sqlx::query("SELECT pg_advisory_xact_lock($1)")
-        .bind(key)
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))")
+        .bind(id.to_string())
         .execute(executor)
         .await?;
     Ok(())
+}
+
+/// The last trusted lifecycle gate for patient clinical intake. A pending
+/// payment hold is usable only while its database-clock deadline is live;
+/// confirmed consultation states remain usable under their existing policy.
+pub async fn intake_upload_allowed<'e, E: PgExecutor<'e>>(
+    executor: E,
+    appointment_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT status IN ('CONFIRMED','WAITING','IN_CONSULTATION') \
+             OR (status='PENDING_PAYMENT' AND hold_expires_at > clock_timestamp()) \
+         FROM appointments WHERE id=$1",
+    )
+    .bind(appointment_id)
+    .fetch_one(executor)
+    .await
 }
 
 pub async fn list_all<'e, E: PgExecutor<'e>>(executor: E) -> Result<Vec<Appointment>, sqlx::Error> {
@@ -154,11 +170,15 @@ pub async fn set_status<'e, E: PgExecutor<'e>>(
 pub async fn confirm_payment_if_pending<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
+    window_secs: i64,
 ) -> Result<bool, sqlx::Error> {
     let result = sqlx::query(
-        "UPDATE appointments SET status='CONFIRMED', updated_at=clock_timestamp() WHERE id=$1 AND status='PENDING_PAYMENT'",
+        "UPDATE appointments SET status='CONFIRMED', updated_at=clock_timestamp() \
+          WHERE id=$1 AND status='PENDING_PAYMENT' \
+            AND COALESCE(hold_expires_at, created_at + make_interval(secs => $2)) > clock_timestamp()",
     )
     .bind(id)
+    .bind(window_secs as f64)
     .execute(executor)
     .await?;
     Ok(result.rows_affected() == 1)
@@ -172,9 +192,21 @@ pub async fn confirm_payment_if_pending<'e, E: PgExecutor<'e>>(
 const HOLD_DUE: &str =
     "COALESCE(a.hold_expires_at, a.created_at + make_interval(secs => $WINDOW)) <= clock_timestamp()";
 
+pub const BOOKING_HOLD_SECONDS: i64 = 600;
+
 fn hold_due(window_param: u8) -> String {
     HOLD_DUE.replace("$WINDOW", &format!("${window_param}"))
 }
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct ExpiryCleanupJob {
+    pub appointment_id: Uuid,
+    pub object_bucket: String,
+    pub object_keys: Vec<String>,
+    pub attempts: i32,
+}
+
+pub const MAX_EXPIRY_CLEANUP_ATTEMPTS: i32 = 12;
 
 /// Transitions one *locked* PENDING_PAYMENT appointment to EXPIRED and releases
 /// its slot. Lock order is always appointment -> slot, the same order the
@@ -184,8 +216,44 @@ fn hold_due(window_param: u8) -> String {
 async fn expire_locked_hold(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     appointment_id: Uuid,
-    slot_id: Uuid,
 ) -> Result<bool, sqlx::Error> {
+    // Uploads take this logical lock before their authoritative appointment
+    // read. Taking it here first makes upload-vs-expiry ordering identical on
+    // every instance: an upload that wins commits before expiry snapshots its
+    // object key; an upload that loses observes EXPIRED and cannot insert.
+    lock_for_document_upload(&mut **tx, appointment_id).await?;
+    let current: Option<(Uuid, Uuid)> = sqlx::query_as(
+        "SELECT id, slot_id FROM appointments WHERE id=$1 AND status='PENDING_PAYMENT' FOR UPDATE",
+    )
+    .bind(appointment_id)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some((appointment_id, slot_id)) = current else {
+        return Ok(false);
+    };
+
+    let object_keys: Vec<String> = sqlx::query_scalar(
+        "SELECT object_key FROM prescription_intake_documents WHERE appointment_id=$1 ORDER BY page_number",
+    )
+    .bind(appointment_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    sqlx::query(
+        "INSERT INTO appointment_expiry_cleanup_jobs (appointment_id, object_bucket, object_keys) \
+         VALUES ($1, COALESCE((SELECT object_bucket FROM prescription_intake_documents WHERE appointment_id=$1 LIMIT 1), ''), $2)",
+    )
+    .bind(appointment_id)
+    .bind(&object_keys)
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query("DELETE FROM prescription_intake_documents WHERE appointment_id=$1")
+        .bind(appointment_id)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("DELETE FROM appointment_clinical_intake WHERE appointment_id=$1")
+        .bind(appointment_id)
+        .execute(&mut **tx)
+        .await?;
     let result = sqlx::query(
         "UPDATE appointments SET status='EXPIRED', updated_at=clock_timestamp() WHERE id=$1 AND status='PENDING_PAYMENT'",
     )
@@ -196,7 +264,7 @@ async fn expire_locked_hold(
         return Ok(false);
     }
     sqlx::query(
-        "UPDATE doctor_schedule_slots SET status='AVAILABLE' WHERE id=$1 AND status='LOCKED_IN_PAYMENT' AND start_time > clock_timestamp()",
+        "UPDATE doctor_schedule_slots SET status='AVAILABLE' WHERE id=$1 AND status='LOCKED_IN_PAYMENT'",
     )
     .bind(slot_id)
     .execute(&mut **tx)
@@ -216,7 +284,8 @@ pub async fn expire_abandoned_hold_for_slot(
     window_secs: i64,
 ) -> Result<Vec<Uuid>, sqlx::Error> {
     let sql = format!(
-        "SELECT a.id FROM appointments a WHERE a.slot_id=$1 AND a.status='PENDING_PAYMENT' AND {} ORDER BY a.id FOR UPDATE OF a",
+        "SELECT a.id FROM appointments a WHERE a.slot_id=$1 AND a.status='PENDING_PAYMENT' AND {} \
+         AND pg_try_advisory_xact_lock(hashtextextended(a.id::text,0)) ORDER BY a.id FOR UPDATE OF a SKIP LOCKED",
         hold_due(2)
     );
     let ids: Vec<Uuid> = sqlx::query_scalar(&sql)
@@ -226,7 +295,7 @@ pub async fn expire_abandoned_hold_for_slot(
         .await?;
     let mut expired = Vec::new();
     for id in ids {
-        if expire_locked_hold(tx, id, slot_id).await? {
+        if expire_locked_hold(tx, id).await? {
             expired.push(id);
         }
     }
@@ -247,7 +316,7 @@ pub async fn expire_due_holds_overlapping_for_patient(
     let sql = format!(
         "SELECT a.id, a.slot_id FROM appointments a WHERE a.patient_id=$1 AND a.status='PENDING_PAYMENT' \
          AND a.slot_period && (SELECT tstzrange(s.start_time, s.end_time, '[)') FROM doctor_schedule_slots s WHERE s.id=$2) \
-         AND {} ORDER BY a.id FOR UPDATE OF a",
+         AND {} AND pg_try_advisory_xact_lock(hashtextextended(a.id::text,0)) ORDER BY a.id FOR UPDATE OF a SKIP LOCKED",
         hold_due(3)
     );
     let rows: Vec<(Uuid, Uuid)> = sqlx::query_as(&sql)
@@ -257,8 +326,8 @@ pub async fn expire_due_holds_overlapping_for_patient(
         .fetch_all(&mut **tx)
         .await?;
     let mut expired = Vec::new();
-    for (id, held_slot) in rows {
-        if expire_locked_hold(tx, id, held_slot).await? {
+    for (id, _held_slot) in rows {
+        if expire_locked_hold(tx, id).await? {
             expired.push(id);
         }
     }
@@ -276,6 +345,7 @@ pub async fn expire_due_holds_batch(
 ) -> Result<Vec<Uuid>, sqlx::Error> {
     let sql = format!(
         "SELECT a.id, a.slot_id FROM appointments a WHERE a.status='PENDING_PAYMENT' AND {} \
+         AND pg_try_advisory_xact_lock(hashtextextended(a.id::text,0)) \
          ORDER BY COALESCE(a.hold_expires_at, a.created_at), a.id LIMIT $2 FOR UPDATE OF a SKIP LOCKED",
         hold_due(1)
     );
@@ -285,12 +355,74 @@ pub async fn expire_due_holds_batch(
         .fetch_all(&mut **tx)
         .await?;
     let mut expired = Vec::new();
-    for (id, slot_id) in rows {
-        if expire_locked_hold(tx, id, slot_id).await? {
+    for (id, _slot_id) in rows {
+        if expire_locked_hold(tx, id).await? {
             expired.push(id);
         }
     }
     Ok(expired)
+}
+
+/// Claims cleanup jobs with a short lease. A crashed worker leaves the row in
+/// RUNNING; the lease predicate makes it eligible again without requiring a
+/// second queue or a destructive reconciliation pass.
+pub async fn claim_expiry_cleanup_jobs<'e, E: PgExecutor<'e>>(
+    executor: E,
+    limit: i64,
+) -> Result<Vec<ExpiryCleanupJob>, sqlx::Error> {
+    sqlx::query_as(
+        "WITH candidates AS ( \
+             SELECT appointment_id FROM appointment_expiry_cleanup_jobs \
+             WHERE (state='PENDING' AND next_attempt_at <= clock_timestamp()) \
+                OR (state='RUNNING' AND lease_until <= clock_timestamp()) \
+             ORDER BY next_attempt_at, appointment_id \
+             LIMIT $1 FOR UPDATE SKIP LOCKED \
+         ) \
+         UPDATE appointment_expiry_cleanup_jobs j \
+            SET state='RUNNING', attempts=j.attempts+1, \
+                lease_until=clock_timestamp()+interval '2 minutes', last_error=NULL \
+           FROM candidates c WHERE j.appointment_id=c.appointment_id \
+         RETURNING j.appointment_id, j.object_bucket, j.object_keys, j.attempts",
+    )
+    .bind(limit)
+    .fetch_all(executor)
+    .await
+}
+
+pub async fn mark_expiry_cleanup_complete<'e, E: PgExecutor<'e>>(
+    executor: E,
+    appointment_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE appointment_expiry_cleanup_jobs \
+            SET state='COMPLETED', completed_at=clock_timestamp(), lease_until=NULL \
+          WHERE appointment_id=$1 AND state='RUNNING'",
+    )
+    .bind(appointment_id)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+pub async fn mark_expiry_cleanup_retry<'e, E: PgExecutor<'e>>(
+    executor: E,
+    appointment_id: Uuid,
+    error: &str,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        "UPDATE appointment_expiry_cleanup_jobs \
+            SET state=CASE WHEN attempts >= $3 THEN 'FAILED' ELSE 'PENDING' END, \
+                next_attempt_at=clock_timestamp()+ \
+                    make_interval(secs => LEAST(300, GREATEST(5, attempts * 5))), \
+                lease_until=NULL, last_error=$2 \
+          WHERE appointment_id=$1 AND state='RUNNING' \
+        RETURNING state='FAILED'",
+    )
+    .bind(appointment_id)
+    .bind(error.chars().take(500).collect::<String>())
+    .bind(MAX_EXPIRY_CLEANUP_ATTEMPTS)
+    .fetch_one(executor)
+    .await
 }
 
 pub async fn complete<'e, E: PgExecutor<'e>>(

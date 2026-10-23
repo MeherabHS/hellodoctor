@@ -150,7 +150,7 @@ impl NotificationService {
     ) -> Result<(), AppError> {
         let mut tx = state.begin_authed(ctx).await?;
         notification_repo::device_tokens::upsert(
-            &mut *tx,
+            &mut tx,
             device_id,
             ctx.user_id,
             platform,
@@ -159,6 +159,24 @@ impl NotificationService {
         .await?;
         tx.commit().await?;
         Ok(())
+    }
+
+    pub async fn revoke_device(
+        state: &AppState,
+        ctx: &AuthContext,
+        device_id: Option<Uuid>,
+        push_token: Option<&str>,
+    ) -> Result<u64, AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        let disabled = notification_repo::device_tokens::disable_device(
+            &mut *tx,
+            ctx.user_id,
+            device_id,
+            push_token,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(disabled)
     }
 
     /// One notification per committed PENDING -> VERIFIED internal review.

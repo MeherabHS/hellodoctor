@@ -388,11 +388,14 @@ pub async fn list_own_appointments(
         "SELECT a.id, a.appointment_number, a.doctor_id, a.modality::text AS modality, \
                 a.status::text AS status, a.consultation_fee, a.clinical_outcome, \
                 a.completed_at, s.start_time, s.end_time, \
-                d.full_name AS doctor_display_name, d.primary_specialty, c.expires_at AS chat_expires_at, c.is_locked AS chat_locked \
+                d.full_name AS doctor_display_name, d.primary_specialty, c.expires_at AS chat_expires_at, c.is_locked AS chat_locked, \
+                cs.status::text AS consultation_session_status, cs.recovery_state AS consultation_recovery_state, \
+                cs.empty_room_deadline, cs.patient_present, cs.doctor_present \
          FROM appointments a \
          JOIN doctor_schedule_slots s ON s.id = a.slot_id \
          JOIN doctor_public_directory d ON d.id = a.doctor_id \
          LEFT JOIN chat_conversations c ON c.appointment_id = a.id \
+         LEFT JOIN consultation_sessions cs ON cs.appointment_id = a.id \
          WHERE a.patient_id = $1 \
            AND ($4::text[] IS NULL OR a.status::text = ANY($4)) \
          ORDER BY \
@@ -428,6 +431,11 @@ pub async fn list_own_appointments(
                 "completed_at": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("completed_at"),
                 "start_time": r.get::<chrono::DateTime<chrono::Utc>, _>("start_time"),
                 "end_time": r.get::<chrono::DateTime<chrono::Utc>, _>("end_time"),
+                "consultation_session_status": r.get::<Option<String>, _>("consultation_session_status"),
+                "consultation_recovery_state": r.get::<Option<String>, _>("consultation_recovery_state"),
+                "empty_room_deadline": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("empty_room_deadline"),
+                "patient_present": r.get::<Option<bool>, _>("patient_present"),
+                "doctor_present": r.get::<Option<bool>, _>("doctor_present"),
             })
         })
         .collect();
