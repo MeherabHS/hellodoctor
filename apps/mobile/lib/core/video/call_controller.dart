@@ -83,6 +83,8 @@ class CallController extends ChangeNotifier {
     required this.engine,
     required this.mintToken,
     required this.requestPermissions,
+    this.telemetrySubmit,
+    this.telemetryPerspective = 'DOCTOR',
   });
 
   final AgoraEngineAdapter engine;
@@ -92,6 +94,8 @@ class CallController extends ChangeNotifier {
   /// so tests can simulate grant/deny without touching the OS permission
   /// dialog.
   final Future<bool> Function() requestPermissions;
+  final Future<void> Function(List<Map<String, dynamic>> events)? telemetrySubmit;
+  final String telemetryPerspective;
 
   CallScreenState state = CallScreenState.requestingPermissions;
   RtcTokenData? _tokenData;
@@ -103,6 +107,27 @@ class CallController extends ChangeNotifier {
   bool _disposed = false;
   bool _wasVideoEnabledBeforeBackground = true;
   Timer? _tokenRenewalGuard;
+  Timer? _telemetryFlushTimer;
+  final List<Map<String, dynamic>> _telemetryQueue = <Map<String, dynamic>>[];
+  bool _joinedAtLeastOnce = false;
+
+  void _queueTelemetry(String suffix) {
+    if (telemetrySubmit == null || _disposed) return;
+    if (_telemetryQueue.length >= 20) _telemetryQueue.removeAt(0);
+    _telemetryQueue.add({
+      'event_type': '${telemetryPerspective}_$suffix',
+      'occurred_at': DateTime.now().toUtc().toIso8601String(),
+    });
+    _telemetryFlushTimer ??= Timer(const Duration(seconds: 1), _flushTelemetry);
+  }
+
+  void _flushTelemetry() {
+    _telemetryFlushTimer = null;
+    if (_telemetryQueue.isEmpty || telemetrySubmit == null || _disposed) return;
+    final events = List<Map<String, dynamic>>.from(_telemetryQueue);
+    _telemetryQueue.clear();
+    unawaited(telemetrySubmit!(events));
+  }
 
   Future<void> start() async {
     _setState(CallScreenState.requestingPermissions);
@@ -153,6 +178,8 @@ class CallController extends ChangeNotifier {
 
   void _onJoinSuccess() {
     if (_disposed) return;
+    _joinedAtLeastOnce = true;
+    _queueTelemetry('JOINED');
     _setState(CallScreenState.connected);
   }
 
@@ -179,17 +206,21 @@ class CallController extends ChangeNotifier {
         }
         break;
       case CallConnectionState.connected:
+        if (_joinedAtLeastOnce) _queueTelemetry('RECONNECTED');
         _setState(CallScreenState.connected);
         break;
       case CallConnectionState.reconnecting:
+        if (_joinedAtLeastOnce) _queueTelemetry('RECONNECTING');
         _setState(CallScreenState.reconnecting);
         break;
       case CallConnectionState.failed:
+        if (_joinedAtLeastOnce) _queueTelemetry('DISCONNECTED');
         errorMessage =
             'The connection was lost and could not be recovered. Please try again.';
         _setState(CallScreenState.failed);
         break;
       case CallConnectionState.left:
+        if (_joinedAtLeastOnce) _queueTelemetry('DISCONNECTED');
         if (state != CallScreenState.failed) {
           _setState(CallScreenState.left);
         }
@@ -245,6 +276,10 @@ class CallController extends ChangeNotifier {
   Future<void> leave() async {
     _tokenRenewalGuard?.cancel();
     await engine.release();
+    if (_joinedAtLeastOnce) {
+      _queueTelemetry('DISCONNECTED');
+      _flushTelemetry();
+    }
     if (_disposed) return;
     _setState(CallScreenState.left);
   }
@@ -283,6 +318,8 @@ class CallController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _tokenRenewalGuard?.cancel();
+    _telemetryFlushTimer?.cancel();
+    _flushTelemetry();
     super.dispose();
   }
 }

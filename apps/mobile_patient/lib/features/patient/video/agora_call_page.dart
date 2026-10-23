@@ -45,6 +45,7 @@ class _AgoraCallPageState extends State<AgoraCallPage>
       engine: RealAgoraEngine(),
       mintToken: () => widget.repo.mintRtcToken(widget.appointmentId),
       requestPermissions: _requestPermissions,
+      telemetrySubmit: (events) => widget.repo.submitTelemetryEvents(widget.appointmentId, events),
     )..addListener(_onControllerChanged);
     _controller.start();
   }

@@ -44,14 +44,19 @@ class BookingResultDto {
     required this.appointmentNumber,
     required this.status,
     required this.amount,
+    this.holdExpiresAt,
+    this.serverTime,
   });
   final String appointmentId, appointmentNumber, status, amount;
+  final DateTime? holdExpiresAt, serverTime;
 
   factory BookingResultDto.fromJson(Json j) => BookingResultDto(
         appointmentId: _textOf(j['appointment_id']),
         appointmentNumber: _textOf(j['appointment_number']),
         status: _textOf(j['status']),
         amount: _textOf(j['amount'], '0'),
+        holdExpiresAt: DateTime.tryParse(_textOf(j['hold_expires_at']))?.toUtc(),
+        serverTime: DateTime.tryParse(_textOf(j['server_time']))?.toUtc(),
       );
 }
 
@@ -69,8 +74,11 @@ class AppointmentDetailDto {
     this.clinicalOutcome,
     this.completedAt,
     this.paymentStatus,
+    this.holdExpiresAt,
+    this.serverTime,
   });
   final String? paymentStatus;
+  final DateTime? holdExpiresAt, serverTime;
   bool get isReady => const [
         'CONFIRMED',
         'WAITING',
@@ -84,6 +92,8 @@ class AppointmentDetailDto {
         id: _textOf(j['id']),
         status: _textOf(j['status']),
         paymentStatus: j['payment_status']?.toString(),
+        holdExpiresAt: DateTime.tryParse(_textOf(j['hold_expires_at']))?.toUtc(),
+        serverTime: DateTime.tryParse(_textOf(j['server_time']))?.toUtc(),
         clinicalOutcome: j['clinical_outcome']?.toString(),
         completedAt: j['completed_at']?.toString(),
       );

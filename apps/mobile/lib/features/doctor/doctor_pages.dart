@@ -531,6 +531,46 @@ class AppointmentCard extends StatelessWidget {
       child: DoctorCard(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (a.hasActiveConsultation)
+          Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF86EFAC))),
+              child: Row(children: [
+                const Icon(Icons.videocam, color: Color(0xFF166534)),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      const Text('Active Consultation',
+                          style: TextStyle(
+                              color: Color(0xFF166534),
+                              fontWeight: FontWeight.w800)),
+                      Text(
+                          a.isWaitingForReconnect
+                              ? (a.patientPresent == false && a.doctorPresent == true
+                                  ? 'The patient is reconnecting. You can rejoin now.'
+                                  : a.patientPresent == true && a.doctorPresent == false
+                                      ? 'You are disconnected. Rejoin to continue the consultation.'
+                                      : 'The room is empty. Either participant can rejoin now.')
+                              : 'The consultation is still active.',
+                          style: const TextStyle(
+                              color: Color(0xFF166534), fontSize: 11)),
+                    ])),
+                FilledButton(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A)),
+                    onPressed: () => Navigator.push(
+                        c,
+                        MaterialPageRoute(
+                            builder: (_) => ConsultationPage(appointment: a))),
+                    child: const Text('Rejoin'))
+              ])),
         Row(children: [
           CircleAvatar(
               radius: 20,

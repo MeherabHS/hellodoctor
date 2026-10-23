@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/network/api_client.dart';
 import 'core/network/screen_refresh.dart';
 import 'core/network/client_error_reporter.dart';
+import 'core/notifications/push_notification_service.dart';
 import 'core/network/connectivity_service.dart';
 import 'core/cache/doctor_cache_store.dart';
 import 'core/notifications/background_sync_worker.dart';
@@ -599,6 +600,7 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
   late final ScreenRefresh _queueRefresh;
   StreamSubscription<NotificationState>? _queueNoticeSubscription;
   Set<String> _knownNotificationIds = {};
+  PushNotificationService? _pushService;
 
   void _refreshDoctorData() {
     if (mounted && tab == 0) unawaited(_queueRefresh.run());
@@ -619,6 +621,7 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
   void dispose() {
     _queueRefresh.dispose();
     _queueNoticeSubscription?.cancel();
+    unawaited(_pushService?.dispose());
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -692,11 +695,12 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
   /// registration row for whenever a real push provider is wired up.
   Future<void> _registerDeviceBestEffort() async {
     try {
-      final repo = context.read<NotificationCubit>().repo;
-      final token = await repo.devicePlaceholderToken();
-      await repo.registerDevice(
-          platform: NotificationRepository.currentPlatformLabel(),
-          pushToken: token);
+      final cubit = context.read<NotificationCubit>();
+      _pushService ??= PushNotificationService(
+        repository: cubit.repo,
+        onNotificationReceived: cubit.load,
+      );
+      await _pushService!.initialize();
     } catch (_) {
       // Best-effort: never block the shell or surface an error for this.
     }

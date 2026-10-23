@@ -62,14 +62,18 @@ class NotificationChannels {
   /// `GET /notifications` is a real, generic, patient-callable endpoint, so
   /// this mapping stays forward-compatible for when patient-facing types
   /// (e.g. appointment confirmed, prescription issued, grievance resolved)
-  /// are added, but the Patient in-app inbox should be expected to render
-  /// empty against the current backend until that lands.
+  /// are added; booking-hold events below are the first patient-targeted
+  /// notification family.
   static AndroidNotificationChannel forType(String notificationType) {
     switch (notificationType) {
       case 'CONSULTATION_REMINDER_15M':
         return consultationReminders;
       case 'NEW_CHAT_MESSAGE':
         return messages;
+      case 'BOOKING_HOLD_CREATED':
+      case 'BOOKING_HOLD_ONE_MINUTE':
+      case 'BOOKING_HOLD_EXPIRED':
+        return appointments;
       default:
         return general;
     }

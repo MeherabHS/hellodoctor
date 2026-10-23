@@ -129,4 +129,39 @@ void main() {
       await family.close();
     });
   }
+
+  testWidgets('renders a server-authoritative ten-minute hold countdown',
+      (tester) async {
+    final now = DateTime.now().toUtc();
+    final family =
+        FamilyProfilesCubit(FamilyProfilesRepository(ApiClient(dio: Dio())));
+    final repo = StatusRepository(AppointmentDetailDto(
+      id: 'a',
+      status: 'PENDING_PAYMENT',
+      paymentStatus: 'INITIATED',
+      holdExpiresAt: now.add(const Duration(minutes: 10)),
+      serverTime: now,
+    ));
+    await tester.pumpWidget(MaterialApp(
+        home: ConsultationStatusPage(
+            appointment: AppointmentSummaryDto(
+                id: 'a',
+                appointmentNumber: 'HD1',
+                doctorId: 'd',
+                doctorDisplayName: 'Dr. Wanjiku',
+                primarySpecialty: 'General Medicine',
+                modality: 'CHAT',
+                status: 'PENDING_PAYMENT',
+                startTime: now,
+                endTime: now.add(const Duration(minutes: 30)),
+                fee: '750'),
+            repo: repo,
+            familyProfilesCubit: family)));
+    await tester.pump();
+    expect(find.textContaining('Reservation expires in '), findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining('Reservation expires in '), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await family.close();
+  });
 }

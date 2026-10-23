@@ -9,6 +9,7 @@ import 'core/l10n/locale_controller.dart';
 import 'core/network/api_client.dart';
 import 'core/network/screen_refresh.dart';
 import 'core/network/client_error_reporter.dart';
+import 'core/notifications/push_notification_service.dart';
 import 'core/network/connectivity_service.dart';
 import 'core/theme/tokens.dart';
 import 'core/widgets/startup_error_page.dart';
@@ -248,6 +249,7 @@ class _SignedInRootState extends State<_SignedInRoot> {
   late final HomeCubit _homeCubit;
   late final FamilyProfilesCubit _familyProfilesCubit;
   late final NotificationCubit _notificationCubit;
+  late final PushNotificationService _pushService;
   bool _completionHandled = false;
 
   @override
@@ -275,6 +277,11 @@ class _SignedInRootState extends State<_SignedInRoot> {
     _notificationCubit = NotificationCubit(NotificationRepository(widget.api))
       ..load()
       ..startPolling(interval: const Duration(minutes: 1));
+    _pushService = PushNotificationService(
+      repository: _notificationCubit.repo,
+      onNotificationReceived: _notificationCubit.load,
+    );
+    unawaited(_pushService.initialize());
   }
 
   @override
@@ -283,6 +290,7 @@ class _SignedInRootState extends State<_SignedInRoot> {
     _homeCubit.close();
     _familyProfilesCubit.close();
     _notificationCubit.close();
+    unawaited(_pushService.dispose());
     super.dispose();
   }
 

@@ -397,6 +397,27 @@ void main() {
       expect(controller.state, CallScreenState.left);
     });
 
+    test('maps provider connection changes to bounded client telemetry', () async {
+      final engine = FakeAgoraEngine();
+      final events = <Map<String, dynamic>>[];
+      final controller = CallController(
+        engine: engine,
+        mintToken: () async => _token(),
+        requestPermissions: () async => true,
+        telemetrySubmit: (batch) async => events.addAll(batch),
+      );
+      await controller.start();
+      engine.simulateJoinSuccess();
+      engine.simulateConnectionState(CallConnectionState.reconnecting);
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      expect(events.map((event) => event['event_type']), containsAll(<String>[
+        'DOCTOR_JOINED',
+        'DOCTOR_RECONNECTING',
+      ]));
+      await controller.leave();
+      expect(events.map((event) => event['event_type']), contains('DOCTOR_DISCONNECTED'));
+    });
+
     test('retry after failure re-runs the full flow', () async {
       final engine = FakeAgoraEngine();
       var shouldFail = true;
