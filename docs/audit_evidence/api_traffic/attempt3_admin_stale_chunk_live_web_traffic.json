@@ -1,0 +1,56 @@
+{
+  "status": "FAIL",
+  "windows": {
+    "doctor_wallet_idle": {
+      "seconds": 35.01,
+      "requests": 0,
+      "counts": {}
+    },
+    "doctor_queue_idle": {
+      "seconds": 35.01,
+      "requests": 3,
+      "counts": {
+        "GET /api/proxy/doctor/appointments?view=upcoming&limit=100&offset=0": 2,
+        "GET /api/proxy/notifications/unread-count": 1
+      }
+    },
+    "doctor_schedule_selected_day": {
+      "seconds": 35.0,
+      "requests": 2,
+      "counts": {
+        "GET /api/proxy/doctor/slots?limit=100&offset=0&day=2030-10-17": 2
+      }
+    },
+    "doctor_chat_open": {
+      "seconds": 32.0,
+      "requests": 3,
+      "counts": {
+        "GET /api/proxy/chat/41d3b0b1-1d28-4b88-ae50-88808ca469eb/messages?after_time=2026-10-16T13%3A55%3A07.113052Z&after_id=47eabba9-fff4-44f5-951d-16d97883aa1a": 3
+      }
+    },
+    "doctor_chat_dom_hidden": {
+      "seconds": 22.01,
+      "requests": 0,
+      "counts": {}
+    },
+    "doctor_chat_browser_offline": {
+      "seconds": 22.01,
+      "requests": 0,
+      "counts": {}
+    },
+    "doctor_chat_closed": {
+      "seconds": 22.0,
+      "requests": 0,
+      "counts": {}
+    }
+  },
+  "errors": [
+    "Failed to load chunk /_next/static/chunks/3wi6r-y_q01-w.js from module 64893"
+  ],
+  "http_failures": [],
+  "physical_device": false,
+  "visibility_mode": "controlled DOM visibilityState, not OS background",
+  "clock": "real wall time, no timer acceleration",
+  "backend": "real development backend and HttpOnly-cookie BFF",
+  "failure_type": "TimeoutError"
+}

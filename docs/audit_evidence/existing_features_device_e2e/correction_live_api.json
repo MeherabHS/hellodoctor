@@ -1,0 +1,32 @@
+{
+  "server_time": "2026-10-15T18:35:49.875203+00:00",
+  "historical_available_slots_retained": 13,
+  "patient_future_slots": 0,
+  "doctor_current_upcoming": 3,
+  "completed_history_records": 0,
+  "old_rows_deleted": false,
+  "query_time_authority": "PostgreSQL",
+  "queue_ids": [
+    "5cc0d508-4191-4764-97ca-2287ceb01e4c",
+    "94956505-2315-4da4-bb13-a6a27248e411",
+    "55758f4d-f0e0-4bbc-8b1b-bdf42e81b1d8"
+  ],
+  "positive_future_fixtures": [
+    {
+      "id": "76ce810d-1484-451d-9b9a-72b73f137ba4",
+      "start_time": "2026-10-15T19:19:01.825527+00:00",
+      "end_time": "2026-10-15T19:29:01.825527+00:00",
+      "created_through": "Doctor own-slot API",
+      "synthetic_test_doctor": true
+    },
+    {
+      "id": "d1bf0e08-14d1-4bce-b39a-f6e201534149",
+      "start_time": "2026-10-16T20:49:01.825527+00:00",
+      "end_time": "2026-10-16T20:59:01.825527+00:00",
+      "created_through": "Doctor own-slot API",
+      "synthetic_test_doctor": true
+    }
+  ],
+  "patient_future_slots_after_own_schedule_api": 2,
+  "fixture_rows_deleted": false
+}

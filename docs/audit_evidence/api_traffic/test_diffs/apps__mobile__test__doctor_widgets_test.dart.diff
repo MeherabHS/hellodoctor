@@ -1,0 +1,15 @@
+--- baseline/apps/mobile/test/doctor_widgets_test.dart
+
++++ current/apps/mobile/test/doctor_widgets_test.dart
+
+@@ -67,7 +67,8 @@
+
+   Future<List<AppointmentDto>> queue({int limit = 25, int offset = 0}) async =>
+       [];
+   @override
+-  Future<List<SlotDto>> slots({int limit = 25, int offset = 0}) async =>
++  Future<List<SlotDto>> slots(
++          {int limit = 25, int offset = 0, DateTime? day}) async =>
+       offset == 0 ? _slots : [];
+   @override
+   Future<List<ChatDto>> chats({int limit = 25, int offset = 0}) async => [];

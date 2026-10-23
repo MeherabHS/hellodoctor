@@ -1,0 +1,24 @@
+﻿{
+    "kind":  "DART_FORMAT_PARSE_ONLY",
+    "executable":  "C:/Users/CUBE/.codex/tools/flutter/bin/cache/dart-sdk/bin/dart.exe",
+    "arguments":  [
+                      "format",
+                      "--output=none",
+                      "--set-exit-if-changed",
+                      "apps/mobile/lib/core/network/api_client.dart",
+                      "apps/mobile/lib/core/network/device_proof.dart",
+                      "apps/mobile/lib/core/network/screen_refresh.dart",
+                      "apps/mobile/test/recovery_stampede_test.dart",
+                      "apps/mobile_patient/lib/core/network/api_client.dart",
+                      "apps/mobile_patient/lib/core/network/device_proof.dart",
+                      "apps/mobile_patient/lib/core/network/screen_refresh.dart",
+                      "apps/mobile_patient/test/recovery_stampede_test.dart"
+                  ],
+    "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+    "environment":  "empty plus safe Windows runtime paths, parser-local scratch, CI and analytics suppression",
+    "exit_code":  0,
+    "elapsed_seconds":  0.2313206,
+    "stdout":  "Formatted 8 files (0 changed) in 0.05 seconds.\n",
+    "stderr":  "Warning: Package resolution error when reading \"analysis_options.yaml\" file for \"apps/mobile/lib/core/network/api_client.dart\":\nFailed to resolve package URI \"package:flutter_lints/flutter.yaml\" in include at \"C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\analysis_options.yaml\".\nWarning: Package resolution error when reading \"analysis_options.yaml\" file for \"apps/mobile/test/recovery_stampede_test.dart\":\nFailed to resolve package URI \"package:flutter_lints/flutter.yaml\" in include at \"C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\analysis_options.yaml\".\nWarning: Package resolution error when reading \"analysis_options.yaml\" file for \"apps/mobile_patient/lib/core/network/api_client.dart\":\nFailed to resolve package URI \"package:flutter_lints/flutter.yaml\" in include at \"C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\analysis_options.yaml\".\nWarning: Package resolution error when reading \"analysis_options.yaml\" file for \"apps/mobile_patient/test/recovery_stampede_test.dart\":\nFailed to resolve package URI \"package:flutter_lints/flutter.yaml\" in include at \"C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\analysis_options.yaml\".\n",
+    "target_code_executed":  false
+}

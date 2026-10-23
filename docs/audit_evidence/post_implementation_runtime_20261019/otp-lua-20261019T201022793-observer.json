@@ -1,0 +1,53 @@
+﻿{
+    "run_id":  "otp-lua-20261019T201022793",
+    "case_count":  5,
+    "reserve_calls":  207,
+    "max_parallel_workers":  8,
+    "cases":  [
+                  {
+                      "case_id":  "cooldown_storm",
+                      "observations":  "requests=101 concurrent_retries=100 global=1 cooldown=1 rolling=1 daily=1 denied=100",
+                      "verdict":  "DEFENSE_PASS"
+                  },
+                  {
+                      "case_id":  "distinct_recipients",
+                      "observations":  "requests=101 concurrent_requests=100 observed_accepted=30 observed_denied=70 additional_global_denied=1 global=30 keys=91",
+                      "verdict":  "DEFENSE_PASS"
+                  },
+                  {
+                      "case_id":  "rolling_boundary",
+                      "observations":  "requests=2 seeded_rolling=2 allowed=1 denied=1 global=8 rolling=3 daily=6 cooldown_after_denial=absent",
+                      "verdict":  "DEFENSE_PASS"
+                  },
+                  {
+                      "case_id":  "daily_boundary",
+                      "observations":  "requests=2 seeded_daily=19 allowed=1 denied=1 global=8 rolling=2 daily=20 cooldown_after_denial=absent",
+                      "verdict":  "DEFENSE_PASS"
+                  },
+                  {
+                      "case_id":  "invalid_counter",
+                      "observations":  "requests=1 global=7 other_keys=absent",
+                      "verdict":  "DEFENSE_PASS"
+                  }
+              ],
+    "verdict":  "DEFENSE_PASS",
+    "retained_fixture_containers":  0,
+    "initial_run":  "otp-lua-20261019T200944105",
+    "initial_failure":  "Optional corrupt-counter observer expected ERR prefix, redis-cli --raw returns only message; scratch observer expectation corrected. Production Lua unchanged.",
+    "ttl_seconds_observed":  {
+                                 "daily":  86400,
+                                 "global":  60,
+                                 "rolling":  900,
+                                 "cooldown":  60
+                             },
+    "counter_observation":  "GET/EXISTS/DBSIZE by separate serial observer after workers completed; worker return counts corroborate committed counters.",
+    "provider_calls":  0,
+    "shared_redis_contacted":  false,
+    "original_source_test_config_changes":  0,
+    "limitations":  [
+                        "No Rust service compilation or timeout/deadline test.",
+                        "No provider dispatch/delivery, OTP secrecy, HTTP auth/account budgets or Redis outage test.",
+                        "Rolling/daily cases seed near-limit values and remove fixture cooldown; actual long-window clock expiration not waited.",
+                        "Lua scope only; no production throughput or email deliverability claim."
+                    ]
+}

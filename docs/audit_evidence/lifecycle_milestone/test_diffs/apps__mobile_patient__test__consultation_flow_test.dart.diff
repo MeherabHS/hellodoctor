@@ -1,0 +1,16 @@
+--- baseline/apps/mobile_patient/test/consultation_flow_test.dart
+
++++ current/apps/mobile_patient/test/consultation_flow_test.dart
+
+@@ -156,8 +156,8 @@
+
+       expect(find.text('Open consultation'), findsNothing);
+       expect(
+           tester
+-              .widget<FilledButton>(
+-                  find.widgetWithText(FilledButton, 'Proceed to payment'))
++              .widget<FilledButton>(find.widgetWithText(
++                  FilledButton, 'Proceed to payment method'))
+               .onPressed,
+           isNotNull);
+       await capture(tester, 'chat_payment_pending_${width.toInt()}');

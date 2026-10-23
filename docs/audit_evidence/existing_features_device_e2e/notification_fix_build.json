@@ -1,0 +1,20 @@
+{
+  "apk": "releases\\hellodoctor-doctor-arm64-notifications-fix-20261015.apk",
+  "sha256": "83e9ef034030f58d9c9ad8dcc9518ba51ce0c0b951626e8b648a7a09105f8daf",
+  "bytes": 20456616,
+  "compiled_manifest_evidence": [
+    "A: android:versionCode(0x0101021b)=(type 0x10)0x5",
+    "A: android:versionName(0x0101021c)=\"1.0.1\" (Raw: \"1.0.1\")",
+    "A: android:name(0x01010003)=\"android.permission.POST_NOTIFICATIONS\" (Raw: \"android.permission.POST_NOTIFICATIONS\")",
+    "A: android:name(0x01010003)=\"android.permission.RECEIVE_BOOT_COMPLETED\" (Raw: \"android.permission.RECEIVE_BOOT_COMPLETED\")",
+    "A: android:name(0x01010003)=\"com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver\" (Raw: \"com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver\")",
+    "A: android:name(0x01010003)=\"com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver\" (Raw: \"com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver\")"
+  ],
+  "doctor_tests": {
+    "success": 190,
+    "failure": 0,
+    "skipped": 0
+  },
+  "device_installation": "PENDING_ADB_CONNECTION",
+  "physical_popup": "NOT_VERIFIED"
+}

@@ -1,0 +1,253 @@
+﻿diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\tests\\refresh.test.ts" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\tests\\refresh.test.ts"
+index 56d6792..acf04b0 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\tests\\refresh.test.ts"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\tests\\refresh.test.ts"	
+@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
+ import { createClient } from 'redis';
+ import { createHash } from 'crypto';
+ import { refreshCoordinator } from '../src/lib/refresh.ts';
++import { redisFixtureConfiguration, assertRedisFixtureOwner } from './redis-fixture.ts';
+ test('parallel Admin reads rotate one single-use refresh token once',async()=>{
+   const rotate=refreshCoordinator(20);let calls=0;
+   const issue=async()=>{calls++;await new Promise(resolve=>setTimeout(resolve,5));return {access_token:'synthetic-access',refresh_token:'synthetic-next'};};
+@@ -15,21 +16,24 @@ test('parallel Admin reads rotate one single-use refresh token once',async()=>{
+ // These exercise the Redis-backed lock path by pointing two INDEPENDENT
+ // refreshCoordinator() closures (standing in for two separate admin-web
+ // instances — the in-memory Map in refresh.ts is otherwise process-local) at
+-// the same local Redis used by the rest of this project's test suite, on a
+-// dedicated logical DB (14) to avoid colliding with the backend's own tests
+-// (which use DB 15 per services/backend/tests/api_tests.rs).
++// an explicitly provisioned disposable Redis. A logical DB alone does not
++// protect shared services; validate its address and ownership marker first.
+ //
+ // Each test creates and explicitly disconnects its own client(s) — and
+ // passes them into refreshCoordinator()'s test-only override parameter —
+ // rather than relying on process.env.REDIS_URL plus the module's internal
+ // lazy-connect-forever singleton, so the test process can exit cleanly.
+-const REDIS_URL = 'redis://127.0.0.1:6379/14';
++const { address: REDIS_URL, fixtureId } = redisFixtureConfiguration(process.env);
+ const probe = createClient({ url: REDIS_URL, socket: { connectTimeout: 500, reconnectStrategy: false } });
+-const hasRedis = await probe.connect().then(() => true).catch(() => false);
+-if (hasRedis) await probe.disconnect();
+-const skipReason = !hasRedis ? 'local Redis not reachable on 127.0.0.1:6379' : false;
++probe.on('error', () => {});
++try {
++  await probe.connect();
++  assertRedisFixtureOwner(await probe.get('hd:test-fixture:owner'), fixtureId);
++} finally {
++  if (probe.isOpen) await probe.disconnect();
++}
+ 
+-test('two admin-web instances racing the same refresh token coordinate to exactly one rotate() call, and the loser never attempts its own rotate', { skip: skipReason }, async () => {
++test('two admin-web instances racing the same refresh token coordinate to exactly one rotate() call, and the loser never attempts its own rotate', async () => {
+   const token = `race-token-${Date.now()}-${Math.random()}`;
+   let calls = 0;
+   const issue = async () => { calls++; await new Promise(r => setTimeout(r, 150)); return { access_token: 'a', refresh_token: 'b' }; };
+@@ -50,7 +54,7 @@ test('two admin-web instances racing the same refresh token coordinate to exactl
+   await Promise.all([clientA.disconnect(), clientB.disconnect()]);
+ });
+ 
+-test('a losing instance never relays the leader\'s tokens and the leader\'s own outcome is unaffected by the race', { skip: skipReason }, async () => {
++test('a losing instance never relays the leader\'s tokens and the leader\'s own outcome is unaffected by the race', async () => {
+   const token = `race-token-2-${Date.now()}-${Math.random()}`;
+   const issue = async () => { await new Promise(r => setTimeout(r, 100)); return { access_token: 'leader-access', refresh_token: 'leader-refresh' }; };
+   const clientA = createClient({ url: REDIS_URL, socket: { reconnectStrategy: false } });
+@@ -68,7 +72,7 @@ test('a losing instance never relays the leader\'s tokens and the leader\'s own
+   await Promise.all([clientA.disconnect(), clientB.disconnect()]);
+ });
+ 
+-test('a crashed leader\'s lock expires on its own TTL and never permanently blocks a follower', { skip: skipReason }, async () => {
++test('a crashed leader\'s lock expires on its own TTL and never permanently blocks a follower', async () => {
+   const token = `crash-token-${Date.now()}-${Math.random()}`;
+   const fp = createHash('sha256').update(token).digest('hex');
+   const client = createClient({ url: REDIS_URL, socket: { reconnectStrategy: false } });
+@@ -91,7 +95,7 @@ test('a crashed leader\'s lock expires on its own TTL and never permanently bloc
+   await client.disconnect();
+ });
+ 
+-test('no raw refresh token ever appears as a Redis key or value during coordination', { skip: skipReason }, async () => {
++test('no raw refresh token ever appears as a Redis key or value during coordination', async () => {
+   const rawToken = `super-secret-raw-refresh-token-${Date.now()}-${Math.random()}`;
+   const clientA = createClient({ url: REDIS_URL, socket: { reconnectStrategy: false } });
+   const clientB = createClient({ url: REDIS_URL, socket: { reconnectStrategy: false } });
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\app\\page.tsx" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\app\\page.tsx"
+index a50b886..95d6521 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\app\\page.tsx"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\app\\page.tsx"	
+@@ -2,7 +2,7 @@
+ 
+ import { GrievanceInvestigation } from '@/components/GrievanceInvestigation';
+ 
+-import React, { useState, useEffect, useCallback } from 'react';
++import React, { useState, useEffect, useCallback, useRef } from 'react';
+ import { useBackendSync, ModalitySplit } from '@/lib/useBackendSync';
+ import { useSlotSync } from '@/lib/useSlotSync';
+ import { scheduleDay, scheduleLabel } from '@/lib/schedule';
+@@ -247,9 +247,10 @@ export default function AdminPortalPage() {
+ 
+   // Toasts
+   const [toasts, setToasts] = useState<ToastNotice[]>([]);
++  const toastSequence = useRef(0);
+ 
+   function showToast(title: string, message: string, icon = '✓', type: 'success' | 'urgent' | 'warning' | 'info' = 'success') {
+-    const id = 'toast_' + Date.now();
++    const id = 'toast_' + ++toastSequence.current;
+     setToasts((prev) => [...prev, { id, title, message, icon, type }]);
+     setTimeout(() => {
+       setToasts((prev) => prev.filter((t) => t.id !== id));
+@@ -1007,7 +1008,8 @@ export default function AdminPortalPage() {
+                   const result = await fetch('/api/logout', { method: 'POST' });
+                   if (!result.ok) window.alert('Signed out locally. Server revocation could not be confirmed.');
+                 } catch { window.alert('Unable to reach the server. Server sign-out could not be confirmed.'); }
+-                window.location.href = '/login';
++                // A full document navigation discards the authenticated runtime.
++                window.location.assign(new URL('/login', window.location.origin).href);
+               }}
+             >
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+@@ -2010,7 +2012,7 @@ export default function AdminPortalPage() {
+                 <div>
+                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>Platform Merchant &amp; Payment Methods</div>
+                   <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>
+-                    How the platform itself collects payment (M-Pesa, card, or any future provider) — separate from a patient's saved payment method or a doctor's payout destination. Credentials are encrypted at rest and never returned by the API.
++                    How the platform itself collects payment (M-Pesa, card, or any future provider) — separate from a patient&apos;s saved payment method or a doctor&apos;s payout destination. Credentials are encrypted at rest and never returned by the API.
+                   </div>
+                 </div>
+                 <button className="admin-btn-pri" onClick={() => setAddPaymentMethodModalOpen(true)} style={{ padding: '7px 14px', fontSize: '11.5px' }}>
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\components\\GrievanceInvestigation.tsx" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\components\\GrievanceInvestigation.tsx"
+index edbc18c..869acd8 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\components\\GrievanceInvestigation.tsx"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\components\\GrievanceInvestigation.tsx"	
+@@ -11,9 +11,13 @@ function value(data: unknown): string {
+ // All evidence comes from the authorized investigation endpoint. In particular,
+ // client acknowledgement and telemetry never imply human reading or RTC media.
+ export function GrievanceInvestigation({ grievanceId }: { grievanceId: string }) {
++  return <InvestigationEvidence key={grievanceId} grievanceId={grievanceId} />;
++}
++
++function InvestigationEvidence({ grievanceId }: { grievanceId: string }) {
+   const [data, setData] = useState<Investigation | null>(null);
+   const [error, setError] = useState('');
+-  const [busy, setBusy] = useState(false);
++  const [busy, setBusy] = useState(true);
+   const [slot, setSlot] = useState('');
+   const [reason, setReason] = useState('');
+   const [slots,setSlots]=useState<BookableDoctorSlot[]>([]);
+@@ -25,7 +29,7 @@ export function GrievanceInvestigation({ grievanceId }: { grievanceId: string })
+     catch (e) { setError(e instanceof Error ? e.message : 'Unable to retrieve investigation evidence.'); }
+     finally { setBusy(false); }
+   }, [grievanceId]);
+-  useEffect(() => { let active = true; setData(null); setBusy(true); setError('');
++  useEffect(() => { let active = true;
+     getGrievanceInvestigation(grievanceId).then(result => { if (active) setData(result); })
+       .catch(e => { if (active) setError(e instanceof Error ? e.message : 'Unable to retrieve investigation evidence.'); })
+       .finally(() => { if (active) setBusy(false); });
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\components\\BotChallenge.tsx" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\components\\BotChallenge.tsx"
+index 24cc069..33ce2f6 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\components\\BotChallenge.tsx"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\components\\BotChallenge.tsx"	
+@@ -36,24 +36,28 @@ export function BotChallenge({ action, reset, onToken }: {
+     onToken(null);
+     if (!config) return;
+     if (!config.required) { onToken(''); return; }
+-    if (!config.siteKey) { setFailed(true); return; }
++    if (!config.siteKey) return;
+     const api = window.turnstile;
+     if (!loaded || !api || !container.current) return;
+     let active = true;
+-    setFailed(false);
+     let widget: string;
+     try { widget = api.render(container.current, { sitekey: config.siteKey, action,
+       'response-field': false,
+       callback: (token: string) => { if (active) { setFailed(false); onToken(token); } },
+       'expired-callback': () => { if (active) { onToken(null); setFailed(true); } },
+       'error-callback': () => { if (active) { onToken(null); setFailed(true); } },
+-    }); } catch { setFailed(true); return; }
++    }); } catch {
++      // Report the external widget failure after effect setup, while honoring
++      // teardown if this challenge was replaced or the component unmounted.
++      queueMicrotask(() => { if (active) setFailed(true); });
++      return () => { active = false; };
++    }
+     return () => { active = false; api.remove(widget); };
+   }, [config, loaded, action, reset, onToken]);
+   return <div>
+     {config?.required && config.siteKey && <Script id="turnstile" src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+       onReady={() => setLoaded(true)} onError={() => { onToken(null); setFailed(true); }} />}
+     <div ref={container} />
+-    {failed && <p role="status">We couldn't complete verification. <button type="button" onClick={() => window.location.reload()}>Try again</button></p>}
++    {(failed || (config?.required && !config.siteKey)) && <p role="status">We couldn&apos;t complete verification. <button type="button" onClick={() => window.location.reload()}>Try again</button></p>}
+   </div>;
+ }
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\lib\\useSlotSync.ts" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\lib\\useSlotSync.ts"
+index 9fc5d5a..9a65d9c 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\lib\\useSlotSync.ts"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\lib\\useSlotSync.ts"	
+@@ -13,7 +13,7 @@ const BASE_INTERVAL_MS = 15000;
+ // across every open admin session. A successful refresh resets the cadence.
+ export function useSlotSync(onUpdate: (rows: AdminSlot[]) => void, enabled=true) {
+   const callback = useRef(onUpdate);
+-  callback.current = onUpdate;
++  useEffect(() => { callback.current = onUpdate; }, [onUpdate]);
+   const epoch = useRef(0);
+   const [sync, setSync] = useState({ loading: true, error: '', updatedAt: '' });
+   const hasError = useRef(false);
+@@ -35,13 +35,14 @@ export function useSlotSync(onUpdate: (rows: AdminSlot[]) => void, enabled=true)
+   }, []);
+   useEffect(() => {
+     if(!enabled)return;
++    const activeEpoch = epoch;
+     const stop = startScheduleSync(refresh, {
+       window, document, online: () => navigator.onLine,
+       every: (callback, ms) => window.setTimeout(callback, ms),
+       cancel: timer => window.clearTimeout(timer as number),
+     }, BASE_INTERVAL_MS, { hasError: () => hasError.current, initial: true });
+     return () => {
+-      epoch.current++;
++      activeEpoch.current++;
+       stop();
+     };
+   }, [refresh,enabled]);
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\lib\\useBackendSync.ts" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\lib\\useBackendSync.ts"
+index 2b1a211..4d998aa 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\lib\\useBackendSync.ts"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\lib\\useBackendSync.ts"	
+@@ -330,7 +330,8 @@ interface BackendSyncCallbacks {
+ }
+ 
+ export function useBackendSync(callbacks:BackendSyncCallbacks,statementMonth:string,activePage='doctors',selectedDoctor:string|null=null,selectedPatient:string|null=null) {
+- const cbRef=useRef(callbacks);cbRef.current=callbacks;
++ const cbRef=useRef(callbacks);
++ useEffect(()=>{cbRef.current=callbacks;},[callbacks]);
+  const epoch=useRef(0),pending=useRef<Promise<void>|null>(null),roundFailed=useRef(false);
+  const rawDoctors=useRef<Record<string,any>>({}),rawPatients=useRef<Record<string,any>>({});
+  const doctors=useRef<Record<string,DoctorHistoryItem>>({}),patients=useRef<Record<string,PatientRecordItem>>({});
+@@ -384,12 +385,13 @@ export function useBackendSync(callbacks:BackendSyncCallbacks,statementMonth:str
+   pending.current=work;return work;
+  },[activePage,statementMonth]);
+  useEffect(()=>{
++  const activeEpoch=epoch;
+   epoch.current++;pending.current=null;
+   const stop=startScheduleSync(fetchPage,{
+    window,document,online:()=>navigator.onLine,
+    every:(callback,ms)=>window.setTimeout(callback,ms),cancel:timer=>window.clearTimeout(timer as number),
+   },30000,{hasError:()=>roundFailed.current,initial:true});
+-  return()=>{epoch.current++;stop();};
++  return()=>{activeEpoch.current++;stop();};
+  },[fetchPage]);
+  useEffect(()=>{
+   if(!selectedDoctor)return;let active=true;
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\lib\\api.ts" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\lib\\api.ts"
+index bdc3531..abbacb3 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web\\src\\lib\\api.ts"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\admin-web\\src\\lib\\api.ts"	
+@@ -296,7 +296,8 @@ async function performRequest<T>(path: string, options?: RequestInit): Promise<T
+     // Session cookie missing/expired and the proxy's own silent-refresh
+     // attempt also failed — send the admin back to login rather than
+     // surfacing a confusing in-page error.
+-    window.location.href = "/login";
++    // Clear the authenticated document/runtime rather than retaining its caches.
++    window.location.assign(new URL('/login', window.location.origin).href);
+     throw new Error("Not authenticated.");
+   }
+ 

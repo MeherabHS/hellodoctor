@@ -1,0 +1,527 @@
+{
+  "run_id": "pressure-20261019T182204",
+  "scope": "Disposable loopback development fixture, real backend; no provider calls",
+  "cases": [
+    {
+      "case_id": "auth_pool_pressure",
+      "lock_seconds": 15,
+      "offered_parallel_requests": 12,
+      "lock_process_exit": 0,
+      "samples": [
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 5
+          },
+          "metrics": [
+            200,
+            {
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"normal\"}": 10.0,
+              "admission_accepted_total{class=\"health\"}": 2.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 4.0,
+              "db_pool_size{role=\"api\"}": 2.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_size{role=\"auth\"}": 5.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"normal\"}": 5.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "db_pool_idle{role=\"api\"}": 2.0,
+              "db_pool_idle{role=\"auth\"}": 0.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.001463,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"1\"}": 0.009808,
+              "db_acquire_seconds_sum": 0.0133957,
+              "db_acquire_seconds_count": 3.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 36569088,
+            "private_bytes": 10514432,
+            "cpu_seconds": 0.1875
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 5
+          },
+          "metrics": [
+            200,
+            {
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"health\"}": 3.0,
+              "admission_accepted_total{class=\"normal\"}": 10.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 4.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"auth\"}": 0.0,
+              "db_pool_idle{role=\"api\"}": 2.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"api\"}": 2.0,
+              "db_pool_size{role=\"auth\"}": 5.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "admission_inflight{class=\"normal\"}": 5.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.001463,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"1\"}": 0.009808,
+              "db_acquire_seconds_sum": 0.0133957,
+              "db_acquire_seconds_count": 3.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 36646912,
+            "private_bytes": 10514432,
+            "cpu_seconds": 0.1875
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 5
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 4.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"normal\"}": 10.0,
+              "admission_accepted_total{class=\"health\"}": 4.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"api\"}": 2.0,
+              "db_pool_size{role=\"auth\"}": 5.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 2.0,
+              "db_pool_idle{role=\"auth\"}": 0.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"normal\"}": 5.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.001463,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"1\"}": 0.009808,
+              "db_acquire_seconds_sum": 0.0133957,
+              "db_acquire_seconds_count": 3.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 36651008,
+            "private_bytes": 10514432,
+            "cpu_seconds": 0.1875
+          }
+        },
+        {
+          "db": {
+            "system_errors": 2,
+            "error_occurrences": 6,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 5
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 4.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_accepted_total{class=\"normal\"}": 10.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"health\"}": 5.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "db_pool_idle{role=\"auth\"}": 0.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 2.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "db_pool_size{role=\"api\"}": 2.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"auth\"}": 5.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.001463,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"1\"}": 0.009808,
+              "db_acquire_seconds_sum": 0.0133957,
+              "db_acquire_seconds_count": 3.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 36704256,
+            "private_bytes": 10563584,
+            "cpu_seconds": 0.21875
+          }
+        },
+        {
+          "db": {
+            "system_errors": 2,
+            "error_occurrences": 6,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 4.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_accepted_total{class=\"health\"}": 6.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"normal\"}": 10.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"auth\"}": 5.0,
+              "db_pool_idle{role=\"api\"}": 2.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_size{role=\"api\"}": 2.0,
+              "db_pool_size{role=\"auth\"}": 5.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.001463,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"1\"}": 0.009808,
+              "db_acquire_seconds_sum": 0.0133957,
+              "db_acquire_seconds_count": 3.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 36704256,
+            "private_bytes": 10563584,
+            "cpu_seconds": 0.21875
+          }
+        },
+        {
+          "db": {
+            "system_errors": 2,
+            "error_occurrences": 6,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 4.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_accepted_total{class=\"health\"}": 7.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"normal\"}": 10.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "db_pool_idle{role=\"auth\"}": 5.0,
+              "db_pool_idle{role=\"api\"}": 2.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "db_pool_size{role=\"auth\"}": 5.0,
+              "db_pool_size{role=\"api\"}": 2.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.001463,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"1\"}": 0.009808,
+              "db_acquire_seconds_sum": 0.0133957,
+              "db_acquire_seconds_count": 3.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 36708352,
+            "private_bytes": 10563584,
+            "cpu_seconds": 0.21875
+          }
+        },
+        {
+          "db": {
+            "system_errors": 2,
+            "error_occurrences": 6,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 4.0,
+              "admission_accepted_total{class=\"normal\"}": 10.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"health\"}": 8.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "db_pool_size{role=\"api\"}": 2.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_size{role=\"auth\"}": 5.0,
+              "db_pool_idle{role=\"auth\"}": 5.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 2.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.001463,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"1\"}": 0.009808,
+              "db_acquire_seconds_sum": 0.0133957,
+              "db_acquire_seconds_count": 3.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 36708352,
+            "private_bytes": 10563584,
+            "cpu_seconds": 0.234375
+          }
+        },
+        {
+          "db": {
+            "system_errors": 2,
+            "error_occurrences": 6,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 4.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"health\"}": 9.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"normal\"}": 10.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "db_pool_size{role=\"api\"}": 2.0,
+              "db_pool_size{role=\"auth\"}": 5.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 2.0,
+              "db_pool_idle{role=\"auth\"}": 5.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.001463,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.002124752348002757,
+              "db_acquire_seconds{quantile=\"1\"}": 0.009808,
+              "db_acquire_seconds_sum": 0.0133957,
+              "db_acquire_seconds_count": 3.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 36659200,
+            "private_bytes": 10473472,
+            "cpu_seconds": 0.234375
+          }
+        }
+      ],
+      "new_request_during_pressure": {
+        "path": "/api/v1/patients/me",
+        "status": 200,
+        "latency_ms": 24.52159999666037,
+        "retry_after": null,
+        "request_id": "bc617e27-22d9-4d5c-bcb5-c3e84d26ef4e"
+      },
+      "health_during_pressure": {
+        "path": "/healthz",
+        "status": 200,
+        "latency_ms": 5.198500002734363,
+        "retry_after": null,
+        "request_id": "598c46f6-29de-4860-add2-49fc6923baed"
+      },
+      "requests": [
+        {
+          "status": 408,
+          "latency_ms": 10008.33540000167,
+          "retry_after": null,
+          "request_id": null
+        },
+        {
+          "status": 408,
+          "latency_ms": 10007.771800002956,
+          "retry_after": null,
+          "request_id": null
+        },
+        {
+          "status": 408,
+          "latency_ms": 10007.198399995104,
+          "retry_after": null,
+          "request_id": null
+        },
+        {
+          "status": 408,
+          "latency_ms": 10007.24430000264,
+          "retry_after": null,
+          "request_id": null
+        },
+        {
+          "status": 503,
+          "latency_ms": 260.27029999386286,
+          "retry_after": "1",
+          "request_id": "5995fd31-c61c-46d7-a31f-25bb1225fb6d"
+        },
+        {
+          "status": 408,
+          "latency_ms": 10006.515799999761,
+          "retry_after": null,
+          "request_id": null
+        },
+        {
+          "status": 503,
+          "latency_ms": 258.90439999784576,
+          "retry_after": "1",
+          "request_id": "f8acb11f-b138-4de8-ade5-5a76b5e56bfb"
+        },
+        {
+          "status": 503,
+          "latency_ms": 259.03229999676114,
+          "retry_after": "1",
+          "request_id": "d85f7f10-c3f5-4b03-a052-bea216c33284"
+        },
+        {
+          "status": 503,
+          "latency_ms": 258.06420000299113,
+          "retry_after": "1",
+          "request_id": "41f7a654-54f4-496b-9eb5-5ceae07d1581"
+        },
+        {
+          "status": 503,
+          "latency_ms": 257.2414000023855,
+          "retry_after": "1",
+          "request_id": "14033c58-08f9-4e56-89d6-1cd0a9d69b3d"
+        },
+        {
+          "status": 503,
+          "latency_ms": 256.57639999553794,
+          "retry_after": "1",
+          "request_id": "6d4a1d5e-f09c-468f-b90b-98b9aa4ded0b"
+        },
+        {
+          "status": 503,
+          "latency_ms": 256.6045999992639,
+          "retry_after": "1",
+          "request_id": "96a70846-f55c-48f1-9ca8-78b51b0b7a54"
+        }
+      ],
+      "db_waiter_count": "NOT_MEASURED",
+      "sql_lock_waits_observed": true
+    }
+  ],
+  "baseline": {
+    "path": "/api/v1/patients/me",
+    "status": 200,
+    "latency_ms": 58.05500000133179,
+    "retry_after": null,
+    "request_id": "819a5640-4e5f-4591-9403-d5f784cd94f4"
+  },
+  "after_recovery": {
+    "path": "/api/v1/patients/me",
+    "status": 200,
+    "latency_ms": 37.606800004141405,
+    "retry_after": null,
+    "request_id": "734b85e5-b2b2-47bc-ac70-505804011c0d"
+  },
+  "final_db": {
+    "system_errors": 2,
+    "error_occurrences": 6,
+    "transactions": 0,
+    "economic_effects": 0,
+    "blocked_auth_connections": 0
+  },
+  "final_metrics": [
+    200,
+    {
+      "admission_accepted_total{class=\"health\"}": 11.0,
+      "admission_accepted_total{class=\"normal\"}": 12.0,
+      "admission_accepted_total{class=\"auth\"}": 2.0,
+      "admission_accepted_total{class=\"consultation\"}": 4.0,
+      "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 4.0,
+      "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 3.0,
+      "db_pool_idle{role=\"auth\"}": 5.0,
+      "db_pool_idle{role=\"payment\"}": 1.0,
+      "db_pool_idle{role=\"api\"}": 2.0,
+      "db_pool_idle{role=\"finance\"}": 1.0,
+      "admission_inflight{class=\"auth\"}": 0.0,
+      "admission_inflight{class=\"health\"}": 1.0,
+      "admission_inflight{class=\"normal\"}": 0.0,
+      "admission_inflight{class=\"consultation\"}": 0.0,
+      "db_pool_size{role=\"finance\"}": 1.0,
+      "db_pool_size{role=\"payment\"}": 1.0,
+      "db_pool_size{role=\"auth\"}": 5.0,
+      "db_pool_size{role=\"api\"}": 2.0,
+      "db_acquire_seconds{quantile=\"0\"}": 0.0013969,
+      "db_acquire_seconds{quantile=\"0.5\"}": 0.0016275165313813836,
+      "db_acquire_seconds{quantile=\"0.9\"}": 0.002124752348002757,
+      "db_acquire_seconds{quantile=\"0.95\"}": 0.002124752348002757,
+      "db_acquire_seconds{quantile=\"0.99\"}": 0.002124752348002757,
+      "db_acquire_seconds{quantile=\"0.999\"}": 0.002124752348002757,
+      "db_acquire_seconds{quantile=\"1\"}": 0.009808,
+      "db_acquire_seconds_sum": 0.0195192,
+      "db_acquire_seconds_count": 7.0
+    }
+  ],
+  "credentials_logged": false,
+  "backend_stopped": true
+}

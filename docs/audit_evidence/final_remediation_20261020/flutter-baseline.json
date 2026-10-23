@@ -1,0 +1,2552 @@
+[
+    {
+        "app":  "mobile",
+        "sha256":  "0581D23086F7283DC97D2D5BDE4F60724F8115F67BAA76949596790AB9800DD7",
+        "relative":  ".gitignore",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\.gitignore"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "D96B380DDB1C9FAB8E44E0BA8BA49977F3AD9A269803D2E1B6D85C6CFAA9C14F",
+        "relative":  ".metadata",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\.metadata"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "FE78D74AFC8711C2852CF9F2F5A1E4D787567EC6A1608DB15DC81CC18105859B",
+        "relative":  "analysis_options.yaml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\analysis_options.yaml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "7EC68C305E510D552166CBE954492EC2B9E198FA6DD7D3A85B6F7C606B42CAAB",
+        "relative":  "audit-flutter-tests-current.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\audit-flutter-tests-current.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "FA68A818B28900C68B8C77066E9621520230E90A74904DD71BB80FF3DB37D257",
+        "relative":  "audit-flutter-tests.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\audit-flutter-tests.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "5595882041F382DBBDD7F1B79D4D49200009F5ED60753802BE2B724296D4DE2E",
+        "relative":  "build_field_test.ps1",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\build_field_test.ps1"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "32B26312A1E74D65D4AC65DFEE518C39EF9F18A66F86FBC2E9AAC01523686D42",
+        "relative":  "build_output.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\build_output.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "1E81578445F86FCBD09244A3D98871118AFE0B0434B62F69C0A7C65C5EA9F343",
+        "relative":  "build_profile.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\build_profile.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "F75B126F8B3CD28DAE3178519A040862E977F27F4CBCDB2D86C5593037342DB2",
+        "relative":  "build_release.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\build_release.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "3482B5BC4132C5B885665CB7C4499D1D0A98290B922ACE1C507DA2372E4E04DF",
+        "relative":  "build_release2.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\build_release2.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "B4008ECBED67E25C09F534E66E46B243CAE45944AF985719CD90CA9E301D103D",
+        "relative":  "build_release3.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\build_release3.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "EDB4D480ED70037825596710920320FF26C2DA25FF75E94049C750485658E404",
+        "relative":  "cleanup-flutter-tests.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\cleanup-flutter-tests.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "D4D0DC1C87B1070661056AF62CC82737A2F82CAB9EEC8BF223D6FB8268A98DDC",
+        "relative":  "cleanup-flutter-web-build.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\cleanup-flutter-web-build.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "E0321C0ECA50D79AB89255FF25310D8DB8FA4C874673B3E251FF91470B2DD412",
+        "relative":  "consultation_analyze.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\consultation_analyze.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "633945B3FF54261DD2C7F691530E8E081499E8DBEEA9B435DC5BC60CBBAB98AA",
+        "relative":  "consultation_focused.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\consultation_focused.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "30DA31752917FF87B40BF6FC427C6F00CE9E49D3E6B814BF21A6AA17B5C43F8E",
+        "relative":  "consultation_release_build.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\consultation_release_build.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "0592A7B383B63FAC7A193D4D29FF0C193D63F3A939829BC3644E64501395DE40",
+        "relative":  "doctor_startup_analyze.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\doctor_startup_analyze.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "FD9E305FB1AEA1DDD73E036DFF7834DC85E21A4D38E7ACAC5D1291203958A954",
+        "relative":  "doctor_startup_release_build.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\doctor_startup_release_build.log"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "531755035671A2C7C3ABCE16915F5E7E0241FF3C03B6EC75C087144DF36489CE",
+        "relative":  "pubspec.lock",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\pubspec.lock"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "82E784B975A648B5EFDCA65FA5E4401E1734BC269162AB3CE2B12A95DA54DC46",
+        "relative":  "pubspec.yaml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\pubspec.yaml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "4DA2388FA3D017A1257E6F90E095043807D3A5D9FCE94C2E44D73E4617586E52",
+        "relative":  "README.md",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\README.md"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "90361708E0A2A8734A7058A872232B6AA1BF20E53106E3F3B25A0857DAB5D905",
+        "relative":  ".idea\\modules.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\.idea\\modules.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "5A51B5C6F5C6600657FFE1142A4604838D68311F9DCF0A4C3703B76FC6FBE0F3",
+        "relative":  ".idea\\workspace.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\.idea\\workspace.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "A6EFA44DCF24C4DA1383113B7A37BF2791B70D52E5C4F4C1865EE41A1325201D",
+        "relative":  ".idea\\libraries\\Dart_SDK.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\.idea\\libraries\\Dart_SDK.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "124B21C81C4A853E4DAB5E4AA40C6502D5C09F4A9B2A6FDBA540E10F67E43738",
+        "relative":  ".idea\\libraries\\KotlinJavaRuntime.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\.idea\\libraries\\KotlinJavaRuntime.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "75188212480010C08797294663D15F00FD5CA1F474173A5D919493B17B6D9518",
+        "relative":  ".idea\\runConfigurations\\main_dart.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\.idea\\runConfigurations\\main_dart.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C9AF75DBC2C8AA867476A09426C80B178C4AEED8B9393AE48503EEDFA3273D71",
+        "relative":  "android\\.gitignore",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\.gitignore"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "42F5676771384D9C16240F2E9FFF174A7F884740C4B28CD112A32B824C7E79F1",
+        "relative":  "android\\build.gradle.kts",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\build.gradle.kts"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "7714698DE712A7872E371F0DBAE626C255FC83AC1C15E52E7CD9FCAA241B5092",
+        "relative":  "android\\gradle.properties",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\gradle.properties"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "EC56C02543666D92D9AC5AE7FCC48F88CE4DE0DEB8B7F9B39928CA46F68C1B2B",
+        "relative":  "android\\gradlew",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\gradlew"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C13C6E91B9A517783976DE213D46398C661EA9E17651376D7301E839EAEDCC62",
+        "relative":  "android\\gradlew.bat",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\gradlew.bat"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "092BA880C8D4A07591AAFC082F45DEEDC9AFCF60C113A4BB3D13CBE1A1FCE9DE",
+        "relative":  "android\\settings.gradle.kts",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\settings.gradle.kts"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C9460CFF8D2C4D745DE701DEA37499469D41810A797388D3A43D36F0CBB4D37C",
+        "relative":  "android\\app\\build.gradle.kts",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\build.gradle.kts"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "446D91E3089520EBD99F93F5A4D95C97ED70CADBBFAC19F0C3E90F987AE1C3AC",
+        "relative":  "android\\app\\proguard-rules.pro",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\proguard-rules.pro"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "B01A4541A8144C15BC617BAB7EB267C99FA1476368FBBDA5A12CDBF4E316A34C",
+        "relative":  "android\\app\\src\\debug\\AndroidManifest.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\debug\\AndroidManifest.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "0851AA9ADAEC3885D1443FDA9DBE6A686C8DE69AB1ED75BB6E6781FDB321AD06",
+        "relative":  "android\\app\\src\\main\\AndroidManifest.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\AndroidManifest.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "EC11D2862CAF2730CC67F0242D273E6BE570120F6A63D3653946C5764C517A35",
+        "relative":  "android\\app\\src\\main\\java\\io\\flutter\\plugins\\GeneratedPluginRegistrant.java",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\java\\io\\flutter\\plugins\\GeneratedPluginRegistrant.java"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "E1035A1E87A03023218FC94FD18AEFEDA1C76389F69A8B5288466190789E5580",
+        "relative":  "android\\app\\src\\main\\kotlin\\com\\example\\hellodoctor_mobile\\DeviceProof.kt",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\kotlin\\com\\example\\hellodoctor_mobile\\DeviceProof.kt"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "0138F85417B00CE968C6949FD595DEEE54CFD6D231F6DD265FEF8628E4CE68EF",
+        "relative":  "android\\app\\src\\main\\kotlin\\com\\example\\hellodoctor_mobile\\MainActivity.kt",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\kotlin\\com\\example\\hellodoctor_mobile\\MainActivity.kt"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "2DF60E2CFBEE873CE2858088CF003E6B93498F2F568476DA437610467EA1A9D7",
+        "relative":  "android\\app\\src\\main\\res\\drawable\\launch_background.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\drawable\\launch_background.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "DCA312EC77DE83E43EF70A825C299B51451247286C29167D62F19165750B8793",
+        "relative":  "android\\app\\src\\main\\res\\drawable-v21\\launch_background.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\drawable-v21\\launch_background.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "6A7C8F0D703E3682108F9662F813302236240D3F8F638BB391E32BFB96055FEF",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C7C0C0189145E4E32A401C61C9BDC615754B0264E7AFAE24E834BB81049EAF81",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "E14AA40904929BF313FDED22CF7E7FFCBF1D1AAC4263B5EF1BE8BFCE650397AA",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "4D470BF22D5C17D84EDC5F82516D1BA8A1C09559CD761CEFB792F86D9F52B540",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "3C34E1F298D0C9EA3455D46DB6B7759C8211A49E9EC6E44B635FC5C87DFB4180",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "CCA15A99B59380A548BF6A890F7CA5380EE509B1F9BBB2F5F9EC3589FA25C2F7",
+        "relative":  "android\\app\\src\\main\\res\\values\\styles.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\values\\styles.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "EA763597DC1A84C8034251CAEE98D7753E0FBF57340FFC94677427DE4B537516",
+        "relative":  "android\\app\\src\\main\\res\\values-night\\styles.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\values-night\\styles.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "EDA9DDDCE1E895DE1EFD716FE75E244187BF8F91A3BB7444C6EA1731E51C74A8",
+        "relative":  "android\\app\\src\\main\\res\\xml\\data_extraction_rules.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\xml\\data_extraction_rules.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "9853986028FBB00D0C31C593CCC154D26D5D2F16273EAA295CDE2F222DCFB2E6",
+        "relative":  "android\\app\\src\\main\\res\\xml\\network_security_config.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\main\\res\\xml\\network_security_config.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "B01A4541A8144C15BC617BAB7EB267C99FA1476368FBBDA5A12CDBF4E316A34C",
+        "relative":  "android\\app\\src\\profile\\AndroidManifest.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\app\\src\\profile\\AndroidManifest.xml"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "16CAEAF66D57A0D1D2087FEF6A97EFA62DE8DA69AFA5B908F40DB35AFC4342DA",
+        "relative":  "android\\gradle\\wrapper\\gradle-wrapper.jar",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\gradle\\wrapper\\gradle-wrapper.jar"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "594A00250EF7A36609A01F3263BF5ED63963AFAF9CA9F82F2CD1DE0F6F056383",
+        "relative":  "android\\gradle\\wrapper\\gradle-wrapper.properties",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\android\\gradle\\wrapper\\gradle-wrapper.properties"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "995C7199CAB65954F545996326755DAEE7B63CC6B42B06C13DA1F9502AB08A99",
+        "relative":  "assets\\fonts\\OFL.txt",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\assets\\fonts\\OFL.txt"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "89B3FB38AA0D275D7A731D0D817A4F1622B316B4D7FBDEDCF02EE9099FF68BC8",
+        "relative":  "assets\\fonts\\PlusJakartaSans.ttf",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\assets\\fonts\\PlusJakartaSans.ttf"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "E85B4DB8BA6ED14708E5F7D3C60336E5A3067CE11329B84AA8BA5D98603EE253",
+        "relative":  "ios\\.gitignore",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\.gitignore"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "E51CFA76FCA1AE586244B43BF97423577315D2906394C1E7768EF43B8D23E161",
+        "relative":  "ios\\Flutter\\AppFrameworkInfo.plist",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\AppFrameworkInfo.plist"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C0D1DA54718E75F2028962B689258ECC741ABF7CDAED50483AA5225264D0A7D7",
+        "relative":  "ios\\Flutter\\Debug.xcconfig",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\Debug.xcconfig"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "826D9ADB35E3A8DA405B756110146F8C179512FBC1F3B7036B3BB084F91AD97F",
+        "relative":  "ios\\Flutter\\flutter_export_environment.sh",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\flutter_export_environment.sh"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "7D1640279C8D8A6E23236238BEC5DBDA83248B49A4B1AC54DA4DA11513D3FE96",
+        "relative":  "ios\\Flutter\\Generated.xcconfig",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\Generated.xcconfig"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C0D1DA54718E75F2028962B689258ECC741ABF7CDAED50483AA5225264D0A7D7",
+        "relative":  "ios\\Flutter\\Release.xcconfig",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\Release.xcconfig"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "relative":  "ios\\Flutter\\ephemeral\\.swift_pm.lock",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\ephemeral\\.swift_pm.lock"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "EAEC5F5268E3A5024D9703046F4097701107D574D0DE7A2D8D81F0BF4644A333",
+        "relative":  "ios\\Flutter\\ephemeral\\flutter_lldbinit",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\ephemeral\\flutter_lldbinit"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "05CFE3977FDEE593EFAD2049A4F62D374E55C69CEDC8AABEEE5566B37ACB8384",
+        "relative":  "ios\\Flutter\\ephemeral\\flutter_lldb_helper.py",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\ephemeral\\flutter_lldb_helper.py"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "E72A8835C8131D1495A07AF40CC6BA47E686EB5A8DEF799A507DD58E0EAA562A",
+        "relative":  "ios\\Flutter\\ephemeral\\flutter_native_integration.env",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\ephemeral\\flutter_native_integration.env"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C59649B8EB9E7F78FBF8DC7F9254012FAD2CBB594B19CC83640A5AFC59E40E20",
+        "relative":  "ios\\Flutter\\ephemeral\\Packages\\FlutterGeneratedPluginSwiftPackage\\Package.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\ephemeral\\Packages\\FlutterGeneratedPluginSwiftPackage\\Package.swift"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "8518FB048C29925943B03DE7F45C9D5232C0B46D2CC97D36F83FF501E1FFB9BA",
+        "relative":  "ios\\Flutter\\ephemeral\\Packages\\FlutterGeneratedPluginSwiftPackage\\Sources\\FlutterGeneratedPluginSwiftPackage\\FlutterGeneratedPluginSwiftPackage.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Flutter\\ephemeral\\Packages\\FlutterGeneratedPluginSwiftPackage\\Sources\\FlutterGeneratedPluginSwiftPackage\\FlutterGeneratedPluginSwiftPackage.swift"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "A738D2830DD03AFA97CC130454C1B0CBF2E8B4D6CCDC8F4246EAF31B6F1EEDB0",
+        "relative":  "ios\\Runner\\AppDelegate.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\AppDelegate.swift"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "A5F88CC6415D2E639D2CB549348B84E02A7FDD0261603B0063ABEF6FA11F075A",
+        "relative":  "ios\\Runner\\GeneratedPluginRegistrant.h",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\GeneratedPluginRegistrant.h"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "2DAFA0A1F55AD6F933081AEB8BB282756C5FDBEA704C66AE17A60DED7690CDA5",
+        "relative":  "ios\\Runner\\GeneratedPluginRegistrant.m",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\GeneratedPluginRegistrant.m"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "611E1550F15B4F259F512F0C4D3C2FB83B73F41756FC4DA1DCE37146F5F7380A",
+        "relative":  "ios\\Runner\\Info.plist",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Info.plist"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "EFE657D8B27F7F8595A0D416BFFB33FE7D93BD2869D81F7353B556C439D7A1A7",
+        "relative":  "ios\\Runner\\Runner-Bridging-Header.h",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Runner-Bridging-Header.h"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "EDCE811C671CA0A6CCB14753E14E16DEB0D89A0ADF4F1B685E362D87D8F4C366",
+        "relative":  "ios\\Runner\\SceneDelegate.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\SceneDelegate.swift"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "5F8B941B774BDE4496D73347C1F79CBDD786BB76FBDAB9ED1F3F0CB78A0FB0D3",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Contents.json",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Contents.json"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "7770183009E914112DE7D8EF1D235A6A30C5834424858E0D2F8253F6B8D31926",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-1024x1024@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-1024x1024@1x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "CAB10A0D391EC5BC09EF50CE49E8AD401CEE7EF03707EC0923A222C5C2B3D212",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@1x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "B9AD02CF6576A04D1B6806AC02A2431481B448DD0C2E505CE25842D1F7C4730B",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@2x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C6E6D3B215AE744A9C391F4C4D44157EFF5E739D6AD6C39F9BFA5DF66DDDD267",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@3x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "5DEE24DC104AC76DC162E42AE0BEB163D426BF365562EE28BA7B3AD368559A60",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@1x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "A9B21EB6F4271385655A8771F76E29EEF8C1107D7879CBCFC567E6619D1F716A",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@2x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "E677D701FFE4AF7BC2935098D6B3984CC9AB7ACE573E6900955A5535B12410CF",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@3x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "B9AD02CF6576A04D1B6806AC02A2431481B448DD0C2E505CE25842D1F7C4730B",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@1x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "7C61C42FC7B657D9CF314D32A4EC458F0647C3AAF360BE1B9377857266EC2499",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@2x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "19BE171481DC71A0B2803EBCD01DD8B0C5FD5778DEE34C0A3CABC948C225F24E",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@3x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "19BE171481DC71A0B2803EBCD01DD8B0C5FD5778DEE34C0A3CABC948C225F24E",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@2x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "4209A49E44A92EC40A327D3455EB1B1C153EE83D75DE1C2BE0A12AB18B2FF9DE",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@3x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "836C918CB613249EBA0483A6B02FA3DF3C1C0A89A315EE4D3B88509B83C7AB73",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@1x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "41C7D42F6E61F8FE7F30B1FFA2256AECBC9682BE06D18C4A3062043E1A2E547C",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@2x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "5D7E5BDF01B93802BC973345B3A78C038907147625035952A08A115A563B7F81",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-83.5x83.5@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-83.5x83.5@2x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "FBD112A9F3B541A1D811F71AC8E4FE68B6176687D973A5F4D99B7AA4A722E94E",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\Contents.json",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\Contents.json"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "93AE7D494FAD0FB30CBF3AE746A39C4BC7A0F8BBF87FBB587A3F3C01F3C5CE20",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "93AE7D494FAD0FB30CBF3AE746A39C4BC7A0F8BBF87FBB587A3F3C01F3C5CE20",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@2x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "93AE7D494FAD0FB30CBF3AE746A39C4BC7A0F8BBF87FBB587A3F3C01F3C5CE20",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@3x.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "853AC958E2416FE2540F6F61165283A3618B71A7BA5F85F65AC41C2158DFCD21",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\README.md",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\README.md"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "BC3644FBB251FF1E18DE25A4932C927850AE1A025BE3DD1447940429633FE4B2",
+        "relative":  "ios\\Runner\\Base.lproj\\LaunchScreen.storyboard",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Base.lproj\\LaunchScreen.storyboard"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "DCEA4686C02065E56217FD19FCFB73D7509B41872E7486126149D47A18559363",
+        "relative":  "ios\\Runner\\Base.lproj\\Main.storyboard",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner\\Base.lproj\\Main.storyboard"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C90F2D2E13E88B31F5CAF1AE029A9226E65F1174C0DC993EB2BE4AE78098A4F5",
+        "relative":  "ios\\Runner.xcodeproj\\project.pbxproj",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner.xcodeproj\\project.pbxproj"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "AC28B35C2B940210BEC0FFF8E424B07FD0EFE9112AB178A10533583F251A386C",
+        "relative":  "ios\\Runner.xcodeproj\\project.xcworkspace\\contents.xcworkspacedata",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner.xcodeproj\\project.xcworkspace\\contents.xcworkspacedata"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "D557C2C32FC6258EC28981FA45DC847B76C9968BEB90A2E26D13EF9C4EA45C30",
+        "relative":  "ios\\Runner.xcodeproj\\project.xcworkspace\\xcshareddata\\IDEWorkspaceChecks.plist",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner.xcodeproj\\project.xcworkspace\\xcshareddata\\IDEWorkspaceChecks.plist"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "DD64C0308AB2971C456871B990B24A008BDC3ECE09833E8DBE9675E33A496E74",
+        "relative":  "ios\\Runner.xcodeproj\\project.xcworkspace\\xcshareddata\\WorkspaceSettings.xcsettings",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner.xcodeproj\\project.xcworkspace\\xcshareddata\\WorkspaceSettings.xcsettings"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "A46C0D064503DB8BF9F452B492C61FDF76F9FEBB8894005FE30B2FACEC21E550",
+        "relative":  "ios\\Runner.xcodeproj\\xcshareddata\\xcschemes\\Runner.xcscheme",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner.xcodeproj\\xcshareddata\\xcschemes\\Runner.xcscheme"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "706A4C812F2A1E220E6785C27580020D58048E2AE4D30D1280F3C43344CE6B38",
+        "relative":  "ios\\Runner.xcworkspace\\contents.xcworkspacedata",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner.xcworkspace\\contents.xcworkspacedata"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "D557C2C32FC6258EC28981FA45DC847B76C9968BEB90A2E26D13EF9C4EA45C30",
+        "relative":  "ios\\Runner.xcworkspace\\xcshareddata\\IDEWorkspaceChecks.plist",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner.xcworkspace\\xcshareddata\\IDEWorkspaceChecks.plist"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "DD64C0308AB2971C456871B990B24A008BDC3ECE09833E8DBE9675E33A496E74",
+        "relative":  "ios\\Runner.xcworkspace\\xcshareddata\\WorkspaceSettings.xcsettings",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\Runner.xcworkspace\\xcshareddata\\WorkspaceSettings.xcsettings"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C0E04141287EB7F9C9F3D31CF5BE8CB626A9EA71351206C9121578E8B8F480C3",
+        "relative":  "ios\\RunnerTests\\RunnerTests.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\ios\\RunnerTests\\RunnerTests.swift"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "88933B70FC427E365B9F2E132970CD6A4DC45FB6346BAF4DAC2CD8B9A095668D",
+        "relative":  "lib\\app.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\app.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "6394BBB4A0578848580A1946D96C2FBFBA7A5C4FD0647C62E25662287A3FEB08",
+        "relative":  "lib\\main.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\main.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "77F860AA61FD6560178C079F85465FF3B5FE3AB0A68D72CC111DF238A6BB9930",
+        "relative":  "lib\\core\\cache\\doctor_cache_store.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\cache\\doctor_cache_store.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "92B312E61D958F247B2C1341A895908E36749B40067E6973D02BC92D0007ABA4",
+        "relative":  "lib\\core\\network\\api_client.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\api_client.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "16954ECBC85A90C4519FDF02A08FF2CE19EAA2784C3149B6B2F8C541D2F9587D",
+        "relative":  "lib\\core\\network\\client_error_reporter.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\client_error_reporter.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C3C9FB6D1BAF7346DADD0C66A483998209BB1B1DAFCCAE09D56057D3137BF5F9",
+        "relative":  "lib\\core\\network\\connectivity_service.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\connectivity_service.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "BA8A58E2E3FF9E153B80F9072C769AC1A0E0B7815A7C3BB70B850D53147B8032",
+        "relative":  "lib\\core\\network\\device_proof.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\device_proof.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "811ECE105F481C5B24EE308E12A8ACA5070E6A46946DC47F826EC1E945C13E11",
+        "relative":  "lib\\core\\network\\screen_refresh.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\screen_refresh.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "96121ECFC5D2029A77593F47A043C8E7774A73D8E5BE912B75612E862940F6D9",
+        "relative":  "lib\\core\\network\\startup_incident_queue.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\startup_incident_queue.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "3052719DA9F06DE1764B272DB766071F78DED7FDC0A51B87214A8FDBA29EB2E5",
+        "relative":  "lib\\core\\notifications\\background_sync_worker.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\notifications\\background_sync_worker.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "7BD73FFAA46137B23619A4BE9EB462134149A7D443CB03D190565B6698A58442",
+        "relative":  "lib\\core\\notifications\\local_notification_service.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\notifications\\local_notification_service.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "89A291480A0422922D96A3069FB09C39688D17497491C461B5ECF5C37E1B6CA4",
+        "relative":  "lib\\core\\notifications\\notification_ids.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\notifications\\notification_ids.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "38CA5DD1075A3DE875E48EC7E6498384BCC92822B7234F4E78595A5B9F56F533",
+        "relative":  "lib\\core\\notifications\\schedule_notification_reconciler.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\notifications\\schedule_notification_reconciler.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "F8850E76DEE4FB3E48BF39A02C5AA6C310E0918FEEBDEDFA6ADD79A2530A5246",
+        "relative":  "lib\\core\\theme\\tokens.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\theme\\tokens.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "627AB7A1DE91D6E19A897C3806FECBF3705FF9F84BCA43162A02F8591C39767D",
+        "relative":  "lib\\core\\time\\kenya_time.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\time\\kenya_time.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "943DC19A36EEF3E349A21231BD4E2B58A3147325FD3109E4FE17ADD819EDCE7C",
+        "relative":  "lib\\core\\validation\\kenya_phone.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\validation\\kenya_phone.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "95B88C113B6417D65576A6DF3936A76A4EF8AB596CC9C701EBE1248A1B819C7A",
+        "relative":  "lib\\core\\widgets\\doctor_widgets.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\widgets\\doctor_widgets.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "D110BF19E71E0F11A11052C0C2D6CBC1E3F047B410F6A85064D3F06461B85E4B",
+        "relative":  "lib\\core\\widgets\\startup_error_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\widgets\\startup_error_page.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "2141116283B3328BB88E06C077E325A4BEFE1CBAAF04A87D165242407CD080ED",
+        "relative":  "lib\\features\\auth\\auth_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\auth\\auth_cubit.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "04A225B71AB1A9416F1A7C84AF6E0B535FF934C5CEA2F78DDC97BF341627C3F4",
+        "relative":  "lib\\features\\auth\\legal_consent_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\auth\\legal_consent_page.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "A3F8C93512D5900E2ED77E6CE5DD2D08768FABF9A259E0E32B136623A411DF55",
+        "relative":  "lib\\features\\doctor\\agora_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\doctor\\agora_page.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "1226D3899250CC90DBF5BB40B539C5FE2B43A68EA46D61ADABC2A6402B74E8B3",
+        "relative":  "lib\\features\\doctor\\articles_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\doctor\\articles_page.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "45B9D39F1C0AFA289A444483FC582D90145A8F97AB788F947AFC40C08B22395E",
+        "relative":  "lib\\features\\doctor\\articles_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\doctor\\articles_repository.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "19BD42857FC63E6D5C2E3D6963C2F2065E3F01F3F117E0EA5A7939D85A867845",
+        "relative":  "lib\\features\\doctor\\clinical_image_viewer.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\doctor\\clinical_image_viewer.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "580A4EC5BCFA0048838C137210B5A98C9F8FF3F5467AC9BA910784A2D44B7D90",
+        "relative":  "lib\\features\\doctor\\clinical_message_bubble.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\doctor\\clinical_message_bubble.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "1C4F89FA4EE4C6EB6480C46CB73D7CEB827422B9C54BC53EA9688E113524DBBF",
+        "relative":  "lib\\features\\doctor\\doctor_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\doctor\\doctor_cubit.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "559D7B7B318C2453875573C3DABFB36FAEF6E4762EAFB738363187C811CAACC6",
+        "relative":  "lib\\features\\doctor\\doctor_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\doctor\\doctor_models.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "41D6F35042B6A164431D487FB3AB2E2BE404FB188138C9F686085AE324C49794",
+        "relative":  "lib\\features\\doctor\\doctor_pages.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\doctor\\doctor_pages.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "8C886ECD487B55FBB5F3CC4437802C91E1B8599A747661ABE05F8065997DAA31",
+        "relative":  "lib\\features\\doctor\\doctor_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\doctor\\doctor_repository.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "46C45073C40A7E32E4180743AF90D356104EFE8463770AA9A9D21C7A47C21423",
+        "relative":  "lib\\features\\notifications\\notification_center_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\notifications\\notification_center_page.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "B64D6D94DBFC9E57AA77CCC733836097709A79DAD69CA3C7BA82B61F43F080E3",
+        "relative":  "lib\\features\\notifications\\notification_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\notifications\\notification_cubit.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "97EB3C1D859230B1887191B917808A6C933C921EBA857050B8E046E663704598",
+        "relative":  "lib\\features\\notifications\\notification_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\notifications\\notification_models.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "986B5E48D56F963FACCC523017D1EDB8D24EEAB938B1D04A5CAC4099F17875E4",
+        "relative":  "lib\\features\\notifications\\notification_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\notifications\\notification_repository.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "80366571ABC69A258B3FA09D91FF94D9B86C6C690777B22FE340A70DE76E4623",
+        "relative":  "lib\\features\\settings\\settings_pages.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\features\\settings\\settings_pages.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "1B78E3B0FC13706D3A5FB05077BF47B4EE967EF4B3C09AAC7AF24BCA92DBA5AB",
+        "relative":  "test\\api_client_host_policy_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\api_client_host_policy_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "4CFAED5DF5D88F9F51486109349F906611106D8D98EAB2B557D3F9453C7DC738",
+        "relative":  "test\\api_traffic_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\api_traffic_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "2783CD13CBFD00F14A467C8634A2138B7966CA48C1A9FBA645EA4F6C70F529CE",
+        "relative":  "test\\articles_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\articles_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "B96894D511191C5A3C294B9B93F88A64DB3B3EFCCD2EE15538B7682A85933C0C",
+        "relative":  "test\\auth_security_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\auth_security_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "D7B4307574A9190D21B87FCE10BC4E71FDC66480D9B8BFF6D47B1DD40B5933AC",
+        "relative":  "test\\auth_state_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\auth_state_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "F68873DB51B58A24740C3E352C8FE0105EEE3BA417AED4F15D492F2DB853B7FE",
+        "relative":  "test\\background_sync_worker_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\background_sync_worker_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "86BBBCB5937E376EA0C63321E5761E0A72639B0421375E5F1E974749F4DC49BF",
+        "relative":  "test\\cache_store_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\cache_store_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "B5D379D84F53D75708A9EAE917A05A5990F49A55142E60FF26079CFC3D17453A",
+        "relative":  "test\\client_error_reporter_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\client_error_reporter_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "34A1C0B739C300E49822F4E7636EFEA498A20C421F7746BDC983D0DD0DF1B257",
+        "relative":  "test\\consultation_actions_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\consultation_actions_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "FCD21741733B4302053ACCA2DC7A44F8FB0F58F8605B6DAD1A3ABC9D48BBF7AC",
+        "relative":  "test\\consultation_completion_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\consultation_completion_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "5CF3644E30B26AFCC1DC76FA80D98614348861196B5262E0AC562CA396EE4613",
+        "relative":  "test\\consultation_pagination_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\consultation_pagination_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "F5A0A569732534B1170036E5FD2424322E5544C591095FA1DFF93CE8B627DB65",
+        "relative":  "test\\doctor_client_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_client_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "D1D63BC85BF52C98BFEAB2EDBC96DB8CA353943046CA29DBAD35AEB7F9CEE7EA",
+        "relative":  "test\\doctor_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_cubit_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "5A31B98342E5077814AC9F4197A4B60023EE81B1E13B7CF4AC6088862461389F",
+        "relative":  "test\\doctor_models_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_models_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "A13D56DECB14FC63E22734ECD8B4F7656331EE3B6BF325915D344AD1DC7D17A6",
+        "relative":  "test\\doctor_navigation_safe_area_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "38CED6F2239F5D71F995B740F3C9B75B193974D20C7A6B3458F6F32F7828FF15",
+        "relative":  "test\\doctor_rx_cleanup_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_rx_cleanup_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "695293C104064C72431A823E88F5D0B75B26170616F79836ED831B61FEF66094",
+        "relative":  "test\\doctor_widgets_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_widgets_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "2B5CE60CECCD42D49D334CEE481F2AB418AB1FF5DFA92DAB6DF70EAE9228D85D",
+        "relative":  "test\\kenya_phone_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\kenya_phone_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "79BA0ABBB5840FF08EF32B59245C0AD0281BBF065466EB13B0152391095575BC",
+        "relative":  "test\\kenya_time_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\kenya_time_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "30108FF4D971D72A39CE0762085C9D0F085F04EBA2292636856FEDE343F099A4",
+        "relative":  "test\\lifecycle_chat_pagination_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\lifecycle_chat_pagination_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "94873CA894848699893F4F8222B43D24A07EDAF37466BD5DBC7BE89C0AEB5AA7",
+        "relative":  "test\\notification_center_page_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\notification_center_page_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "7AE468312BB94AC5A07CF18F782D858D77282536915524835318BF412238B47B",
+        "relative":  "test\\notification_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\notification_cubit_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "330E8A74165FE4818FEC4A058F97B26FE2F63A41A446147372E06768AE3591C6",
+        "relative":  "test\\notification_platform_delivery_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\notification_platform_delivery_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "71875ADACE72F83C9D9A8D2297C04988823A5914865B873FB48C1E6536CB8186",
+        "relative":  "test\\notification_repository_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\notification_repository_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "623439441007C1F68F97A2C0E7AC67F6FE93D401F73CA91C89570D8EF4C111C7",
+        "relative":  "test\\notification_traffic_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\notification_traffic_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C820CA60D0124693982D097D8BCA9C2F1A99BD58BE20312648C09AA767A9A108",
+        "relative":  "test\\pre_e2e_queue_chat_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\pre_e2e_queue_chat_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "17E8A7B63B474129B27029FDD8825C7AD6F1545D38CAE1EDF2E0F4D49CC2D8A7",
+        "relative":  "test\\qna_rendering_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\qna_rendering_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "6C612E5D527FD675E101118BCA8C7989FADEEB4612165F90BB0AF51A03FF20C0",
+        "relative":  "test\\queue_lifecycle_refresh_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\queue_lifecycle_refresh_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "9207A98F1FB7C2FB32CBDF72864967E5C029210E71FE674D83BDD23C1299B77D",
+        "relative":  "test\\recovery_stampede_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\recovery_stampede_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "B30D8948A83CFFAD23900237AC4755D8E0775DC4B58E274781E5C122CD8BDD10",
+        "relative":  "test\\schedule_notification_reconciler_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\schedule_notification_reconciler_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "3D2BEC98B0D57B1868B75CE0FF79CDEB38C87EB29A097AC9D6D418B06F9C8A3A",
+        "relative":  "test\\startup_incident_queue_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\startup_incident_queue_test.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "8986C14D85A7D9421F448017E9CAA53A7D08F327C2E32DB5148F420C770E4258",
+        "relative":  "test\\dev\\client_incident_live.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\dev\\client_incident_live.dart"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "F40F029599CBD0224D486903677FB4D1530CB01A8A7518F1AB08D8A3B2E8FD41",
+        "relative":  "test\\failures\\notifications-empty_isolatedDiff.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\failures\\notifications-empty_isolatedDiff.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "9796C2B08255F378D89425CFECA911C836B833B7F3E45FED3C0497C92788866E",
+        "relative":  "test\\failures\\notifications-empty_maskedDiff.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\failures\\notifications-empty_maskedDiff.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C2AD81A851A2105D5FD4B81E488FDA510E8EF06A183C696896DDCD0B23E52547",
+        "relative":  "test\\failures\\notifications-empty_masterImage.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\failures\\notifications-empty_masterImage.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "139A661B58B387F18A0B6AB5E395E4CCD3529C977581186C3FBBBFF94F345520",
+        "relative":  "test\\failures\\notifications-empty_testImage.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\failures\\notifications-empty_testImage.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "F40F029599CBD0224D486903677FB4D1530CB01A8A7518F1AB08D8A3B2E8FD41",
+        "relative":  "test\\failures\\notifications-populated_isolatedDiff.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\failures\\notifications-populated_isolatedDiff.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "9429CFEB09AC493D5A345F406F7EB963B8E2AF7C6DC08E34749892E913E6F7D0",
+        "relative":  "test\\failures\\notifications-populated_maskedDiff.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\failures\\notifications-populated_maskedDiff.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "8E32B9640BBA1B6667F4F3A752AACFE61A9F184B104B5DD4E73BFD29986373EB",
+        "relative":  "test\\failures\\notifications-populated_masterImage.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\failures\\notifications-populated_masterImage.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "9B30D124C1E5514F14B18D9B9D6819FE9100F797F51C83A6B3F424EAC73DF7FE",
+        "relative":  "test\\failures\\notifications-populated_testImage.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\failures\\notifications-populated_testImage.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "C2AD81A851A2105D5FD4B81E488FDA510E8EF06A183C696896DDCD0B23E52547",
+        "relative":  "test\\goldens\\notifications-empty.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\notifications-empty.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "A8F1C4E25D62D612BCF61A3D8E6ACACFD865CC4F197418B3FAB9015BE3098961",
+        "relative":  "test\\goldens\\notifications-error.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\notifications-error.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "20126BC7D708B92ACCD3C8D25DA8DE373E119425E1277FCC2B9E4110CB2F3848",
+        "relative":  "test\\goldens\\notifications-loading.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\notifications-loading.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "8E32B9640BBA1B6667F4F3A752AACFE61A9F184B104B5DD4E73BFD29986373EB",
+        "relative":  "test\\goldens\\notifications-populated.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\notifications-populated.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "CF9E85F025DD4A37C4C8C578F5B7B854B1C152099B523801AC25A95FC03C0A39",
+        "relative":  "test\\goldens\\qna-answered.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\qna-answered.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "2A25590D3622789CA171D4DF30EF8AD8F5BFF18CEEA52C1874F8091D8CACAD31",
+        "relative":  "test\\goldens\\qna-editor-keyboard.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\qna-editor-keyboard.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "67500D3059CEA1F71805B606391F37CA2C6938323308A030C32346B8D4F216D9",
+        "relative":  "test\\goldens\\qna-empty.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\qna-empty.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "2C94D23036CE57914E1CCCB3A444FD268D9903FE27D3BEE36064FAB907889D6C",
+        "relative":  "test\\goldens\\qna-error.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\qna-error.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "F3D99D68C18A05D48074B1D2B2FE9DE0B5819E79ACC7AD902CBBA860B65294D0",
+        "relative":  "test\\goldens\\qna-loading.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\qna-loading.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "7E6E952D9C9DEC2007E5EE0926F3BB4FCDECE95D70F107F9267F93DD08CA42FC",
+        "relative":  "test\\goldens\\qna-long-question.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\qna-long-question.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "D8AC015AA7BA1BB0FA963B2F23C5F16C6663BB1F698D9C85DD13FF0F74C151F4",
+        "relative":  "test\\goldens\\qna-offline-cache.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\qna-offline-cache.png"
+    },
+    {
+        "app":  "mobile",
+        "sha256":  "43A249240D318DBD8C82ADE1DAED0392B5FEB555D6B8A572EA3E5E31F2D22D1E",
+        "relative":  "test\\goldens\\qna-unanswered.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\goldens\\qna-unanswered.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "62E5192417FA8FADF6C72FC6A524DDD91B045436AB496017C74F948F1EFC31B3",
+        "relative":  ".gitignore",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\.gitignore"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "D96B380DDB1C9FAB8E44E0BA8BA49977F3AD9A269803D2E1B6D85C6CFAA9C14F",
+        "relative":  ".metadata",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\.metadata"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "FE78D74AFC8711C2852CF9F2F5A1E4D787567EC6A1608DB15DC81CC18105859B",
+        "relative":  "analysis_options.yaml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\analysis_options.yaml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C36FDE5FA003F24B0A20DACE16C9B9FC686D58987B85F21E1B800E8EE938A5B1",
+        "relative":  "auth_navigation_focused.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\auth_navigation_focused.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "8D25D8B2CDC448778E9547CF64F26D3E76292FE19C533690194C448E61178E45",
+        "relative":  "auth_navigation_pub_get.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\auth_navigation_pub_get.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "1A079F08524CDDA1E3EFA3549E055127E2452E91EA03CE8DC75DE0CC318E9109",
+        "relative":  "consultation_analyze.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\consultation_analyze.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A378805208BE16651630FB724A3909882D59F1832B79BDAEAE00CC9C0B5BEAF5",
+        "relative":  "consultation_flow.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\consultation_flow.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "23CD8AA691C05E456AD202CD69D48527E113DE7BCE8997A3362F4526707E8869",
+        "relative":  "consultation_focused.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\consultation_focused.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "F62F6E057ED9C9D6D83CACE33C4E4E4C9710B4070D8D56572D9168813A49A030",
+        "relative":  "consultation_release_build.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\consultation_release_build.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C3CE52CBD012E898F809811D21F21EAD3BB3AFD08B49A4EFE4DA74080248664D",
+        "relative":  "l10n.yaml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\l10n.yaml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "6C9590595C62597D3238E622E695BEF8776785458869F2154CD1901FAD91177E",
+        "relative":  "patient_auth_ui_test.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\patient_auth_ui_test.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "077E1F6FA08BDB25DD73558688D58B9E0920B71F893D17F1D09A28DD6F11C9E4",
+        "relative":  "patient_correction_tests.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\patient_correction_tests.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EAC1AA27F5529E78C13D5687F59477336546399770D55959ED87EAFA2AEDED12",
+        "relative":  "patient_test.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\patient_test.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "299380BEBD1E050D4850D5D27D8A734A419CCE83858DC7A94553AFA095E96ED2",
+        "relative":  "patient_tests_auth_revised.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\patient_tests_auth_revised.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "61F8791BEA8DE20836FC22543DB42779603AC44014B0A9605F1F9D5209CCFAAC",
+        "relative":  "patient_test_after_workmanager.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\patient_test_after_workmanager.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "8390A6650D787FBE216D19CCBD3CCE3CC769109D26DD5E98851010ACA7077F7F",
+        "relative":  "patient_test_final.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\patient_test_final.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "695939B2F8E6BCBB3DBFAF0FC97AE33AD2B4120DDD553A38175235F7412ED4EF",
+        "relative":  "patient_ui_correction_tests.log",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\patient_ui_correction_tests.log"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "DCE194FD766F7DC976DDEBCCD8F21CF0CBB16E0FD3E918E052FE213D628B6C82",
+        "relative":  "pubspec.lock",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\pubspec.lock"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "98F4F7E3844316645A716A2C69AD1470DECCEE5657AF2FA80B66A11916DF57E9",
+        "relative":  "pubspec.yaml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\pubspec.yaml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "ECF4006AC745FF3248B7791CE9FFB0F30E420DFE22A58429AEE24885D11CB746",
+        "relative":  "README.md",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\README.md"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "7FF2509EA7F02EF36B57A0B4F90E81BE60AB63BD8D64A521DBC846AD943EC9B0",
+        "relative":  ".idea\\modules.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\.idea\\modules.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5A51B5C6F5C6600657FFE1142A4604838D68311F9DCF0A4C3703B76FC6FBE0F3",
+        "relative":  ".idea\\workspace.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\.idea\\workspace.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A6EFA44DCF24C4DA1383113B7A37BF2791B70D52E5C4F4C1865EE41A1325201D",
+        "relative":  ".idea\\libraries\\Dart_SDK.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\.idea\\libraries\\Dart_SDK.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "124B21C81C4A853E4DAB5E4AA40C6502D5C09F4A9B2A6FDBA540E10F67E43738",
+        "relative":  ".idea\\libraries\\KotlinJavaRuntime.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\.idea\\libraries\\KotlinJavaRuntime.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "75188212480010C08797294663D15F00FD5CA1F474173A5D919493B17B6D9518",
+        "relative":  ".idea\\runConfigurations\\main_dart.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\.idea\\runConfigurations\\main_dart.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C9AF75DBC2C8AA867476A09426C80B178C4AEED8B9393AE48503EEDFA3273D71",
+        "relative":  "android\\.gitignore",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\.gitignore"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "7A179730814D2E1B221A4807104ABC6CCC3215FE9F2E6E5F127DBE72A56AE585",
+        "relative":  "android\\build.gradle.kts",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\build.gradle.kts"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "7714698DE712A7872E371F0DBAE626C255FC83AC1C15E52E7CD9FCAA241B5092",
+        "relative":  "android\\gradle.properties",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\gradle.properties"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EC56C02543666D92D9AC5AE7FCC48F88CE4DE0DEB8B7F9B39928CA46F68C1B2B",
+        "relative":  "android\\gradlew",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\gradlew"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C13C6E91B9A517783976DE213D46398C661EA9E17651376D7301E839EAEDCC62",
+        "relative":  "android\\gradlew.bat",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\gradlew.bat"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "092BA880C8D4A07591AAFC082F45DEEDC9AFCF60C113A4BB3D13CBE1A1FCE9DE",
+        "relative":  "android\\settings.gradle.kts",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\settings.gradle.kts"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "393FACBF51A2A162CF6BF0B533F19B7E8FC04262B07CE74649EE83163F3CFB0D",
+        "relative":  "android\\app\\build.gradle.kts",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\build.gradle.kts"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "725D76473057B2D4229C1EBB82D2471A599AEFB3AA11D0B9DC27F56E14844CB9",
+        "relative":  "android\\app\\proguard-rules.pro",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\proguard-rules.pro"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B01A4541A8144C15BC617BAB7EB267C99FA1476368FBBDA5A12CDBF4E316A34C",
+        "relative":  "android\\app\\src\\debug\\AndroidManifest.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\debug\\AndroidManifest.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "83516F703EAC4CA4AD63BB9CF5013EB8820B2CCFE727D09907C6188C25790350",
+        "relative":  "android\\app\\src\\debug\\res\\xml\\network_security_config.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\debug\\res\\xml\\network_security_config.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "D1A6FBC80D0ABD00959F9039CB9268AF3CE54E1001B8A7319F42F54DF7C150FE",
+        "relative":  "android\\app\\src\\main\\AndroidManifest.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\AndroidManifest.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B8742D67A4A271E38481126074D2BF35F10D9D1B2AD882A5B476F7A9115F879A",
+        "relative":  "android\\app\\src\\main\\java\\io\\flutter\\plugins\\GeneratedPluginRegistrant.java",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\java\\io\\flutter\\plugins\\GeneratedPluginRegistrant.java"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "1D4916458A6CE61B60187146B37DE23EAFDFA33780BD229D0CB1456F979BBE5B",
+        "relative":  "android\\app\\src\\main\\kotlin\\com\\hellodoctor\\patient\\DeviceProof.kt",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\kotlin\\com\\hellodoctor\\patient\\DeviceProof.kt"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B077DB886AAADB6AFED9DB93DD1F15DCD196D3B30ED3C77BB29997535C469D3E",
+        "relative":  "android\\app\\src\\main\\kotlin\\com\\hellodoctor\\patient\\MainActivity.kt",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\kotlin\\com\\hellodoctor\\patient\\MainActivity.kt"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "2DF60E2CFBEE873CE2858088CF003E6B93498F2F568476DA437610467EA1A9D7",
+        "relative":  "android\\app\\src\\main\\res\\drawable\\launch_background.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\drawable\\launch_background.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "DCA312EC77DE83E43EF70A825C299B51451247286C29167D62F19165750B8793",
+        "relative":  "android\\app\\src\\main\\res\\drawable-v21\\launch_background.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\drawable-v21\\launch_background.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "6A7C8F0D703E3682108F9662F813302236240D3F8F638BB391E32BFB96055FEF",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\mipmap-hdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C7C0C0189145E4E32A401C61C9BDC615754B0264E7AFAE24E834BB81049EAF81",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\mipmap-mdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "E14AA40904929BF313FDED22CF7E7FFCBF1D1AAC4263B5EF1BE8BFCE650397AA",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\mipmap-xhdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "4D470BF22D5C17D84EDC5F82516D1BA8A1C09559CD761CEFB792F86D9F52B540",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\mipmap-xxhdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "3C34E1F298D0C9EA3455D46DB6B7759C8211A49E9EC6E44B635FC5C87DFB4180",
+        "relative":  "android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\mipmap-xxxhdpi\\ic_launcher.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "CCA15A99B59380A548BF6A890F7CA5380EE509B1F9BBB2F5F9EC3589FA25C2F7",
+        "relative":  "android\\app\\src\\main\\res\\values\\styles.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\values\\styles.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EA763597DC1A84C8034251CAEE98D7753E0FBF57340FFC94677427DE4B537516",
+        "relative":  "android\\app\\src\\main\\res\\values-night\\styles.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\values-night\\styles.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EDA9DDDCE1E895DE1EFD716FE75E244187BF8F91A3BB7444C6EA1731E51C74A8",
+        "relative":  "android\\app\\src\\main\\res\\xml\\data_extraction_rules.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\xml\\data_extraction_rules.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "0FB95955A47F7CA325EA003062EEA27C7E22135BF6CE6A5C3778D789347071BD",
+        "relative":  "android\\app\\src\\main\\res\\xml\\network_security_config.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\main\\res\\xml\\network_security_config.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B01A4541A8144C15BC617BAB7EB267C99FA1476368FBBDA5A12CDBF4E316A34C",
+        "relative":  "android\\app\\src\\profile\\AndroidManifest.xml",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\app\\src\\profile\\AndroidManifest.xml"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "16CAEAF66D57A0D1D2087FEF6A97EFA62DE8DA69AFA5B908F40DB35AFC4342DA",
+        "relative":  "android\\gradle\\wrapper\\gradle-wrapper.jar",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\gradle\\wrapper\\gradle-wrapper.jar"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "594A00250EF7A36609A01F3263BF5ED63963AFAF9CA9F82F2CD1DE0F6F056383",
+        "relative":  "android\\gradle\\wrapper\\gradle-wrapper.properties",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\android\\gradle\\wrapper\\gradle-wrapper.properties"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "995C7199CAB65954F545996326755DAEE7B63CC6B42B06C13DA1F9502AB08A99",
+        "relative":  "assets\\fonts\\OFL.txt",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\assets\\fonts\\OFL.txt"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "89B3FB38AA0D275D7A731D0D817A4F1622B316B4D7FBDEDCF02EE9099FF68BC8",
+        "relative":  "assets\\fonts\\PlusJakartaSans.ttf",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\assets\\fonts\\PlusJakartaSans.ttf"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "E85B4DB8BA6ED14708E5F7D3C60336E5A3067CE11329B84AA8BA5D98603EE253",
+        "relative":  "ios\\.gitignore",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\.gitignore"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "E51CFA76FCA1AE586244B43BF97423577315D2906394C1E7768EF43B8D23E161",
+        "relative":  "ios\\Flutter\\AppFrameworkInfo.plist",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\AppFrameworkInfo.plist"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C0D1DA54718E75F2028962B689258ECC741ABF7CDAED50483AA5225264D0A7D7",
+        "relative":  "ios\\Flutter\\Debug.xcconfig",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\Debug.xcconfig"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5FEAF9E433D6EEF815417BEA99A6D674FB113B2260840DFB63C29260BDEC2CFD",
+        "relative":  "ios\\Flutter\\flutter_export_environment.sh",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\flutter_export_environment.sh"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "D54050E523CDC373EE294FB0B6308DDB94EC28097E418CAB90BD28E3419AB81C",
+        "relative":  "ios\\Flutter\\Generated.xcconfig",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\Generated.xcconfig"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C0D1DA54718E75F2028962B689258ECC741ABF7CDAED50483AA5225264D0A7D7",
+        "relative":  "ios\\Flutter\\Release.xcconfig",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\Release.xcconfig"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "relative":  "ios\\Flutter\\ephemeral\\.swift_pm.lock",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\ephemeral\\.swift_pm.lock"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EAEC5F5268E3A5024D9703046F4097701107D574D0DE7A2D8D81F0BF4644A333",
+        "relative":  "ios\\Flutter\\ephemeral\\flutter_lldbinit",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\ephemeral\\flutter_lldbinit"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "05CFE3977FDEE593EFAD2049A4F62D374E55C69CEDC8AABEEE5566B37ACB8384",
+        "relative":  "ios\\Flutter\\ephemeral\\flutter_lldb_helper.py",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\ephemeral\\flutter_lldb_helper.py"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "449BD320C1C1F3B0C02246F9992143FC36D250B8021BC724BF1C37D631475B41",
+        "relative":  "ios\\Flutter\\ephemeral\\flutter_native_integration.env",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\ephemeral\\flutter_native_integration.env"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C59649B8EB9E7F78FBF8DC7F9254012FAD2CBB594B19CC83640A5AFC59E40E20",
+        "relative":  "ios\\Flutter\\ephemeral\\Packages\\FlutterGeneratedPluginSwiftPackage\\Package.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\ephemeral\\Packages\\FlutterGeneratedPluginSwiftPackage\\Package.swift"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "8518FB048C29925943B03DE7F45C9D5232C0B46D2CC97D36F83FF501E1FFB9BA",
+        "relative":  "ios\\Flutter\\ephemeral\\Packages\\FlutterGeneratedPluginSwiftPackage\\Sources\\FlutterGeneratedPluginSwiftPackage\\FlutterGeneratedPluginSwiftPackage.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Flutter\\ephemeral\\Packages\\FlutterGeneratedPluginSwiftPackage\\Sources\\FlutterGeneratedPluginSwiftPackage\\FlutterGeneratedPluginSwiftPackage.swift"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "54A5E98D6C3E8A79413AD50607B83AAC8DED8828BC913EDA1FE86BB33A66CD5D",
+        "relative":  "ios\\Runner\\AppDelegate.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\AppDelegate.swift"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A5F88CC6415D2E639D2CB549348B84E02A7FDD0261603B0063ABEF6FA11F075A",
+        "relative":  "ios\\Runner\\GeneratedPluginRegistrant.h",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\GeneratedPluginRegistrant.h"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EF0DD8B8BA5AFE0560EF73B158FF1DEE60D550932816E36E1BCDE0B455C472B3",
+        "relative":  "ios\\Runner\\GeneratedPluginRegistrant.m",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\GeneratedPluginRegistrant.m"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "7BD3BE8EB2307C47C52DDDC373AB87E536D5D884EC26AF0BFD84EA3C26ADB450",
+        "relative":  "ios\\Runner\\Info.plist",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Info.plist"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EFE657D8B27F7F8595A0D416BFFB33FE7D93BD2869D81F7353B556C439D7A1A7",
+        "relative":  "ios\\Runner\\Runner-Bridging-Header.h",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Runner-Bridging-Header.h"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EDCE811C671CA0A6CCB14753E14E16DEB0D89A0ADF4F1B685E362D87D8F4C366",
+        "relative":  "ios\\Runner\\SceneDelegate.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\SceneDelegate.swift"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5F8B941B774BDE4496D73347C1F79CBDD786BB76FBDAB9ED1F3F0CB78A0FB0D3",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Contents.json",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Contents.json"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "7770183009E914112DE7D8EF1D235A6A30C5834424858E0D2F8253F6B8D31926",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-1024x1024@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-1024x1024@1x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "CAB10A0D391EC5BC09EF50CE49E8AD401CEE7EF03707EC0923A222C5C2B3D212",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@1x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B9AD02CF6576A04D1B6806AC02A2431481B448DD0C2E505CE25842D1F7C4730B",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@2x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C6E6D3B215AE744A9C391F4C4D44157EFF5E739D6AD6C39F9BFA5DF66DDDD267",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-20x20@3x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5DEE24DC104AC76DC162E42AE0BEB163D426BF365562EE28BA7B3AD368559A60",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@1x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A9B21EB6F4271385655A8771F76E29EEF8C1107D7879CBCFC567E6619D1F716A",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@2x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "E677D701FFE4AF7BC2935098D6B3984CC9AB7ACE573E6900955A5535B12410CF",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-29x29@3x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B9AD02CF6576A04D1B6806AC02A2431481B448DD0C2E505CE25842D1F7C4730B",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@1x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "7C61C42FC7B657D9CF314D32A4EC458F0647C3AAF360BE1B9377857266EC2499",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@2x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "19BE171481DC71A0B2803EBCD01DD8B0C5FD5778DEE34C0A3CABC948C225F24E",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-40x40@3x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "19BE171481DC71A0B2803EBCD01DD8B0C5FD5778DEE34C0A3CABC948C225F24E",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@2x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "4209A49E44A92EC40A327D3455EB1B1C153EE83D75DE1C2BE0A12AB18B2FF9DE",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-60x60@3x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "836C918CB613249EBA0483A6B02FA3DF3C1C0A89A315EE4D3B88509B83C7AB73",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@1x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@1x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "41C7D42F6E61F8FE7F30B1FFA2256AECBC9682BE06D18C4A3062043E1A2E547C",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-76x76@2x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5D7E5BDF01B93802BC973345B3A78C038907147625035952A08A115A563B7F81",
+        "relative":  "ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-83.5x83.5@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\AppIcon.appiconset\\Icon-App-83.5x83.5@2x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "FBD112A9F3B541A1D811F71AC8E4FE68B6176687D973A5F4D99B7AA4A722E94E",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\Contents.json",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\Contents.json"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "93AE7D494FAD0FB30CBF3AE746A39C4BC7A0F8BBF87FBB587A3F3C01F3C5CE20",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "93AE7D494FAD0FB30CBF3AE746A39C4BC7A0F8BBF87FBB587A3F3C01F3C5CE20",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@2x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@2x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "93AE7D494FAD0FB30CBF3AE746A39C4BC7A0F8BBF87FBB587A3F3C01F3C5CE20",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@3x.png",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\LaunchImage@3x.png"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "853AC958E2416FE2540F6F61165283A3618B71A7BA5F85F65AC41C2158DFCD21",
+        "relative":  "ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\README.md",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Assets.xcassets\\LaunchImage.imageset\\README.md"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "BC3644FBB251FF1E18DE25A4932C927850AE1A025BE3DD1447940429633FE4B2",
+        "relative":  "ios\\Runner\\Base.lproj\\LaunchScreen.storyboard",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Base.lproj\\LaunchScreen.storyboard"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "DCEA4686C02065E56217FD19FCFB73D7509B41872E7486126149D47A18559363",
+        "relative":  "ios\\Runner\\Base.lproj\\Main.storyboard",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner\\Base.lproj\\Main.storyboard"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "6C0905054931489C78D3D7B728B776365D12CF5F640FE4A39C712E073A3075E7",
+        "relative":  "ios\\Runner.xcodeproj\\project.pbxproj",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner.xcodeproj\\project.pbxproj"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "AC28B35C2B940210BEC0FFF8E424B07FD0EFE9112AB178A10533583F251A386C",
+        "relative":  "ios\\Runner.xcodeproj\\project.xcworkspace\\contents.xcworkspacedata",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner.xcodeproj\\project.xcworkspace\\contents.xcworkspacedata"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "D557C2C32FC6258EC28981FA45DC847B76C9968BEB90A2E26D13EF9C4EA45C30",
+        "relative":  "ios\\Runner.xcodeproj\\project.xcworkspace\\xcshareddata\\IDEWorkspaceChecks.plist",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner.xcodeproj\\project.xcworkspace\\xcshareddata\\IDEWorkspaceChecks.plist"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "DD64C0308AB2971C456871B990B24A008BDC3ECE09833E8DBE9675E33A496E74",
+        "relative":  "ios\\Runner.xcodeproj\\project.xcworkspace\\xcshareddata\\WorkspaceSettings.xcsettings",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner.xcodeproj\\project.xcworkspace\\xcshareddata\\WorkspaceSettings.xcsettings"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A46C0D064503DB8BF9F452B492C61FDF76F9FEBB8894005FE30B2FACEC21E550",
+        "relative":  "ios\\Runner.xcodeproj\\xcshareddata\\xcschemes\\Runner.xcscheme",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner.xcodeproj\\xcshareddata\\xcschemes\\Runner.xcscheme"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "706A4C812F2A1E220E6785C27580020D58048E2AE4D30D1280F3C43344CE6B38",
+        "relative":  "ios\\Runner.xcworkspace\\contents.xcworkspacedata",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner.xcworkspace\\contents.xcworkspacedata"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "D557C2C32FC6258EC28981FA45DC847B76C9968BEB90A2E26D13EF9C4EA45C30",
+        "relative":  "ios\\Runner.xcworkspace\\xcshareddata\\IDEWorkspaceChecks.plist",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner.xcworkspace\\xcshareddata\\IDEWorkspaceChecks.plist"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "DD64C0308AB2971C456871B990B24A008BDC3ECE09833E8DBE9675E33A496E74",
+        "relative":  "ios\\Runner.xcworkspace\\xcshareddata\\WorkspaceSettings.xcsettings",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\Runner.xcworkspace\\xcshareddata\\WorkspaceSettings.xcsettings"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C0E04141287EB7F9C9F3D31CF5BE8CB626A9EA71351206C9121578E8B8F480C3",
+        "relative":  "ios\\RunnerTests\\RunnerTests.swift",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\ios\\RunnerTests\\RunnerTests.swift"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A24CD113980B226797343F9E4D0EC7E8970634F5D21F8630BFBDB8254635BDD8",
+        "relative":  "lib\\app.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\app.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "51B25E6927C7C9F3CA76B4F8EFBEBE62BCC14AF01F3E89E5A35FB768C2223E06",
+        "relative":  "lib\\main.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\main.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "E90401620EE302D38A0EC0E819A56C2A69C3268CCFB224A549D3E19D4184E58F",
+        "relative":  "lib\\core\\cache\\patient_cache_store.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\cache\\patient_cache_store.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5098EEED9B651FCB2146258A28A0B09E91379773A75378D2630296454D2F5559",
+        "relative":  "lib\\core\\config\\emergency_contact.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\config\\emergency_contact.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "D4440CAFED7C41465CBBA2A2CEE7AAAC1787444015FF136B061C318A3EE8B262",
+        "relative":  "lib\\core\\l10n\\kenya_time.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\l10n\\kenya_time.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "2BC21C723D2EC563FC2CAF23A255BB89566C01693BF318FC2A135AD079C82820",
+        "relative":  "lib\\core\\l10n\\locale_controller.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\l10n\\locale_controller.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "BCC144FCDF7ECA4C0884EE06EFA5C8702533DE0AD61B2B8B473407D8A5CCE919",
+        "relative":  "lib\\core\\l10n\\patient_display.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\l10n\\patient_display.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "518D97B6A78E9D3503CF2C0C3DE57BF16E6DD8D8B161C8A11E216F7CCB79E466",
+        "relative":  "lib\\core\\l10n\\patient_labels.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\l10n\\patient_labels.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5212ECD0B190B0B8E585D9AE622D02B58140DBB67CDE43BF58A6238BCCF67218",
+        "relative":  "lib\\core\\network\\api_client.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\api_client.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "82BB1DF1A36D0A529D64FC8FF553923069BEEFFA9460AC7CF1FAED172D32E046",
+        "relative":  "lib\\core\\network\\availability_refresh.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\availability_refresh.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "428C1BFB0401704430E5A366CA2643D9EBCF00615C93C5F155939FCE2084DC0D",
+        "relative":  "lib\\core\\network\\client_error_reporter.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\client_error_reporter.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C3C9FB6D1BAF7346DADD0C66A483998209BB1B1DAFCCAE09D56057D3137BF5F9",
+        "relative":  "lib\\core\\network\\connectivity_service.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\connectivity_service.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "BA8A58E2E3FF9E153B80F9072C769AC1A0E0B7815A7C3BB70B850D53147B8032",
+        "relative":  "lib\\core\\network\\device_proof.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\device_proof.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "811ECE105F481C5B24EE308E12A8ACA5070E6A46946DC47F826EC1E945C13E11",
+        "relative":  "lib\\core\\network\\screen_refresh.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\screen_refresh.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "D199CB82670937FF09A80C12F5169CF3B869E0BFE50CA8E9948C215E78188038",
+        "relative":  "lib\\core\\network\\startup_incident_queue.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\startup_incident_queue.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "2FFD7F307A80DE37DA4293EA580137667467450D9F315375CB1E8B99B39E94E9",
+        "relative":  "lib\\core\\notifications\\local_notification_service.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\notifications\\local_notification_service.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "22CD9E818BBAE076A139AB18722CB1686BFD8DD9F65E576E7FFB2367AE52BB7A",
+        "relative":  "lib\\core\\notifications\\notification_ids.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\notifications\\notification_ids.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "05427742F3CCA9D8A31F372F54D392E79F266DCE52DE2B514EE3A069421E98F1",
+        "relative":  "lib\\core\\theme\\tokens.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\theme\\tokens.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "943DC19A36EEF3E349A21231BD4E2B58A3147325FD3109E4FE17ADD819EDCE7C",
+        "relative":  "lib\\core\\validation\\kenya_phone.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\validation\\kenya_phone.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "95D89B61F0EF6CBD254968E4540F69A532F09210C3E6C7CB0746383DDDB2C8E3",
+        "relative":  "lib\\core\\validation\\otp_validation.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\validation\\otp_validation.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "6643E9A85D88C33EC5B1172FBE6F9D9060B92B90D9153F8BEFE6915A6EDDD35B",
+        "relative":  "lib\\core\\validation\\upload_validation.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\validation\\upload_validation.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B7872BEBE03FC62BEFF35FAB0814FF15F82F16C9D85A8227A5CCA04E61CCA64F",
+        "relative":  "lib\\core\\widgets\\patient_widgets.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\widgets\\patient_widgets.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "7A6C7639E030000F62BC463C81ED1ED17E711B7638C6CC421F4DADBCD8017188",
+        "relative":  "lib\\core\\widgets\\startup_error_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\widgets\\startup_error_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "0CFD165FB21999EE0099D271C1FC4068837401440AF6437D58E02593C6D7420E",
+        "relative":  "lib\\features\\auth\\auth_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\auth\\auth_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "19A3553F8070BD6FADAC4A7149592DF5104872AB56CD48133450320C97C718B1",
+        "relative":  "lib\\features\\auth\\auth_entry_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\auth\\auth_entry_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C1DEAB8A5B49433543C5AD094D446D6B2160BBA6CF31C2C9E3D0D9A836B009C6",
+        "relative":  "lib\\features\\auth\\auth_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\auth\\auth_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "06E0E4F17D60EBFDD5AA7F583424858DDCBF795876D329DF4C58D84857FC55C3",
+        "relative":  "lib\\features\\auth\\auth_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\auth\\auth_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "98CAB5423298F63595BF1DCCF3B97675AB6984E0CD82FF72A81992F3C6B25DA6",
+        "relative":  "lib\\features\\auth\\email_otp_verify_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\auth\\email_otp_verify_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "E4FBDA452A7B18F8C5AD47A0678F194E273ED32A3B8EE62AE1904D45AE856DC3",
+        "relative":  "lib\\features\\auth\\otp_verify_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\auth\\otp_verify_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "6AD886CCFF95834146EDF3E87813FDC0F556D068274D01D57E20A2C97ABD409A",
+        "relative":  "lib\\features\\auth\\phone_entry_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\auth\\phone_entry_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "344FCC8365866D7990B388EDCF29B839EB4CEA01A4DFA5770B91201787EDF4A3",
+        "relative":  "lib\\features\\auth\\profile_completion_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\auth\\profile_completion_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "6AD11A48008342D661E375B0912C7A54EED93D5933D2F4245E24B5898FFC4998",
+        "relative":  "lib\\features\\notifications\\notification_center_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\notifications\\notification_center_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "6C6A455CD3005064C2560BBD4E1510B2BE9E1D4A5F0644CC54CD6A2C233D64D0",
+        "relative":  "lib\\features\\notifications\\notification_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\notifications\\notification_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "AB737252B2FA187BDA67A955CB17D32023515DDB72A58262771A3D4996278883",
+        "relative":  "lib\\features\\notifications\\notification_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\notifications\\notification_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "03C881BB85EF6417B233A8DC311A867DEBA8688D1976D7768273C45E5B7842D7",
+        "relative":  "lib\\features\\notifications\\notification_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\notifications\\notification_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "1F1A50D775050E2EADE22C2E034EF5BB76CE419FA7AB1912C1638A0F4AFCB5E3",
+        "relative":  "lib\\features\\patient\\blogs\\blogs_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\blogs\\blogs_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "0D8EBB58653845913711AAC3F3329FAE57B820963E7BB2208B46E9CB543B797A",
+        "relative":  "lib\\features\\patient\\blogs\\blogs_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\blogs\\blogs_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "D68A6B4385BC2B3734FDDEE03B6720E5D8446952CC62F2CDA4A44E46D111004D",
+        "relative":  "lib\\features\\patient\\blogs\\blogs_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\blogs\\blogs_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5AC87A3A8291D8C23883733F6B81FC704D92C9BA4262947644F9E82CFD0A016C",
+        "relative":  "lib\\features\\patient\\blogs\\blog_detail_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\blogs\\blog_detail_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "E3BD36B4B6B4D1AD246B05B6C06E06DE200A21E60EAEEB431A6A492777A1BE75",
+        "relative":  "lib\\features\\patient\\booking\\add_payment_method_sheet.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\booking\\add_payment_method_sheet.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "23D2F38EE2F05D64A9745188B4B780316F5564C95761E02DC3418B9D69F7F632",
+        "relative":  "lib\\features\\patient\\booking\\booking_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\booking\\booking_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "AE974F244400DB7938AC1CA2E452997E3B7CC4BB5C56087936ED1E17E829EB5F",
+        "relative":  "lib\\features\\patient\\booking\\booking_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\booking\\booking_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "30850B60177C1E0F9056F3A10C8C8EF692D628928076EC243BFCA4F041DE7B7D",
+        "relative":  "lib\\features\\patient\\booking\\booking_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\booking\\booking_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "DB3C60112D4B58AF0E552C1B80917D5A60FA40A6A88161B61208B884F753C316",
+        "relative":  "lib\\features\\patient\\booking\\paid_chat_booking_modal.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\booking\\paid_chat_booking_modal.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "0D760FC9BA5E395C9D72E3C768F80180366FB3CB2FBAC741022B439A46787DAC",
+        "relative":  "lib\\features\\patient\\booking\\patient_booking_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\booking\\patient_booking_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "34F95A4529C294A8A3C3C8C9D9F50DE698AB46CDDAFA06B97D3DA445F28A1AD5",
+        "relative":  "lib\\features\\patient\\booking\\pre_consult_intake_modal.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\booking\\pre_consult_intake_modal.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "BB3CC2ACCE439B5B4440529F3FC8EECDB69871C53A9FF38EE42C1174A336A1E1",
+        "relative":  "lib\\features\\patient\\booking\\waiting_room_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\booking\\waiting_room_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "274C0560C89E5395EBB336867A3F797EC0615A6169D09D35CC88276EC44A0EA6",
+        "relative":  "lib\\features\\patient\\booking\\waiting_room_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\booking\\waiting_room_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EDA3B44FB374D640E9CC95D9A407DBD183E5657A7C038B52BC4A0A67AB350801",
+        "relative":  "lib\\features\\patient\\chat\\chat_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\chat\\chat_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "2741A4BBEB795C96BEE017F135234C64134009A03DB3EBF33683A6ABA14C72AC",
+        "relative":  "lib\\features\\patient\\chat\\chat_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\chat\\chat_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "AF862DE37795D9757D723E16759A408C09BA69AF2688D1DC8872E957FCC50475",
+        "relative":  "lib\\features\\patient\\chat\\chat_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\chat\\chat_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "19BD42857FC63E6D5C2E3D6963C2F2065E3F01F3F117E0EA5A7939D85A867845",
+        "relative":  "lib\\features\\patient\\chat\\clinical_image_viewer.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\chat\\clinical_image_viewer.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "8C15B52DF7750C2F5E067F05D9F46FFCEC1BEA0592A423048515B8DB2A99CF82",
+        "relative":  "lib\\features\\patient\\chat\\consultation_status_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\chat\\consultation_status_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "0386DA4426CC33CB8BBCA747FDFCD552D54E70F71BDB1B291DF59C2C19ADBB56",
+        "relative":  "lib\\features\\patient\\chat\\patient_chat_list_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\chat\\patient_chat_list_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "2CC1BA5A5BE1E30AB13522A66D32AAE58CF6E809BB7D170FDCAD087BAE74D821",
+        "relative":  "lib\\features\\patient\\chat\\patient_chat_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\chat\\patient_chat_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EDE24AD4F7F1B407BC7D8B37E4EE6D624BE3E1179C631DE150E688325FF3C8BF",
+        "relative":  "lib\\features\\patient\\consultation\\post_consultation_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\consultation\\post_consultation_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "0A119C50B2D8114411F8CD1ED89348DD6D39ADC4D077731DD6229AB828F8BD33",
+        "relative":  "lib\\features\\patient\\directory\\consultation_actions.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\directory\\consultation_actions.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B0B139D4B6A050153042EAEFA20F60BE18D1A98617FC114AC1488C457419D514",
+        "relative":  "lib\\features\\patient\\directory\\directory_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\directory\\directory_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C1AC3B1D116F2548DA024184D8FFC3CC3C200CC82BEE626C004A3DB71BDF2BEE",
+        "relative":  "lib\\features\\patient\\directory\\directory_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\directory\\directory_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "F17A6F30D59866B98258825CF7AB81B48D359E3C14F00E0A7A29BD2449F35A00",
+        "relative":  "lib\\features\\patient\\directory\\directory_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\directory\\directory_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "2D744C61C90E5E7C83249633FC55DAF68A567D052F640AA0D0A1A37DDB0A6BD4",
+        "relative":  "lib\\features\\patient\\directory\\doctor_profile_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\directory\\doctor_profile_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5567D943E584610E91EA1CCB32FFF54B91B9959D93D0D415FC0C2C66DA4BFFA2",
+        "relative":  "lib\\features\\patient\\directory\\patient_directory_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\directory\\patient_directory_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "E14C954CFAF7E5AE4D961D252AE26811B014138F1DB95B436F4CCFC6AB30264E",
+        "relative":  "lib\\features\\patient\\grievance\\grievance_modal.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\grievance\\grievance_modal.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "704E115DB330813E3FEF7E403700C63C66EB4A50644E50A24CDD694508034641",
+        "relative":  "lib\\features\\patient\\grievance\\grievance_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\grievance\\grievance_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A03520BC544F7749A502B455DC62C9A2D520A7916FFF6FE7A6D80CCBF17AB357",
+        "relative":  "lib\\features\\patient\\home\\emergency_contact_banner.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\home\\emergency_contact_banner.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "211942C045735722B106E192B5D3A3AE6A7EBDB8DEC4BEF04DC109A68E6E1471",
+        "relative":  "lib\\features\\patient\\home\\home_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\home\\home_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "F1DE430B8926E08354E9CC942CD0485F484C65DF57839B6A9F73B34864CC4B96",
+        "relative":  "lib\\features\\patient\\home\\home_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\home\\home_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "22D78E84D664AAA036A748827B4CB4B5369A334D4D7D1096B16252ABF0980963",
+        "relative":  "lib\\features\\patient\\home\\home_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\home\\home_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "764F351F5F6EA9BE1CE1EC2258493F4A1DE6E68403DA9CF9112408FBB5F082A6",
+        "relative":  "lib\\features\\patient\\home\\patient_home_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\home\\patient_home_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "F36581BFD281420026CC3ED968DA044C86EC3E0722372FEAB24603C87B78D778",
+        "relative":  "lib\\features\\patient\\profile\\add_dependent_sheet.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\add_dependent_sheet.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "65D588CC8B1305897EDD4113C7E401975DF139FFCAD20E2B3B71CE4BA57E6A23",
+        "relative":  "lib\\features\\patient\\profile\\data_rights_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\data_rights_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "79FAE20277C68E394FA089AA61EC01FAB20D8AB982664193D4F44EC3A973AFBD",
+        "relative":  "lib\\features\\patient\\profile\\family_profiles_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\family_profiles_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "48272C0F125B50C62C9BDCFA67ADAD2E333F8940D3C2C2378907B78900232A96",
+        "relative":  "lib\\features\\patient\\profile\\family_profiles_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\family_profiles_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A503326CB83B15B27137D8F6D9E60C9502D7B6333FBBFCD1FBAD2FA99F8B0EDE",
+        "relative":  "lib\\features\\patient\\profile\\family_profile_chip_row.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\family_profile_chip_row.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "29946A85B5119B22F4F80E9A7B66CD74928D5247F233364008AA0D4B5C37959F",
+        "relative":  "lib\\features\\patient\\profile\\language_modal.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\language_modal.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "CEC5CD93D6304498764024AA8BE63FA7ADC6858F0431855FEDF16E6DCBA8BB6D",
+        "relative":  "lib\\features\\patient\\profile\\patient_profile_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\patient_profile_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "3985A6447957FA8DFB6E15FAEBA8ADC76908998453F701295956D6E7E6BB8F32",
+        "relative":  "lib\\features\\patient\\profile\\profile_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\profile_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "F52BF01BC6A936A10B07CEE6BCE79E3D12E9FF102007E5A864C6275FD3559FD0",
+        "relative":  "lib\\features\\patient\\profile\\profile_edit_sheet.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\profile_edit_sheet.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "3F2E43AA7476C0B29F55FDB7884ED662B39DEB7E167B438E793279C90540529B",
+        "relative":  "lib\\features\\patient\\profile\\profile_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\profile_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B9F4F2C48DB24996C5434FBA8D37ECA111C8508B7476D9341B53DB30FEBA9E35",
+        "relative":  "lib\\features\\patient\\profile\\profile_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\profile\\profile_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "11F11B78B90963BF590E9C8ABF0F502091143ED186E105E7C4A0281A49FAC536",
+        "relative":  "lib\\features\\patient\\qna\\qna_ask_sheet.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\qna\\qna_ask_sheet.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A935006A2A6AFEB5E9874FFDEFD1B1D6E4C8B2A42B0D3BE0D2F472CB5D5933DE",
+        "relative":  "lib\\features\\patient\\qna\\qna_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\qna\\qna_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A8FFE4A662D9C49A96A8D73792AF34160791725C1C9B747C1473DC6B076DA5AA",
+        "relative":  "lib\\features\\patient\\qna\\qna_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\qna\\qna_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B217350432EE9848F05D708544EA424986655FC3CEA59315AFC21EEF42C7227F",
+        "relative":  "lib\\features\\patient\\qna\\qna_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\qna\\qna_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "579E9CDE5104A161EAB8DAE9EA79BF8C0C5E529F855077267D55B8AE6A47AF70",
+        "relative":  "lib\\features\\patient\\qna\\qna_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\qna\\qna_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A50F7189C92FE249688E0D50F55FCEBC6478D3B908FD099C641C30FB5CABD5E4",
+        "relative":  "lib\\features\\patient\\services\\patient_services_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\services\\patient_services_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "AD26D18ABD5F94F5A67566A0EDFBC43A95BC6B1839BC60896DB36EA0D8862258",
+        "relative":  "lib\\features\\patient\\vault\\health_vault_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\vault\\health_vault_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "944C407F68C3AD81113DFCF62918A41B57EF1F94F576C27DE0448893CB68295C",
+        "relative":  "lib\\features\\patient\\vault\\vault_cubit.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\vault\\vault_cubit.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5C1442D456E6AE94A9E95495BDA0FBECD71857EBADDCD4A7A4405B066BA6C296",
+        "relative":  "lib\\features\\patient\\vault\\vault_models.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\vault\\vault_models.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C8A33DDFF3243A9D82879FF74AA7D039DC988FF55FE01C6AB83920EB17042417",
+        "relative":  "lib\\features\\patient\\vault\\vault_repository.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\vault\\vault_repository.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "C76968BA2977875BAA42D33B77AB7841F55F88061FC66AEE53EF74AA5651B915",
+        "relative":  "lib\\features\\patient\\video\\agora_placeholder_page.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\features\\patient\\video\\agora_placeholder_page.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "9F5A96CE1C9726AC992AF4015CEC8028979F2EFD051FC62DCB15CBC7B3F9F40C",
+        "relative":  "lib\\l10n\\app_en.arb",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\l10n\\app_en.arb"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "638002B45531B358417258BA6AF88E6EEAA5C2BD23DE6511C0408A0C767E45F9",
+        "relative":  "lib\\l10n\\app_localizations.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\l10n\\app_localizations.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "30A9F1F9770B913FE11B8DCA65D8828516087F6BE789F29EE7638C4CFED57940",
+        "relative":  "lib\\l10n\\app_localizations_en.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\l10n\\app_localizations_en.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "944024D3F7D241868F63B97F084AB9724BD6DDD0DA0CBECDE4EF791B7975CE0A",
+        "relative":  "lib\\l10n\\app_localizations_sw.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\l10n\\app_localizations_sw.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "0B7F4F88C8010BADC4A66BB8412F795E35B1CBD3F25C0E8FFF054F8300E5DD89",
+        "relative":  "lib\\l10n\\app_sw.arb",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\l10n\\app_sw.arb"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "3C10B2A352F1E947CBB03DE375DBC924B57B46FF7EDCF35BF0DA7AA039F84E4C",
+        "relative":  "test\\api_client_host_policy_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\api_client_host_policy_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "CC1175A9D281AE45E32B9E4619BA8684744152675E7BF14198DF804040BBE417",
+        "relative":  "test\\api_traffic_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\api_traffic_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "6744257C3CEAF018AFEC01F0158C7B3A29D3AD8496C1886537804E991414F0D8",
+        "relative":  "test\\app_boot_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\app_boot_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "72FBABBAA1F0DC6E481B75684AE34BEA42557B280998323D879A9E79A5D12298",
+        "relative":  "test\\auth_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\auth_cubit_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "AD833ED2A16915415372C38E4726B69125E15DF2A9BFAB2AD2578A2D643DA744",
+        "relative":  "test\\auth_navigation_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\auth_navigation_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5625143DDCC1439741287425147DEF8803AE2AFC3CE262F0692983657B0B8F7F",
+        "relative":  "test\\auth_security_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\auth_security_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5C5424C305F8EE0404406CA87F58AA36163697E76D79170C9417D81403639CA9",
+        "relative":  "test\\booking_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\booking_cubit_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "BF95FF40A3B8828A4AED0DB4BEC6780151406237537F02E627C9D19897E56C92",
+        "relative":  "test\\cache_store_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\cache_store_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "16072ADE732612E6FB1D9C72588FA98E946A6EF1714609A29B3E8E0321F54230",
+        "relative":  "test\\chat_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\chat_cubit_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "EAD1E125D105937250DF93F7E8B010A506C86A448441E50765A7AC0E6D27E2DF",
+        "relative":  "test\\client_error_reporter_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\client_error_reporter_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "9CE6FE51C4DD4F7874ADD70906E2D092FFA6B00F327A4A5497B82A6019EDC40B",
+        "relative":  "test\\consultation_booking_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\consultation_booking_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "43205128E5E503D4699E7C58188FB70CCF0E0CA3390E60E2FB3474550A43DD29",
+        "relative":  "test\\consultation_flow_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\consultation_flow_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "88F8EA63A186EF1DC0CA80CB35D9A20D53FD68D5D6DCDDCE59C6D85D994FE234",
+        "relative":  "test\\directory_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\directory_cubit_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "DBBF00EEDC795887CB4FC8D4DD0C75C868C84B62493C42A8190EE1CA3A0982F8",
+        "relative":  "test\\family_profiles_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\family_profiles_cubit_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "39C1386939F1E306757937A5717EDAE435B8FE6E015AAE325C49A485405C51AD",
+        "relative":  "test\\home_cubit_active_profile_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\home_cubit_active_profile_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "02C01A77E94C25C3EE360F3876F62E7AA917E650441262BA2E1D9DF68E1B1730",
+        "relative":  "test\\kenya_phone_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\kenya_phone_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "56B480A6B0732A5278C6B7BA3390086EE0393795FF95DEAA3416FB73873CFD32",
+        "relative":  "test\\lifecycle_chat_pagination_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\lifecycle_chat_pagination_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "A02A3754081258A21AC6F98C65F8E22273FF926C8BAAD9D59792B35B93D49F92",
+        "relative":  "test\\locale_controller_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\locale_controller_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "88B3B0148F49CC971C7C41247E7619F0CF26B6FE63FC45BCF59F92578362B6E8",
+        "relative":  "test\\notification_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\notification_cubit_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "5A02084384AD031F0A5278C55B04B6129578E505AEBD875410D82ADF348A9FA8",
+        "relative":  "test\\notification_traffic_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\notification_traffic_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "FBBA4D21421B6E3EDBD76E33206CC12AF2B53F3CD73DDE458A337B4CA2BF6AE5",
+        "relative":  "test\\otp_validation_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\otp_validation_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B600E9AC285FE173A403A3A142A8D69C55DDC8B25FB56CC5BA10448705AE5A7F",
+        "relative":  "test\\patient_discovery_qna_correction_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B3BA198620CBD7FD5E6408574EE61476DD23739A3EDBF9AB70B8E7ECD59E24A0",
+        "relative":  "test\\patient_intake_cleanup_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\patient_intake_cleanup_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B355076A5C8FFA7C5740F5E8CE6DE48678B1DCD0798DDB2CBBA13A477AB43F58",
+        "relative":  "test\\patient_navigation_safe_area_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\patient_navigation_safe_area_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "857A983EA7FF2E5DDD4EAEF1B88DA29394F6CAE7834F0ABF0FB78761286C8BDD",
+        "relative":  "test\\phone_entry_page_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\phone_entry_page_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "17A43E9A05E91EB87CF1C120E034065C0F9365A31FECAE55693B9C7B31AB3DEB",
+        "relative":  "test\\pre_e2e_availability_payment_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\pre_e2e_availability_payment_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "B282460F970F85BCA251E8D4B8723FF924FEB81C0A0D4CE33E6457BA78D010B0",
+        "relative":  "test\\qna_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\qna_cubit_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "F707261A40EA73D2A7C1C8AE5BDA31ABA3E53768E05BB332BD7AC66FED12FDB6",
+        "relative":  "test\\recovery_stampede_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\recovery_stampede_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "774E0192AEF02EF105D52629014DF6FB3DCB4E8D19620CC5A14A882995A1A146",
+        "relative":  "test\\startup_incident_queue_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\startup_incident_queue_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "37B24BEDD9CE67E4537604BC729E83C1B948E4063E263F0469F89E93D777C2AD",
+        "relative":  "test\\telemetry_event_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\telemetry_event_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "BD28A1E6080FD91F400080AA2AA1C0C62A6DEDC1264329042590FCC1641B839E",
+        "relative":  "test\\upload_validation_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\upload_validation_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "F9CF1303DBD6FD0EF037F69B4A54845329094074C761DBBCE2D63D9B5543D201",
+        "relative":  "test\\vault_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\vault_cubit_test.dart"
+    },
+    {
+        "app":  "mobile_patient",
+        "sha256":  "3F6A585A25C845CE70B3E4ABED28926D11B849ECC5E1E4742C023C88CCED066F",
+        "relative":  "test\\waiting_room_cubit_test.dart",
+        "original":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\waiting_room_cubit_test.dart"
+    }
+]

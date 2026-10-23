@@ -1,0 +1,229 @@
+﻿[
+    {
+        "kind":  "SOURCE_FORMAT_ONLY",
+        "executable":  "C:/Users/CUBE/.rustup/toolchains/stable-x86_64-pc-windows-msvc/bin/rustfmt.exe",
+        "arguments":  [
+                          "--config-path",
+                          "C:\\Users\\CUBE\\Desktop\\helodoc old site\\docs\\audit_evidence\\post_implementation_20261019\\source-rustfmt.toml",
+                          "services/backend/src/rate_limit.rs",
+                          "services/backend/src/services/auth_abuse.rs",
+                          "services/backend/src/telemetry/mod.rs",
+                          "services/backend/src/api/router.rs",
+                          "services/backend/src/api/v1/webhook_handlers.rs",
+                          "services/backend/tests/api_tests.rs"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  2.144184,
+        "stdout":  "",
+        "stderr":  "Warning: can\u0027t set `skip_children = true`, unstable features are only available in nightly channel.\n",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "RUST_SYNTAX_FORMAT_ONLY",
+        "executable":  "C:/Users/CUBE/.rustup/toolchains/stable-x86_64-pc-windows-msvc/bin/rustfmt.exe",
+        "arguments":  [
+                          "--check",
+                          "--config-path",
+                          "C:\\Users\\CUBE\\Desktop\\helodoc old site\\docs\\audit_evidence\\post_implementation_20261019\\source-rustfmt.toml",
+                          "services/backend/src/rate_limit.rs",
+                          "services/backend/src/services/auth_abuse.rs",
+                          "services/backend/src/telemetry/mod.rs",
+                          "services/backend/src/api/router.rs",
+                          "services/backend/src/api/v1/webhook_handlers.rs",
+                          "services/backend/tests/api_tests.rs",
+                          "services/backend/src/admission.rs",
+                          "services/backend/src/crypto.rs",
+                          "services/backend/src/services/upload_security_service.rs",
+                          "services/backend/src/services/device_proof.rs",
+                          "services/backend/src/services/admin_totp.rs",
+                          "services/backend/src/api/middleware/web_auth.rs",
+                          "services/backend/tests/economic_idempotency.rs"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.3314545,
+        "stdout":  "",
+        "stderr":  "Warning: can\u0027t set `skip_children = true`, unstable features are only available in nightly channel.\n",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/admin-web/src/lib/turnstile.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.3119019,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/admin-web/src/lib/web-assertion.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.0601316,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/admin-web/src/lib/polling.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.056158099999999996,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/admin-web/tests/turnstile.test.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.056193099999999996,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/admin-web/tests/web-assertion.test.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.057490599999999996,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/admin-web/tests/polling.test.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.0582127,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/doctor-web/src/lib/turnstile.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.059251,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/doctor-web/src/lib/schedule-sync.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.0579084,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/doctor-web/tests/turnstile.test.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.0557883,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "TYPESCRIPT_PARSE_ONLY",
+        "executable":  "C:/Program Files/nodejs/node.exe",
+        "arguments":  [
+                          "--experimental-strip-types",
+                          "--check",
+                          "apps/doctor-web/tests/schedule-sync.test.ts"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.0559164,
+        "stdout":  "",
+        "stderr":  "",
+        "target_code_executed":  false
+    },
+    {
+        "kind":  "PYTHON_AST_PARSE_ONLY",
+        "executable":  "C:/Users/CUBE/AppData/Local/Python/bin/python.exe",
+        "arguments":  [
+                          "-I",
+                          "-S",
+                          "-c",
+                          "import ast,pathlib; paths=[\"services/backend/scripts/resilience/attack-local.py\",\"services/backend/scripts/resilience/observe-local.py\"]; [ast.parse(pathlib.Path(p).read_text(encoding=\"utf-8\"),filename=p) for p in paths]; print(\"AST_PARSE_PASS files=2\")"
+                      ],
+        "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+        "environment":  "empty plus SystemRoot,WINDIR,PATH,HOME,USERPROFILE,TEMP,TMP with parser-local scratch",
+        "exit_code":  0,
+        "elapsed_seconds":  0.0714954,
+        "stdout":  "AST_PARSE_PASS files=2\r\n",
+        "stderr":  "",
+        "target_code_executed":  false
+    }
+]

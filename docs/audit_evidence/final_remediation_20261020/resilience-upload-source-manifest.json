@@ -1,0 +1,11 @@
+{
+    "before_sha256":  "2B23F6D93ABFB34A278C1086BBF3AE0E89834462B872329E82A71671D624F402",
+    "after_sha256":  "D2909E9993AC0264D9963B30A1718BA37C4D2ADB07E403E956EEE5D863059A70",
+    "original_synchronous_test_module_unchanged":  true,
+    "semaphore_capacity":  4,
+    "acquisition":  "try_acquire_owned",
+    "production_extraction":  "OnceLock Arc clone moved identically to private decoder_semaphore helper",
+    "prevalidation_still_precedes_permit":  true,
+    "new_named_cases":  3,
+    "arbitrary_sleeps_added":  0
+}

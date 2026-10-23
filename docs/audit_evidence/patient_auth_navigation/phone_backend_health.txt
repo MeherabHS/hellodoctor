@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+
+content-type: application/json
+
+vary: origin, access-control-request-method, access-control-request-headers
+
+content-length: 148
+
+connection: close
+
+date: Thu, 15 Oct 2026 14:02:41 GMT
+
+
+
+{"binary_latest_migration":"20261105000001","database":"ready","database_latest_migration":"20261105000001","migrations":"current","status":"ready"}

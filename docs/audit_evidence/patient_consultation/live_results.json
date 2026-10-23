@@ -1,0 +1,35 @@
+{
+  "payment": "Signed development MPESA webhook; no live provider or money",
+  "checks": {
+    "doctor_password_and_development_mfa": "PASS",
+    "paid_patient_specific_chat_and_video_mapping": "PASS",
+    "patient_send_web_receive_web_reply_patient_receive": "PASS",
+    "chat_has_no_video_action": "PASS",
+    "mobile_real_backend_render": "PASS",
+    "mobile_patient_real_backend_render": "PASS",
+    "all_three_clients_shared_history": "PASS"
+  },
+  "console_errors": [],
+  "appointments": [
+    {
+      "amount": "500",
+      "appointment_id": "e04a489d-20e6-42b8-8cf7-2b269aa7e499",
+      "appointment_number": "APT-20261014-E04A489D",
+      "payment_redirect_url": "https://payment-provider-not-configured.invalid/mpesa/sess_50398be8a685492399816533a223b7bb",
+      "payment_session_id": "50398be8-a685-4923-9981-6533a223b7bb",
+      "status": "PENDING_PAYMENT",
+      "modality": "CHAT",
+      "conversation_id": "fcda3b61-6abd-4a27-bdab-2e03ee6ccafd"
+    },
+    {
+      "amount": "800",
+      "appointment_id": "55758f4d-f0e0-4bbc-8b1b-bdf42e81b1d8",
+      "appointment_number": "APT-20261014-55758F4D",
+      "payment_redirect_url": "https://payment-provider-not-configured.invalid/mpesa/sess_fba5f8739dcb4ed9ac32e0d9a1a33d0c",
+      "payment_session_id": "fba5f873-9dcb-4ed9-ac32-e0d9a1a33d0c",
+      "status": "PENDING_PAYMENT",
+      "modality": "VIDEO",
+      "conversation_id": "4d5df927-36c3-42fa-9d6b-46fd17c89035"
+    }
+  ]
+}

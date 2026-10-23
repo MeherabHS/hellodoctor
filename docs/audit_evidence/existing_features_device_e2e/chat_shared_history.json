@@ -1,0 +1,8 @@
+{
+  "same_history_for_patient_and_doctor": true,
+  "patient_message_count": 1,
+  "doctor_reply_count": 1,
+  "same_conversation_id": "e6c21dbd-38b6-4a6d-82bd-504669ddcb3a",
+  "patient_name_mapping": "Patient Test Account",
+  "modality": "CHAT"
+}

@@ -1,0 +1,28 @@
+{
+  "checks": {
+    "doctor_slot_publication_and_patient_future_only_sync": true,
+    "provider_unavailable_does_not_fake_payment": true,
+    "committed_patient_message_has_privacy_safe_doctor_notice": true,
+    "doctor_reply_has_one_privacy_safe_patient_notification": true,
+    "doctor_own_green_incoming_white_across_all_three_rendered_themes": true,
+    "persisted_sender_identity_controls_doctor_ownership_styling": true,
+    "real_doctor_web_reply_patient_api_same_persisted_history": true,
+    "every_safe_event_field_is_explicitly_available_in_grievance_ui": true,
+    "admin_header_has_canonical_role_and_no_fake_persona": true,
+    "admin_grievance_explicitly_renders_every_recorded_trace_and_audit_event": true,
+    "canonical_admin_account_attribution_and_preservation_hold": true
+  },
+  "page_errors": [],
+  "physical_device": false,
+  "real_external_payment": false,
+  "real_azure": false,
+  "rtc_media": false,
+  "payment_evidence": "Existing HMAC-signed DEVELOPMENT callback only",
+  "references": {
+    "appointment_id": "c49a76e0-ee1d-43a9-bbfa-14c70a63d4ec",
+    "conversation_id": "41d3b0b1-1d28-4b88-ae50-88808ca469eb",
+    "grievance_id": "f79541ef-3270-44bf-9eca-d87ef5edbc42",
+    "grievance_number": "GRV-20261016-00000002"
+  },
+  "status": "PASS"
+}

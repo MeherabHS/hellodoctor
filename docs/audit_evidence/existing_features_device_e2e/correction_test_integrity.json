@@ -1,0 +1,64 @@
+{
+  "baseline_test_files": 66,
+  "baseline_counts": {
+    "rust_library": 53,
+    "backend_integration": 215,
+    "doctor_flutter": 190,
+    "patient_flutter": 185,
+    "doctor_web": 47,
+    "admin_web": 13
+  },
+  "existing_files_modified": [
+    "apps/mobile/test/doctor_widgets_test.dart",
+    "apps/mobile_patient/test/consultation_booking_test.dart",
+    "apps/mobile_patient/test/consultation_flow_test.dart",
+    "services/backend/tests/api_tests.rs"
+  ],
+  "backend_existing_content_preserved_exactly": true,
+  "existing_tests_deleted": 0,
+  "existing_assertions_deleted_without_replacement": 0,
+  "existing_assertions_weakened": 0,
+  "skip_ignore_added": 0,
+  "failures_swallowed": 0,
+  "intentional_ui_expectation_changes": [
+    {
+      "file": "apps/mobile_patient/test/consultation_booking_test.dart",
+      "test": "$payment renders server truth and preserves narrow layout",
+      "old": "Open consultation button enabled only for PAYMENT_HELD",
+      "new": "Correct primary button enabled; Open consultation absent before payment and Proceed absent after confirmation",
+      "reason": "Explicit requested payment CTA contract; paid access remains locked"
+    },
+    {
+      "file": "apps/mobile_patient/test/consultation_booking_test.dart",
+      "test": "$payment renders server truth and preserves narrow layout",
+      "old": "Awaiting payment confirmation",
+      "new": "Payment required",
+      "reason": "Explicit requested user-facing copy"
+    },
+    {
+      "file": "apps/mobile_patient/test/consultation_flow_test.dart",
+      "test": "paid CHAT chooser through booking, payment polling and real repository chat at each width",
+      "old": "Awaiting payment confirmation",
+      "new": "Payment required",
+      "reason": "Same explicit copy contract"
+    },
+    {
+      "file": "apps/mobile_patient/test/consultation_flow_test.dart",
+      "test": "paid CHAT chooser through booking, payment polling and real repository chat at each width",
+      "old": "Open consultation exists but disabled",
+      "new": "Open consultation absent and Proceed to payment enabled",
+      "reason": "Explicit requested payment CTA; no prepayment access"
+    }
+  ],
+  "other_intentional_test_edits": [
+    "Doctor widget tests navigate to All Scheduled after the explicitly changed default; all assertions/fixtures unchanged",
+    "Patient flow slot-label lookup uses Nairobi instead of host-local time; status refresh navigation matches new secondary label"
+  ],
+  "new_test_files": [
+    "apps/mobile/test/pre_e2e_queue_chat_test.dart",
+    "apps/mobile_patient/test/pre_e2e_availability_payment_test.dart",
+    "apps/doctor-web/tests/pre-e2e-queue-chat.test.ts"
+  ],
+  "physical_device": "DEFERRED_BY_USER",
+  "video_agora": "DEFERRED"
+}

@@ -1,0 +1,12 @@
+{
+  "case_id": "distributed_login",
+  "request_count": 30000,
+  "http_statuses": {
+    "503": 10074,
+    "None": 19750,
+    "401": 31,
+    "429": 145
+  },
+  "original_case_id": "patient",
+  "classification_only_mapping": true
+}

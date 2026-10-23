@@ -1,0 +1,8 @@
+﻿{
+    "source_path":  "services/backend/src/rate_limit.rs",
+    "function":  "check_otp_delivery_limit",
+    "source_sha256":  "eefc9a59e0556470b91f12677ee26371f36fd13fb0e011fbc090663b9ad4acae",
+    "lua_sha256":  "de8bdeb03a65e5d321ceadd03dfaf54889193c21c4e165e7b4cf6fa322451520",
+    "lua_character_count":  528,
+    "extraction":  "Exact first Rust raw string within check_otp_delivery_limit; no replacements or Lua changes"
+}

@@ -1,0 +1,23 @@
+﻿{
+    "command":  "docker version --format \"{{json .Server}}\"",
+    "kind":  "READ_ONLY_DAEMON_METADATA",
+    "exit_code":  1,
+    "elapsed_seconds":  0.16225299999999998,
+    "output":  [
+                   "null",
+                   "failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified."
+               ],
+    "service_started":  false,
+    "target_code_executed":  false,
+    "runtime_execution":  "BLOCKED_ENVIRONMENT",
+    "missing_capability":  "No reachable Docker daemon or demonstrated alternative OS sandbox; isolated Rust, Node/Next, Flutter/Android and disposable DB/Redis unavailable",
+    "host_tools_present":  [
+                               "rustfmt",
+                               "cargo",
+                               "node",
+                               "flutter",
+                               "dart",
+                               "python"
+                           ],
+    "host_tools_are_not_isolation":  true
+}

@@ -1,0 +1,8 @@
+﻿[
+    "services/backend/src/api/router.rs",
+    "services/backend/src/api/v1/webhook_handlers.rs",
+    "services/backend/src/rate_limit.rs",
+    "services/backend/src/services/auth_abuse.rs",
+    "services/backend/src/telemetry/mod.rs",
+    "services/backend/tests/api_tests.rs"
+]

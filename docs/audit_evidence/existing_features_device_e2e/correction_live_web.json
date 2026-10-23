@@ -1,0 +1,12 @@
+{
+  "checks": {
+    "bff_queue_matches_backend_eligibility_and_order": true,
+    "desktop_default_is_upcoming": true,
+    "completed_filter_remains_available": true,
+    "real_shared_history_ownership_colors": true,
+    "paperclip_present_canned_medical_advice_removed": true,
+    "reload_preserves_sender_identity": true
+  },
+  "page_errors": [],
+  "physical_device": false
+}

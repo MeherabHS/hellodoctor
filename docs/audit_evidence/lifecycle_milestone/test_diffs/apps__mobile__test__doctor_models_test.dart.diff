@@ -1,0 +1,32 @@
+--- baseline/apps/mobile/test/doctor_models_test.dart
+
++++ current/apps/mobile/test/doctor_models_test.dart
+
+@@ -3,6 +3,26 @@
+
+ import 'package:hellodoctor_mobile/features/doctor/doctor_models.dart';
+ 
+ void main() {
++  test(
++      'message chronology compares real instants across fractional seconds and UTC offsets',
++      () {
++    final values = [
++      '2026-10-16T08:00:00.000002Z',
++      '2026-10-16T08:00:00Z',
++      '2026-10-16T11:00:00.000001+03:00'
++    ];
++    values.sort(compareMessageInstants);
++    expect(values, [
++      '2026-10-16T08:00:00Z',
++      '2026-10-16T11:00:00.000001+03:00',
++      '2026-10-16T08:00:00.000002Z'
++    ]);
++    expect(
++        compareMessageInstants(
++            '2026-10-16T08:00:00.123456Z', '2026-10-16T11:00:00.123456+03:00'),
++        0);
++  });
++
+   test('appointment DTO preserves server lifecycle and contextual access', () {
+     final a = AppointmentDto.fromJson({
+       'id': 'a1',

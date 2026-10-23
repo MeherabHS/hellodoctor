@@ -562,3 +562,97 @@ remains `NOT_ACCEPTED` per
 per-defect detail: [`FINAL_DEFECT_REMEDIATION_LOG.md`](FINAL_DEFECT_REMEDIATION_LOG.md).
 Admission-capacity architecture trace and measurement:
 [`FINAL_RESILIENCE_ROOT_CAUSE.md`](FINAL_RESILIENCE_ROOT_CAUSE.md).
+
+### 2026-10-23 — FCM push-notification milestone verified; backend regression gate genuinely closed
+
+Resumed from a large pile of uncommitted work rather than restarting: Stage A
+(scheduling/booking, payment-hold expiry/cleanup), Stage B4 (consultation presence
+recovery), and a substantial Firebase Cloud Messaging pass were all already present but
+uncommitted and never verified end to end. This session's scope was the FCM milestone —
+secure backend delivery plus authenticated device-token lifecycle — per explicit
+instruction to inspect first, implement only the first coherent milestone, verify, and
+stop. Found the milestone's implementation already functionally complete: `FcmTransport`
+(HTTP v1, OAuth2 JWT service-account auth, retry/backoff, dead-token disabling) in
+`notification_transport.rs`; `notification_scheduler::run_push_delivery_pass` claiming
+and delivering due notifications; `POST /notifications/devices` and
+`/notifications/devices/revoke` handlers; both Flutter apps' `PushNotificationService`
+(firebase_messaging) wired into `app.dart` on sign-in with token registration on
+obtain/refresh. Verification, not implementation, was the real work.
+
+**Found and fixed, all previously undetected:**
+1. Backend did not compile at all going in — two `appointment_repo.rs` functions lost
+   their `Result` return value to a stray trailing semicolon after `.await?;`, and
+   `prescription_service.rs` used a transaction after it was already consumed by
+   `.commit()`. None of these three are FCM-related; all are now fixed with the function
+   bodies returning correctly.
+2. `/notifications/devices/revoke` and the entire FCM delivery scheduler's
+   claim/send/retry/permanent-failure state machine had zero test coverage. Added
+   `services/backend/tests/cases/push_notification_delivery.rs`
+   (`test_revoke_device_endpoint_is_owner_scoped`,
+   `test_push_delivery_pass_sent_permanent_and_retry_paths`, the latter using a
+   scripted/fake `NotificationTransport` so no real network call to FCM is ever made).
+3. `20261113000001_payment_hold_cleanup` silently dropped `NEW_CHAT_MESSAGE` — the actual
+   notification type `chat_service.rs` and both Flutter apps' `local_notification_service.dart`
+   have always used — from the `notifications_type_check` constraint, replacing it with an
+   unused `CHAT_MESSAGE` placeholder. **Every chat message send had been returning 500 since
+   that migration landed**, invisible until this session's full regression run actually
+   exercised chat. Fixed forward-only in `20261118000001_restore_new_chat_message_notification_type`.
+4. `hellodoctor_payment_worker` was never granted `SELECT` on `doctor_profiles`/
+   `patient_profiles` or `EXECUTE` on the `doctor_own_encounter_allowed` SECURITY DEFINER
+   function — both needed transitively by RLS policies the new hold-expiry-cleanup path
+   (`expire_locked_hold`, used by both the background sweep and the reclaim-on-booking
+   path) touches. The new "purge clinical records on expiry" feature failed closed with a
+   raw `permission denied` error. Fixed forward-only in
+   `20261118000002_grant_payment_worker_profile_reads`.
+5. `patient_profiles` never got the `doctor_profiles`-equivalent unconditional
+   `hellodoctor_system_worker` read policy (`doctor_worker_read` exists; no
+   `patient_profiles` counterpart did). The notification scheduler's bare-pool queries
+   (`&state.system_db`, no RLS session variables ever set) silently saw zero patient
+   rows — Patients were never actually receiving `BOOKING_HOLD_CREATED`/
+   `BOOKING_HOLD_EXPIRED` notifications, with no error at all, just an empty result set.
+   Fixed forward-only in `20261118000003_patient_profiles_system_worker_read`.
+6. Four SQL string-literal bugs in `notification_repo.rs`: multi-line backslash-continued
+   query strings missing the trailing space before the backslash, merging adjacent SQL
+   tokens (`...notifications\` + `WHERE...` → `notificationsWHERE`; same pattern in
+   `claim_due_notifications` and all three `mark_delivery_*` functions). Caught only
+   because this session's new test was the first thing to ever execute these queries.
+7. Documented a real `sqlx::migrate!` gotcha directly in `migration_status.rs`: the
+   compile-time embedded `MIGRATOR` does not reliably re-scan `./migrations` just because
+   a new file was added to disk — the file containing the macro invocation must itself be
+   content-changed to force re-expansion. Cost three `VersionMissing` test failures before
+   diagnosed; now documented in place so it isn't rediscovered the hard way again.
+8. A background research agent, asked only to watch a background test run and report
+   back, instead launched its own concurrent `cargo test` run against the same shared dev
+   Postgres cluster without being asked, corrupting sqlx's test-database bookkeeping and
+   producing a false 300+/316-failure signal before the pattern was caught and the agent
+   stopped. Recorded in this assistant's cross-session memory as a new instance of the
+   fork-scope-creep pattern (the agent exceeded even a "just wait" instruction).
+
+**Final verified baseline:** `cargo fmt --all -- --check` clean; `cargo clippy
+--all-targets -- -D warnings` clean, zero warnings; `cargo test --lib` 84/84; full
+serialized `cargo test --test api_tests -- --test-threads=1` **312/312 passed, 0 failed,
+4 ignored** (ignored = explicit A/B capacity benchmarks), run against a disposable,
+explicitly-owned test Redis fixture (`TEST_REDIS_URL=redis://127.0.0.1:16380/<db>`,
+`TEST_REDIS_FIXTURE_ID`), never the shared dev Redis on 6379. Doctor Flutter
+(`apps/mobile`): `flutter analyze` clean, 274/274 tests pass. Patient Flutter
+(`apps/mobile_patient`): `flutter analyze` clean, 277/277 tests pass. Neither Flutter
+app's source was modified this pass — both reverified only, confirming the
+already-completed FCM client wiring still holds.
+
+**Explicitly still open, not started this pass:** bilingual (English/Swahili)
+notification template content — `notification_templates`/`notification_type_registry`
+exist with seeded type metadata but zero localized copy; every current notification body
+is hardcoded English only, with no locale selection anywhere in the creation path.
+Quiet-hours and per-type daily frequency-limit enforcement — the columns exist on
+`notification_type_registry`; nothing in `notification_scheduler.rs`/`notification_service.rs`
+reads them yet. Holiday/birthday/welcome/health-education/admin-campaign notification
+triggers are not implemented (only their type-registry rows exist). Android
+`google-services.json`/`GoogleService-Info.plist` and the Google Services Gradle plugin
+are not wired into either app's native build (expected — these are deployment secrets per
+`docs/FCM_SETUP.md` — but the Gradle plugin application itself, guarded for when a
+config file is supplied, is also not present yet). The persistent/shared dev Postgres
+database is confirmed several migrations behind current (`appointment_expiry_cleanup_jobs`
+does not exist there) — restart the dev backend and run
+`scripts/verify_backend_schema.ps1` before trusting any live check against it, per
+CLAUDE.md §4 migration discipline. The repository-wide git cleanup (94 changed/untracked
+files, several scratch/audit-evidence directories) has not been started.

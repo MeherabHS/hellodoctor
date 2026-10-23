@@ -1,0 +1,19 @@
+--- baseline/apps/mobile_patient/test/consultation_booking_test.dart
+
++++ current/apps/mobile_patient/test/consultation_booking_test.dart
+
+@@ -107,11 +107,11 @@
+
+           FilledButton,
+           payment == 'PAYMENT_HELD'
+               ? 'Open consultation'
+-              : 'Proceed to payment'));
++              : 'Proceed to payment method'));
+       expect(button.onPressed != null, isTrue);
+       expect(find.text('Open consultation'),
+           payment == 'PAYMENT_HELD' ? findsOneWidget : findsNothing);
+-      expect(find.text('Proceed to payment'),
++      expect(find.text('Proceed to payment method'),
+           payment == 'PAYMENT_HELD' ? findsNothing : findsOneWidget);
+       expect(
+           find.text(payment == 'PAYMENT_HELD'

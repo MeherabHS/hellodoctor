@@ -1,0 +1,37 @@
+{
+  "assertions": {
+    "BACKEND_BUILD": "PASS",
+    "BACKEND_REGRESSION": "INCONCLUSIVE",
+    "FINANCIAL_DB_INVARIANTS": "PASS",
+    "FINANCIAL_HTTP_IDEMPOTENCY": "SOURCE_PRESENT_RUNTIME_UNVERIFIED",
+    "PAYMENT_PROVIDER_INTEGRATION": "NOT_IMPLEMENTED",
+    "ADMIN_WEB_TESTS": "INCONCLUSIVE",
+    "DOCTOR_WEB_TESTS": "PASS",
+    "PATIENT_FLUTTER_TESTS": "PASS",
+    "DOCTOR_FLUTTER_TESTS": "FAIL",
+    "ANDROID_DEVICE_PROOF": "SOURCE_PRESENT_RUNTIME_UNVERIFIED",
+    "TURNSTILE_BROWSER_ACCEPTANCE": "NOT_RUN",
+    "ADMIN_TOTP_ACCEPTANCE": "SOURCE_PRESENT_RUNTIME_UNVERIFIED",
+    "GLOBAL_ADMISSION_RUNTIME": "PASS",
+    "DISTRIBUTED_30000_CLIENT_TEST": "INCONCLUSIVE",
+    "EXPENSIVE_FLOOD_ISOLATION": "INCONCLUSIVE",
+    "RECOVERY_STAMPEDE_TEST": "PASS",
+    "DB_POOL_PRESSURE_TEST": "INCONCLUSIVE",
+    "MIGRATION_ACCEPTANCE": "PASS",
+    "EDGE_DEPLOYMENT_READINESS": "INCONCLUSIVE",
+    "TEST_ASSERTIONS_WEAKENED": 0,
+    "NEW_CRITICAL_DEFECTS": 0,
+    "OVERALL_SECURITY_VERDICT": "NOT_ACCEPTED"
+  },
+  "scope_qualifications": {
+    "BACKEND_REGRESSION": "69 unit + economic + enum migration tests pass; 263 other API tests not executed; Clippy fails separately.",
+    "FINANCIAL_DB_INVARIANTS": "Existing economic repository test and independent six-phase SQL fixture only; not every refund/late-callback/RLS negative acceptance case.",
+    "ADMIN_WEB_TESTS": "40/40 safe tests pass; five refresh tests not run because they hardcode shared Redis. Lint fails separately.",
+    "ANDROID_DEVICE_PROOF": "Actual Rust HTTP synthetic-key proof/session acceptance passed 27 checks; native Android compilation and Keystore execution not established.",
+    "GLOBAL_ADMISSION_RUNTIME": "Configured auth lane and aggregate budgets observed under loopback authentication load; not production capacity or all-cost-class acceptance.",
+    "EXPENSIVE_FLOOD_ISOLATION": "Authenticated profile probes survived auth hashing flood; authorized upload/consultation/signed-webhook mixed flood not measured.",
+    "RECOVERY_STAMPEDE_TEST": "Deterministic unit/coordinator jitter and coalescing only; not 1,000 live full-stack clients. Doctor lifecycle suite still has a separate failure.",
+    "MIGRATION_ACCEPTANCE": "Fresh synthetic DB applies all 62 via SQLx, all 62 checksums match source; raw economic down/up passes. Existing-data upgrade/production ownership/rollback acceptance unverified.",
+    "NEW_CRITICAL_DEFECTS": "No new confirmed critical exploit; this does not assert absence of defects or accept outstanding failures."
+  }
+}

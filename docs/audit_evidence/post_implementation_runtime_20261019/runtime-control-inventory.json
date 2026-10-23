@@ -1,0 +1,142 @@
+[
+  {
+    "control": "Financial obligation uniqueness",
+    "source": "migrations/20261110000001_economic_idempotency.up.sql; repository/transaction_repo.rs",
+    "test": "Economic repository race + raw SQL",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (DB scope)"
+  },
+  {
+    "control": "Callback replay protection",
+    "source": "services/backend/src/repository/payment_event_repo.rs; services/appointment_service.rs",
+    "test": "Same/distinct-event repository and SQL phases",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (tested DB cases; provider HTTP unverified)"
+  },
+  {
+    "control": "Economic journal",
+    "source": "services/backend/src/economic migration; financial_economic_effects",
+    "test": "SQL observer and economic assertions",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (confirmation/settlement/payout DB scope)"
+  },
+  {
+    "control": "Consultation settlement idempotency",
+    "source": "services/backend/src/doctor_complete_consultation; consultation_service.rs",
+    "test": "100-way completion race",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (DB scope)"
+  },
+  {
+    "control": "Payout uniqueness",
+    "source": "services/backend/src/economic migration; disbursement repositories",
+    "test": "Two-Admin approval/payout SQL races",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (local state; external transfer absent)"
+  },
+  {
+    "control": "Global admission",
+    "source": "services/backend/src/admission.rs",
+    "test": "Four unit tests + actual HTTP load",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (auth/profile scope)"
+  },
+  {
+    "control": "Local concurrency bounds",
+    "source": "services/backend/src/admission.rs",
+    "test": "Unit lane bounds + sampled auth occupancy",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (tested lanes; not all runtime lanes)"
+  },
+  {
+    "control": "Redis shared budgets",
+    "source": "services/backend/src/admission.rs; rate_limit.rs",
+    "test": "Actual HTTP admission + OTP Lua",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (single backend; cross-replica not tested)"
+  },
+  {
+    "control": "DB pool pressure",
+    "source": "services/backend/src/admission.rs; repository acquisition helpers",
+    "test": "SQL-lock HTTP attempt and metrics",
+    "executed": "Yes, partial",
+    "result": "INCONCLUSIVE (five SQL waits; pool not exhausted)"
+  },
+  {
+    "control": "Argon2 workers",
+    "source": "services/backend/src/crypto.rs",
+    "test": "Fail-fast unit + actual hash flood",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (sampled peak four; cancellation race not tested)"
+  },
+  {
+    "control": "Upload sanitizers",
+    "source": "services/backend/src/services/upload_security_service.rs; rate_limit.rs",
+    "test": "Content/compression unit cases",
+    "executed": "Yes, content only",
+    "result": "SOURCE_PRESENT_RUNTIME_UNVERIFIED (global flood/cancellation)"
+  },
+  {
+    "control": "Account login throttling",
+    "source": "services/backend/src/services/auth_abuse.rs; auth service",
+    "test": "100 distinct-IP same-target calls per role",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (development role routes; five hashes each)"
+  },
+  {
+    "control": "OTP delivery budgets",
+    "source": "services/backend/src/rate_limit.rs; services/auth_abuse.rs",
+    "test": "207 actual Lua reservations, five cases",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (Redis scope; Rust dispatch/provider not tested)"
+  },
+  {
+    "control": "Turnstile",
+    "source": "both web src/lib/turnstile.ts and BFF routes",
+    "test": "11 helper cases per app",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (synthetic helper); browser/provider NOT_RUN"
+  },
+  {
+    "control": "Admin HMAC assertion",
+    "source": "Admin web-assertion.ts; api/middleware/web_auth.rs",
+    "test": "Three Node cases + Rust pure validation",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (pure helpers); Redis/HTTP gate NOT_RUN"
+  },
+  {
+    "control": "Admin SHA256 TOTP",
+    "source": "services/backend/src/services/admin_totp.rs; algorithm migration",
+    "test": "Published-vector unit",
+    "executed": "Yes, vector only",
+    "result": "SOURCE_PRESENT_RUNTIME_UNVERIFIED (full factor/replay flow)"
+  },
+  {
+    "control": "Android Keystore",
+    "source": "both DeviceProof.kt/MainActivity.kt bridges",
+    "test": "No native test found",
+    "executed": "No",
+    "result": "SOURCE_PRESENT_RUNTIME_UNVERIFIED; compile cache missing"
+  },
+  {
+    "control": "Backend device proof",
+    "source": "services/backend/src/services/device_proof.rs; auth middleware",
+    "test": "Rust crypto unit + 27 HTTP checks",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (synthetic ES256 client; not Keystore)"
+  },
+  {
+    "control": "Refresh proof replay denial",
+    "source": "services/backend/src/device_proof.rs; auth-service refresh ordering",
+    "test": "Actual access replay/rotation/reuse/logout",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (sequential synthetic HTTP); concurrent races remain"
+  },
+  {
+    "control": "Recovery jitter",
+    "source": "both web coordinators; Flutter screen_refresh.dart",
+    "test": "Seven tests/web, three/app; deterministic 1,000-client model",
+    "executed": "Yes",
+    "result": "VERIFIED_PASS (unit scope); Doctor lifecycle failure separate"
+  }
+]

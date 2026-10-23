@@ -1,0 +1,14 @@
+{
+  "doctor": {
+    "passed": 197,
+    "failed": 0,
+    "skipped": 0,
+    "exit_code": 0
+  },
+  "patient": {
+    "passed": 195,
+    "failed": 0,
+    "skipped": 0,
+    "exit_code": 0
+  }
+}

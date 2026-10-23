@@ -1,0 +1,64 @@
+﻿{
+    "finished_utc":  "2026-10-19T18:28:10.0996059Z",
+    "removed_containers":  [
+                               {
+                                   "name":  "hd-acceptance-forwarder-20261019",
+                                   "id":  "a090eb3740406dfe63db5c0e4ad59521dde1cb391aa495cd7cd12ff527846767",
+                                   "label":  "runtime-20261019",
+                                   "running":  true,
+                                   "paused":  false
+                               },
+                               {
+                                   "name":  "hd-acceptance-pg-20261019",
+                                   "id":  "33f5f9f20a80f3710e3aeed06beaede3110d4c59c7f193b0e036166121d213fc",
+                                   "label":  "runtime-20261019",
+                                   "running":  true,
+                                   "paused":  false
+                               },
+                               {
+                                   "name":  "hd-acceptance-redis-20261019",
+                                   "id":  "d24b2eb4d3f6badf78c979d75a5a1fe41d8453bd724e3ae72ff3a3017972472b",
+                                   "label":  "runtime-20261019",
+                                   "running":  true,
+                                   "paused":  false
+                               }
+                           ],
+    "removed_networks":  [
+                             "hd-acceptance-forwarding-20261019",
+                             "hd-acceptance-20261019"
+                         ],
+    "shared_before":  [
+                          {
+                              "name":  "hellodoctor-postgres",
+                              "id":  "f03a221c53daff89e5338eb4128bdfba63faf08ee806d6fcb8eff6419da7e990",
+                              "started_at":  "2026-10-19T13:54:26.183061926Z",
+                              "running":  true
+                          },
+                          {
+                              "name":  "hellodoctor-redis",
+                              "id":  "dbd55aaad0acd66844cbb19ff634e89b9ba388cd4dbb8371bf0a23f846724fa6",
+                              "started_at":  "2026-10-19T13:54:26.179904177Z",
+                              "running":  true
+                          }
+                      ],
+    "shared_after":  [
+                         {
+                             "name":  "hellodoctor-postgres",
+                             "id":  "f03a221c53daff89e5338eb4128bdfba63faf08ee806d6fcb8eff6419da7e990",
+                             "started_at":  "2026-10-19T13:54:26.183061926Z",
+                             "running":  true
+                         },
+                         {
+                             "name":  "hellodoctor-redis",
+                             "id":  "dbd55aaad0acd66844cbb19ff634e89b9ba388cd4dbb8371bf0a23f846724fa6",
+                             "started_at":  "2026-10-19T13:54:26.179904177Z",
+                             "running":  true
+                         }
+                     ],
+    "shared_restarted":  false,
+    "volumes_removed":  0,
+    "source_changes":  0,
+    "backend_processes_remaining":  [
+
+                                    ]
+}

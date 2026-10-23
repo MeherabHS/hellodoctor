@@ -1,0 +1,11 @@
+{
+  "patient": {
+    "id": "9fbc8f1c-599c-4125-b02a-16cedb653093",
+    "user_id": "b776767a-331e-41a8-837c-500023ee2ddc",
+    "name": "Patient Test Account"
+  },
+  "doctor": {
+    "id": "da000001-0000-0000-0000-000000000001",
+    "name": "Dr. Synthetic Doctor One"
+  }
+}

@@ -1,0 +1,82 @@
+{
+  "kind": "automated transport and lifecycle observations; not physical-device measurement",
+  "doctor_suite_passed": 217,
+  "patient_suite_passed": 214,
+  "observations": [
+    {
+      "scenario": "equivalent simultaneous GETs with differently ordered query maps",
+      "actual_transport_requests": 1,
+      "after_completion_and_explicit_refetch": 2
+    },
+    {
+      "scenario": "different resources/cursors",
+      "actual_transport_requests": 3
+    },
+    {
+      "scenario": "account changes during pending protected read",
+      "actual_transport_requests": 2,
+      "old_response_rejected": true
+    },
+    {
+      "scenario": "failed GET followed by new retry",
+      "actual_transport_requests": 2,
+      "first_failure_preserved": true
+    },
+    {
+      "scenario": "visible screen refresh timer, 30 simulated seconds, 10-second interval",
+      "refresh_callbacks": 3
+    },
+    {
+      "scenario": "screen covered by pushed route for 30 simulated seconds",
+      "additional_refresh_callbacks": 0
+    },
+    {
+      "scenario": "paused screen for 60 simulated seconds",
+      "additional_refresh_callbacks": 0
+    },
+    {
+      "scenario": "route return / foreground resume",
+      "additional_refresh_callbacks_each": 1
+    },
+    {
+      "scenario": "timer, network reconnect and direct request while first read remains pending",
+      "refresh_callbacks": 1
+    },
+    {
+      "scenario": "global notification tick before 60 foreground seconds",
+      "additional_delta_requests": 0
+    },
+    {
+      "scenario": "global notification tick at 60 foreground seconds",
+      "additional_delta_requests": 1,
+      "additional_unread_requests": 1
+    },
+    {
+      "scenario": "five simulated background minutes",
+      "additional_notification_requests": 0
+    },
+    {
+      "scenario": "125 new notifications awaiting catchup",
+      "first_tick_delta_pages": 4,
+      "first_tick_rows": 100,
+      "all_150_initial_and_new_rows_retained_on_second_tick": true
+    },
+    {
+      "scenario": "61 older notifications and one new delta",
+      "final_unique_rows": 62,
+      "older_page_requests": 2,
+      "rows_survive_explicit_reconciliation": true
+    }
+  ],
+  "sources": [
+    "apps/mobile/test/api_traffic_test.dart",
+    "apps/mobile_patient/test/api_traffic_test.dart",
+    "apps/mobile/test/notification_traffic_test.dart",
+    "apps/mobile_patient/test/notification_traffic_test.dart"
+  ],
+  "limitations": [
+    "Transport interception and Flutter-controlled lifecycle are automated fixtures.",
+    "Global Home request budgets are configured/source-traced, not measured on a handset.",
+    "OS-managed background work and local delivery remain device-dependent."
+  ]
+}

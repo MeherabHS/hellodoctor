@@ -80,7 +80,9 @@ async def walkthrough():
             doctor = await context.new_page()
             doctor.on('pageerror', lambda error: errors.append(type(error).__name__))
             await doctor.goto('http://127.0.0.1:3001', wait_until='networkidle')
-            name = f'Dr. Synthetic Kenya Review {nonce} {label}'
+            # Keep run IDs/actions in email, license and evidence metadata.
+            # full_name is public Patient directory content.
+            name = f'Dr. Synthetic Kenya Review {"A" if index == 0 else "B"}'
             email = f'kenya-review-{nonce}-{label.lower()}@example.test'
             # Only a non-privileged, synthetic test account; credential never exported.
             password = f'Synthetic-Review-{nonce}-Aa1!'

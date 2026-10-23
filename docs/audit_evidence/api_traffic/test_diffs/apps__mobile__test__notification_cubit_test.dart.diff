@@ -1,0 +1,27 @@
+--- baseline/apps/mobile/test/notification_cubit_test.dart
+
++++ current/apps/mobile/test/notification_cubit_test.dart
+
+@@ -36,6 +36,21 @@
+
+   Future<List<NotificationDto>> list({int? offset, int? limit}) async {
+     listCalls++;
+     return listGate == null ? listResponse : await listGate!.future;
++  }
++
++  @override
++  Future<List<NotificationDto>> newerThan(NotificationDto cursor) async {
++    final rows = (await list())
++        .where((n) =>
++            n.createdAt.isAfter(cursor.createdAt) ||
++            (n.createdAt.isAtSameMomentAs(cursor.createdAt) &&
++                n.id.compareTo(cursor.id) > 0))
++        .toList();
++    rows.sort((a, b) {
++      final time = a.createdAt.compareTo(b.createdAt);
++      return time == 0 ? a.id.compareTo(b.id) : time;
++    });
++    return rows;
+   }
+ 
+   @override

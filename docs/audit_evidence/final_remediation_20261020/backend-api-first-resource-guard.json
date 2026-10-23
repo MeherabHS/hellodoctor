@@ -1,0 +1,11 @@
+﻿{
+    "reason":  "Disposable PG tmpfs reached683/768MiB89percent; stop before fixture ENOSPC or memory pressure",
+    "process_id":  19676,
+    "executable":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\cargo-target\\debug\\deps\\api_tests-816221c4948d1a36.exe",
+    "database_count":  34,
+    "database_bytes_observed":  "399MiB",
+    "fixture_used_mib":  683,
+    "fixture_cap_mib":  768,
+    "production_or_shared_target":  false,
+    "status":  "INTERRUPTED_RESOURCE_GUARD_NOT_FULL_SUITE_RESULT"
+}

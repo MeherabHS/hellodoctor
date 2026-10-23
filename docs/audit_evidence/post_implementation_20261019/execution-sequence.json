@@ -1,0 +1,72 @@
+﻿[
+    {
+        "step":  1,
+        "action":  "Read required documents and skill",
+        "status":  "COMPLETE"
+    },
+    {
+        "step":  2,
+        "action":  "Record source state",
+        "status":  "COMPLETE"
+    },
+    {
+        "step":  3,
+        "action":  "Inventory source/tests",
+        "status":  "COMPLETE"
+    },
+    {
+        "step":  4,
+        "action":  "Check OS isolation",
+        "status":  "UNAVAILABLE_DOCUMENTED"
+    },
+    {
+        "step":  5,
+        "action":  "Offline compilation/regression",
+        "status":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "step":  6,
+        "action":  "Correct proven in-scope source defects",
+        "status":  "SOURCE_CORRECTED_RUNTIME_UNVERIFIED"
+    },
+    {
+        "step":  7,
+        "action":  "Disposable DB financial/migrations",
+        "status":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "step":  8,
+        "action":  "Auth BFF Android synthetic execution",
+        "status":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "step":  9,
+        "action":  "HTTP adversarial execution",
+        "status":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "step":  10,
+        "action":  "Independent current DB/resource observations",
+        "status":  "BLOCKED_ENVIRONMENT_HISTORICAL_EVIDENCE_SEPARATE"
+    },
+    {
+        "step":  11,
+        "action":  "Read-only deployment review",
+        "status":  "SOURCE_REVIEWED_OPERATOR_STATE_UNKNOWN"
+    },
+    {
+        "step":  12,
+        "action":  "Reconcile acceptance requirements",
+        "status":  "COMPLETE"
+    },
+    {
+        "step":  13,
+        "action":  "Reports and machine evidence",
+        "status":  "COMPLETE"
+    },
+    {
+        "step":  14,
+        "action":  "Operator actions and launch blockers",
+        "status":  "DOCUMENTED"
+    }
+]

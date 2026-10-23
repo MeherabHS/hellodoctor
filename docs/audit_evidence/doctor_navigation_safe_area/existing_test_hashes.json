@@ -1,0 +1,23 @@
+{
+  "apps/mobile/test/api_client_host_policy_test.dart": "1b78e3b0fc13706d3a5fb05077bf47b4ee967ef4b3c09aac7af24bca92dba5ab",
+  "apps/mobile/test/articles_test.dart": "2783cd13cbfd00f14a467c8634a2138b7966ca48c1a9fba645ea4f6c70f529ce",
+  "apps/mobile/test/auth_security_test.dart": "b96894d511191c5a3c294b9b93f88a64db3b3efccd2ee15538b7682a85933c0c",
+  "apps/mobile/test/auth_state_test.dart": "d7b4307574a9190d21b87fce10bc4e71fdc66480d9b8bff6d47b1dd40b5933ac",
+  "apps/mobile/test/background_sync_worker_test.dart": "f68873db51b58a24740c3e352c8fe0105eee3ba417aed4f15d492f2db853b7fe",
+  "apps/mobile/test/cache_store_test.dart": "86bbbcb5937e376ea0c63321e5761e0a72639b0421375e5f1e974749f4dc49bf",
+  "apps/mobile/test/client_error_reporter_test.dart": "b5d379d84f53d75708a9eae917a05a5990f49a55142e60ff26079cfc3d17453a",
+  "apps/mobile/test/consultation_actions_test.dart": "34a1c0b739c300e49822f4e7636efea498a20c421f7746bdc983d0dd0df1b257",
+  "apps/mobile/test/consultation_completion_test.dart": "fcd21741733b4302053acca2dc7a44f8fb0f58f8605b6dad1a3abc9d48bbf7ac",
+  "apps/mobile/test/consultation_pagination_test.dart": "03018844cd861514d2cb3179a4abb485cdecb1bd6f23cb179d97c9d81cbb45af",
+  "apps/mobile/test/doctor_client_test.dart": "d0d1d73cd552e2956c15cb58c616786595b580a4c4d6d77f1a4854299a5224a6",
+  "apps/mobile/test/doctor_cubit_test.dart": "4def1be5546d08bd950d56fbf765b319eb0bb272c3a8f889cf19de2b855c9482",
+  "apps/mobile/test/doctor_models_test.dart": "cde99a92931713fbd90d6048f13ee12854494e84bd75a6983905f247467f89e7",
+  "apps/mobile/test/doctor_widgets_test.dart": "ffe9ee3012b5d2f03f9d70a8912d03662008e2b520151d2abe79655f07910167",
+  "apps/mobile/test/kenya_phone_test.dart": "2b5ce60ceccd42d49d334cee481f2ab418ab1ff5dfa92dab6df70eae9228d85d",
+  "apps/mobile/test/notification_center_page_test.dart": "94873ca894848699893f4f8222b43d24a07edaf37466bd5dbc7be89c0aeb5aa7",
+  "apps/mobile/test/notification_cubit_test.dart": "01dccec20026b82c9b4c6c594bfade672ec404a30462149f30d4ceb57dc5070b",
+  "apps/mobile/test/notification_repository_test.dart": "71875adace72f83c9d9a8d2297c04988823a5914865b873fb48c1e6536cb8186",
+  "apps/mobile/test/qna_rendering_test.dart": "17e8a7b63b474129b27029fdd8825c7ad6f1545d38cae1edf2e0f4d49cc2d8a7",
+  "apps/mobile/test/schedule_notification_reconciler_test.dart": "b30d8948a83cffad23900237ac4755d8e0775dc4b58e274781e5c122cd8bdd10",
+  "apps/mobile/test/startup_incident_queue_test.dart": "3d2bec98b0d57b1868b75ce0ff79cdeb38c87eb29a097ac9d6d418b06f9c8a3a"
+}

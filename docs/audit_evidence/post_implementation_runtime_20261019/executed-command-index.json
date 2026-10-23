@@ -1,0 +1,749 @@
+[
+  {
+    "record": "backend-admission-focused.json",
+    "started_utc": "2026-10-19T14:21:16.8006314Z",
+    "executable": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\cargo-target\\debug\\deps\\hellodoctor_backend-128fa8638737eeae.exe",
+    "arguments": [
+      "admission::tests",
+      "--test-threads=1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 0.0369368,
+    "timed_out": false
+  },
+  {
+    "record": "backend-api-enum.json",
+    "started_utc": "2026-10-19T18:12:11.7781592Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "api_tests",
+      "test_enum_add_value_migration_reversibility_limitation_pattern",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 1.1585554,
+    "timed_out": false
+  },
+  {
+    "record": "backend-api-list.json",
+    "started_utc": "2026-10-19T18:10:37.8547857Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "api_tests",
+      "--",
+      "--list"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 93.8591952,
+    "timed_out": false
+  },
+  {
+    "record": "backend-build.json",
+    "started_utc": "2026-10-19T14:22:09.8214467Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "build",
+      "--offline",
+      "--locked",
+      "--bin",
+      "hellodoctor-backend"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 78.87113289999999,
+    "timed_out": false
+  },
+  {
+    "record": "backend-check-toolpath.json",
+    "started_utc": "2026-10-19T14:05:30.5211272Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "check",
+      "--offline",
+      "--locked",
+      "--all-targets"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 376.96536749999996,
+    "timed_out": false
+  },
+  {
+    "record": "backend-check.json",
+    "started_utc": "2026-10-19T14:04:30.9047165Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "check",
+      "--offline",
+      "--locked",
+      "--all-targets"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 101,
+    "duration_seconds": 20.7637613,
+    "timed_out": false
+  },
+  {
+    "record": "backend-clippy.json",
+    "started_utc": "2026-10-19T14:12:30.0862913Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "clippy",
+      "--offline",
+      "--locked",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 101,
+    "duration_seconds": 15.337041999999999,
+    "timed_out": false
+  },
+  {
+    "record": "backend-economic-prerequisite.json",
+    "started_utc": "2026-10-19T18:09:29.8840589Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "economic_idempotency",
+      "--",
+      "--test-threads=1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 17.7656872,
+    "timed_out": false
+  },
+  {
+    "record": "backend-economic.json",
+    "started_utc": "2026-10-19T14:23:28.7602944Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "test",
+      "--offline",
+      "--locked",
+      "--test",
+      "economic_idempotency",
+      "--",
+      "--test-threads=1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 101,
+    "duration_seconds": 77.39379869999999,
+    "timed_out": false
+  },
+  {
+    "record": "backend-format.json",
+    "started_utc": "2026-10-19T14:04:28.5831922Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 2.2664947,
+    "timed_out": false
+  },
+  {
+    "record": "backend-proof-focused.json",
+    "started_utc": "2026-10-19T14:21:16.8523324Z",
+    "executable": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\cargo-target\\debug\\deps\\hellodoctor_backend-128fa8638737eeae.exe",
+    "arguments": [
+      "device_proof::tests",
+      "--test-threads=1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 0.0326452,
+    "timed_out": false
+  },
+  {
+    "record": "backend-unit-list.json",
+    "started_utc": "2026-10-19T14:21:16.7122428Z",
+    "executable": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\cargo-target\\debug\\deps\\hellodoctor_backend-128fa8638737eeae.exe",
+    "arguments": [
+      "--list"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 0.0332606,
+    "timed_out": false
+  },
+  {
+    "record": "backend-unit.json",
+    "started_utc": "2026-10-19T14:12:45.4795175Z",
+    "executable": "C:/Users/CUBE/.cargo/bin/cargo.exe",
+    "arguments": [
+      "test",
+      "--offline",
+      "--locked",
+      "--lib",
+      "--",
+      "--test-threads=1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code": 0,
+    "duration_seconds": 518.5940611,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile-analyze.json",
+    "started_utc": "2026-10-19T14:06:48.5847244Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "analyze",
+      "--no-pub"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile",
+    "exit_code": 1,
+    "duration_seconds": 12.752313599999999,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile-format.json",
+    "started_utc": "2026-10-19T14:06:17.9348180Z",
+    "executable": "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\cache\\dart-sdk\\bin\\dart.exe",
+    "arguments": [
+      "format",
+      "--output=none",
+      "--set-exit-if-changed",
+      "lib",
+      "test"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile",
+    "exit_code": 1,
+    "duration_seconds": 1.9478486,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile-pub-offline.json",
+    "started_utc": "2026-10-19T14:05:59.2701504Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "pub",
+      "get",
+      "--offline",
+      "--enforce-lockfile"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile",
+    "exit_code": 0,
+    "duration_seconds": 6.5522583999999995,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile-queue-lifecycle-reproduction.json",
+    "started_utc": "2026-10-19T14:09:09.7388991Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "test",
+      "--no-pub",
+      "--concurrency=1",
+      "--reporter=json",
+      "test/queue_lifecycle_refresh_test.dart",
+      "--dart-define=API_BASE_URL=http://127.0.0.1:1/api/v1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile",
+    "exit_code": 1,
+    "duration_seconds": 6.432173,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile-security-recovery-focused.json",
+    "started_utc": "2026-10-19T14:09:16.2648808Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter=json",
+      "test/auth_security_test.dart",
+      "test/auth_state_test.dart",
+      "test/recovery_stampede_test.dart",
+      "--dart-define=API_BASE_URL=http://127.0.0.1:1/api/v1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile",
+    "exit_code": 0,
+    "duration_seconds": 8.9201067,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile-tests-complete-environment.json",
+    "started_utc": "2026-10-19T14:07:59.3936794Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter=json",
+      "--dart-define=API_BASE_URL=http://127.0.0.1:1/api/v1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile",
+    "exit_code": 1,
+    "duration_seconds": 47.320343799999996,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile-tests.json",
+    "started_utc": "2026-10-19T14:06:41.4243232Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter=json",
+      "--dart-define=API_BASE_URL=http://127.0.0.1:1/api/v1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile",
+    "exit_code": 1,
+    "duration_seconds": 1.2875467999999999,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile-toolchain-version.json",
+    "started_utc": "2026-10-19T14:09:53.5517276Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "--version"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile",
+    "exit_code": 0,
+    "duration_seconds": 1.0190396,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile_patient-analyze.json",
+    "started_utc": "2026-10-19T14:06:05.9213194Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "analyze",
+      "--no-pub"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient",
+    "exit_code": 1,
+    "duration_seconds": 42.634316399999996,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile_patient-format.json",
+    "started_utc": "2026-10-19T14:06:17.2691361Z",
+    "executable": "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\cache\\dart-sdk\\bin\\dart.exe",
+    "arguments": [
+      "format",
+      "--output=none",
+      "--set-exit-if-changed",
+      "lib",
+      "test"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient",
+    "exit_code": 1,
+    "duration_seconds": 0.5951228,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile_patient-pub-offline-complete-path.json",
+    "started_utc": "2026-10-19T14:05:32.5883064Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "pub",
+      "get",
+      "--offline",
+      "--enforce-lockfile"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient",
+    "exit_code": 0,
+    "duration_seconds": 13.2655528,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile_patient-pub-offline.json",
+    "started_utc": "2026-10-19T14:05:21.8342422Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "pub",
+      "get",
+      "--offline",
+      "--enforce-lockfile"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient",
+    "exit_code": 1,
+    "duration_seconds": 0.21803619999999999,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile_patient-tests-complete-environment.json",
+    "started_utc": "2026-10-19T14:07:00.2275797Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter=json",
+      "--dart-define=API_BASE_URL=http://127.0.0.1:1/api/v1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient",
+    "exit_code": 0,
+    "duration_seconds": 59.0552582,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-mobile_patient-tests.json",
+    "started_utc": "2026-10-19T14:06:39.8099566Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--no-version-check",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter=json",
+      "--dart-define=API_BASE_URL=http://127.0.0.1:1/api/v1"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient",
+    "exit_code": 1,
+    "duration_seconds": 1.5361692999999998,
+    "timed_out": false
+  },
+  {
+    "record": "flutter-version.json",
+    "started_utc": "2026-10-19T14:05:01.9771803Z",
+    "executable": "C:\\Windows\\System32\\cmd.exe",
+    "arguments": [
+      "/d",
+      "/c",
+      "C:\\Users\\CUBE\\.codex\\tools\\flutter\\bin\\flutter.bat",
+      "--version",
+      "--no-version-check"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient",
+    "exit_code": 1,
+    "duration_seconds": 0.11256329999999999,
+    "timed_out": false
+  },
+  {
+    "record": "http-driver-first.json",
+    "started_utc": "2026-10-19T18:11:54.7176278Z",
+    "executable": "C:/Users/CUBE/AppData/Local/Python/bin/python.exe",
+    "arguments": [
+      "-I",
+      "-S",
+      "scratch/acceptance-runtime-20261019/http-fixture/verify-http.py",
+      "--binary",
+      "scratch/acceptance-runtime-20261019/cargo-target/debug/hellodoctor-backend.exe",
+      "--repo",
+      "C:\\Users\\CUBE\\Desktop\\helodoc old site"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+    "exit_code": 0,
+    "duration_seconds": 119.74106259999999,
+    "timed_out": false
+  },
+  {
+    "record": "http-fault-driver-repaired-forwarder.json",
+    "started_utc": "2026-10-19T18:20:31.1938144Z",
+    "executable": "C:/Users/CUBE/AppData/Local/Python/bin/python.exe",
+    "arguments": [
+      "-I",
+      "-S",
+      "scratch/acceptance-runtime-20261019/http-fixture/verify-faults-retry.py"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+    "exit_code": 0,
+    "duration_seconds": 54.4755021,
+    "timed_out": false
+  },
+  {
+    "record": "http-fault-driver-toolpath.json",
+    "started_utc": "2026-10-19T18:17:05.4336672Z",
+    "executable": "C:/Users/CUBE/AppData/Local/Python/bin/python.exe",
+    "arguments": [
+      "-I",
+      "-S",
+      "scratch/acceptance-runtime-20261019/http-fixture/verify-faults.py"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+    "exit_code": 0,
+    "duration_seconds": 63.560815899999994,
+    "timed_out": false
+  },
+  {
+    "record": "http-fault-driver.json",
+    "started_utc": "2026-10-19T18:16:50.3076364Z",
+    "executable": "C:/Users/CUBE/AppData/Local/Python/bin/python.exe",
+    "arguments": [
+      "-I",
+      "-S",
+      "scratch/acceptance-runtime-20261019/http-fixture/verify-faults.py"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+    "exit_code": 1,
+    "duration_seconds": 0.1808363,
+    "timed_out": false
+  },
+  {
+    "record": "http-original-observer.json",
+    "started_utc": "2026-10-19T18:21:24.9520071Z",
+    "executable": "C:/Users/CUBE/AppData/Local/Python/bin/python.exe",
+    "arguments": [
+      "-I",
+      "-S",
+      "services/backend/scripts/resilience/observe-local.py",
+      "--before",
+      "docs/audit_evidence/post_implementation_runtime_20261019/observer-before.json",
+      "--after",
+      "docs/audit_evidence/post_implementation_runtime_20261019/observer-after.json",
+      "--attack",
+      "docs/audit_evidence/post_implementation_runtime_20261019/observer-attack-classification.json",
+      "--output",
+      "docs/audit_evidence/post_implementation_runtime_20261019/observer-distributed-verdict.json"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+    "exit_code": 0,
+    "duration_seconds": 0.1130258,
+    "timed_out": false
+  },
+  {
+    "record": "http-pressure-driver.json",
+    "started_utc": "2026-10-19T18:19:11.6588600Z",
+    "executable": "C:/Users/CUBE/AppData/Local/Python/bin/python.exe",
+    "arguments": [
+      "-I",
+      "-S",
+      "scratch/acceptance-runtime-20261019/http-fixture/verify-pressure.py"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+    "exit_code": 1,
+    "duration_seconds": 41.9027482,
+    "timed_out": false
+  },
+  {
+    "record": "http-pressure-independent-lock.json",
+    "started_utc": "2026-10-19T18:22:04.4381646Z",
+    "executable": "C:/Users/CUBE/AppData/Local/Python/bin/python.exe",
+    "arguments": [
+      "-I",
+      "-S",
+      "scratch/acceptance-runtime-20261019/http-fixture/verify-pressure-fixed.py"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+    "exit_code": 0,
+    "duration_seconds": 46.1573886,
+    "timed_out": false
+  },
+  {
+    "record": "web-admin-build-copied-cache.json",
+    "started_utc": "2026-10-19T14:08:33.9572527Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--max-old-space-size=1536",
+      "node_modules/next/dist/bin/next",
+      "build"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web",
+    "exit_code": 0,
+    "duration_seconds": 32.8182581,
+    "timed_out": false
+  },
+  {
+    "record": "web-admin-build.json",
+    "started_utc": "2026-10-19T14:06:34.0152029Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--max-old-space-size=1536",
+      "node_modules/next/dist/bin/next",
+      "build"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web",
+    "exit_code": 1,
+    "duration_seconds": 11.4534405,
+    "timed_out": false
+  },
+  {
+    "record": "web-admin-lint.json",
+    "started_utc": "2026-10-19T14:04:54.5768202Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--max-old-space-size=1536",
+      "node_modules/eslint/bin/eslint.js",
+      "."
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web",
+    "exit_code": 1,
+    "duration_seconds": 55.9378465,
+    "timed_out": false
+  },
+  {
+    "record": "web-admin-tests-safe.json",
+    "started_utc": "2026-10-19T14:05:50.5744892Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--max-old-space-size=1536",
+      "--experimental-strip-types",
+      "--test",
+      "tests/api-traffic.test.ts",
+      "tests/investigation.test.ts",
+      "tests/polling.test.ts",
+      "tests/professional-verification.test.ts",
+      "tests/public-exposure.test.ts",
+      "tests/schedule.test.ts",
+      "tests/turnstile.test.ts",
+      "tests/web-assertion.test.ts"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web",
+    "exit_code": 0,
+    "duration_seconds": 0.43940209999999996,
+    "timed_out": false
+  },
+  {
+    "record": "web-admin-typecheck.json",
+    "started_utc": "2026-10-19T14:04:48.3517077Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--max-old-space-size=1536",
+      "node_modules/typescript/bin/tsc",
+      "--noEmit",
+      "--incremental",
+      "false"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web",
+    "exit_code": 0,
+    "duration_seconds": 6.1506326,
+    "timed_out": false
+  },
+  {
+    "record": "web-doctor-build.json",
+    "started_utc": "2026-10-19T14:05:55.8285936Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--max-old-space-size=1536",
+      "node_modules/next/dist/bin/next",
+      "build"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\doctor-web",
+    "exit_code": 0,
+    "duration_seconds": 41.9540006,
+    "timed_out": false
+  },
+  {
+    "record": "web-doctor-lint.json",
+    "started_utc": "2026-10-19T14:05:25.0444030Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--max-old-space-size=1536",
+      "scripts/check-source.mjs"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\doctor-web",
+    "exit_code": 0,
+    "duration_seconds": 0.08589619999999999,
+    "timed_out": false
+  },
+  {
+    "record": "web-doctor-tests.json",
+    "started_utc": "2026-10-19T14:05:25.1451215Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--max-old-space-size=1536",
+      "--experimental-strip-types",
+      "--test",
+      "tests/*.test.ts"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\doctor-web",
+    "exit_code": 0,
+    "duration_seconds": 0.7827955999999999,
+    "timed_out": false
+  },
+  {
+    "record": "web-doctor-typecheck.json",
+    "started_utc": "2026-10-19T14:05:19.6692494Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--max-old-space-size=1536",
+      "node_modules/typescript/bin/tsc",
+      "--noEmit",
+      "--incremental",
+      "false"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\doctor-web",
+    "exit_code": 0,
+    "duration_seconds": 5.3071549,
+    "timed_out": false
+  },
+  {
+    "record": "web-node-version.json",
+    "started_utc": "2026-10-19T14:08:03.9383217Z",
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "arguments": [
+      "--version"
+    ],
+    "working_directory": "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\admin-web",
+    "exit_code": 0,
+    "duration_seconds": 0.062245299999999996,
+    "timed_out": false
+  }
+]

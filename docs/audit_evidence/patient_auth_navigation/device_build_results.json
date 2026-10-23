@@ -1,0 +1,15 @@
+{
+  "version": "1.0.1+4",
+  "release_build_exit": 0,
+  "install_exit": 0,
+  "app_data_cleared": false,
+  "device_model": "moto g96 5G",
+  "android": "16",
+  "startup_alive_after_seconds": 5,
+  "startup_native_fatal": false,
+  "physical_fresh_registration_verified": false,
+  "artifact": "releases/hellodoctor-patient-arm64-auth-navigation-fix-20261015.apk",
+  "bytes": 20889612,
+  "sha256": "a0837f698fae0d667fd8724916c43c337386e6a0d7debf9caa814b187bddd759",
+  "bottom_navigation_safe_area": true
+}

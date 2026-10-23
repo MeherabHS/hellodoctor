@@ -1,0 +1,34 @@
+{
+  "baseline_counts": {
+    "rust_library": 53,
+    "backend_integration": 235,
+    "patient_flutter": 205,
+    "doctor_flutter": 208,
+    "doctor_web": 53,
+    "admin_web": 16
+  },
+  "baseline_source": "Observed final lifecycle milestone gates, 770 tests; no fresh pre-edit rerun",
+  "modified_existing_test_files": [
+    "apps/mobile/test/consultation_pagination_test.dart",
+    "apps/mobile/test/doctor_cubit_test.dart",
+    "apps/mobile/test/doctor_widgets_test.dart",
+    "apps/mobile/test/notification_cubit_test.dart",
+    "apps/mobile_patient/test/chat_cubit_test.dart",
+    "apps/mobile_patient/test/notification_cubit_test.dart",
+    "services/backend/tests/api_tests.rs"
+  ],
+  "missing_existing_test_files": [],
+  "removed_existing_test_functions": [],
+  "added_skip_ignore_lines": [],
+  "existing_assertions_deleted_without_replacement": [],
+  "intentionally_changed_assertions": [],
+  "private_profile_cutoff_assertion_preserved": true,
+  "fixture_protocol_additions": [
+    "Existing notification fakes implement the additive after-cursor protocol; no assertions changed.",
+    "Existing schedule fakes accept optional day; no assertions changed.",
+    "Patient chat fake implements newer-message protocol; no assertions changed.",
+    "Doctor consultation pagination test now checks first-page length=100 and hasMore=true, explicitly loads the next page, then runs every original exact ordering/identity/page assertion unchanged. This exercises the approved on-demand pagination behavior."
+  ],
+  "test_runners_changed": false,
+  "historical_tag_rewritten": false
+}

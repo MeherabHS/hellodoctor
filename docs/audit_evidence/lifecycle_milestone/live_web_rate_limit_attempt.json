@@ -1,0 +1,11 @@
+{
+  "checks": {},
+  "page_errors": [],
+  "physical_device": false,
+  "real_external_payment": false,
+  "real_azure": false,
+  "rtc_media": false,
+  "payment_evidence": "Existing HMAC-signed DEVELOPMENT callback only",
+  "status": "FAIL",
+  "failure_type": "AssertionError"
+}

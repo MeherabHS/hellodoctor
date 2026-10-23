@@ -1,0 +1,11 @@
+{
+  "status": "FAIL",
+  "windows": {},
+  "errors": [],
+  "http_failures": [],
+  "physical_device": false,
+  "visibility_mode": "controlled DOM visibilityState, not OS background",
+  "clock": "real wall time, no timer acceleration",
+  "backend": "real development backend and HttpOnly-cookie BFF",
+  "failure_type": "TimeoutError"
+}

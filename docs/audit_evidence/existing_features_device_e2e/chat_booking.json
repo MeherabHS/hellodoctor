@@ -1,0 +1,9 @@
+{
+  "appointment_id": "5cc0d508-4191-4764-97ca-2287ceb01e4c",
+  "reference": "APT-20261015-5CC0D508",
+  "doctor_id": "da000001-0000-0000-0000-000000000001",
+  "modality": "CHAT",
+  "status": "CONFIRMED",
+  "fee": "500",
+  "conversation_id": "e6c21dbd-38b6-4a6d-82bd-504669ddcb3a"
+}

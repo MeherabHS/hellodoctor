@@ -1,0 +1,547 @@
+--- apps/mobile/test/doctor_widgets_test.dart (before)
++++ apps/mobile/test/doctor_widgets_test.dart (after)
+@@ -146,6 +146,8 @@
+     });
+     await tester.pumpWidget(
+         harness(const QueuePage(), DoctorState(queue: [appointment])));
++    await tester.tap(find.text('All Scheduled (1)'));
++    await tester.pump();
+     expect(find.text('Server patient'), findsOneWidget);
+     expect(find.text('Scheduled'), findsOneWidget);
+   });
+@@ -182,6 +184,8 @@
+           harness(const QueuePage(), DoctorState(queue: [appointment])));
+       await tester.pumpAndSettle();
+       expect(tester.takeException(), isNull, reason: 'width=$width');
++      await tester.tap(find.text('All Scheduled (1)'));
++      await tester.pump();
+       expect(find.text('Start video consultation'), findsOneWidget,
+           reason: 'width=$width');
+       expect(find.text('Follow-up messages'), findsOneWidget,
+--- apps/mobile_patient/test/consultation_booking_test.dart (before)
++++ apps/mobile_patient/test/consultation_booking_test.dart (after)
+@@ -103,15 +103,22 @@
+               repo: repo,
+               familyProfilesCubit: family)));
+       await tester.pump();
+-      final button = tester.widget<FilledButton>(
+-          find.widgetWithText(FilledButton, 'Open consultation'));
+-      expect(button.onPressed != null, payment == 'PAYMENT_HELD');
++      final button = tester.widget<FilledButton>(find.widgetWithText(
++          FilledButton,
++          payment == 'PAYMENT_HELD'
++              ? 'Open consultation'
++              : 'Proceed to payment'));
++      expect(button.onPressed != null, isTrue);
++      expect(find.text('Open consultation'),
++          payment == 'PAYMENT_HELD' ? findsOneWidget : findsNothing);
++      expect(find.text('Proceed to payment'),
++          payment == 'PAYMENT_HELD' ? findsNothing : findsOneWidget);
+       expect(
+           find.text(payment == 'PAYMENT_HELD'
+               ? 'Consultation confirmed'
+               : payment == 'FAILED'
+                   ? 'Payment failed'
+-                  : 'Awaiting payment confirmation'),
++                  : 'Payment required'),
+           findsOneWidget);
+       expect(find.text('KES 750'), findsOneWidget);
+       expect(tester.takeException(), isNull);
+--- apps/mobile_patient/test/consultation_flow_test.dart (before)
++++ apps/mobile_patient/test/consultation_flow_test.dart (after)
+@@ -1,3 +1,4 @@
++import 'package:hellodoctor_mobile_patient/core/l10n/kenya_time.dart';
+ import 'dart:io';
+ import 'dart:ui' as ui;
+ import 'package:dio/dio.dart';
+@@ -138,7 +139,7 @@
+       await tester.pumpAndSettle();
+       await tester.tap(find.text('1').first);
+       await tester.pumpAndSettle();
+-      final local = DateTime.parse('2026-11-01T07:00:00Z').toLocal();
++      final local = kenyaTime(DateTime.parse('2026-11-01T07:00:00Z'));
+       final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+       final label =
+           '${hour.toString().padLeft(2, '0')}:00 ${local.hour >= 12 ? 'PM' : 'AM'}';
+@@ -151,16 +152,17 @@
+       expect(bookings.single['modality'], 'CHAT');
+       expect(bookings.single['slot_id'], 'slot');
+       expect(bookings.single['gateway'], 'MPESA');
+-      expect(find.text('Awaiting payment confirmation'), findsOneWidget);
++      expect(find.text('Payment required'), findsOneWidget);
++      expect(find.text('Open consultation'), findsNothing);
+       expect(
+           tester
+               .widget<FilledButton>(
+-                  find.widgetWithText(FilledButton, 'Open consultation'))
++                  find.widgetWithText(FilledButton, 'Proceed to payment'))
+               .onPressed,
+-          isNull);
++          isNotNull);
+       await capture(tester, 'chat_payment_pending_${width.toInt()}');
+       paid = true;
+-      await tester.tap(find.text('Check payment status'));
++      await tester.tap(find.text('Refresh status'));
+       await tester.pumpAndSettle();
+       expect(find.text('Consultation confirmed'), findsOneWidget);
+       await capture(tester, 'chat_payment_confirmed_${width.toInt()}');
+--- services/backend/tests/api_tests.rs (before)
++++ services/backend/tests/api_tests.rs (after)
+@@ -14914,3 +14914,457 @@
+         assert_eq!(after, before);
+     }
+ }
++
++// Pre-E2E corrections: additive fixtures and assertions; historical cases above remain intact.
++#[sqlx::test(migrations = "./migrations")]
++async fn test_pre_e2e_queue_excludes_stale_and_terminal_but_preserves_history(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let now = Utc::now();
++    let (_, past) = insert_confirmed_appointment(&pool, now - Duration::hours(4)).await;
++    let (_, completed) = insert_confirmed_appointment(&pool, now - Duration::hours(3)).await;
++    sqlx::query("UPDATE appointments SET status='COMPLETED', completed_at=NOW()-INTERVAL '2 hours' WHERE id=$1").bind(completed).execute(&pool).await.unwrap();
++    let (_, near) = insert_confirmed_appointment(&pool, now + Duration::minutes(30)).await;
++    let (_, later) = insert_confirmed_appointment(&pool, now + Duration::minutes(150)).await;
++    let (_, tomorrow) = insert_confirmed_appointment(&pool, now + Duration::days(1)).await;
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let response = get(
++        &app,
++        "/api/v1/doctor/appointments?view=upcoming",
++        Some(&doctor),
++    )
++    .await;
++    assert_eq!(response.status(), StatusCode::OK);
++    let body = json_body(response).await;
++    let ids: Vec<_> = body["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .map(|v| v["id"].as_str().unwrap().to_owned())
++        .collect();
++    assert_eq!(
++        ids,
++        vec![near.to_string(), later.to_string(), tomorrow.to_string()]
++    );
++    assert!(body["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .all(|v| v["queue_actionable"] == true));
++    let history = json_body(
++        get(
++            &app,
++            "/api/v1/doctor/appointments?status=COMPLETED",
++            Some(&doctor),
++        )
++        .await,
++    )
++    .await;
++    assert_eq!(history["data"].as_array().unwrap().len(), 1);
++    assert_eq!(history["data"][0]["id"], completed.to_string());
++    assert_eq!(history["data"][0]["queue_actionable"], false);
++    let all = json_body(get(&app, "/api/v1/doctor/appointments", Some(&doctor)).await).await;
++    assert_eq!(all["data"].as_array().unwrap().len(), 5);
++    assert_eq!(all["data"][0]["id"], near.to_string());
++    assert_eq!(all["data"][3]["id"], completed.to_string());
++    assert_eq!(all["data"][4]["id"], past.to_string());
++    let (_, active) = insert_confirmed_appointment(&pool, now - Duration::minutes(60)).await;
++    sqlx::query("UPDATE appointments SET status='IN_CONSULTATION' WHERE id=$1")
++        .bind(active)
++        .execute(&pool)
++        .await
++        .unwrap();
++    let queue = json_body(
++        get(
++            &app,
++            "/api/v1/doctor/appointments?view=upcoming",
++            Some(&doctor),
++        )
++        .await,
++    )
++    .await;
++    assert_eq!(queue["data"].as_array().unwrap().len(), 4);
++    assert_eq!(queue["data"][0]["id"], active.to_string());
++    assert_eq!(queue["data"][1]["id"], near.to_string());
++    let other = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
++    let isolated = json_body(
++        get(
++            &app,
++            "/api/v1/doctor/appointments?view=upcoming",
++            Some(&other),
++        )
++        .await,
++    )
++    .await;
++    assert_eq!(isolated["data"].as_array().unwrap().len(), 0);
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_pre_e2e_slot_instant_boundaries_and_nairobi_date(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let doctor = DoctorProfileId::from(uid(DOCTOR1_PROFILE_ID));
++    let now: DateTime<Utc> = sqlx::query_scalar("SELECT clock_timestamp()")
++        .fetch_one(&pool)
++        .await
++        .unwrap();
++    let crossing = DateTime::<Utc>::from_naive_utc_and_offset(
++        now.date_naive()
++            .succ_opt()
++            .unwrap()
++            .and_hms_opt(21, 30, 0)
++            .unwrap(),
++        Utc,
++    );
++    let times = [
++        now - Duration::days(2),
++        now - Duration::hours(2),
++        now - Duration::seconds(1),
++        now + Duration::minutes(30),
++        crossing,
++    ];
++    let mut ids = Vec::new();
++    for start in times {
++        let id = Uuid::new_v4();
++        doctor_repo::insert_slot(
++            &pool,
++            &ScheduleSlot {
++                id,
++                doctor_id: doctor,
++                start_time: start,
++                end_time: start + Duration::minutes(10),
++                status: SlotStatus::Available,
++                created_at: now,
++            },
++        )
++        .await
++        .unwrap();
++        ids.push(id);
++    }
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let response = get(
++        &app,
++        &format!("/api/v1/doctors/{doctor}/slots"),
++        Some(&patient),
++    )
++    .await;
++    assert_eq!(response.status(), StatusCode::OK);
++    let body = json_body(response).await;
++    let rows = body["data"].as_array().unwrap();
++    for id in &ids[..3] {
++        assert!(rows.iter().all(|v| v["id"] != id.to_string()));
++    }
++    for id in &ids[3..] {
++        assert!(rows.iter().any(|v| v["id"] == id.to_string()));
++    }
++    let row = rows.iter().find(|v| v["id"] == ids[4].to_string()).unwrap();
++    assert_eq!(
++        DateTime::parse_from_rfc3339(row["start_time"].as_str().unwrap())
++            .unwrap()
++            .with_timezone(&Utc),
++        crossing
++    );
++    assert_ne!(
++        crossing.date_naive(),
++        (crossing + Duration::hours(3)).date_naive()
++    );
++    for id in &ids[..3] {
++        let response=post_idem(&app,"/api/v1/appointments/book",Some(&patient),&serde_json::json!({"doctor_id":doctor,"slot_id":id,"modality":"CHAT","gateway":"MPESA"}),&Uuid::new_v4().to_string()).await;
++        assert_eq!(response.status(), StatusCode::CONFLICT);
++        assert_eq!(schedule_slot_status(&pool, *id).await, "AVAILABLE");
++    }
++    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM appointments")
++        .fetch_one(&pool)
++        .await
++        .unwrap();
++    assert_eq!(count, 0);
++    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM transactions")
++        .fetch_one(&pool)
++        .await
++        .unwrap();
++    assert_eq!(count, 0);
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_pre_e2e_slot_start_crossed_while_waiting_for_row_lock(pool: PgPool) {
++    let (_, pool) = test_app(pool).await;
++    let id = Uuid::new_v4();
++    let doctor = DoctorProfileId::from(uid(DOCTOR1_PROFILE_ID));
++    let mut holder = pool.begin().await.unwrap();
++    sqlx::query("INSERT INTO doctor_schedule_slots(id,doctor_id,start_time,end_time,status) VALUES($1,$2,clock_timestamp()+INTERVAL '700 milliseconds',clock_timestamp()+INTERVAL '10 minutes','AVAILABLE')").bind(id).bind(doctor).execute(&mut *holder).await.unwrap();
++    holder.commit().await.unwrap();
++    let mut holder = pool.begin().await.unwrap();
++    sqlx::query("SELECT id FROM doctor_schedule_slots WHERE id=$1 FOR UPDATE")
++        .bind(id)
++        .fetch_one(&mut *holder)
++        .await
++        .unwrap();
++    let mut waiter = pool.begin().await.unwrap();
++    let before: bool = sqlx::query_scalar(
++        "SELECT start_time > CURRENT_TIMESTAMP FROM doctor_schedule_slots WHERE id=$1",
++    )
++    .bind(id)
++    .fetch_one(&mut *waiter)
++    .await
++    .unwrap();
++    assert!(before);
++    let task = tokio::spawn(async move {
++        let result = doctor_repo::try_lock_slot(&mut waiter, id, doctor)
++            .await
++            .unwrap();
++        waiter.commit().await.unwrap();
++        result
++    });
++    tokio::time::sleep(std::time::Duration::from_millis(900)).await;
++    holder.commit().await.unwrap();
++    assert!(!task.await.unwrap());
++    assert_eq!(schedule_slot_status(&pool, id).await, "AVAILABLE");
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_pre_e2e_payment_resume_has_no_duplicate_or_false_payment(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let slots = json_body(
++        get(
++            &app,
++            &format!("/api/v1/doctors/{DOCTOR1_PROFILE_ID}/slots"),
++            Some(&patient),
++        )
++        .await,
++    )
++    .await;
++    let response=post_idem(&app,"/api/v1/appointments/book",Some(&patient),&serde_json::json!({"doctor_id":DOCTOR1_PROFILE_ID,"slot_id":slots["data"][0]["id"],"modality":"CHAT","gateway":"MPESA"}),&Uuid::new_v4().to_string()).await;
++    assert_eq!(response.status(), StatusCode::CREATED);
++    let body = json_body(response).await;
++    let id = body["data"]["appointment_id"].as_str().unwrap();
++    let path = format!("/api/v1/appointments/{id}/payment");
++    let mut tasks = Vec::new();
++    for _ in 0..4 {
++        let app = app.clone();
++        let token = patient.clone();
++        let path = path.clone();
++        tasks.push(tokio::spawn(async move {
++            post(&app, &path, Some(&token), &serde_json::json!({}))
++                .await
++                .status()
++        }));
++    }
++    for task in tasks {
++        assert_eq!(task.await.unwrap(), StatusCode::CONFLICT);
++    }
++    let status =
++        json_body(get(&app, &format!("/api/v1/appointments/{id}"), Some(&patient)).await).await;
++    assert_eq!(status["data"]["status"], "PENDING_PAYMENT");
++    assert_eq!(status["data"]["payment_status"], "INITIATED");
++    let counts: (i64, i64) = sqlx::query_as(
++        "SELECT (SELECT COUNT(*) FROM appointments),(SELECT COUNT(*) FROM transactions)",
++    )
++    .fetch_one(&pool)
++    .await
++    .unwrap();
++    assert_eq!(counts, (1, 1));
++    let other = fresh_patient_token(&pool).await;
++    assert_eq!(
++        post(&app, &path, Some(&other), &serde_json::json!({}))
++            .await
++            .status(),
++        StatusCode::NOT_FOUND
++    );
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    assert_eq!(
++        post(&app, &path, Some(&doctor), &serde_json::json!({}))
++            .await
++            .status(),
++        StatusCode::FORBIDDEN
++    );
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_pre_e2e_clinical_attachment_shared_private_persistent_and_idempotent(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    open_clinical_window(&pool, appointment).await;
++    let conv = json_body(
++        get(
++            &app,
++            &format!("/api/v1/appointments/{appointment}/conversation"),
++            Some(&patient),
++        )
++        .await,
++    )
++    .await;
++    let conversation = conv["data"]["id"].as_str().unwrap();
++    let upload = format!("/api/v1/chat/{conversation}/attachments");
++    let body = serde_json::json!({"mime_type":"image/jpeg","base64_content":minimal_jpeg_base64()});
++    let key = Uuid::new_v4().to_string();
++    let mut tasks = Vec::new();
++    for _ in 0..4 {
++        let app = app.clone();
++        let token = doctor.clone();
++        let path = upload.clone();
++        let body = body.clone();
++        let key = key.clone();
++        tasks.push(tokio::spawn(async move {
++            let r = post_idem(&app, &path, Some(&token), &body, &key).await;
++            assert_eq!(r.status(), StatusCode::CREATED);
++            json_body(r).await
++        }));
++    }
++    let mut results = Vec::new();
++    for task in tasks {
++        results.push(task.await.unwrap());
++    }
++    let message = results[0]["data"]["id"].as_str().unwrap();
++    for r in &results {
++        assert_eq!(r["data"]["id"], message);
++    }
++    assert_eq!(results[0]["data"]["sender_id"], DOCTOR1_USER_ID);
++    assert!(results[0]["data"].get("attachment_object_key").is_none());
++    assert!(results[0]["data"].get("attachment_bucket").is_none());
++    assert!(results[0]["data"].get("attachment_hash").is_none());
++    assert_eq!(
++        results[0]["data"]["attachment"]["display_name"],
++        "Clinical image"
++    );
++    assert!(
++        results[0]["data"]["attachment"]["size_bytes"]
++            .as_i64()
++            .unwrap()
++            <= 40 * 1024
++    );
++    let list = format!("/api/v1/chat/{conversation}/messages");
++    let p = json_body(get(&app, &list, Some(&patient)).await).await;
++    let d = json_body(get(&app, &list, Some(&doctor)).await).await;
++    assert_eq!(p["data"], d["data"]);
++    assert_eq!(p["data"].as_array().unwrap().len(), 1);
++    let view = format!("/api/v1/chat/{conversation}/messages/{message}/attachment");
++    let response = get(&app, &view, Some(&patient)).await;
++    assert_eq!(response.status(), StatusCode::OK);
++    assert_eq!(response.headers()["cache-control"], "no-store, private");
++    let file = json_body(response).await;
++    let bytes = STANDARD
++        .decode(file["data"]["base64_content"].as_str().unwrap())
++        .unwrap();
++    assert!(bytes.len() <= 40 * 1024);
++    assert!(bytes.starts_with(&[0xff, 0xd8, 0xff]));
++    let doctor_file = json_body(get(&app, &view, Some(&doctor)).await).await;
++    assert_eq!(doctor_file["data"], file["data"]);
++    let count: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages WHERE conversation_id=$1")
++            .bind(Uuid::parse_str(conversation).unwrap())
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(count, 1);
++    let other_doctor = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
++    let other_patient = fresh_patient_token(&pool).await;
++    assert_eq!(
++        post_idem(
++            &app,
++            &upload,
++            Some(&other_doctor),
++            &body,
++            &Uuid::new_v4().to_string()
++        )
++        .await
++        .status(),
++        StatusCode::NOT_FOUND
++    );
++    assert_eq!(
++        post_idem(
++            &app,
++            &upload,
++            Some(&patient),
++            &body,
++            &Uuid::new_v4().to_string()
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
++    for token in [&other_doctor, &other_patient] {
++        assert_eq!(
++            get(&app, &view, Some(token)).await.status(),
++            StatusCode::NOT_FOUND
++        );
++    }
++    sqlx::query("UPDATE chat_conversations SET expires_at=NOW()-INTERVAL '1 second' WHERE id=$1")
++        .bind(Uuid::parse_str(conversation).unwrap())
++        .execute(&pool)
++        .await
++        .unwrap();
++    assert_eq!(
++        post_idem(
++            &app,
++            &upload,
++            Some(&doctor),
++            &body,
++            &Uuid::new_v4().to_string()
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
++    let count: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages WHERE conversation_id=$1")
++            .bind(Uuid::parse_str(conversation).unwrap())
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(count, 1);
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_pre_e2e_clinical_attachment_rejects_spoof_corruption_and_size(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    open_clinical_window(&pool, appointment).await;
++    let conv = json_body(
++        get(
++            &app,
++            &format!("/api/v1/appointments/{appointment}/conversation"),
++            Some(&patient),
++        )
++        .await,
++    )
++    .await;
++    let id = conv["data"]["id"].as_str().unwrap();
++    let path = format!("/api/v1/chat/{id}/attachments");
++    for body in [
++        serde_json::json!({"mime_type":"image/png","base64_content":minimal_jpeg_base64()}),
++        serde_json::json!({"mime_type":"image/jpeg","base64_content":STANDARD.encode([0xff,0xd8,0xff,0,1,2])}),
++        serde_json::json!({"mime_type":"application/pdf","base64_content":STANDARD.encode(b"%PDF-fixture")}),
++    ] {
++        assert_eq!(
++            post_idem(
++                &app,
++                &path,
++                Some(&doctor),
++                &body,
++                &Uuid::new_v4().to_string()
++            )
++            .await
++            .status(),
++            StatusCode::UNPROCESSABLE_ENTITY
++        );
++    }
++    let response = post_idem(
++        &app,
++        &path,
++        Some(&doctor),
++        &serde_json::json!({"mime_type":"image/jpeg","base64_content":"A".repeat(14*1024*1024+1)}),
++        &Uuid::new_v4().to_string(),
++    )
++    .await;
++    assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
++    let count: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages WHERE conversation_id=$1")
++            .bind(Uuid::parse_str(id).unwrap())
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(count, 0);
++}

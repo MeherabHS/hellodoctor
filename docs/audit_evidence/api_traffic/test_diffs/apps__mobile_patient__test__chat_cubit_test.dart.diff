@@ -1,0 +1,22 @@
+--- baseline/apps/mobile_patient/test/chat_cubit_test.dart
+
++++ current/apps/mobile_patient/test/chat_cubit_test.dart
+
+@@ -37,6 +37,16 @@
+
+     if (messagesError != null) throw messagesError!;
+     return messagesResult ?? const [];
+   }
++
++  @override
++  Future<List<ChatMessageDto>> newerMessages(
++          String conversationId, ChatMessageDto after) async =>
++      (await messages(conversationId))
++          .where((m) =>
++              m.sentAt.isAfter(after.sentAt) ||
++              (m.sentAt.isAtSameMomentAs(after.sentAt) &&
++                  m.id.compareTo(after.id) > 0))
++          .toList();
+ 
+   @override
+   Future<ChatMessageDto> sendMessage(

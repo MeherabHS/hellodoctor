@@ -1,0 +1,15 @@
+﻿{
+    "recorded_utc":  "2026-10-19T13:51:42.2810536Z",
+    "kind":  "TRUSTED_PARENT_EVIDENCE_CONSISTENCY_CHECK_NOT_APPLICATION_TEST",
+    "passed":  true,
+    "control_records":  20,
+    "runtime_suite_records":  12,
+    "load_scenario_records":  10,
+    "unmeasured_metrics_per_scenario":  22,
+    "explicit_assertions":  22,
+    "new_regression_functions":  4,
+    "target_test_bodies_executed":  0,
+    "independent_source_review":  "Three subsystem reviewers; focused corrections re-reviewed; final report QA by auth reviewer",
+    "collector_retry_note":  "Initial parent check counted a nested ConvertFrom-Json array as1; fixed array assignment and rechecked actual20records. No application code/tests executed.",
+    "runtime_acceptance_complete":  false
+}

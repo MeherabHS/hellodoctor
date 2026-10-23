@@ -1,0 +1,43 @@
+﻿{
+    "started_utc":  "2026-10-19T14:21:16.7122428Z",
+    "executable":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\cargo-target\\debug\\deps\\hellodoctor_backend-128fa8638737eeae.exe",
+    "arguments":  [
+                      "--list"
+                  ],
+    "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\backend",
+    "exit_code":  0,
+    "timed_out":  false,
+    "duration_seconds":  0.0332606,
+    "environment_keys":  [
+                             "APPDATA",
+                             "CARGO_BUILD_JOBS",
+                             "CARGO_HOME",
+                             "CARGO_NET_OFFLINE",
+                             "CARGO_TARGET_DIR",
+                             "CI",
+                             "COMSPEC",
+                             "DART_SUPPRESS_ANALYTICS",
+                             "FLUTTER_SUPPRESS_ANALYTICS",
+                             "GIT_TERMINAL_PROMPT",
+                             "HOME",
+                             "HTTP_PROXY",
+                             "HTTPS_PROXY",
+                             "JAVA_HOME",
+                             "LOCALAPPDATA",
+                             "NEXT_TELEMETRY_DISABLED",
+                             "NO_PROXY",
+                             "npm_config_offline",
+                             "npm_config_update_notifier",
+                             "PATH",
+                             "RUSTUP_HOME",
+                             "SystemRoot",
+                             "TEMP",
+                             "TMP",
+                             "USERPROFILE",
+                             "WINDIR"
+                         ],
+    "environment_policy":  "Cleared, allowlisted, scratch home/temp, offline package policy, external HTTP proxies point to closed loopback; not formal OS network isolation",
+    "source_changes_authorized":  false,
+    "local_development_verification":  true,
+    "formal_sandbox_certified":  false
+}

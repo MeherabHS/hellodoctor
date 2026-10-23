@@ -1,0 +1,18 @@
+﻿{
+    "run_id":  "sql-20261019T200439272",
+    "command":  "./services/backend/scripts/resilience/Invoke-IsolatedSql.ps1",
+    "shell":  "Windows PowerShell -NoProfile -ExecutionPolicy Bypass -File",
+    "working_directory":  "C:\\Users\\CUBE\\Desktop\\helodoc old site",
+    "started_utc":  "2026-10-19T14:04:39.2737875+00:00",
+    "finished_utc":  "2026-10-19T14:04:48.0415788+00:00",
+    "duration_seconds":  8.7492568,
+    "exit_code":  0,
+    "cached_image_id":  "sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54",
+    "phase_count":  6,
+    "operations_per_phase":  100,
+    "total_operations":  600,
+    "max_parallel_sql_clients":  8,
+    "profile":  "disposable PostgreSQL 16 raw-SQL fixture; no external network; no published ports; read-only source/root; 2 CPUs; 512 MiB RAM; no swap; 64 pids; 512 MiB scratch; 180 s timeout",
+    "claim_scope":  "raw SQL database invariants only; not SQLx migration metadata, Rust HTTP, external provider, or throughput capacity",
+    "output_file":  "sql-20261019T200439272.log"
+}

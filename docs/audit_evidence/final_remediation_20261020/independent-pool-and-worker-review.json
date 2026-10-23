@@ -1,0 +1,46 @@
+{
+    "reviewed_utc":  "2026-10-19T19:08:38.4433596Z",
+    "security_assertions_weakened":  0,
+    "source_review_result":  "PASS",
+    "code_or_assertion_edits_by_reviewer":  0,
+    "reviewer":  "remediate_flutter independent read-only review",
+    "scope":  "test-only role-pool idle cleanup, new capability pool pressure test, private decoder semaphore extraction, new password/sanitizer cancellation tests",
+    "files":  [
+                  {
+                      "reviewed_sha256":  "d953a3a0909b6d75c28c28a4be75d83420d3e6131842dc95f016ba92c6386ea6",
+                      "path":  "services/backend/tests/api_tests.rs",
+                      "baseline_sha256":  "8819b63514abdb3569d475311f092c79335845d11fe696b8361d9921f9d7a738",
+                      "new_file":  false
+                  },
+                  {
+                      "reviewed_sha256":  "02c9553867a2f2e507384e1e31dfb0661ae4cec30168701be3d53bac99c4c813",
+                      "path":  "services/backend/tests/cases/pool_pressure.rs",
+                      "baseline_sha256":  null,
+                      "new_file":  true
+                  },
+                  {
+                      "reviewed_sha256":  "81ac487e64d34598eaf6232affff7512f19c400c781b0d3df9458234754a481f",
+                      "path":  "services/backend/src/crypto.rs",
+                      "baseline_sha256":  "26ec8f91d58953d62d096cad4db45de7eb801b21d65bdd95a3fe5a8052aeca77",
+                      "new_file":  false
+                  },
+                  {
+                      "reviewed_sha256":  "d2909e9993ac0264d9963b30a1718ba37c4d2adb07e403e956eee5d863059a70",
+                      "path":  "services/backend/src/services/upload_security_service.rs",
+                      "baseline_sha256":  "2b23f6d93abfb34a278c1086bbf3ae0e89834462b872329e82a71671d624f402",
+                      "new_file":  false
+                  }
+              ],
+    "limitations":  [
+                        "New pool pressure test is an in-process router/real SQL and Redis integration case, not a network flood or capacity benchmark.",
+                        "Healthz is expected to remain200 for auth-only saturation because production readiness checks API/migrations and Redis. It returns503 for API saturation. This must be reported as observed behavior, not complete readiness of every role pool.",
+                        "Direct begin_authed_as test enforces an outer1second timeout and any error. Exact250ms acquisition timing is a source-established deadline, not a measured250ms bound asserted by this case.",
+                        "The test holds real connection guards and independently counts pg_stat_activity, but does not measure production waiter-peak or queued demand under load. Reserved consultation admission cannot guarantee clinical200 when shared capability pool is full; the expected controlled503 captures this limitation.",
+                        "Cancellation tests deterministically abort callers while actual production blocking closures are queued. They prove permit retention until the closure completes and recovery, not actual simultaneous CPU worker occupancy in a network attack."
+                    ],
+    "runtime_verification_by_reviewer":  "NOT_RUN",
+    "blocking_findings":  [
+
+                          ],
+    "production_pool_enlargement":  0
+}

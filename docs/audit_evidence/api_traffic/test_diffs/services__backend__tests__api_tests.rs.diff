@@ -1,0 +1,268 @@
+--- baseline/services/backend/tests/api_tests.rs
+
++++ current/services/backend/tests/api_tests.rs
+
+@@ -16765,3 +16765,262 @@
+
+     let rejected:i64=sqlx::query_scalar("SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1 AND event_type='ATTACHMENT_UPLOAD_REJECTED' AND reason_code='WINDOW_CLOSED_OR_DENIED'").bind(appointment).fetch_one(&pool).await.unwrap();
+     assert_eq!(rejected, 1);
+ }
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_traffic_notification_cursor_pages_are_stable_and_owner_scoped(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let time = chrono::Utc::now() - chrono::Duration::hours(1);
++    for index in 1..=100_u128 {
++        sqlx::query("INSERT INTO notifications(id,user_id,type,title,body,created_at,dedup_key)VALUES($1,$2,'NEW_CHAT_MESSAGE','New consultation message','A new consultation message is available.',$3,$1::text)").bind(Uuid::from_u128(index)).bind(uid(PATIENT_USER_ID)).bind(time).execute(&pool).await.unwrap();
++    }
++    let foreign = Uuid::from_u128(101);
++    sqlx::query("INSERT INTO notifications(id,user_id,type,title,body,created_at,dedup_key)VALUES($1,$2,'NEW_CHAT_MESSAGE','Private notification','Another account notification',$3,$1::text)").bind(foreign).bind(uid(DOCTOR2_USER_ID)).bind(time).execute(&pool).await.unwrap();
++    let latest = get(&app, "/api/v1/notifications", Some(&patient)).await;
++    assert_eq!(latest.status(), StatusCode::OK);
++    let latest = json_body(latest).await;
++    assert_eq!(latest["data"].as_array().unwrap().len(), 25);
++    assert_eq!(latest["data"][0]["id"], Uuid::from_u128(100).to_string());
++    let mut cursor = Uuid::nil();
++    let mut seen = std::collections::HashSet::new();
++    for _ in 0..4 {
++        let path = format!(
++            "/api/v1/notifications?limit=25&after_time={}&after_id={cursor}",
++            time.to_rfc3339().replace('+', "%2B")
++        );
++        let response = get(&app, &path, Some(&patient)).await;
++        assert_eq!(response.status(), StatusCode::OK);
++        let body = json_body(response).await;
++        let rows = body["data"].as_array().unwrap();
++        assert_eq!(rows.len(), 25);
++        for row in rows {
++            assert_eq!(row["user_id"], PATIENT_USER_ID);
++            assert_ne!(row["id"], foreign.to_string());
++            assert!(seen.insert(row["id"].as_str().unwrap().to_owned()));
++        }
++        cursor = uid(rows.last().unwrap()["id"].as_str().unwrap());
++    }
++    assert_eq!(seen.len(), 100);
++    let empty = get(
++        &app,
++        &format!(
++            "/api/v1/notifications?after_time={}&after_id={cursor}",
++            time.to_rfc3339().replace('+', "%2B")
++        ),
++        Some(&patient),
++    )
++    .await;
++    assert_eq!(empty.status(), StatusCode::OK);
++    assert_eq!(json_body(empty).await["data"], serde_json::json!([]));
++    let before = get(
++        &app,
++        &format!(
++            "/api/v1/notifications?before_time={}&before_id={cursor}&limit=25",
++            time.to_rfc3339().replace('+', "%2B")
++        ),
++        Some(&patient),
++    )
++    .await;
++    assert_eq!(before.status(), StatusCode::OK);
++    let before = json_body(before).await;
++    assert_eq!(before["data"][0]["id"], Uuid::from_u128(99).to_string());
++    assert_eq!(
++        get(
++            &app,
++            "/api/v1/notifications?after_id=00000000-0000-0000-0000-000000000001",
++            Some(&patient)
++        )
++        .await
++        .status(),
++        StatusCode::UNPROCESSABLE_ENTITY
++    );
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_traffic_admin_timeline_pages_remain_complete_without_recursive_growth(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let session = consultation_repo::find_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    let conv = chat_repo::find_conversation_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    for _index in 0..120 {
++        sqlx::query("INSERT INTO chat_messages(id,conversation_id,sender_id,content,sent_at)VALUES($1,$2,$3,'private clinical fixture text',clock_timestamp())").bind(Uuid::new_v4()).bind(conv.id).bind(uid(PATIENT_USER_ID)).execute(&pool).await.unwrap();
++        let response = post(
++            &app,
++            &format!("/api/v1/appointments/{appointment}/trace-ack"),
++            Some(&patient),
++            &serde_json::json!({"event":"CHAT_OPENED","conversation_id":conv.id}),
++        )
++        .await;
++        assert_eq!(response.status(), StatusCode::OK);
++    }
++    let grievance=post(&app,"/api/v1/grievances",Some(&patient),&serde_json::json!({"consultation_id":session.id,"target":"DOCTOR","category":"Pagination investigation","claim_summary":"Synthetic case proving complete bounded investigation evidence"})).await;
++    assert_eq!(grievance.status(), StatusCode::CREATED);
++    let case = json_body(grievance).await;
++    let id = case["data"]["grievance_id"].as_str().unwrap();
++    let base = format!("/api/v1/admin/grievances/{id}/timeline");
++    let response = get(
++        &app,
++        &format!("{base}?event_limit=17&record_limit=20"),
++        Some(&admin),
++    )
++    .await;
++    assert_eq!(response.status(), StatusCode::OK);
++    let first = json_body(response).await["data"].clone();
++    assert_eq!(first["records"]["messages"].as_array().unwrap().len(), 20);
++    assert_eq!(first["record_page"]["totals"]["messages"], 120);
++    let total = first["event_page"]["total"].as_u64().unwrap();
++    assert!(total >= 120);
++    let snapshot = first["event_page"]["snapshot_at"]
++        .as_str()
++        .unwrap()
++        .replace('+', "%2B");
++    let mut page = first;
++    let mut seen = std::collections::HashSet::new();
++    for iteration in 0..30 {
++        assert!(!page.to_string().contains("private clinical fixture text"));
++        assert_eq!(page["event_page"]["total"].as_u64().unwrap(), total);
++        let count = page["trace_events"].as_array().unwrap().len()
++            + page["audit_events"].as_array().unwrap().len();
++        assert!(count <= 17);
++        for kind in ["trace_events", "audit_events"] {
++            for row in page[kind].as_array().unwrap() {
++                assert!(seen.insert(format!("{kind}:{}", row["id"])));
++            }
++        }
++        if !page["event_page"]["has_more"].as_bool().unwrap() {
++            break;
++        }
++        assert!(
++            iteration < 29,
++            "Evidence paging must terminate despite read audits"
++        );
++        let next = &page["event_page"]["next"];
++        let path=format!("{base}?event_limit=17&snapshot_at={snapshot}&after_time={}&after_id={}&after_source={}&include_records=false",next["time"].as_str().unwrap().replace('+',"%2B"),next["id"].as_str().unwrap(),next["source"].as_str().unwrap());
++        let response = get(&app, &path, Some(&admin)).await;
++        assert_eq!(response.status(), StatusCode::OK);
++        page = json_body(response).await["data"].clone();
++        assert_eq!(page["records"], serde_json::json!({}));
++        assert!(page["telemetry"].is_null());
++    }
++    assert_eq!(seen.len() as u64, total);
++    let mut message_ids = std::collections::HashSet::new();
++    for offset in (0..120).step_by(20) {
++        let response=get(&app,&format!("{base}?include_events=false&record_limit=20&record_offset={offset}&snapshot_at={snapshot}"),Some(&admin)).await;
++        assert_eq!(response.status(), StatusCode::OK);
++        let body = json_body(response).await;
++        assert_eq!(body["data"]["trace_events"], serde_json::json!([]));
++        assert_eq!(body["data"]["audit_events"], serde_json::json!([]));
++        let rows = body["data"]["records"]["messages"].as_array().unwrap();
++        assert_eq!(rows.len(), 20);
++        for row in rows {
++            assert!(message_ids.insert(row["id"].as_str().unwrap().to_owned()));
++        }
++    }
++    assert_eq!(message_ids.len(), 120);
++    assert_eq!(
++        get(&app, &base, Some(&patient)).await.status(),
++        StatusCode::FORBIDDEN
++    );
++    assert_eq!(
++        get(&app, &format!("{base}?after_source=TRACE"), Some(&admin))
++            .await
++            .status(),
++        StatusCode::UNPROCESSABLE_ENTITY
++    );
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_traffic_admin_aggregate_summaries_match_existing_appointment_values(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let fee: bigdecimal::BigDecimal =
++        sqlx::query_scalar("SELECT consultation_fee FROM appointments WHERE id=$1")
++            .bind(appointment)
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    let overview = get(&app, "/api/v1/admin/overview", Some(&admin)).await;
++    assert_eq!(overview.status(), StatusCode::OK);
++    let overview = json_body(overview).await;
++    assert_eq!(overview["data"]["modality_split"]["videoCount"], 1);
++    assert_eq!(overview["data"]["modality_split"]["chatCount"], 0);
++    assert_eq!(
++        overview["data"]["modality_split"]["videoRevenue"],
++        fee.to_string()
++    );
++    let doctors = json_body(get(&app, "/api/v1/admin/doctors", Some(&admin)).await).await;
++    let row = doctors["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .find(|row| row["id"] == DOCTOR1_PROFILE_ID)
++        .unwrap();
++    assert_eq!(row["video_count"], 1);
++    assert_eq!(row["chat_count"], 0);
++    let patients = json_body(get(&app, "/api/v1/admin/patients", Some(&admin)).await).await;
++    let row = patients["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .find(|row| row["id"] == PATIENT_PROFILE_ID)
++        .unwrap();
++    assert_eq!(row["video_count"], 1);
++    assert_eq!(row["chat_count"], 0);
++    assert_eq!(row["consultation_fee_total"], fee.to_string());
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_traffic_doctor_schedule_day_query_is_nairobi_scoped_and_retains_history(
++    pool: PgPool,
++) {
++    let (app, pool) = test_app(pool).await;
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let ids = [Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4()];
++    for (id, time) in ids.iter().zip([
++        "2030-10-16T20:59:00Z",
++        "2030-10-16T21:01:00Z",
++        "2030-10-17T21:01:00Z",
++    ]) {
++        let start = chrono::DateTime::parse_from_rfc3339(time)
++            .unwrap()
++            .with_timezone(&chrono::Utc);
++        sqlx::query("INSERT INTO doctor_schedule_slots(id,doctor_id,start_time,end_time,status)VALUES($1,$2,$3,$3+INTERVAL '1 minute','AVAILABLE')").bind(id).bind(uid(DOCTOR1_PROFILE_ID)).bind(start).execute(&pool).await.unwrap();
++    }
++    let response = get(
++        &app,
++        "/api/v1/doctor/slots?day=2030-10-17&limit=100",
++        Some(&doctor),
++    )
++    .await;
++    assert_eq!(response.status(), StatusCode::OK);
++    let response = json_body(response).await;
++    let rows = response["data"].as_array().unwrap();
++    assert_eq!(rows.len(), 1);
++    assert_eq!(rows[0]["id"], ids[1].to_string());
++    let count: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM doctor_schedule_slots WHERE id=ANY($1)")
++            .bind(ids.as_slice())
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(count, 3);
++    let unrelated = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
++    let response = get(
++        &app,
++        "/api/v1/doctor/slots?day=2030-10-17&limit=100",
++        Some(&unrelated),
++    )
++    .await;
++    assert_eq!(response.status(), StatusCode::OK);
++    assert_eq!(json_body(response).await["data"], serde_json::json!([]));
++}

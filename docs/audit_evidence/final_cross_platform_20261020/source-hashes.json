@@ -1,0 +1,37 @@
+﻿{
+    "run":  "final_cross_platform_20261020",
+    "commit":  "dca9b3c5fcdb6303d31abbb77d3a1fd4ac1f879f",
+    "dirty":  true,
+    "components":  [
+                       {
+                           "component":  "doctor_flutter",
+                           "root":  "apps/mobile",
+                           "file_count":  138,
+                           "aggregate_sha256":  "ebb6030473f65db77775704205d8af40c6def3ca3cd60e935d24e35b47c564e9"
+                       },
+                       {
+                           "component":  "backend",
+                           "root":  "services/backend",
+                           "file_count":  263,
+                           "aggregate_sha256":  "a151f417fc7da842474fdd7fe96d8982ecc7bd707729ad3fc4567f7b6998f011"
+                       },
+                       {
+                           "component":  "patient_flutter",
+                           "root":  "apps/mobile_patient",
+                           "file_count":  202,
+                           "aggregate_sha256":  "61b10b356b6db4558ec32385fa6ad9a05ce1b271e4d33ce823fadd0ddaab87d2"
+                       },
+                       {
+                           "component":  "doctor_web",
+                           "root":  "apps/doctor-web",
+                           "file_count":  86,
+                           "aggregate_sha256":  "0f93c1d2b178e597619c20e7cdc5b2037459892a74e6c9f3937a9d1c0d5156d5"
+                       },
+                       {
+                           "component":  "admin_web",
+                           "root":  "apps/admin-web",
+                           "file_count":  56,
+                           "aggregate_sha256":  "61066e678a14dc5ee897ed74347434c9c02bfb74cac7ac8f559106b7ba10eca1"
+                       }
+                   ]
+}

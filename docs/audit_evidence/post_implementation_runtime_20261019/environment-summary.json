@@ -1,0 +1,30 @@
+﻿{
+    "docker_daemon":  "29.7.2",
+    "desktop":  "4.89.0",
+    "cached_images":  [
+                          "postgres:16",
+                          "redis:7-alpine"
+                      ],
+    "shared_containers_excluded":  [
+                                       "hellodoctor-postgres",
+                                       "hellodoctor-redis"
+                                   ],
+    "shared_networks_excluded":  [
+                                     "backend_default",
+                                     "bridge",
+                                     "host",
+                                     "none"
+                                 ],
+    "shared_volumes_excluded":  [
+                                    "backend_hellodoctor_pgdata",
+                                    "backend_hellodoctor_redisdata"
+                                ],
+    "ordinary_local_execution_authorized":  true,
+    "source_freeze":  true,
+    "formal_audit_sandbox_override":  "Owner explicitly waived for this development verification only; skill unchanged",
+    "physical_device":  "DEFERRED_BY_USER",
+    "video_agora_e2e":  "DEFERRED_BY_USER",
+    "host_logical_processors":  12,
+    "host_ram_gib":  23.92,
+    "measurement_note":  "Hardware identification, not workload CPU/RSS or throughput"
+}

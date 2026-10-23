@@ -1,0 +1,651 @@
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\lib\\core\\network\\api_client.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\api_client.dart"
+index e1f2cc1..b023413 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\lib\\core\\network\\api_client.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\api_client.dart"	
+@@ -156,16 +156,13 @@ class ApiClient {
+     FlutterSecureStorage? storage,
+     DeviceProofSigner? proofSigner,
+     TokenStore? tokenStore,
+-  }) : _proofSigner =
+-           proofSigner ??
++  })  : _proofSigner = proofSigner ??
+             DeviceProofSigner(enabled: dio == null || kReleaseMode),
+         _storage = tokenStore ?? SecureTokenStore(storage),
+-       _dio =
+-           dio ??
++        _dio = dio ??
+             Dio(
+               BaseOptions(
+-               baseUrl:
+-                   baseUrl ??
++                baseUrl: baseUrl ??
+                     const String.fromEnvironment(
+                       'API_BASE_URL',
+                       defaultValue: 'http://10.0.2.2:8080/api/v1',
+@@ -221,8 +218,9 @@ class ApiClient {
+             'APP_BUILD',
+             defaultValue: 'unreported',
+           );
+-          if (_proofSigner.enabled)
++          if (_proofSigner.enabled) {
+             options.headers['X-Device-Proof-Required'] = '1';
++          }
+           if (options.extra['client_incident'] == true) {
+             if (options.extra['session_generation'] != _sessionGeneration) {
+               return handler.reject(
+@@ -263,9 +261,10 @@ class ApiClient {
+                 ),
+               );
+             }
+-            if (token != null)
++            if (token != null) {
+               options.headers['Authorization'] = 'Bearer $token';
+             }
++          }
+           try {
+             await _attachDeviceProof(options);
+           } catch (error) {
+@@ -303,8 +302,9 @@ class ApiClient {
+         },
+         onError: (error, handler) async {
+           final options = error.requestOptions;
+-          if (options.extra['client_incident'] == true)
++          if (options.extra['client_incident'] == true) {
+             return handler.next(error);
++          }
+           if (options.extra['session_generation'] != _sessionGeneration) {
+             return handler.next(error);
+           }
+@@ -333,7 +333,8 @@ class ApiClient {
+                     statusCode: 409,
+                     data: {
+                       'error': {
+-                        'message': 'Your session was renewed. Please retry this action.',
++                        'message':
++                            'Your session was renewed. Please retry this action.',
+                       },
+                     },
+                   ),
+@@ -361,11 +362,9 @@ class ApiClient {
+     String? binding;
+     final body = options.data;
+     if (body is Map && _isSessionEstablishment(options.path)) {
+-      binding =
+-          (body['challenge_token'] ??
++      binding = (body['challenge_token'] ??
+           body['session_token'] ??
+-                  body['phone_number'])
+-              as String?;
++          body['phone_number']) as String?;
+     } else if (body is Map &&
+         (options.path.endsWith('/auth/refresh') ||
+             options.path.endsWith('/auth/logout'))) {
+@@ -479,8 +478,7 @@ class ApiClient {
+     final existing = _inflightReads[key];
+     if (existing != null) return existing;
+     late final Future<Response<dynamic>> work;
+-    work =
+-        _request(
++    work = _request(
+       (options) =>
+           _dio.get(path, queryParameters: parameters, options: options),
+     ).whenComplete(() {
+@@ -508,7 +506,8 @@ class ApiClient {
+     ProgressCallback? onSendProgress,
+     bool idempotent = false,
+     String? idempotencyKey,
+-  }) => _request(
++  }) =>
++      _request(
+         (options) => _dio.post(
+           path,
+           data: data,
+@@ -522,7 +521,8 @@ class ApiClient {
+     String path, {
+     Object? data,
+     bool idempotent = false,
+-  }) => _request(
++  }) =>
++      _request(
+         (options) => _dio.put(path, data: data, options: options),
+         idempotencyKey: idempotent ? _generateIdempotencyKey() : null,
+       );
+@@ -590,8 +590,9 @@ class ApiClient {
+     // binding. Never silently bind a copied refresh token to a new device key.
+     if (_proofSigner.enabled &&
+         (key == 'access_token' || key == 'refresh_token') &&
+-        await _storage.read('device_bound') != 'true')
++        await _storage.read('device_bound') != 'true') {
+       return null;
++    }
+     return _storage.read(key);
+   }
+ 
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\lib\\core\\network\\device_proof.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\device_proof.dart"
+index 8ffa687..1ad5eb7 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\lib\\core\\network\\device_proof.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\device_proof.dart"	
+@@ -5,8 +5,9 @@ import 'package:flutter/services.dart';
+ /// This is path-bound HelloDoctor proof, not a generic RFC 9449 implementation.
+ class DeviceProofSigner {
+   DeviceProofSigner({bool enabled = true})
+-    : enabled =
+-          enabled && !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
++      : enabled = enabled &&
++            !kIsWeb &&
++            defaultTargetPlatform == TargetPlatform.android;
+   final bool enabled;
+   static const _channel = MethodChannel('hellodoctor/device_proof');
+ 
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\lib\\core\\network\\screen_refresh.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\screen_refresh.dart"
+index 8e0aa99..13a17ad 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\lib\\core\\network\\screen_refresh.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\lib\\core\\network\\screen_refresh.dart"	
+@@ -129,17 +129,13 @@ class ScreenRefresh with WidgetsBindingObserver, RouteAware {
+     if (!visible) return Future.value();
+     if (_inFlight != null) return _inFlight!;
+     late final Future<void> work;
+-    work = Future<void>.sync(refresh)
+-        .then((_) {
+-          _consecutiveFailures = (hasError?.call() ?? false)
+-              ? _consecutiveFailures + 1
+-              : 0;
+-        })
+-        .catchError((Object e, StackTrace st) {
++    work = Future<void>.sync(refresh).then((_) {
++      _consecutiveFailures =
++          (hasError?.call() ?? false) ? _consecutiveFailures + 1 : 0;
++    }).catchError((Object e, StackTrace st) {
+       _consecutiveFailures++;
+       throw e;
+-        })
+-        .whenComplete(() {
++    }).whenComplete(() {
+       if (identical(_inFlight, work)) _inFlight = null;
+     });
+     _inFlight = work;
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\test\\doctor_rx_cleanup_test.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_rx_cleanup_test.dart"
+index 1f3f7a9..f0099c5 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\test\\doctor_rx_cleanup_test.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_rx_cleanup_test.dart"	
+@@ -30,9 +30,12 @@ void main() {
+         otherFilePickerPagesPending: false,
+       );
+ 
+-      expect(await f.exists(), isFalse,
++      expect(
++        await f.exists(),
++        isFalse,
+         reason:
+-              'image_picker-sourced temp files must be deleted once no longer needed');
++            'image_picker-sourced temp files must be deleted once no longer needed',
++      );
+     });
+ 
+     test(
+@@ -51,19 +54,23 @@ void main() {
+         },
+       );
+ 
+-      expect(clearCalled, isTrue,
+-          reason: 'the plugin-safe clearTemporaryFiles() path must run');
+-      expect(await f.exists(), isTrue,
+-          reason:
+-              'a file_picker-sourced path must NEVER be deleted directly by '
++      expect(
++        clearCalled,
++        isTrue,
++        reason: 'the plugin-safe clearTemporaryFiles() path must run',
++      );
++      expect(
++        await f.exists(),
++        isTrue,
++        reason: 'a file_picker-sourced path must NEVER be deleted directly by '
+             'path — it could be a user-owned external original, not an '
+-              'app-managed cache copy');
++            'app-managed cache copy',
++      );
+     });
+ 
+     test(
+         'defers the plugin-safe clear call while another file_picker page '
+-        'is still pending, so a concurrent upload is never starved',
+-        () async {
++        'is still pending, so a concurrent upload is never starved', () async {
+       final f = File('${tempDir.path}/pending_sibling.pdf');
+       await f.writeAsBytes([7, 8, 9]);
+ 
+@@ -95,8 +102,7 @@ void main() {
+       );
+     });
+ 
+-    test('a clearFilePickerTemp failure is swallowed, not rethrown',
+-        () async {
++    test('a clearFilePickerTemp failure is swallowed, not rethrown', () async {
+       await expectLater(
+         cleanupPickedRxFile(
+           path: '${tempDir.path}/unused.pdf',
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\test\\doctor_widgets_test.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_widgets_test.dart"
+index c310080..39e9ede 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\test\\doctor_widgets_test.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\doctor_widgets_test.dart"	
+@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
+ import 'package:flutter_bloc/flutter_bloc.dart';
+ import 'package:flutter_test/flutter_test.dart';
+ import 'package:hellodoctor_mobile/core/network/api_client.dart';
++import 'package:hellodoctor_mobile/core/time/kenya_time.dart';
+ import 'package:hellodoctor_mobile/core/widgets/doctor_widgets.dart';
+ import 'package:hellodoctor_mobile/features/doctor/doctor_cubit.dart';
+ import 'package:hellodoctor_mobile/features/doctor/doctor_models.dart';
+@@ -272,8 +273,8 @@ void main() {
+   testWidgets('blocked Web slots do not become mobile patient bookings',
+       (tester) async {
+     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+-    final now = DateTime.now();
+-    final start = DateTime(now.year, now.month, now.day, 23);
++    final now = kenyaTime(DateTime.now());
++    final start = kenyaWallTime(now.year, now.month, now.day, 23, 0);
+     final blocked = SlotDto.fromJson({
+       'id': 'blocked-web-slot',
+       'status': 'BLOCKED',
+@@ -538,8 +539,8 @@ void main() {
+   testWidgets('BLOCKED slot shows only Unblock, never Cancel or Block',
+       (tester) async {
+     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+-    final now = DateTime.now();
+-    final start = DateTime(now.year, now.month, now.day, 23);
++    final now = kenyaTime(DateTime.now());
++    final start = kenyaWallTime(now.year, now.month, now.day, 23, 0);
+     final blocked = SlotDto(
+         id: 's-blocked',
+         status: 'BLOCKED',
+@@ -557,8 +558,8 @@ void main() {
+       'tapping Block on an available slot calls the repository and updates '
+       'the displayed status', (tester) async {
+     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+-    final now = DateTime.now();
+-    final start = DateTime(now.year, now.month, now.day, 23);
++    final now = kenyaTime(DateTime.now());
++    final start = kenyaWallTime(now.year, now.month, now.day, 23, 0);
+     final available = SlotDto(
+         id: 's-open',
+         status: 'AVAILABLE',
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\test\\queue_lifecycle_refresh_test.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\queue_lifecycle_refresh_test.dart"
+index 08a5eaa..3593910 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile\\test\\queue_lifecycle_refresh_test.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile\\test\\queue_lifecycle_refresh_test.dart"	
+@@ -9,6 +9,7 @@ import 'package:hellodoctor_mobile/features/doctor/doctor_models.dart';
+ import 'package:hellodoctor_mobile/features/notifications/notification_cubit.dart';
+ import 'package:hellodoctor_mobile/features/notifications/notification_models.dart';
+ import 'package:hellodoctor_mobile/features/notifications/notification_repository.dart';
++
+ import 'doctor_cubit_test.dart' show StubDoctorRepository;
+ 
+ class LifecycleQueueRepository extends StubDoctorRepository {
+@@ -19,7 +20,8 @@ class LifecycleQueueRepository extends StubDoctorRepository {
+       patientName: 'Previous Patient',
+       status: 'CONFIRMED',
+       lifecycle: 'UPCOMING',
+-        queueActionable: true)
++      queueActionable: true,
++    ),
+   ];
+   @override
+   Future<List<AppointmentDto>> queue({int limit = 25, int offset = 0}) async {
+@@ -34,12 +36,20 @@ class QuietNotifications extends NotificationCubit {
+   Future<void> load() async {}
+ }
+ 
+-Future<void> mount(WidgetTester tester, DoctorCubit doctor,
+-    NotificationCubit notifications) async {
+-  await tester.pumpWidget(MultiBlocProvider(providers: [
++Future<void> mount(
++  WidgetTester tester,
++  DoctorCubit doctor,
++  NotificationCubit notifications,
++) async {
++  await tester.pumpWidget(
++    MultiBlocProvider(
++      providers: [
+         BlocProvider<DoctorCubit>.value(value: doctor),
+         BlocProvider<NotificationCubit>.value(value: notifications),
+-  ], child: const MaterialApp(home: DoctorShell())));
++      ],
++      child: const MaterialApp(home: DoctorShell()),
++    ),
++  );
+   await tester.pumpAndSettle();
+ }
+ 
+@@ -69,6 +79,10 @@ void main() {
+       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
++      // pumpAndSettle does not advance a timer that has not scheduled a frame.
++      // Resume deliberately waits 250–2000ms; advance its documented upper
++      // bound in fake time, then require exactly one authoritative queue read.
++      await tester.pump(const Duration(seconds: 2));
+       await tester.pumpAndSettle();
+       expect(repo.queueReads, firstReads + 1);
+       expect(doctor.state.queue, isEmpty);
+@@ -78,7 +92,8 @@ void main() {
+           id: 'next',
+           patientName: 'Next Patient',
+           status: 'CONFIRMED',
+-          lifecycle: 'UPCOMING')
++          lifecycle: 'UPCOMING',
++        ),
+       ];
+       await tester.pump(const Duration(seconds: 30));
+       await tester.pumpAndSettle();
+@@ -91,6 +106,49 @@ void main() {
+       await tester.pumpAndSettle();
+       expect(doctor.state.queue, isEmpty);
+       expect(tester.takeException(), isNull);
++    },
++  );
++
++  testWidgets('rapid resumes coalesce and disposal cancels pending refresh', (
++    tester,
++  ) async {
++    final repo = LifecycleQueueRepository();
++    final doctor = DoctorCubit(repo);
++    final api = ApiClient(dio: Dio());
++    final notifications = QuietNotifications(NotificationRepository(api));
++    addTearDown(() async {
++      await tester.pumpWidget(const SizedBox.shrink());
++      await doctor.close();
++      await notifications.close();
++      api.dispose();
++    });
++    await mount(tester, doctor, notifications);
++    final initialReads = repo.queueReads;
++    repo.current = [];
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
++    await tester.pump(const Duration(milliseconds: 249));
++    expect(repo.queueReads, initialReads);
++    await tester.pump(const Duration(milliseconds: 1751));
++    await tester.pumpAndSettle();
++    expect(repo.queueReads, initialReads + 1);
++    expect(doctor.state.queue, isEmpty);
++
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
++    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
++    await tester.pumpWidget(const SizedBox.shrink());
++    await tester.pump(const Duration(seconds: 2));
++    expect(repo.queueReads, initialReads + 1);
++    expect(tester.takeException(), isNull);
+   });
+ 
+   testWidgets(
+@@ -116,7 +174,8 @@ void main() {
+         title: 'New consultation message',
+         body: 'You have a new consultation message.',
+         createdAt: DateTime.utc(2026, 10, 16),
+-        deliveryStatus: 'CREATED');
++        deliveryStatus: 'CREATED',
++      );
+       notifications.emit(NotificationState(items: [notice]));
+       await tester.pumpAndSettle();
+       expect(repo.queueReads, initialReads + 1);
+@@ -129,5 +188,6 @@ void main() {
+       await tester.pump(const Duration(seconds: 31));
+       expect(repo.queueReads, initialReads + 1);
+       expect(tester.takeException(), isNull);
+-  });
++    },
++  );
+ }
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\lib\\core\\network\\api_client.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\api_client.dart"
+index e60dfa4..3841b1e 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\lib\\core\\network\\api_client.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\api_client.dart"	
+@@ -154,16 +154,13 @@ class ApiClient {
+     FlutterSecureStorage? storage,
+     DeviceProofSigner? proofSigner,
+     TokenStore? tokenStore,
+-  }) : _proofSigner =
+-           proofSigner ??
++  })  : _proofSigner = proofSigner ??
+             DeviceProofSigner(enabled: dio == null || kReleaseMode),
+         _storage = tokenStore ?? SecureTokenStore(storage),
+-       _dio =
+-           dio ??
++        _dio = dio ??
+             Dio(
+               BaseOptions(
+-               baseUrl:
+-                   baseUrl ??
++                baseUrl: baseUrl ??
+                     const String.fromEnvironment(
+                       'API_BASE_URL',
+                       defaultValue: 'http://10.0.2.2:8080/api/v1',
+@@ -218,8 +215,9 @@ class ApiClient {
+             'APP_BUILD',
+             defaultValue: 'unreported',
+           );
+-          if (_proofSigner.enabled)
++          if (_proofSigner.enabled) {
+             options.headers['X-Device-Proof-Required'] = '1';
++          }
+           if (options.extra['client_incident'] == true) {
+             if (options.extra['session_generation'] != _sessionGeneration) {
+               return handler.reject(
+@@ -260,9 +258,10 @@ class ApiClient {
+                 ),
+               );
+             }
+-            if (token != null)
++            if (token != null) {
+               options.headers['Authorization'] = 'Bearer $token';
+             }
++          }
+           try {
+             await _attachDeviceProof(options);
+           } catch (error) {
+@@ -300,8 +299,9 @@ class ApiClient {
+         },
+         onError: (error, handler) async {
+           final options = error.requestOptions;
+-          if (options.extra['client_incident'] == true)
++          if (options.extra['client_incident'] == true) {
+             return handler.next(error);
++          }
+           if (options.extra['session_generation'] != _sessionGeneration) {
+             return handler.next(error);
+           }
+@@ -330,7 +330,8 @@ class ApiClient {
+                     statusCode: 409,
+                     data: {
+                       'error': {
+-                        'message': 'Your session was renewed. Please retry this action.',
++                        'message':
++                            'Your session was renewed. Please retry this action.',
+                       },
+                     },
+                   ),
+@@ -358,11 +359,9 @@ class ApiClient {
+     String? binding;
+     final body = options.data;
+     if (body is Map && _isSessionEstablishment(options.path)) {
+-      binding =
+-          (body['challenge_token'] ??
++      binding = (body['challenge_token'] ??
+           body['session_token'] ??
+-                  body['phone_number'])
+-              as String?;
++          body['phone_number']) as String?;
+     } else if (body is Map &&
+         (options.path.endsWith('/auth/refresh') ||
+             options.path.endsWith('/auth/logout'))) {
+@@ -476,8 +475,7 @@ class ApiClient {
+     final existing = _inflightReads[key];
+     if (existing != null) return existing;
+     late final Future<Response<dynamic>> work;
+-    work =
+-        _request(
++    work = _request(
+       (options) =>
+           _dio.get(path, queryParameters: parameters, options: options),
+     ).whenComplete(() {
+@@ -506,7 +504,8 @@ class ApiClient {
+     bool idempotent = false,
+     String? idempotencyKey,
+     CancelToken? cancelToken,
+-  }) => _request(
++  }) =>
++      _request(
+         (options) => _dio.post(
+           path,
+           data: data,
+@@ -521,7 +520,8 @@ class ApiClient {
+     String path, {
+     Object? data,
+     bool idempotent = false,
+-  }) => _request(
++  }) =>
++      _request(
+         (options) => _dio.put(path, data: data, options: options),
+         idempotencyKey: idempotent ? _generateIdempotencyKey() : null,
+       );
+@@ -589,8 +589,9 @@ class ApiClient {
+     // binding. Never silently bind a copied refresh token to a new device key.
+     if (_proofSigner.enabled &&
+         (key == 'access_token' || key == 'refresh_token') &&
+-        await _storage.read('device_bound') != 'true')
++        await _storage.read('device_bound') != 'true') {
+       return null;
++    }
+     return _storage.read(key);
+   }
+ 
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\lib\\core\\network\\device_proof.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\device_proof.dart"
+index 8ffa687..1ad5eb7 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\lib\\core\\network\\device_proof.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\device_proof.dart"	
+@@ -5,8 +5,9 @@ import 'package:flutter/services.dart';
+ /// This is path-bound HelloDoctor proof, not a generic RFC 9449 implementation.
+ class DeviceProofSigner {
+   DeviceProofSigner({bool enabled = true})
+-    : enabled =
+-          enabled && !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
++      : enabled = enabled &&
++            !kIsWeb &&
++            defaultTargetPlatform == TargetPlatform.android;
+   final bool enabled;
+   static const _channel = MethodChannel('hellodoctor/device_proof');
+ 
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\lib\\core\\network\\screen_refresh.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\screen_refresh.dart"
+index 8e0aa99..13a17ad 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\lib\\core\\network\\screen_refresh.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\lib\\core\\network\\screen_refresh.dart"	
+@@ -129,17 +129,13 @@ class ScreenRefresh with WidgetsBindingObserver, RouteAware {
+     if (!visible) return Future.value();
+     if (_inFlight != null) return _inFlight!;
+     late final Future<void> work;
+-    work = Future<void>.sync(refresh)
+-        .then((_) {
+-          _consecutiveFailures = (hasError?.call() ?? false)
+-              ? _consecutiveFailures + 1
+-              : 0;
+-        })
+-        .catchError((Object e, StackTrace st) {
++    work = Future<void>.sync(refresh).then((_) {
++      _consecutiveFailures =
++          (hasError?.call() ?? false) ? _consecutiveFailures + 1 : 0;
++    }).catchError((Object e, StackTrace st) {
+       _consecutiveFailures++;
+       throw e;
+-        })
+-        .whenComplete(() {
++    }).whenComplete(() {
+       if (identical(_inFlight, work)) _inFlight = null;
+     });
+     _inFlight = work;
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\test\\patient_intake_cleanup_test.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\patient_intake_cleanup_test.dart"
+index e6c741d..9c5e334 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\test\\patient_intake_cleanup_test.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\patient_intake_cleanup_test.dart"	
+@@ -27,8 +27,11 @@ void main() {
+ 
+       await deletePickedSourceFile(f.path);
+ 
+-      expect(await f.exists(), isFalse,
+-          reason: 'image_picker temp files must not persist indefinitely');
++      expect(
++        await f.exists(),
++        isFalse,
++        reason: 'image_picker temp files must not persist indefinitely',
++      );
+     });
+ 
+     test('a missing/already-deleted file does not throw', () async {
+@@ -39,7 +42,8 @@ void main() {
+   });
+ 
+   group('cleanupFilePickerTemp (file_picker-sourced)', () {
+-    test('never raw-deletes any path — only calls the plugin-safe clear '
++    test(
++        'never raw-deletes any path — only calls the plugin-safe clear '
+         'function', () async {
+       final external = File('${tempDir.path}/user_original.pdf');
+       await external.writeAsBytes([4, 5, 6]);
+@@ -52,15 +56,16 @@ void main() {
+       );
+ 
+       expect(clearCalled, isTrue);
+-      expect(await external.exists(), isTrue,
+-          reason:
+-              'file_picker-sourced results must never be deleted by raw '
++      expect(
++        await external.exists(),
++        isTrue,
++        reason: 'file_picker-sourced results must never be deleted by raw '
+             'path — only via the plugin\'s own clearTemporaryFiles(), '
+-              'which never touches a user-owned external original');
++            'which never touches a user-owned external original',
++      );
+     });
+ 
+-    test('a clearFilePickerTemp failure is swallowed, not rethrown',
+-        () async {
++    test('a clearFilePickerTemp failure is swallowed, not rethrown', () async {
+       await expectLater(
+         cleanupFilePickerTemp(
+           clearFilePickerTemp: () async =>
+diff --git "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\test\\pre_e2e_availability_payment_test.dart" "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\pre_e2e_availability_payment_test.dart"
+index 5942f6a..fd339d5 100644
+--- "a/C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\flutter-mobile_patient\\test\\pre_e2e_availability_payment_test.dart"	
++++ "b/C:\\Users\\CUBE\\Desktop\\helodoc old site\\apps\\mobile_patient\\test\\pre_e2e_availability_payment_test.dart"	
+@@ -43,7 +43,9 @@ class ControlledPayment extends BookingRepository {
+ }
+ 
+ void main() {
+-  test('availability refresh clears obsolete selection and disables stale booking during fetch', () async {
++  test(
++      'availability refresh clears obsolete selection and disables stale booking during fetch',
++      () async {
+     final repo = ControlledAvailability();
+     final cubit = BookingCubit(repo, doctorId: 'd', modality: 'CHAT');
+     final now = DateTime.now().toUtc();
+@@ -240,7 +242,9 @@ void main() {
+       },
+     );
+   }
+-  test('attachment metadata maps to shared message identity without raw storage URLs', () {
++  test(
++      'attachment metadata maps to shared message identity without raw storage URLs',
++      () {
+     final message = ChatMessageDto.fromJson({
+       'id': 'message',
+       'sender_id': 'doctor-user',

@@ -1,0 +1,105 @@
+{
+  "recorded_at_utc": "2026-10-16T14:05:40.199289+00:00",
+  "baseline_source": "Last observed complete correction gates; not a freshly rerun pre-edit baseline",
+  "tests": {
+    "rust_library": {
+      "baseline": 53,
+      "passed": 53,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "exit_code": 0,
+      "log": "rust_library.log"
+    },
+    "backend_integration": {
+      "baseline": 221,
+      "passed": 235,
+      "failed": 0,
+      "ignored": 0,
+      "filtered": 0,
+      "exit_code": 0,
+      "duration_seconds": 1872.3,
+      "log": "backend_full.log"
+    },
+    "patient_flutter": {
+      "baseline": 195,
+      "passed": 205,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "log": "patient_flutter_tests.log"
+    },
+    "doctor_flutter": {
+      "baseline": 197,
+      "passed": 208,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "log": "doctor_full.log"
+    },
+    "doctor_web": {
+      "baseline": 50,
+      "passed": 53,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "log": "doctor_web_tests.log"
+    },
+    "admin_web": {
+      "baseline": 13,
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0,
+      "log": "admin_web_tests.log"
+    }
+  },
+  "other_gates": {
+    "rust_fmt": 0,
+    "clippy_offline_all_targets_deny_warnings": 0,
+    "patient_format_check": 0,
+    "patient_analyze": 0,
+    "doctor_format_check": 0,
+    "doctor_analyze": 0,
+    "doctor_web_lint": 0,
+    "doctor_web_typecheck": 0,
+    "doctor_web_production_build": 0,
+    "admin_web_lint": 0,
+    "admin_web_lint_warning_count": 10,
+    "admin_web_typecheck": 0,
+    "admin_web_production_build": 0
+  },
+  "physical_device": "NOT_DETECTED_BY_ADB",
+  "real_external_payment_provider": false,
+  "real_azure_blob": false,
+  "video_agora": "DEFERRED",
+  "rtc_media": false,
+  "baseline_test_total": 729,
+  "final_test_total": 770,
+  "new_tests_added": 41,
+  "backend_source_unchanged_during_full_gate": true,
+  "test_integrity": {
+    "existing_tests_deleted": 0,
+    "existing_assertions_deleted_without_approved_replacement": 0,
+    "assertions_weakened": 0,
+    "skip_ignore_added": 0,
+    "test_runner_failures_swallowed": 0,
+    "intentional_contract_assertion_replacements": 23,
+    "existing_assertions_deleted": 0
+  },
+  "live_backend_readiness": {
+    "exit_code": 0,
+    "source_migration": 20261106000006,
+    "binary_migration": 20261106000006,
+    "database_migration": 20261106000006,
+    "log": "backend_readiness.log"
+  },
+  "live_web_acceptance": {
+    "exit_code": 0,
+    "status": "PASS",
+    "report": "live_web_verification.json",
+    "log": "live_web_acceptance.log",
+    "physical_device": false
+  },
+  "release_apks_built_and_signature_verified": true
+}

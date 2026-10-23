@@ -1,0 +1,7 @@
+{
+    "old_scratch_baseline_mismatches":  [
+                                            "apps/doctor-web\\README.md"
+                                        ],
+    "baseline_lint_original_match":  false,
+    "admin_lint_source_matches_baseline":  true
+}

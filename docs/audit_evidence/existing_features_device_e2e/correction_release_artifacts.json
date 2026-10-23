@@ -1,0 +1,28 @@
+[
+  {
+    "role": "doctor",
+    "version": "1.0.1+6",
+    "path": "releases/hellodoctor-doctor-arm64-pre-e2e-corrections-20261016.apk",
+    "bytes": 20522220,
+    "sha256": "148cb63428d55f2c46265243aedc85e8ca29627e51c38c927657d52e41366e1b",
+    "signature_verified": true,
+    "installed_on_phone": false,
+    "physical_acceptance": "DEFERRED_BY_USER",
+    "api_base": "http://192.168.0.105:8080/api/v1",
+    "environment": "development",
+    "development_otp": true
+  },
+  {
+    "role": "patient",
+    "version": "1.0.1+5",
+    "path": "releases/hellodoctor-patient-arm64-pre-e2e-corrections-20261016.apk",
+    "bytes": 21479436,
+    "sha256": "7fb9dfc6a0a95724c2c886addb5ad321247c29816854250fe3be3f506ddfc470",
+    "signature_verified": true,
+    "installed_on_phone": false,
+    "physical_acceptance": "DEFERRED_BY_USER",
+    "api_base": "http://192.168.0.105:8080/api/v1",
+    "environment": "development",
+    "development_otp": true
+  }
+]

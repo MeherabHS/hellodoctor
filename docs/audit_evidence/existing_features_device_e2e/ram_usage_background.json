@@ -1,0 +1,23 @@
+{
+  "measured_at": "2026-10-15T20:29:33+06:00",
+  "method": "adb shell dumpsys meminfo <package>",
+  "units": "Android kB converted to MiB by dividing by 1024",
+  "state": "both applications background; neither restarted for measurement",
+  "patient": {
+    "pid": 15095,
+    "pss_kb": 75590,
+    "rss_kb": 180696,
+    "swap_pss_kb": 227,
+    "pss_mib": 73.82,
+    "rss_mib": 176.46
+  },
+  "doctor": {
+    "pid": 15378,
+    "pss_kb": 52734,
+    "rss_kb": 157852,
+    "swap_pss_kb": 228,
+    "pss_mib": 51.5,
+    "rss_mib": 154.15
+  },
+  "combined_pss_mib": 125.32
+}
