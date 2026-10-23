@@ -406,6 +406,40 @@ void main() {
       expect(events.map((event) => event['event_type']), contains('PATIENT_DISCONNECTED'));
     });
 
+    test('an ordinary uninterrupted join never queues a false reconnect', () async {
+      // Real Agora SDKs report onConnectionStateChanged(connected) as a
+      // follow-up to the SDK's own onJoinChannelSuccess for the very same
+      // join — not just onJoinChannelSuccess alone, which is all the test
+      // above exercises. A controller that gates "was this a reconnect?" on
+      // "have we ever joined" rather than "have we ever actually reached
+      // connected" would misreport this ordinary, never-interrupted call.
+      final engine = FakeAgoraEngine();
+      final events = <Map<String, dynamic>>[];
+      final controller = CallController(
+        engine: engine,
+        mintToken: () async => _session(),
+        requestPermissions: () async => true,
+        telemetrySubmit: (batch) async => events.addAll(batch),
+      );
+      await controller.start();
+      engine.simulateJoinSuccess();
+      engine.simulateConnectionState(CallConnectionState.connected);
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      expect(
+        events.map((event) => event['event_type']),
+        isNot(contains('PATIENT_RECONNECTED')),
+      );
+
+      // A genuine later drop-and-recover must still be reported.
+      engine.simulateConnectionState(CallConnectionState.reconnecting);
+      engine.simulateConnectionState(CallConnectionState.connected);
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      expect(
+        events.map((event) => event['event_type']),
+        contains('PATIENT_RECONNECTED'),
+      );
+    });
+
     test('retry after failure re-runs the full flow', () async {
       final engine = FakeAgoraEngine();
       var shouldFail = true;

@@ -25,6 +25,12 @@ import 'doctor_cubit.dart';
 import 'doctor_models.dart';
 import 'agora_page.dart';
 import 'articles_page.dart';
+import '../../core/video/call_screen_guard.dart';
+
+/// Shared across every "join/rejoin a live video consultation" entry point
+/// in this file — see [CallScreenGuard]'s own doc comment for why one
+/// instance, not one per call site.
+final _callScreenGuard = CallScreenGuard();
 
 /// Shared bell builder so every tab constructs the same `onTap` navigation
 /// and reads the same live `NotificationCubit` unread count, without
@@ -565,10 +571,8 @@ class AppointmentCard extends StatelessWidget {
                 FilledButton(
                     style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF16A34A)),
-                    onPressed: () => Navigator.push(
-                        c,
-                        MaterialPageRoute(
-                            builder: (_) => ConsultationPage(appointment: a))),
+                    onPressed: () => _callScreenGuard.push(
+                        c, (_) => ConsultationPage(appointment: a)),
                     child: const Text('Rejoin'))
               ])),
         Row(children: [
@@ -663,10 +667,8 @@ class _ConsultationActionsState extends State<ConsultationActions> {
                 ? null
                 : a.isChat
                     ? openChat
-                    : () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => ConsultationPage(appointment: a))),
+                    : () => _callScreenGuard.push(
+                        context, (_) => ConsultationPage(appointment: a)),
             icon:
                 Icon(a.isChat ? Icons.chat_outlined : Icons.videocam_outlined),
             label: Text(busy ? 'Opening consultation...' : a.startLabel,
@@ -3164,11 +3166,10 @@ class _ChatTopBar extends StatelessWidget {
                         chat.appointmentId == null ||
                         chat.isClosed
                     ? null
-                    : () => Navigator.push(
+                    : () => _callScreenGuard.push(
                         c,
-                        MaterialPageRoute(
-                            builder: (_) => AgoraPage(
-                                appointmentId: chat.appointmentId!)))),
+                        (_) => AgoraPage(
+                            appointmentId: chat.appointmentId!))),
           const SizedBox(width: 6),
           if (!chat.isClosed)
             _ChatIconBtn(
@@ -4461,10 +4462,8 @@ class _ConsultationState extends State<ConsultationPage> {
                       icon: const Icon(Icons.history),
                       label: const Text('Patient history')),
                   FilledButton.icon(
-                      onPressed: () => Navigator.push(
-                          c,
-                          MaterialPageRoute(
-                              builder: (_) => AgoraPage(appointmentId: a.id))),
+                      onPressed: () => _callScreenGuard.push(
+                          c, (_) => AgoraPage(appointmentId: a.id)),
                       icon: const Icon(Icons.video_call),
                       label: const Text('Join Agora')),
                   OutlinedButton.icon(

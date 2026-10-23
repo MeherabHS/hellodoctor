@@ -66,6 +66,18 @@ class CallController extends ChangeNotifier {
   final List<Map<String, dynamic>> _telemetryQueue = <Map<String, dynamic>>[];
   bool _joinedAtLeastOnce = false;
 
+  /// True only after the engine's own connection-state callback has reported
+  /// `connected` at least once. Deliberately distinct from
+  /// [_joinedAtLeastOnce]: the Agora SDK's documented event order for every
+  /// successful join is `onConnectionStateChanged(connecting)` ->
+  /// `onJoinChannelSuccess` -> `onConnectionStateChanged(connected)` — that
+  /// last, SDK-driven `connected` event for the *original* join would
+  /// otherwise be indistinguishable from a genuine reconnect if gated on
+  /// [_joinedAtLeastOnce] alone (which [_onJoinSuccess] already set to true
+  /// one callback earlier), misreporting every ordinary, never-interrupted
+  /// call as a reconnect in clinical telemetry.
+  bool _hasReachedConnectedBefore = false;
+
   void _queueTelemetry(String suffix) {
     if (telemetrySubmit == null || _disposed) return;
     if (_telemetryQueue.length >= 20) _telemetryQueue.removeAt(0);
@@ -157,7 +169,8 @@ class CallController extends ChangeNotifier {
         }
         break;
       case CallConnectionState.connected:
-        if (_joinedAtLeastOnce) _queueTelemetry('RECONNECTED');
+        if (_hasReachedConnectedBefore) _queueTelemetry('RECONNECTED');
+        _hasReachedConnectedBefore = true;
         _setState(CallScreenState.connected);
         break;
       case CallConnectionState.reconnecting:

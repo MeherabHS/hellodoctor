@@ -7,7 +7,7 @@ export interface Conversation { id: string; appointment_id: string; patient_disp
 export interface Message { id: string; sender_id: string; content: string; sent_at: string; attachment_id?: string; attachment?: {id:string;display_name:string;mime_type:string;size_bytes:number}|null }
 export interface Question { id: string; question_text: string; status: string; category: string | null; created_at: string; answer_text: string | null; answering_doctor: string | null }
 export interface DoctorNotification { metadata?:{appointment_id?:string}; id:string; notification_type:string; title:string; body:string; related_entity_type:string|null; related_entity_id:string|null; created_at:string; read_at:string|null }
-export interface Statement extends RecordDto { period: string; currency: string; status: string; amount_label: string; gross_earnings: string; platform_charge: string; adjustments: string; payable: string; payout_status: string; entries: RecordDto[]; next_offset: number | null }
+export interface Statement extends RecordDto { period: string; currency: string; status: string; amount_label: string; gross_earnings: string; platform_charge: string; basis_note: string; adjustments: string; payable: string; payout_status: string; entries: RecordDto[]; next_offset: number | null }
 export interface RxPage { key: string; file: File; preview: string; state: 'LOCAL' | 'UPLOADING' | 'UPLOADED' | 'FAILED'; requestKey: string; documentId?: string; error?: string; uploadNotes?: string; originalBytes?: number; uploadProgress?: number | null }
 
 export function messageSide(message: Pick<Message,'sender_id'>, authenticatedUserId: string): 'doctor'|'patient' {

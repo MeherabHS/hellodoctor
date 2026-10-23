@@ -9,6 +9,8 @@ const kWaitingRoomTerminalStatuses = {
   'COMPLETED',
   'EXPIRED',
   'PREMATURE_TERMINATION',
+  'REFUNDED',
+  'DISPUTED',
 };
 
 class WaitingRoomState {
