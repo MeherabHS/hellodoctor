@@ -1,0 +1,818 @@
+{
+  "case_id": "admin",
+  "request_count": 100,
+  "logical_identities": 100,
+  "elapsed_seconds": 1.1315570000006119,
+  "http_statuses": {
+    "401": 5,
+    "429": 95
+  },
+  "responses_per_second": 88.3738070640241,
+  "rejections_per_second": 83.9551167108229,
+  "p50_ms": 1.375,
+  "p95_ms": 38.597,
+  "p99_ms": 644.141,
+  "requests": [
+    {
+      "index": 0,
+      "logical_ip": "198.18.0.0",
+      "status": 401,
+      "request_id": "561a5105-476e-4124-93ad-61bbc151c1de",
+      "trace_id": "",
+      "latency_ms": 622.484
+    },
+    {
+      "index": 1,
+      "logical_ip": "198.18.0.1",
+      "status": 401,
+      "request_id": "76314ab5-4cd1-4d68-9d2b-8fcd6370a793",
+      "trace_id": "",
+      "latency_ms": 642.978
+    },
+    {
+      "index": 3,
+      "logical_ip": "198.18.0.3",
+      "status": 401,
+      "request_id": "c34ac2ef-e33d-4713-af46-0ca421bc9280",
+      "trace_id": "",
+      "latency_ms": 644.141
+    },
+    {
+      "index": 5,
+      "logical_ip": "198.18.0.5",
+      "status": 429,
+      "request_id": "e8375e87-724e-4578-bcc6-155309d723b3",
+      "trace_id": "",
+      "latency_ms": 36.443
+    },
+    {
+      "index": 6,
+      "logical_ip": "198.18.0.6",
+      "status": 429,
+      "request_id": "769a6d8b-ddff-4933-aed2-39e3a9050c0f",
+      "trace_id": "",
+      "latency_ms": 34.953
+    },
+    {
+      "index": 2,
+      "logical_ip": "198.18.0.2",
+      "status": 401,
+      "request_id": "ab147e4c-dfab-418d-8fb2-fbda9f1a5045",
+      "trace_id": "",
+      "latency_ms": 682.673
+    },
+    {
+      "index": 7,
+      "logical_ip": "198.18.0.7",
+      "status": 429,
+      "request_id": "a7e9c416-e6ba-4e47-a3af-aae8323da525",
+      "trace_id": "",
+      "latency_ms": 15.301
+    },
+    {
+      "index": 8,
+      "logical_ip": "198.18.0.8",
+      "status": 429,
+      "request_id": "9c4c8773-18ec-4ec4-88d5-5c58580bc64e",
+      "trace_id": "",
+      "latency_ms": 15.505
+    },
+    {
+      "index": 9,
+      "logical_ip": "198.18.0.9",
+      "status": 429,
+      "request_id": "1ce24c1a-2362-4e8f-aceb-a924cce11644",
+      "trace_id": "",
+      "latency_ms": 14.681
+    },
+    {
+      "index": 10,
+      "logical_ip": "198.18.0.10",
+      "status": 429,
+      "request_id": "b352b2d8-d0df-4b96-8f51-339d1508adf2",
+      "trace_id": "",
+      "latency_ms": 19.725
+    },
+    {
+      "index": 11,
+      "logical_ip": "198.18.0.11",
+      "status": 429,
+      "request_id": "deb7d160-9ff0-4522-abbf-96d05f7b5320",
+      "trace_id": "",
+      "latency_ms": 27.534
+    },
+    {
+      "index": 12,
+      "logical_ip": "198.18.0.12",
+      "status": 429,
+      "request_id": "d049e464-3d3a-42b6-a5f3-a182ac14460e",
+      "trace_id": "",
+      "latency_ms": 25.548
+    },
+    {
+      "index": 15,
+      "logical_ip": "198.18.0.15",
+      "status": 429,
+      "request_id": "8d36f4e5-0854-4b27-82b9-c5d5d7ad6528",
+      "trace_id": "",
+      "latency_ms": 13.511
+    },
+    {
+      "index": 16,
+      "logical_ip": "198.18.0.16",
+      "status": 429,
+      "request_id": "d25d9560-393f-4145-b2a6-d49aace71d7c",
+      "trace_id": "",
+      "latency_ms": 14.872
+    },
+    {
+      "index": 14,
+      "logical_ip": "198.18.0.14",
+      "status": 429,
+      "request_id": "ba4e0661-d5c1-4b74-b01b-01338192299c",
+      "trace_id": "",
+      "latency_ms": 30.257
+    },
+    {
+      "index": 13,
+      "logical_ip": "198.18.0.13",
+      "status": 429,
+      "request_id": "d66e2e36-7ea5-489e-890a-4545625d0056",
+      "trace_id": "",
+      "latency_ms": 38.597
+    },
+    {
+      "index": 18,
+      "logical_ip": "198.18.0.18",
+      "status": 429,
+      "request_id": "d990842f-fcf9-4c47-99b3-2066a6d241ac",
+      "trace_id": "",
+      "latency_ms": 1.132
+    },
+    {
+      "index": 19,
+      "logical_ip": "198.18.0.19",
+      "status": 429,
+      "request_id": "6a73ccda-7087-4afb-9f7a-01f5620d3b54",
+      "trace_id": "",
+      "latency_ms": 1.613
+    },
+    {
+      "index": 20,
+      "logical_ip": "198.18.0.20",
+      "status": 429,
+      "request_id": "c28ed9fd-d49a-40ae-8f87-4c3e85f4bf77",
+      "trace_id": "",
+      "latency_ms": 1.293
+    },
+    {
+      "index": 21,
+      "logical_ip": "198.18.0.21",
+      "status": 429,
+      "request_id": "6c70a880-2a4d-47dc-ab5d-57ac526d564c",
+      "trace_id": "",
+      "latency_ms": 1.159
+    },
+    {
+      "index": 22,
+      "logical_ip": "198.18.0.22",
+      "status": 429,
+      "request_id": "261eb1bf-6113-4d15-b726-d4e8f33e672e",
+      "trace_id": "",
+      "latency_ms": 1.093
+    },
+    {
+      "index": 23,
+      "logical_ip": "198.18.0.23",
+      "status": 429,
+      "request_id": "ac3b2ad6-6f76-4a3a-a155-62bd0cf6aa2b",
+      "trace_id": "",
+      "latency_ms": 1.063
+    },
+    {
+      "index": 24,
+      "logical_ip": "198.18.0.24",
+      "status": 429,
+      "request_id": "0f8e0093-d7e8-409d-bc00-10f035a486c4",
+      "trace_id": "",
+      "latency_ms": 0.843
+    },
+    {
+      "index": 25,
+      "logical_ip": "198.18.0.25",
+      "status": 429,
+      "request_id": "6849390a-37a1-4474-adc4-5df75c19f31d",
+      "trace_id": "",
+      "latency_ms": 0.882
+    },
+    {
+      "index": 26,
+      "logical_ip": "198.18.0.26",
+      "status": 429,
+      "request_id": "5bbd48ff-8c41-42ff-9867-9dc201e394b5",
+      "trace_id": "",
+      "latency_ms": 0.921
+    },
+    {
+      "index": 27,
+      "logical_ip": "198.18.0.27",
+      "status": 429,
+      "request_id": "2140db28-dec1-4076-a771-f9cfc50494c2",
+      "trace_id": "",
+      "latency_ms": 0.966
+    },
+    {
+      "index": 28,
+      "logical_ip": "198.18.0.28",
+      "status": 429,
+      "request_id": "20740544-efc9-46f2-b2e9-b12fe9afb994",
+      "trace_id": "",
+      "latency_ms": 0.942
+    },
+    {
+      "index": 29,
+      "logical_ip": "198.18.0.29",
+      "status": 429,
+      "request_id": "f4bac0a1-6f7b-4bef-81ed-c8ee14731067",
+      "trace_id": "",
+      "latency_ms": 0.863
+    },
+    {
+      "index": 30,
+      "logical_ip": "198.18.0.30",
+      "status": 429,
+      "request_id": "dc8c2267-5a87-4f55-95e4-27620507491a",
+      "trace_id": "",
+      "latency_ms": 0.916
+    },
+    {
+      "index": 31,
+      "logical_ip": "198.18.0.31",
+      "status": 429,
+      "request_id": "466746e8-e94a-4a5f-b81d-70de3ad43e72",
+      "trace_id": "",
+      "latency_ms": 0.83
+    },
+    {
+      "index": 32,
+      "logical_ip": "198.18.0.32",
+      "status": 429,
+      "request_id": "136727f5-ee4d-460a-89a0-4d0b520ec5c4",
+      "trace_id": "",
+      "latency_ms": 0.829
+    },
+    {
+      "index": 33,
+      "logical_ip": "198.18.0.33",
+      "status": 429,
+      "request_id": "d2c05b98-2e81-4dc9-806e-2e6c367190d2",
+      "trace_id": "",
+      "latency_ms": 0.842
+    },
+    {
+      "index": 34,
+      "logical_ip": "198.18.0.34",
+      "status": 429,
+      "request_id": "017608c8-0527-4847-86ff-e709e4c8b291",
+      "trace_id": "",
+      "latency_ms": 0.762
+    },
+    {
+      "index": 36,
+      "logical_ip": "198.18.0.36",
+      "status": 429,
+      "request_id": "dbdcac30-7f0e-4aa2-9495-313681e78fe0",
+      "trace_id": "",
+      "latency_ms": 0.761
+    },
+    {
+      "index": 17,
+      "logical_ip": "198.18.0.17",
+      "status": 429,
+      "request_id": "bb74431c-3452-415a-bc93-d649145252e4",
+      "trace_id": "",
+      "latency_ms": 17.879
+    },
+    {
+      "index": 37,
+      "logical_ip": "198.18.0.37",
+      "status": 429,
+      "request_id": "4167675a-f160-4488-8c7f-4fe0ac8b0f89",
+      "trace_id": "",
+      "latency_ms": 21.612
+    },
+    {
+      "index": 35,
+      "logical_ip": "198.18.0.35",
+      "status": 429,
+      "request_id": "5ae29a2a-d5d2-4860-aaeb-cd147fe780e0",
+      "trace_id": "",
+      "latency_ms": 23.519
+    },
+    {
+      "index": 38,
+      "logical_ip": "198.18.0.38",
+      "status": 429,
+      "request_id": "940de5b9-ad74-482b-a5ee-af2559ca5957",
+      "trace_id": "",
+      "latency_ms": 16.15
+    },
+    {
+      "index": 39,
+      "logical_ip": "198.18.0.39",
+      "status": 429,
+      "request_id": "43ccc43c-b02f-4957-80e6-aceb8d4cca17",
+      "trace_id": "",
+      "latency_ms": 1.375
+    },
+    {
+      "index": 41,
+      "logical_ip": "198.18.0.41",
+      "status": 429,
+      "request_id": "a984f311-dc04-4d28-8fe6-3b52d65acdf2",
+      "trace_id": "",
+      "latency_ms": 1.436
+    },
+    {
+      "index": 40,
+      "logical_ip": "198.18.0.40",
+      "status": 429,
+      "request_id": "299fc7d7-fbe4-43b3-98a1-5d596f9d036c",
+      "trace_id": "",
+      "latency_ms": 1.485
+    },
+    {
+      "index": 42,
+      "logical_ip": "198.18.0.42",
+      "status": 429,
+      "request_id": "17acc2fc-1d6e-446d-bc6e-83e05d59203c",
+      "trace_id": "",
+      "latency_ms": 1.092
+    },
+    {
+      "index": 43,
+      "logical_ip": "198.18.0.43",
+      "status": 429,
+      "request_id": "20eaae7a-72d0-4a68-867f-c1a2122d781d",
+      "trace_id": "",
+      "latency_ms": 1.146
+    },
+    {
+      "index": 45,
+      "logical_ip": "198.18.0.45",
+      "status": 429,
+      "request_id": "c38c933a-afe9-47e6-b1fa-024f5aee288e",
+      "trace_id": "",
+      "latency_ms": 1.164
+    },
+    {
+      "index": 44,
+      "logical_ip": "198.18.0.44",
+      "status": 429,
+      "request_id": "20d381ee-a6fc-44d6-8438-b27c2fcdb59f",
+      "trace_id": "",
+      "latency_ms": 1.438
+    },
+    {
+      "index": 46,
+      "logical_ip": "198.18.0.46",
+      "status": 429,
+      "request_id": "6cb3f48a-6cbf-402c-ab6b-03e9621ece9b",
+      "trace_id": "",
+      "latency_ms": 1.272
+    },
+    {
+      "index": 47,
+      "logical_ip": "198.18.0.47",
+      "status": 429,
+      "request_id": "14491b5e-0a55-4d82-a13c-47688b03620a",
+      "trace_id": "",
+      "latency_ms": 1.154
+    },
+    {
+      "index": 48,
+      "logical_ip": "198.18.0.48",
+      "status": 429,
+      "request_id": "f0efa05a-db3b-4371-bcf0-f85decbbce0e",
+      "trace_id": "",
+      "latency_ms": 1.398
+    },
+    {
+      "index": 49,
+      "logical_ip": "198.18.0.49",
+      "status": 429,
+      "request_id": "9bcfdecf-5598-4a20-8572-72f4d8e23264",
+      "trace_id": "",
+      "latency_ms": 14.261
+    },
+    {
+      "index": 52,
+      "logical_ip": "198.18.0.52",
+      "status": 429,
+      "request_id": "0608b44e-5993-46ca-a10c-b893190e931c",
+      "trace_id": "",
+      "latency_ms": 1.179
+    },
+    {
+      "index": 53,
+      "logical_ip": "198.18.0.53",
+      "status": 429,
+      "request_id": "855cebb4-897a-49c9-b7da-475918c8143b",
+      "trace_id": "",
+      "latency_ms": 0.944
+    },
+    {
+      "index": 54,
+      "logical_ip": "198.18.0.54",
+      "status": 429,
+      "request_id": "100676c2-4384-40d6-892d-bf29760fa97e",
+      "trace_id": "",
+      "latency_ms": 0.882
+    },
+    {
+      "index": 50,
+      "logical_ip": "198.18.0.50",
+      "status": 429,
+      "request_id": "f87825d2-145a-4e7a-86a6-4946062d9366",
+      "trace_id": "",
+      "latency_ms": 24.401
+    },
+    {
+      "index": 51,
+      "logical_ip": "198.18.0.51",
+      "status": 429,
+      "request_id": "db530489-b36f-45e2-9039-3e383210834b",
+      "trace_id": "",
+      "latency_ms": 24.772
+    },
+    {
+      "index": 56,
+      "logical_ip": "198.18.0.56",
+      "status": 429,
+      "request_id": "b327dcff-a032-48a3-890c-f20746d5917e",
+      "trace_id": "",
+      "latency_ms": 1.007
+    },
+    {
+      "index": 57,
+      "logical_ip": "198.18.0.57",
+      "status": 429,
+      "request_id": "63f74dd8-2989-468c-a51b-a8cf542ff1c3",
+      "trace_id": "",
+      "latency_ms": 0.977
+    },
+    {
+      "index": 58,
+      "logical_ip": "198.18.0.58",
+      "status": 429,
+      "request_id": "3694873b-d48b-49ee-b998-d210aafc2f64",
+      "trace_id": "",
+      "latency_ms": 0.919
+    },
+    {
+      "index": 59,
+      "logical_ip": "198.18.0.59",
+      "status": 429,
+      "request_id": "2a04e245-11e7-451a-abbc-9d233b8962e1",
+      "trace_id": "",
+      "latency_ms": 0.941
+    },
+    {
+      "index": 60,
+      "logical_ip": "198.18.0.60",
+      "status": 429,
+      "request_id": "8fb34ee0-c5e6-4bba-b9be-bc11d7f9bfce",
+      "trace_id": "",
+      "latency_ms": 1.009
+    },
+    {
+      "index": 62,
+      "logical_ip": "198.18.0.62",
+      "status": 429,
+      "request_id": "0df99ec3-2f5b-4ba5-8557-cc167c1750e7",
+      "trace_id": "",
+      "latency_ms": 0.904
+    },
+    {
+      "index": 55,
+      "logical_ip": "198.18.0.55",
+      "status": 429,
+      "request_id": "3481c669-7e0d-4690-8feb-f5e35c7a7578",
+      "trace_id": "",
+      "latency_ms": 22.015
+    },
+    {
+      "index": 61,
+      "logical_ip": "198.18.0.61",
+      "status": 429,
+      "request_id": "289ddf1c-44c7-49c2-bd80-2fe74bee32d9",
+      "trace_id": "",
+      "latency_ms": 12.415
+    },
+    {
+      "index": 64,
+      "logical_ip": "198.18.0.64",
+      "status": 429,
+      "request_id": "913f0c25-933d-4cde-83b0-c3a1c290534b",
+      "trace_id": "",
+      "latency_ms": 1.261
+    },
+    {
+      "index": 65,
+      "logical_ip": "198.18.0.65",
+      "status": 429,
+      "request_id": "4e1ebbca-c3ab-4ee5-ad4d-212ef94c1c3a",
+      "trace_id": "",
+      "latency_ms": 1.172
+    },
+    {
+      "index": 66,
+      "logical_ip": "198.18.0.66",
+      "status": 429,
+      "request_id": "4fdc2d93-05b1-4b0e-9b4b-2c46cd3f92ce",
+      "trace_id": "",
+      "latency_ms": 0.843
+    },
+    {
+      "index": 67,
+      "logical_ip": "198.18.0.67",
+      "status": 429,
+      "request_id": "8025bf64-8d9d-498d-a841-141364ff62e3",
+      "trace_id": "",
+      "latency_ms": 1.005
+    },
+    {
+      "index": 69,
+      "logical_ip": "198.18.0.69",
+      "status": 429,
+      "request_id": "b8472964-920f-4b08-a4f9-4aa8ceee9857",
+      "trace_id": "",
+      "latency_ms": 0.962
+    },
+    {
+      "index": 63,
+      "logical_ip": "198.18.0.63",
+      "status": 429,
+      "request_id": "ea82d3e7-22da-4a7e-8ebf-92d0b7ca4b14",
+      "trace_id": "",
+      "latency_ms": 26.32
+    },
+    {
+      "index": 70,
+      "logical_ip": "198.18.0.70",
+      "status": 429,
+      "request_id": "4e923f83-acc2-4df0-97f4-0a46b79e439b",
+      "trace_id": "",
+      "latency_ms": 11.717
+    },
+    {
+      "index": 68,
+      "logical_ip": "198.18.0.68",
+      "status": 429,
+      "request_id": "3fd28fc0-6681-4a20-8a33-f617e9bf93e4",
+      "trace_id": "",
+      "latency_ms": 12.969
+    },
+    {
+      "index": 72,
+      "logical_ip": "198.18.0.72",
+      "status": 429,
+      "request_id": "0cf1bb8e-39af-4410-8dc1-897952050869",
+      "trace_id": "",
+      "latency_ms": 1.408
+    },
+    {
+      "index": 71,
+      "logical_ip": "198.18.0.71",
+      "status": 429,
+      "request_id": "c8ec7b63-3197-42cd-a56d-18468f30ac07",
+      "trace_id": "",
+      "latency_ms": 1.736
+    },
+    {
+      "index": 73,
+      "logical_ip": "198.18.0.73",
+      "status": 429,
+      "request_id": "2eac016b-a735-48c9-8ddf-61cd1395a4fd",
+      "trace_id": "",
+      "latency_ms": 1.894
+    },
+    {
+      "index": 75,
+      "logical_ip": "198.18.0.75",
+      "status": 429,
+      "request_id": "646dc9ac-48df-4e74-9fdb-0a24068f8618",
+      "trace_id": "",
+      "latency_ms": 0.914
+    },
+    {
+      "index": 77,
+      "logical_ip": "198.18.0.77",
+      "status": 429,
+      "request_id": "9eb9db1f-f1a7-41f1-bfec-b98566686e97",
+      "trace_id": "",
+      "latency_ms": 11.879
+    },
+    {
+      "index": 76,
+      "logical_ip": "198.18.0.76",
+      "status": 429,
+      "request_id": "4ffd81fd-c2cd-49d7-b171-a655e59743bb",
+      "trace_id": "",
+      "latency_ms": 12.423
+    },
+    {
+      "index": 74,
+      "logical_ip": "198.18.0.74",
+      "status": 429,
+      "request_id": "f970e98b-3f6f-47c7-a877-bacb79846140",
+      "trace_id": "",
+      "latency_ms": 12.984
+    },
+    {
+      "index": 79,
+      "logical_ip": "198.18.0.79",
+      "status": 429,
+      "request_id": "3a154475-12f5-4cf8-9ad6-d0d16fd834a8",
+      "trace_id": "",
+      "latency_ms": 1.49
+    },
+    {
+      "index": 80,
+      "logical_ip": "198.18.0.80",
+      "status": 429,
+      "request_id": "6604512a-f0ec-46b2-9cb1-359d5d1cfc73",
+      "trace_id": "",
+      "latency_ms": 1.433
+    },
+    {
+      "index": 82,
+      "logical_ip": "198.18.0.82",
+      "status": 429,
+      "request_id": "69685a6a-d2e7-4f1d-a18d-b320ddbf32f7",
+      "trace_id": "",
+      "latency_ms": 1.005
+    },
+    {
+      "index": 83,
+      "logical_ip": "198.18.0.83",
+      "status": 429,
+      "request_id": "53c21062-e833-4cc7-9368-f603ed710d46",
+      "trace_id": "",
+      "latency_ms": 0.968
+    },
+    {
+      "index": 84,
+      "logical_ip": "198.18.0.84",
+      "status": 429,
+      "request_id": "c0070421-8b58-4f78-9fb9-867b36563392",
+      "trace_id": "",
+      "latency_ms": 0.91
+    },
+    {
+      "index": 81,
+      "logical_ip": "198.18.0.81",
+      "status": 429,
+      "request_id": "9b2e05ae-385d-490d-adc6-ab96114c7d10",
+      "trace_id": "",
+      "latency_ms": 12.831
+    },
+    {
+      "index": 86,
+      "logical_ip": "198.18.0.86",
+      "status": 429,
+      "request_id": "b9265069-6e94-45a7-b08d-ec72950d7391",
+      "trace_id": "",
+      "latency_ms": 1.497
+    },
+    {
+      "index": 78,
+      "logical_ip": "198.18.0.78",
+      "status": 429,
+      "request_id": "df82868d-1ec1-4f03-bb53-1078bb5ebcd2",
+      "trace_id": "",
+      "latency_ms": 27.409
+    },
+    {
+      "index": 85,
+      "logical_ip": "198.18.0.85",
+      "status": 429,
+      "request_id": "40d4c63c-357d-4c7d-a787-ca7e7ea9b7ab",
+      "trace_id": "",
+      "latency_ms": 24.109
+    },
+    {
+      "index": 87,
+      "logical_ip": "198.18.0.87",
+      "status": 429,
+      "request_id": "6d07d23b-e200-4f62-952e-f565e1980f24",
+      "trace_id": "",
+      "latency_ms": 12.813
+    },
+    {
+      "index": 90,
+      "logical_ip": "198.18.0.90",
+      "status": 429,
+      "request_id": "a1519561-9932-4b4b-b686-9f101c203543",
+      "trace_id": "",
+      "latency_ms": 0.93
+    },
+    {
+      "index": 89,
+      "logical_ip": "198.18.0.89",
+      "status": 429,
+      "request_id": "f2210fd7-ef4c-42ef-a061-0bf7d0abce3c",
+      "trace_id": "",
+      "latency_ms": 1.416
+    },
+    {
+      "index": 91,
+      "logical_ip": "198.18.0.91",
+      "status": 429,
+      "request_id": "912beda9-1989-418e-b3f9-d3cfdc5025d9",
+      "trace_id": "",
+      "latency_ms": 1.072
+    },
+    {
+      "index": 92,
+      "logical_ip": "198.18.0.92",
+      "status": 429,
+      "request_id": "6827febc-488e-4181-ba18-e751c6b2430d",
+      "trace_id": "",
+      "latency_ms": 1.155
+    },
+    {
+      "index": 93,
+      "logical_ip": "198.18.0.93",
+      "status": 429,
+      "request_id": "eb36a0e2-22ba-4829-8091-7b5e8d1e4139",
+      "trace_id": "",
+      "latency_ms": 0.891
+    },
+    {
+      "index": 94,
+      "logical_ip": "198.18.0.94",
+      "status": 429,
+      "request_id": "bbaa84d6-8357-41d6-b365-301e7d5ab9f3",
+      "trace_id": "",
+      "latency_ms": 0.798
+    },
+    {
+      "index": 95,
+      "logical_ip": "198.18.0.95",
+      "status": 429,
+      "request_id": "f980e827-9252-4652-941a-94a3594207a7",
+      "trace_id": "",
+      "latency_ms": 0.899
+    },
+    {
+      "index": 96,
+      "logical_ip": "198.18.0.96",
+      "status": 429,
+      "request_id": "706a6845-63cc-4408-ba3c-3f6cab2f77f8",
+      "trace_id": "",
+      "latency_ms": 0.846
+    },
+    {
+      "index": 97,
+      "logical_ip": "198.18.0.97",
+      "status": 429,
+      "request_id": "3b8d4ea1-f1f2-4a60-ae97-c672e9cbb402",
+      "trace_id": "",
+      "latency_ms": 0.931
+    },
+    {
+      "index": 99,
+      "logical_ip": "198.18.0.99",
+      "status": 429,
+      "request_id": "68448801-1945-408f-bfc8-6a5abac7b676",
+      "trace_id": "",
+      "latency_ms": 0.697
+    },
+    {
+      "index": 88,
+      "logical_ip": "198.18.0.88",
+      "status": 429,
+      "request_id": "b7968910-4c62-4064-a4ef-40a5e4f4e6f6",
+      "trace_id": "",
+      "latency_ms": 17.095
+    },
+    {
+      "index": 98,
+      "logical_ip": "198.18.0.98",
+      "status": 429,
+      "request_id": "d00e1766-632f-4929-aa68-ad1d5a3cf51f",
+      "trace_id": "",
+      "latency_ms": 11.234
+    },
+    {
+      "index": 4,
+      "logical_ip": "198.18.0.4",
+      "status": 401,
+      "request_id": "fcb702af-49b8-4254-93e0-c74992aeab60",
+      "trace_id": "",
+      "latency_ms": 504.499
+    }
+  ],
+  "verdict": "OBSERVER_REQUIRED"
+}

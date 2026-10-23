@@ -1,0 +1,84 @@
+{"utc": "2026-10-15T14:14:48.496907+00:00", "action": "capture", "file": "patient_home.png"}
+{"utc": "2026-10-15T14:14:51.676055+00:00", "action": "tap", "label": "Search specialist", "index": 0}
+{"utc": "2026-10-15T14:15:12.593734+00:00", "action": "type", "character_count": 20}
+{"utc": "2026-10-15T14:15:12.788148+00:00", "action": "back"}
+{"utc": "2026-10-15T14:15:13.264154+00:00", "action": "capture", "file": "patient_discovery.png"}
+{"utc": "2026-10-15T14:15:44.892192+00:00", "action": "tap", "label": "View profile", "index": 0}
+{"utc": "2026-10-15T14:15:45.379882+00:00", "action": "capture", "file": "patient_doctor_profile.png"}
+{"utc": "2026-10-15T14:16:14.306579+00:00", "action": "launch", "app": "doctor", "cold": false}
+{"utc": "2026-10-15T14:16:17.420591+00:00", "action": "tap", "label": "Schedule", "index": 0}
+{"utc": "2026-10-15T14:16:17.933878+00:00", "action": "capture", "file": "doctor_schedule_before.png"}
+{"utc": "2026-10-15T14:16:21.054291+00:00", "action": "tap", "label": "Add Slot", "index": 0}
+{"utc": "2026-10-15T14:16:50.223330+00:00", "action": "tap", "label": "OK", "index": 0}
+{"utc": "2026-10-15T14:17:05.024403+00:00", "action": "tap", "label": "OK", "index": 0}
+{"utc": "2026-10-15T14:17:08.124219+00:00", "action": "tap", "label": "OK", "index": 0}
+{"utc": "2026-10-15T14:17:08.617929+00:00", "action": "capture", "file": "doctor_slot_created.png"}
+{"utc": "2026-10-15T14:17:31.472908+00:00", "action": "launch", "app": "patient", "cold": false}
+{"utc": "2026-10-15T14:17:35.210811+00:00", "action": "tap", "label": "Availability", "index": 0}
+{"utc": "2026-10-15T14:17:35.688314+00:00", "action": "capture", "file": "patient_availability.png"}
+{"utc": "2026-10-15T14:17:38.795156+00:00", "action": "tap", "label": "Book chat", "index": 0}
+{"utc": "2026-10-15T14:17:39.286916+00:00", "action": "capture", "file": "patient_chat_price.png"}
+{"utc": "2026-10-15T14:18:23.965692+00:00", "action": "tap", "label": "Select a consultation slot", "index": 0}
+{"utc": "2026-10-15T14:19:05.387504+00:00", "action": "tap", "label": "Thu\n15", "index": 0}
+{"utc": "2026-10-15T14:19:28.694774+00:00", "action": "capture", "file": "patient_booking_slots.png"}
+{"utc": "2026-10-15T14:20:08.858704+00:00", "action": "tap", "label": "Thu\n15", "index": 0}
+{"utc": "2026-10-15T14:20:31.064055+00:00", "action": "tap", "label": "10:16 PM", "index": 0}
+{"utc": "2026-10-15T14:20:34.522740+00:00", "action": "type", "character_count": 57}
+{"utc": "2026-10-15T14:20:34.702695+00:00", "action": "back"}
+{"utc": "2026-10-15T14:20:35.160809+00:00", "action": "capture", "file": "patient_chat_booking_form.png"}
+{"utc": "2026-10-15T14:20:38.281886+00:00", "action": "tap", "label": "Proceed to Payment", "index": 0}
+{"utc": "2026-10-15T14:20:38.761627+00:00", "action": "capture", "file": "patient_payment_pending.png"}
+{"utc": "2026-10-15T14:21:50.303344+00:00", "action": "capture", "file": "patient_payment_confirmed.png"}
+{"utc": "2026-10-15T14:21:53.077334+00:00", "action": "capture", "file": "patient_chat_open.png"}
+{"utc": "2026-10-15T14:22:24.248238+00:00", "action": "tap", "label": "Open consultation", "index": 0}
+{"utc": "2026-10-15T14:22:24.661172+00:00", "action": "capture", "file": "patient_chat_open.png"}
+{"utc": "2026-10-15T14:23:27.116413+00:00", "action": "type", "character_count": 35}
+{"utc": "2026-10-15T14:23:27.516352+00:00", "action": "capture", "file": "patient_chat_keyboard.png"}
+{"utc": "2026-10-15T14:23:52.699194+00:00", "action": "capture", "file": "patient_message_sent.png"}
+{"utc": "2026-10-15T14:23:54.463872+00:00", "action": "launch", "app": "doctor", "cold": false}
+{"utc": "2026-10-15T14:23:57.493603+00:00", "action": "tap", "label": "Queue", "index": 0}
+{"utc": "2026-10-15T14:23:57.890598+00:00", "action": "capture", "file": "doctor_chat_patient_queue.png"}
+{"utc": "2026-10-15T14:24:20.487461+00:00", "action": "tap", "label": "Refresh", "index": 0}
+{"utc": "2026-10-15T14:24:20.929530+00:00", "action": "capture", "file": "doctor_chat_patient_queue.png"}
+{"utc": "2026-10-15T14:24:50.800546+00:00", "action": "swipe", "direction": "down"}
+{"utc": "2026-10-15T14:24:53.228769+00:00", "action": "capture", "file": "doctor_chat_patient_queue.png"}
+{"utc": "2026-10-15T14:25:11.522516+00:00", "action": "tap", "label": "Chat", "index": 0}
+{"utc": "2026-10-15T14:25:11.893183+00:00", "action": "capture", "file": "doctor_chat_list.png"}
+{"utc": "2026-10-15T14:25:49.800600+00:00", "action": "type", "character_count": 36}
+{"utc": "2026-10-15T14:25:50.170564+00:00", "action": "capture", "file": "doctor_chat_keyboard.png"}
+{"utc": "2026-10-15T14:25:53.671812+00:00", "action": "capture", "file": "doctor_reply_sent.png"}
+{"utc": "2026-10-15T14:25:55.385101+00:00", "action": "launch", "app": "patient", "cold": false}
+{"utc": "2026-10-15T14:25:55.774612+00:00", "action": "capture", "file": "patient_reply_received.png"}
+{"utc": "2026-10-15T14:26:53.808869+00:00", "action": "assert_ui", "text": "Hello, I received your test message."}
+{"utc": "2026-10-15T14:26:54.196766+00:00", "action": "capture", "file": "patient_reply_received.png"}
+{"utc": "2026-10-15T14:27:25.059604+00:00", "action": "launch", "app": "patient", "cold": true}
+{"utc": "2026-10-15T14:27:27.266416+00:00", "action": "assert_ui", "text": "Patient Test Account"}
+{"utc": "2026-10-15T14:27:30.290482+00:00", "action": "tap", "label": "Chat with Doctor", "index": 0}
+{"utc": "2026-10-15T14:27:30.687663+00:00", "action": "capture", "file": "patient_active_chat_list.png"}
+{"utc": "2026-10-15T14:28:03.680845+00:00", "action": "tap", "label": "Open consultation", "index": 1}
+{"utc": "2026-10-15T14:28:05.904061+00:00", "action": "assert_ui", "text": "Consultation confirmed"}
+{"utc": "2026-10-15T14:28:08.927956+00:00", "action": "tap", "label": "Open consultation", "index": 0}
+{"utc": "2026-10-15T14:28:11.149127+00:00", "action": "assert_ui", "text": "Hello, I received your test message."}
+{"utc": "2026-10-15T14:28:11.528459+00:00", "action": "capture", "file": "patient_chat_history_after_cold_restart.png"}
+{"utc": "2026-10-15T14:28:13.597378+00:00", "action": "launch", "app": "doctor", "cold": true}
+{"utc": "2026-10-15T14:30:46.835945+00:00", "action": "launch", "app": "doctor", "cold": true}
+{"utc": "2026-10-15T14:31:48.345438+00:00", "action": "type", "character_count": 32}
+{"utc": "2026-10-15T14:31:51.544122+00:00", "action": "type", "character_count": 12}
+{"utc": "2026-10-15T14:31:54.589919+00:00", "action": "tap", "label": "Continue to MFA", "index": 0}
+{"utc": "2026-10-15T14:32:42.913691+00:00", "action": "capture", "file": "doctor_login_probe.png"}
+{"utc": "2026-10-15T14:33:57.781072+00:00", "action": "type", "character_count": 5}
+{"utc": "2026-10-15T14:33:58.096097+00:00", "action": "type", "character_count": 5}
+{"utc": "2026-10-15T14:33:58.419672+00:00", "action": "type", "character_count": 5}
+{"utc": "2026-10-15T14:33:58.739302+00:00", "action": "type", "character_count": 5}
+{"utc": "2026-10-15T14:33:59.054387+00:00", "action": "type", "character_count": 5}
+{"utc": "2026-10-15T14:33:59.380396+00:00", "action": "type", "character_count": 5}
+{"utc": "2026-10-15T14:33:59.697003+00:00", "action": "type", "character_count": 2}
+{"utc": "2026-10-15T14:36:16.197808+00:00", "action": "launch", "app": "doctor", "cold": false}
+{"utc": "2026-10-15T14:38:00.423340+00:00", "action": "type", "character_count": 4}
+{"utc": "2026-10-15T14:38:00.740978+00:00", "action": "type", "character_count": 4}
+{"utc": "2026-10-15T14:38:01.065059+00:00", "action": "type", "character_count": 4}
+{"utc": "2026-10-15T14:38:01.383552+00:00", "action": "type", "character_count": 4}
+{"utc": "2026-10-15T14:38:01.703166+00:00", "action": "type", "character_count": 4}
+{"utc": "2026-10-15T14:38:02.023872+00:00", "action": "type", "character_count": 4}
+{"utc": "2026-10-15T14:38:02.342770+00:00", "action": "type", "character_count": 4}
+{"utc": "2026-10-15T14:38:02.663795+00:00", "action": "type", "character_count": 4}

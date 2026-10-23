@@ -1,0 +1,65 @@
+{
+  "baseline_counts": {
+    "rust_library": 53,
+    "backend_integration": 235,
+    "patient_flutter": 205,
+    "doctor_flutter": 208,
+    "doctor_web": 53,
+    "admin_web": 16
+  },
+  "final_counts": {
+    "rust_library": 53,
+    "backend_integration": 239,
+    "patient_flutter": 214,
+    "doctor_flutter": 217,
+    "doctor_web": 59,
+    "admin_web": 20
+  },
+  "observed_exit_codes": {
+    "doctor_format_analyze_test_apk_build": 0,
+    "patient_format_analyze_test_apk_build_before_final_status_route_correction": 0,
+    "doctor_web_lint_typecheck_test_build": 0,
+    "admin_web_test_typecheck_lint_build": 0,
+    "test_assertion_audit": 0,
+    "backend_focused_4": 0,
+    "patient_final_format_analyze_test_apk_build": 0,
+    "backend_fmt_clippy_library_full_integration": 0,
+    "backend_binary_build": 0,
+    "backend_readiness": 0,
+    "doctor_web_final_query_boundary_lint_typecheck_test_build": 0,
+    "real_edge_web_traffic_acceptance": 0
+  },
+  "final_backend_run": "PASS",
+  "patient_final_status_route_correction": "PASS",
+  "admin_lint_warnings": 9,
+  "new_tests_added": 32,
+  "existing_assertions_deleted": 0,
+  "existing_assertions_changed": 0,
+  "test_skip_ignore_added": 0,
+  "physical_device_verified": false,
+  "total_baseline_tests": 770,
+  "total_final_tests": 802,
+  "backend_integration_result": {
+    "passed": 239,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 0,
+    "seconds": 1885.63
+  },
+  "backend_library_result": {
+    "passed": 53,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 0,
+    "seconds": 127.42
+  },
+  "real_web_traffic_check": "PASS",
+  "backend_schema_readiness": "PASS_SOURCE_BINARY_DATABASE_20261106000006",
+  "backend_source_changed_during_gates": [],
+  "finalized_at_utc": "2026-10-16T19:00:13.118810+00:00",
+  "web_http_failures": 0,
+  "web_page_errors": 0,
+  "status": "AUTOMATED_AND_REAL_LOCAL_WEB_VERIFIED_PHYSICAL_DEVICE_PENDING"
+}

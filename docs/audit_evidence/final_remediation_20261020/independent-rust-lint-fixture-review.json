@@ -1,0 +1,43 @@
+{
+    "production_configuration_changes":  0,
+    "reviewed_utc":  "2026-10-19T18:56:55.7109434Z",
+    "method":  "Source diff against SHA256-matched baseline copy; no target code execution",
+    "source_review_result":  "PASS",
+    "findings":  [
+
+                 ],
+    "existing_business_assertions_removed":  0,
+    "reviewer":  "remediate_flutter independent read-only reviewer",
+    "observations":  [
+                         "admission.rs:142 preserves exact max(1).min(4) bounds using clamp(1,4), after unchanged saturation and usize conversion. Capacity 0/1 remains one auth slot; capacity \u003e=2 preserves intended auth reserve. Other lanes and ordinary ceiling unchanged.",
+                         "admission.rs:337-364 adds boundaries at0,1,2,3,4,5,10,u32::MAX including normal/consultation/webhook/health reservations. Existing tests retained.",
+                         "admin_totp.rs:84 is_none_or is equivalent to map_or(true,predicate): None accepts any valid window candidate; Some requires a strictly later timestep. FOR UPDATE, SHA256-only algorithm check, decrypted key, 3-step window, strict comparison, and update remain unchanged.",
+                         "api_tests.rs:81-97 removes implicit shared default. Mandatory TEST_REDIS_URL parses through actual redis client and permits only literal loopback TCP endpoints on non6379 ports. No fallback, hostname resolution, remote, TLS or socket endpoint admitted.",
+                         "api_tests.rs:113-145 requires a bounded remediation fixture identity plus matching marker in the selected real Redis DB before any destructive command. Atomic FLUSHDB+marker restoration preserves subsequent serialized test setup. Real Redis operations are preserved.",
+                         "api_tests.rs:166,341,384 applies guarded endpoint and reset to both helper paths without modifying production config or middleware.",
+                         "Ownership marker is an operator guard, not cryptographic proof or OS isolation. Its safety depends on the orchestration independently proving a new owned fixture, which remains mandatory. Tests must stay serialized because resets affect shared fixture state."
+                     ],
+    "scope":  "Root Rust lint fixes, added lane-boundary coverage and test Redis endpoint/ownership guard only",
+    "files":  [
+                  {
+                      "reviewed_sha256":  "baa19fd740ab353201e97229ba654f80ccb34389b86c96697499128252691872",
+                      "path":  "services/backend/src/admission.rs",
+                      "baseline_sha256":  "d92fb85f99c047948dd23d747643ee9029f95b2928ed2bdd9991ebc50d81ef1c",
+                      "prior_copy_matches_baseline":  true
+                  },
+                  {
+                      "reviewed_sha256":  "d6a33303b19c5a27318554b1900dfb6d1bd0675b81ab55babbb2c88243e49d98",
+                      "path":  "services/backend/src/services/admin_totp.rs",
+                      "baseline_sha256":  "1f81ce1685482de6360a254055479867f79b2891adda83f19f549cdcc549e783",
+                      "prior_copy_matches_baseline":  true
+                  },
+                  {
+                      "reviewed_sha256":  "5329f6bffeb9880a371c573c531af9630a201e5dccc1864810e7689da1792305",
+                      "path":  "services/backend/tests/api_tests.rs",
+                      "baseline_sha256":  "8819b63514abdb3569d475311f092c79335845d11fe696b8361d9921f9d7a738",
+                      "prior_copy_matches_baseline":  true
+                  }
+              ],
+    "security_bypasses_added":  0,
+    "runtime_acceptance":  "NOT_ASSESSED_BY_THIS_REVIEW"
+}

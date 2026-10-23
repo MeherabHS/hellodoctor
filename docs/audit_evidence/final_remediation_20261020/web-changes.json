@@ -1,0 +1,61 @@
+{
+    "baseline_files":  132,
+    "changed":  [
+                    {
+                        "path":  "apps/admin-web\\tests\\refresh.test.ts",
+                        "before_sha256":  "56EF12320FA26EC408D599AA03F490DF3CE4FBB64B68556A41FC3C2B3574E79C",
+                        "after_sha256":  "989063F609BDD41EEA202DD8A85FB8740F79CFA501BCE3BF3078913D506A6869",
+                        "old_scratch_matches_baseline":  true
+                    },
+                    {
+                        "path":  "apps/admin-web\\src\\app\\page.tsx",
+                        "before_sha256":  "11C5E9B00B21B0B2A0DBC99D5B627F8D6FB0AAE760B004F1DA4ECF44D72F5DDA",
+                        "after_sha256":  "3AA56585B5596FC403DB577146C42EA2CEEE4E7F56D5CA35DCB3A6BD7D73ADB4",
+                        "old_scratch_matches_baseline":  true
+                    },
+                    {
+                        "path":  "apps/admin-web\\src\\components\\GrievanceInvestigation.tsx",
+                        "before_sha256":  "1FFC646A42ED934C67F19E88A626CEB524E54879964A6B9543B816DCB7D360DB",
+                        "after_sha256":  "80C9990A2A0499C0B2525FE36ACDCF6A18CE8EA6051DA61E984A4AC6DEF67D69",
+                        "old_scratch_matches_baseline":  true
+                    },
+                    {
+                        "path":  "apps/admin-web\\src\\components\\BotChallenge.tsx",
+                        "before_sha256":  "49ED11D8DE6D0BB21ADE8355D4C4A6967A9880DCC32607A531720BB37D1C2CD6",
+                        "after_sha256":  "C46ABC98DD94F2B05F4255565EA865B978C4DEFFBC9D75026EA0E6F88C2E90F4",
+                        "old_scratch_matches_baseline":  true
+                    },
+                    {
+                        "path":  "apps/admin-web\\src\\lib\\useSlotSync.ts",
+                        "before_sha256":  "8BE1E3F35F5329F544CFEF42D41FD1C65F996010EFCCED863D22C9325F2E8130",
+                        "after_sha256":  "B979377DBDA327A410C72CA6D1D6984624B6ACAFDCC25D05D0487AC09CC917B4",
+                        "old_scratch_matches_baseline":  true
+                    },
+                    {
+                        "path":  "apps/admin-web\\src\\lib\\useBackendSync.ts",
+                        "before_sha256":  "80C823A17DAEE426932DD702E1B12489432ADD645DE30102CADDFE4610F6AFCA",
+                        "after_sha256":  "E3DFD24C8207E47B0121502E0B20AC9AAFD8E1951CF64B1684C96D4F9775D8D9",
+                        "old_scratch_matches_baseline":  true
+                    },
+                    {
+                        "path":  "apps/admin-web\\src\\lib\\api.ts",
+                        "before_sha256":  "C4E3AB8AAFE184E3239C53631D45F6C42CF0D0EBDAE7213FC72632361F8545E9",
+                        "after_sha256":  "48D35484E3A00332A229583CA0357DE987A0746EEBF028A4A9FE0D10D74523D6",
+                        "old_scratch_matches_baseline":  true
+                    }
+                ],
+    "deleted":  [
+
+                ],
+    "new_files":  [
+                      "apps/admin-web/tests/redis-fixture.ts",
+                      "apps/admin-web/tests/redis-fixture.test.ts"
+                  ],
+    "source_changes_authorized":  true,
+    "production_configuration_changed":  false,
+    "dependencies_changed":  false,
+    "existing_test_assertions_deleted":  0,
+    "existing_tests_deleted":  0,
+    "existing_skip_removed":  4,
+    "new_skips_added":  0
+}

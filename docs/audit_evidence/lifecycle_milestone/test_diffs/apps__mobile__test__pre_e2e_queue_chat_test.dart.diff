@@ -1,0 +1,74 @@
+--- baseline/apps/mobile/test/pre_e2e_queue_chat_test.dart
+
++++ current/apps/mobile/test/pre_e2e_queue_chat_test.dart
+
+@@ -14,7 +14,7 @@
+
+ import 'package:hellodoctor_mobile/features/doctor/doctor_models.dart';
+ import 'package:hellodoctor_mobile/features/doctor/doctor_pages.dart';
+ import 'package:hellodoctor_mobile/features/doctor/doctor_repository.dart';
+-import 'doctor_widgets_test.dart' show harness, repoHarness;
++import 'doctor_widgets_test.dart' show repoHarness;
+ 
+ class ImagePickerFixture extends FilePicker {
+   ImagePickerFixture({this.fileSize = 4});
+@@ -45,6 +45,14 @@
+
+     cleared++;
+     return true;
+   }
++}
++
++class HistoryFixtureRepository extends DoctorRepository {
++  HistoryFixtureRepository(this.completed) : super(ApiClient(dio: Dio()));
++  final AppointmentDto completed;
++  @override
++  Future<List<AppointmentDto>> consultationHistory({int offset = 0}) async =>
++      offset == 0 ? [completed] : [];
+ }
+ 
+ class FailedImageRepository extends DoctorRepository {
+@@ -146,17 +154,19 @@
+
+           'start_time': now.add(Duration(minutes: minutes)).toIso8601String(),
+           'queue_actionable': actionable
+         });
+-    await tester.pumpWidget(harness(
++    await tester.pumpWidget(repoHarness(
+         const QueuePage(),
+         DoctorState(queue: [
+           item('Current', 'IN_CONSULTATION', true, -60),
+           item('Nearest', 'CONFIRMED', true, 30),
+           item('Later', 'CONFIRMED', true, 120),
+-          item('Tomorrow', 'CONFIRMED', true, 1440),
++          item('Tomorrow', 'CONFIRMED', false, 1440),
+           item('Completed patient', 'COMPLETED', false, -120),
+           item('Old unpaid', 'PENDING_PAYMENT', false, -180),
+           item('Stale confirmed', 'CONFIRMED', false, -240)
+-        ])));
++        ]),
++        HistoryFixtureRepository(
++            item('Completed patient', 'COMPLETED', false, -120))));
+     expect(find.text('Completed patient'), findsNothing);
+     expect(find.text('Stale confirmed'), findsNothing);
+     expect(find.text('Old unpaid'), findsNothing);
+@@ -164,12 +174,12 @@
+
+         lessThan(tester.getTopLeft(find.text('Nearest')).dy));
+     expect(tester.getTopLeft(find.text('Nearest')).dy,
+         lessThan(tester.getTopLeft(find.text('Later')).dy));
+-    expect(tester.getTopLeft(find.text('Later')).dy,
+-        lessThan(tester.getTopLeft(find.text('Tomorrow')).dy));
+-    expect(find.text('Tomorrow'), findsOneWidget);
+-    await tester.ensureVisible(find.text('Completed (1)'));
+-    await tester.tap(find.text('Completed (1)'));
+-    await tester.pump();
++    expect(find.text('Later'), findsOneWidget);
++    expect(find.text('Tomorrow'), findsNothing);
++    expect(find.textContaining('Completed ('), findsNothing);
++    await tester.ensureVisible(find.text('Consultation History'));
++    await tester.tap(find.text('Consultation History'));
++    await tester.pumpAndSettle();
+     expect(find.text('Completed patient'), findsOneWidget);
+     expect(find.text('Nearest'), findsNothing);
+     await tester.pumpWidget(const SizedBox.shrink());

@@ -1,0 +1,45 @@
+{
+  "baseline_tag_unchanged": true,
+  "existing_tests_deleted": 0,
+  "existing_assertions_deleted": 0,
+  "assertions_weakened": 0,
+  "added_skip_ignore_markers": 0,
+  "changed_existing_test_files": [
+    "services/backend/tests/api_tests.rs",
+    "apps/mobile/test/doctor_widgets_test.dart",
+    "apps/mobile/test/notification_center_page_test.dart",
+    "services/backend/src/services/consultation_service.rs"
+  ],
+  "documented_ui_expectation_updates": [
+    {
+      "file": "apps/mobile/test/doctor_widgets_test.dart",
+      "old": "expect(find.text('CallPatient'),findsOneWidget,reason:'width=$width')",
+      "new": "expect(find.text('Startvideoconsultation'),findsOneWidget,reason:'width=$width')",
+      "count": 2,
+      "reason": "Requested modality-specific consultation actions; identical findsOneWidget and width checks retained. Added negative opposite-modality assertions."
+    },
+    {
+      "file": "apps/mobile/test/doctor_widgets_test.dart",
+      "old": "expect(find.text('Chat'),findsOneWidget,reason:'width=$width')",
+      "new": "expect(find.text('Follow-upmessages'),findsOneWidget,reason:'width=$width')",
+      "count": 1,
+      "reason": "Requested modality-specific consultation actions; identical findsOneWidget and width checks retained. Added negative opposite-modality assertions."
+    },
+    {
+      "file": "apps/mobile/test/doctor_widgets_test.dart",
+      "old": "expect(find.text('WriteRx'),findsOneWidget,reason:'width=$width')",
+      "new": "expect(find.text('Writeprescription'),findsOneWidget,reason:'width=$width')",
+      "count": 1,
+      "reason": "Requested modality-specific consultation actions; identical findsOneWidget and width checks retained. Added negative opposite-modality assertions."
+    }
+  ],
+  "added_assertions": 142,
+  "unchanged_assertions": 2343,
+  "new_test_files": [
+    "apps/doctor-web/tests/consultation-actions.test.ts",
+    "apps/mobile/test/consultation_actions_test.dart",
+    "apps/mobile/test/consultation_pagination_test.dart",
+    "apps/mobile_patient/test/consultation_booking_test.dart",
+    "apps/mobile_patient/test/consultation_flow_test.dart"
+  ]
+}

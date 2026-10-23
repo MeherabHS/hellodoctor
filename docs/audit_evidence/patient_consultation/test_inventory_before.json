@@ -1,0 +1,213 @@
+{
+  "baseline_tag": "pre-patient-security-validated",
+  "baseline_commit": "eadf92f36c07ee77e100cc70736b8530b009b2d1",
+  "files": {
+    "services/backend/tests/api_tests.rs": {
+      "sha256": "8415e15a2b929f4700caf1bd7b12def2d30d149c05f3173cac9a35e8bff1bc7c"
+    },
+    "apps/mobile/test/api_client_host_policy_test.dart": {
+      "sha256": "1b78e3b0fc13706d3a5fb05077bf47b4ee967ef4b3c09aac7af24bca92dba5ab"
+    },
+    "apps/mobile/test/articles_test.dart": {
+      "sha256": "2783cd13cbfd00f14a467c8634a2138b7966ca48c1a9fba645ea4f6c70f529ce"
+    },
+    "apps/mobile/test/auth_security_test.dart": {
+      "sha256": "b96894d511191c5a3c294b9b93f88a64db3b3efccd2ee15538b7682a85933c0c"
+    },
+    "apps/mobile/test/auth_state_test.dart": {
+      "sha256": "d7b4307574a9190d21b87fce10bc4e71fdc66480d9b8bff6d47b1dd40b5933ac"
+    },
+    "apps/mobile/test/background_sync_worker_test.dart": {
+      "sha256": "f68873db51b58a24740c3e352c8fe0105eee3ba417aed4f15d492f2db853b7fe"
+    },
+    "apps/mobile/test/cache_store_test.dart": {
+      "sha256": "86bbbcb5937e376ea0c63321e5761e0a72639b0421375e5f1e974749f4dc49bf"
+    },
+    "apps/mobile/test/client_error_reporter_test.dart": {
+      "sha256": "b5d379d84f53d75708a9eae917a05a5990f49a55142e60ff26079cfc3d17453a"
+    },
+    "apps/mobile/test/consultation_completion_test.dart": {
+      "sha256": "fcd21741733b4302053acca2dc7a44f8fb0f58f8605b6dad1a3abc9d48bbf7ac"
+    },
+    "apps/mobile/test/doctor_client_test.dart": {
+      "sha256": "d0d1d73cd552e2956c15cb58c616786595b580a4c4d6d77f1a4854299a5224a6"
+    },
+    "apps/mobile/test/doctor_cubit_test.dart": {
+      "sha256": "4def1be5546d08bd950d56fbf765b319eb0bb272c3a8f889cf19de2b855c9482"
+    },
+    "apps/mobile/test/doctor_models_test.dart": {
+      "sha256": "cde99a92931713fbd90d6048f13ee12854494e84bd75a6983905f247467f89e7"
+    },
+    "apps/mobile/test/doctor_widgets_test.dart": {
+      "sha256": "599e2c0222a6c9617c5aa9bad61aac34442da178cdd4b616c0e4243877064c4b"
+    },
+    "apps/mobile/test/kenya_phone_test.dart": {
+      "sha256": "2b5ce60ceccd42d49d334cee481f2ab418ab1ff5dfa92dab6df70eae9228d85d"
+    },
+    "apps/mobile/test/notification_center_page_test.dart": {
+      "sha256": "02b0052ed53d169805eb55af304fbfd26710656fc73562410169b4c05b81204f"
+    },
+    "apps/mobile/test/notification_cubit_test.dart": {
+      "sha256": "01dccec20026b82c9b4c6c594bfade672ec404a30462149f30d4ceb57dc5070b"
+    },
+    "apps/mobile/test/notification_repository_test.dart": {
+      "sha256": "71875adace72f83c9d9a8d2297c04988823a5914865b873fb48c1e6536cb8186"
+    },
+    "apps/mobile/test/qna_rendering_test.dart": {
+      "sha256": "17e8a7b63b474129b27029fdd8825c7ad6f1545d38cae1edf2e0f4d49cc2d8a7"
+    },
+    "apps/mobile/test/schedule_notification_reconciler_test.dart": {
+      "sha256": "b30d8948a83cffad23900237ac4755d8e0775dc4b58e274781e5c122cd8bdd10"
+    },
+    "apps/mobile/test/startup_incident_queue_test.dart": {
+      "sha256": "3d2bec98b0d57b1868b75ce0ff79cdeb38c87eb29a097ac9d6d418b06f9c8a3a"
+    },
+    "apps/mobile/test/dev/client_incident_live.dart": {
+      "sha256": "8986c14d85a7d9421f448017e9caa53a7d08f327c2e32db5148f420c770e4258"
+    },
+    "apps/mobile_patient/test/api_client_host_policy_test.dart": {
+      "sha256": "3c10b2a352f1e947cbb03de375dbc924b57b46ff7edcf35bf0da7aa039f84e4c"
+    },
+    "apps/mobile_patient/test/app_boot_test.dart": {
+      "sha256": "6744257c3ceaf018afec01f0158c7b3a29d3ad8496c1886537804e991414f0d8"
+    },
+    "apps/mobile_patient/test/auth_cubit_test.dart": {
+      "sha256": "72fbabbaa1f0dc6e481b75684ae34bea42557b280998323d879a9e79a5d12298"
+    },
+    "apps/mobile_patient/test/auth_security_test.dart": {
+      "sha256": "5625143ddcc1439741287425147def8803ae2afc3ce262f0692983657b0b8f7f"
+    },
+    "apps/mobile_patient/test/booking_cubit_test.dart": {
+      "sha256": "42b48bfda92dee34af6a5cf7a264a29495d7e1da9d76442830e8a06778d58f64"
+    },
+    "apps/mobile_patient/test/cache_store_test.dart": {
+      "sha256": "bf95ff40a3b8828a4aed0db4bec6780151406237537f02e627c9d19897e56c92"
+    },
+    "apps/mobile_patient/test/chat_cubit_test.dart": {
+      "sha256": "946fcbe56c690cbd570d7e77c84f57dc71a0ce2a44ca381921f21a6c0440a500"
+    },
+    "apps/mobile_patient/test/client_error_reporter_test.dart": {
+      "sha256": "ead1e125d105937250df93f7e8b010a506c86a448441e50765a7ac0e6d27e2df"
+    },
+    "apps/mobile_patient/test/directory_cubit_test.dart": {
+      "sha256": "88f8ea63a186ef1dc0ca80cb35d9a20d53fd68d5d6dcddce59c6d85d994fe234"
+    },
+    "apps/mobile_patient/test/family_profiles_cubit_test.dart": {
+      "sha256": "dbbf00eedc795887cb4fc8d4dd0c75c868c84b62493c42a8190ee1ca3a0982f8"
+    },
+    "apps/mobile_patient/test/home_cubit_active_profile_test.dart": {
+      "sha256": "39c1386939f1e306757937a5717edae435b8fe6e015aae325c49a485405c51ad"
+    },
+    "apps/mobile_patient/test/kenya_phone_test.dart": {
+      "sha256": "02c01a77e94c25c3ee360f3876f62e7aa917e650441262ba2e1d9df68e1b1730"
+    },
+    "apps/mobile_patient/test/locale_controller_test.dart": {
+      "sha256": "a02a3754081258a21ac6f98c65f8e22273ff926c8baad9d59792b35b93d49f92"
+    },
+    "apps/mobile_patient/test/notification_cubit_test.dart": {
+      "sha256": "2ef55b869bb2f1df9b282702fd90d55c39923a1cff5739ff1ec6e90acd5cf357"
+    },
+    "apps/mobile_patient/test/otp_validation_test.dart": {
+      "sha256": "fbba4d21421b6e3edbd76e33206cc12af2b53f3cd73dde458a337b4ca2bf6ae5"
+    },
+    "apps/mobile_patient/test/patient_discovery_qna_correction_test.dart": {
+      "sha256": "b600e9ac285fe173a403a3a142a8d69c55ddc8b25fb56cc5ba10448705ae5a7f"
+    },
+    "apps/mobile_patient/test/phone_entry_page_test.dart": {
+      "sha256": "857a983ea7ff2e5ddd4eaef1b88da29394f6cae7834f0abf0fb78761286c8bdd"
+    },
+    "apps/mobile_patient/test/qna_cubit_test.dart": {
+      "sha256": "b282460f970f85bca251e8d4b8723ff924feb81c0a0d4ce33e6457ba78d010b0"
+    },
+    "apps/mobile_patient/test/startup_incident_queue_test.dart": {
+      "sha256": "774e0192aef02ef105d52629014df6fb3dcb4e8d19620cc5a14a882995a1a146"
+    },
+    "apps/mobile_patient/test/telemetry_event_test.dart": {
+      "sha256": "37b24bedd9ce67e4537604bc729e83c1b948e4063e263f0469f89e93d777c2ad"
+    },
+    "apps/mobile_patient/test/upload_validation_test.dart": {
+      "sha256": "bd28a1e6080fd91f400080aa2aa1c0c62a6dedc1264329042590fcc1641b839e"
+    },
+    "apps/mobile_patient/test/vault_cubit_test.dart": {
+      "sha256": "f9cf1303dbd6fd0ef037f69b4a54845329094074c761dbbce2d63d9b5543d201"
+    },
+    "apps/mobile_patient/test/waiting_room_cubit_test.dart": {
+      "sha256": "3f6a585a25c845ce70b3e4abed28926d11b849ecc5e1e4742c023c88cced066f"
+    },
+    "apps/doctor-web/tests/articles.test.ts": {
+      "sha256": "c424fdb587bedb5746ee96939c4b3af8cfa7699c53efa0854f35b9df2d11274a"
+    },
+    "apps/doctor-web/tests/client-incidents.test.ts": {
+      "sha256": "0a026ad9718cb5e1127b63a89c09a1846a1a52d43cb974c3e816dec9dfef87ba"
+    },
+    "apps/doctor-web/tests/contracts.test.ts": {
+      "sha256": "4ef15075829d89f0323f9ec37d5b3f0ee3a3c391a40dc1aa46b40348d63075c4"
+    },
+    "apps/doctor-web/tests/origin.test.ts": {
+      "sha256": "aa473ec826ba10614c31366eff4bf71453d1f92be59c7860736b82f95984e58a"
+    },
+    "apps/doctor-web/tests/professional-verification.test.ts": {
+      "sha256": "5c0ed053fd61c0009b8e561daa04c64260122c825a6688bfdbdbc294871ff03d"
+    },
+    "apps/doctor-web/tests/public-exposure.test.ts": {
+      "sha256": "c232a8c8f44d832d6a439446348c9df51da99086d0300b14dd9188010f5213f2"
+    },
+    "apps/doctor-web/tests/rx-compression.test.ts": {
+      "sha256": "bc4b65388a6f0c99506a2f004ffbc1b8d6744d91bda05df5d9071bd7fbb5739b"
+    },
+    "apps/doctor-web/tests/rx-upload.test.ts": {
+      "sha256": "4df6e926091df814d32acd5123d6bcf54e717b1e3bfbf27c0108aabe779616e4"
+    },
+    "apps/doctor-web/tests/schedule-sync.test.ts": {
+      "sha256": "71f0ebf64d4633502d6f459cd38cd8ca519a66e5b7e523aa111b6e92d536f3ea"
+    },
+    "apps/doctor-web/tests/slot-list.test.ts": {
+      "sha256": "d09447d934cf7ce0392843d2eb3e2a7a0b88ff2e0e2430eed3acfa72ce62c590"
+    },
+    "apps/admin-web/tests/professional-verification.test.ts": {
+      "sha256": "ba23c2be4f480ec50dbb71870b0936e03763d41958b753b6608f643ebc978a9d"
+    },
+    "apps/admin-web/tests/public-exposure.test.ts": {
+      "sha256": "c232a8c8f44d832d6a439446348c9df51da99086d0300b14dd9188010f5213f2"
+    },
+    "apps/admin-web/tests/refresh.test.ts": {
+      "sha256": "8fb0fdab3132d1a466df39e7cd339e56dd062377bc0099e1900278c4792eaf72"
+    },
+    "apps/admin-web/tests/schedule.test.ts": {
+      "sha256": "bf57e7b93c8914b516b26a2f4c3c477b7730271dcbb3524542a6330fd92dd45d"
+    },
+    "services/backend/src/config.rs": {
+      "sha256": "355acf14cd2ed98a9aa91393a0f3c2cc00bf3a714b0a4a6c5f8bab9a75feefa3"
+    },
+    "services/backend/src/error.rs": {
+      "sha256": "ba96c1957df6aa859d9fb615a8a168eec376d822416fa0f18ea533447a5e53a3"
+    },
+    "services/backend/src/migration_status.rs": {
+      "sha256": "9b960a55c72fb934edfbd2ac731b48234ab19edaab78a142bf8ac225527b6468"
+    },
+    "services/backend/src/system_error.rs": {
+      "sha256": "eea83b86b256ba2dbfb6faf29f48d6d72998e6be44fb364f8730c633d67cb7c9"
+    },
+    "services/backend/src/domain/ids.rs": {
+      "sha256": "03bbf20ada56d17b3528ba81d044073f4405adb619d9a3ddebf9b245c16881cd"
+    },
+    "services/backend/src/domain/validation.rs": {
+      "sha256": "f9142e564cee0e8beb811b0c57f4b567a8db9f4d72c162441be5098ed52eb4bb"
+    },
+    "services/backend/src/services/agora_token_service.rs": {
+      "sha256": "aacfea973c52519a288ad5dd1575296e2e799bd994da8954da0ac502e5e1588f"
+    },
+    "services/backend/src/services/audit_service.rs": {
+      "sha256": "018da2edb740ead2c1edee47182dfdd0db88da88b67ec65b27fd96abe0c7bb39"
+    },
+    "services/backend/src/services/consultation_service.rs": {
+      "sha256": "382ec16d901384f0682a0e40624f653f3f244b4059af666c8410402306c1d812"
+    },
+    "services/backend/src/services/upload_security_service.rs": {
+      "sha256": "cd283dc4bb4d8c4849f6443a233f2772a90f51984a1c75ffffd0f41db0566767"
+    },
+    "services/backend/src/api/v1/client_error_handlers.rs": {
+      "sha256": "1114a9a6d2e66840b21e63bfc92c9a32af6b525e7e218287c69c9033f8b8fb64"
+    }
+  }
+}

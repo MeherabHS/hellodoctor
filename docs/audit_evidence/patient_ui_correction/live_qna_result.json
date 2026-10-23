@@ -1,0 +1,9 @@
+{
+  "create_http_status": 201,
+  "created_status": "OPEN",
+  "feed_status": "OPEN",
+  "survives_second_fetch": true,
+  "no_fabricated_answer": true,
+  "author_identity_not_exposed": true,
+  "email_mfa_login": "PASS"
+}

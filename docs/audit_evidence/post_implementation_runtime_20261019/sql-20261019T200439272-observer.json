@@ -1,0 +1,380 @@
+﻿{
+    "run_id":  "sql-20261019T200439272",
+    "observations":  [
+                         {
+                             "case_id":  "obligation",
+                             "request_count":  100,
+                             "active_obligations":  1,
+                             "payment_confirmed_effects":  0,
+                             "consultation_settled_effects":  0,
+                             "provider_event_rows":  0,
+                             "approving_admin":  "\u003cNULL\u003e",
+                             "verdict":  "DEFENSE_PASS"
+                         },
+                         {
+                             "case_id":  "confirmation",
+                             "request_count":  100,
+                             "active_obligations":  1,
+                             "payment_confirmed_effects":  1,
+                             "consultation_settled_effects":  0,
+                             "provider_event_rows":  100,
+                             "approving_admin":  "\u003cNULL\u003e",
+                             "verdict":  "DEFENSE_PASS"
+                         },
+                         {
+                             "case_id":  "replay",
+                             "request_count":  100,
+                             "active_obligations":  1,
+                             "payment_confirmed_effects":  1,
+                             "consultation_settled_effects":  0,
+                             "provider_event_rows":  100,
+                             "approving_admin":  "\u003cNULL\u003e",
+                             "verdict":  "DEFENSE_PASS"
+                         },
+                         {
+                             "case_id":  "settlement",
+                             "request_count":  100,
+                             "active_obligations":  1,
+                             "payment_confirmed_effects":  1,
+                             "consultation_settled_effects":  1,
+                             "provider_event_rows":  100,
+                             "approving_admin":  "\u003cNULL\u003e",
+                             "verdict":  "DEFENSE_PASS"
+                         },
+                         {
+                             "case_id":  "approval",
+                             "request_count":  100,
+                             "active_obligations":  1,
+                             "payment_confirmed_effects":  1,
+                             "consultation_settled_effects":  1,
+                             "provider_event_rows":  100,
+                             "approving_admin":  "44444444-4444-4444-4444-444444444444",
+                             "verdict":  "DEFENSE_PASS"
+                         },
+                         {
+                             "case_id":  "payout",
+                             "request_count":  100,
+                             "active_obligations":  1,
+                             "payment_confirmed_effects":  1,
+                             "consultation_settled_effects":  1,
+                             "provider_event_rows":  100,
+                             "approving_admin":  "44444444-4444-4444-4444-444444444444",
+                             "verdict":  "DEFENSE_PASS"
+                         }
+                     ],
+    "migration_up_pass":  true,
+    "economic_down_up_pass":  true,
+    "negative_regression_reference_pass":  true,
+    "up_migration_count":  62,
+    "observer_asserted_failed_history_count":  2,
+    "observer_asserted_doctor_lifetime_net":  80,
+    "observer_asserted_paid_effect_count":  1,
+    "fixture_gross":  100,
+    "fixture_platform_fee":  20,
+    "amount_scope":  "Net80 explicitly asserted by independent observer; gross100/platformfee20 are fixture inputs, not independent credits observed.",
+    "retained_container_count":  0,
+    "limitations":  [
+                        "Not a Rust build, application integration, HTTP, provider or SQLx metadata test.",
+                        "Fixture executes SQL as postgres; this does not independently establish capability-role/RLS denial enforcement.",
+                        "Maximum eight concurrent SQL clients; not 100 simultaneous HTTP requests or 30000-client traffic.",
+                        "Duration includes disposable cluster startup and migrations; not throughput measurement."
+                    ],
+    "source_hashes":  [
+                          {
+                              "path":  "services/backend/migrations/20261001000001_initial_schema.up.sql",
+                              "sha256":  "67bf6cac0b10dc21c6478bdd53fc69877c1c137c9ca103fffe06ab293d14ffb6"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261002000001_add_phone_otps.up.sql",
+                              "sha256":  "43e53dc521f137f7513553a32d03801f60d1a90aa67f4ad653419970909de3b2"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261002000002_idempotency_response_body.up.sql",
+                              "sha256":  "fc92290675b6c1154fba1182e329c5a9c7d2ddf328f2b250f4aa4a6cb6883de6"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261002000003_pending_mfa_challenges.up.sql",
+                              "sha256":  "424acd9974514821f889aa5bc58080427e0b494c05c0cc394040a674253f44bf"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261002000004_idempotency_nullable_user.up.sql",
+                              "sha256":  "c2467db9e2f830138411e8bbb9f427ba768c03d8c02b9b095cd41e6efb39f001"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261003000001_rls_hardening.up.sql",
+                              "sha256":  "0811fa8af80a4fef6801042c8a0fbefa43f76675537c1fff974899bdeb43eec4"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261004000001_system_error_service.up.sql",
+                              "sha256":  "b174f39268eb5bfd7ba04a0076c6dab7cf292645b44791c84b678ea03542cf44"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261004000002_consultation_telemetry_events.up.sql",
+                              "sha256":  "d928de79b33f7d6c692843c59b544a6b40861753a5213c3e163a2315a12fa288"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261004000003_admin_audit_snapshots.up.sql",
+                              "sha256":  "ac6dee38fdd832ad8d03438378e7db2672acbc0cb10fdd98b6feede0347f5b2e"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261004000004_security_correctness_fixes.up.sql",
+                              "sha256":  "4b2258e7998a05350c15e25285b8bfb82774af26c6302fa11d87783dcd2ace09"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261004000005_pass2_fixes.up.sql",
+                              "sha256":  "5dbabb4b4be91e3ba81b8771c93d9d6a387b738d90f6f9af7e4f4f6a9b619cbf"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261005000001_doctor_contract_qna.up.sql",
+                              "sha256":  "d7fbba08e292db8cf27b407ab398a5c59e11e6b042531e1ba7aeaa03ddf75109"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261005000002_history_access_window.up.sql",
+                              "sha256":  "82cd51cbf6a1fe338bc2814f025ba1df28b99d3a4d110eebaa405c41dcd29a44"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261006000001_doctor_payout_methods.up.sql",
+                              "sha256":  "ca4e3ac9f3fa4db3c1d7f7ac343e3f2a33b31885a7790bbc9b6d998b5927d7cc"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261007000001_kenya_payout_routing.up.sql",
+                              "sha256":  "b3f84848912060dbb3b5e3509cf4c1cd8d95f0c9e59e9b61d0d42acfdbe5441a"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261008000001_financial_state_machine.up.sql",
+                              "sha256":  "c5f1c0c847418ab84f32b9680e7ff7ac16f764bc47566477bc8bb432431e93dd"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261009000001_fix_disbursement_allocation_index.up.sql",
+                              "sha256":  "b42256cb47912ba3fc7cd2937523cb611c988479794da389ac9cf0340aa54bb5"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261010000001_add_kenya_bank_gateway.up.sql",
+                              "sha256":  "bf952d117f3768922a87cb79c32c2995511cce8fcb6ff16beb47bc88bd12f93b"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261011000001_statement_payout_snapshot.up.sql",
+                              "sha256":  "ef5beb493f66ec5a8bc5d9ed49dcbb2ea0b00e43a7ea4d595c5511d087f8fb37"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261012000001_financial_close_integrity.up.sql",
+                              "sha256":  "994ed134f1ab6130e512d78793667e56b935735c0846a852d8e1380aa9b6ecec"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261013000001_atomic_doctor_onboarding.up.sql",
+                              "sha256":  "6aba7540b45c090ecd0fd3d3f167ba42b0fea6e68c53590dcf7dfc13bb28d312"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261014000001_rx_pages_document_authorization.up.sql",
+                              "sha256":  "baae719739ba2a410fb6a04c18632992bee639daafb7c2494fde8cd9df4f90b9"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261015000001_refund_approval_not_payment.up.sql",
+                              "sha256":  "7ecbb836defe1cffd2bc79b1d2cf265c1c088a76032480177686fc18b22d3cb8"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261016000001_atomic_consultation_completion.up.sql",
+                              "sha256":  "2c564f47f720b601c87545d0dd0ec5ef8026833c8d329a0fc978dbd33cb58e5f"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261017000001_clinical_and_payout_invariants.up.sql",
+                              "sha256":  "209c110978bff14322ce9229b3cfa483651ccc486059182a364c3115b080029f"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261018000001_audit_corrections.up.sql",
+                              "sha256":  "a02379f3b67d970d134a1341b7f04963c65527cead02e02db1339134597e96ce"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261019000001_migration_status_grant.up.sql",
+                              "sha256":  "24dfceac48d54477f5922df83edf15cd9c314fd7ed62aec329b73243bf1a8152"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261020000001_doctor_engagement_notifications.up.sql",
+                              "sha256":  "a2864784a88169cb9f1ddb0adea4527656ebaf7fcb227800ed24b00b550038b9"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261021000001_doctor_slot_blocking.up.sql",
+                              "sha256":  "39e4bb1405c169b4d611d7ae57bec6812ea943c21839be545a11f58dec815130"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261022000001_client_incident_context.up.sql",
+                              "sha256":  "158e95ade73fd11908392f8d4bab89231e0897eb12a8d75b3717d622a56c98c7"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261023000001_refresh_token_lineage.up.sql",
+                              "sha256":  "61c0d7373edb5a51f59c5d0b43636bf585174264811f0f04ef17c705fe05d25d"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261024000001_professional_verification.up.sql",
+                              "sha256":  "dceacdbd69acf5fe9ab691f4e6177c78a5b3da6da5a24673eef5a8c606d80464"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261025000001_doctor_articles.up.sql",
+                              "sha256":  "f81f2cfd5f2fd2dd1af5cf0412085d421e1999af9ac4e49eea136957afbf57a7"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261026000001_canonical_user_isolation.up.sql",
+                              "sha256":  "9e59c9db3a2f90486a4d3049a0abff4f38899f061958fb3843d7e07338906f22"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261027000001_legal_acceptances.up.sql",
+                              "sha256":  "c9bf0fc8990dafbb6198ccb4a2b5d3b1fc9b331abf7145c7578754e1394d2ee0"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261028000001_grievance_number_sequence.up.sql",
+                              "sha256":  "55ea848ab638ef40f9c343255d46bc2cb5ea96ecaef29b2b27b4c2b568fd47a2"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261029000001_notification_finance_worker_insert.up.sql",
+                              "sha256":  "62174a6c341ad680fb85313601e74a2d873eed26777302f524e33472a8a51fa0"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261030000001_prescription_intake_20_image_cap.up.sql",
+                              "sha256":  "6a075af172b3f84f9c333735d573351d5d521619b559a99439c899ddec377ec8"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261031000001_statement_transactions_doctor_ownership.up.sql",
+                              "sha256":  "ded9be031dbe13bc02315960073ee30b8f897fee2a80162827baafedf44f04a4"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261101000001_patient_profile_dependents.up.sql",
+                              "sha256":  "899bc195edc7253f02592bd201951134a21677621465108ddeb2549fc3357e95"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261101000002_patient_qna_submission.up.sql",
+                              "sha256":  "77beaf4a40b29dd20035997d1943fc89a57d636d40ebac9fa04500d4bc0a1ba8"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261102000001_patient_data_consent.up.sql",
+                              "sha256":  "81c28a09fe3bff4ce8d7d327f4171699e61c6b3c6d77c186a65197c034e36f59"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261102000002_patient_data_consent_document.up.sql",
+                              "sha256":  "cccfece3894b216d9199218db49dc02a087182d48c357812495c2dd5028f5bd3"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261103000001_patient_email_auth.up.sql",
+                              "sha256":  "fc3fe20e8ed316822b62b3f9efe12342955463436e1fc14ae39005cf1e457da7"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261104000001_patient_registration_details.up.sql",
+                              "sha256":  "fb51161646bd4b5cf268ed5618e862b7b8ea2eb957bf70873fa1707dc948e1fa"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261104000002_patient_policies_and_rights.up.sql",
+                              "sha256":  "81b2187aa49c778b190f7c855961422d96acda1b42bb360cdcfc4ab03349d00c"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261105000001_patient_own_open_questions.up.sql",
+                              "sha256":  "ecc97259c06e69c67db5d04bc086751d1f8cfab6884f929fc4cb769545d48529"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261106000001_canonical_admin_enum.up.sql",
+                              "sha256":  "1d17ef4a3ae3d71c751d4720f587c74f2b195850cc080e7c7474345101de97f2"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261106000002_single_admin.up.sql",
+                              "sha256":  "27ce7f1fe4ff1d5bd76ceb74704780406b1c68d423e9a0f852ef77f6d5398b5e"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261106000003_consultation_trace.up.sql",
+                              "sha256":  "1ca12771c422bf341afdc463193f4bf113c9687b01d39f25c142b07cf7f9fb5e"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261106000004_encounter_history_reschedule.up.sql",
+                              "sha256":  "a324ec92c1b58045f935f8cd6040e3f7cbf0c6dca42ef5420eea682b8ac42858"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261106000005_chat_helpers.up.sql",
+                              "sha256":  "49f7cac3b7f02769fc88774a7bce823837f30d0288c0b9dd40746fcd2a020cb2"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261106000006_investigation_evidence.up.sql",
+                              "sha256":  "5bd2cd352c38ee4d6389089988f9b7092ec76a84fa31a61ef9a83f282f15e8d5"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261107000001_totp_replay_protection.up.sql",
+                              "sha256":  "98deaab03993b1adeeec22ff2a8e11efde1ac8c31c0627d4eabca4f53385ceed"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261107000002_doctor_verification_revocation.up.sql",
+                              "sha256":  "c62618a614bbfd3fec5d0618ef56d8b9484042c9b2abf104d41c2a7fe7ce9f43"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261107000003_chat_rls_backstop.up.sql",
+                              "sha256":  "c8391276a49c34b7f3c0fa160d2a200366832e9a5eb890b918e6d3e6512beea0"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261108000001_patient_payment_methods.up.sql",
+                              "sha256":  "01d4f5677c49bf8d8f4aa650086ff2a396b9ac46009e51b582383ce2632ace4e"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261108000002_platform_payment_methods.up.sql",
+                              "sha256":  "3599a60d0462b95b2f63cf61443532591dd5d21624f3f36eb20606f3be2d13d0"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261109000001_data_rights_execution.up.sql",
+                              "sha256":  "d1c2f8f71e49b50779ba593628aadfa3480d50bdf0501ecd18dcf71294b91496"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261110000001_economic_idempotency.down.sql",
+                              "sha256":  "600ff5cda418cce12caa08f317ac2d78840f1cc0ceeccc711951a825e31947f9"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261110000001_economic_idempotency.up.sql",
+                              "sha256":  "8f2f924ced38c3607254e3dc88a1bd000c166449232feb1e8d6824afa8845f04"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261110000003_auth_session_device_keys.up.sql",
+                              "sha256":  "afc1c6d4bbc2028a25b9993246d7d518d291f7433afb1e3c72d17f34c21aa203"
+                          },
+                          {
+                              "path":  "services/backend/migrations/20261110000004_admin_totp_algorithm.up.sql",
+                              "sha256":  "094c57a37706f6a040bd3da52a2e3ccf2ff147b13a648c046fd0b0e1108942f6"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/approval.sql",
+                              "sha256":  "2fd17975a6ba7b12158f11f28053376daa2bd7d0e80d8acc77d93946af474c94"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/confirmation.sql",
+                              "sha256":  "e62de202883b4f0186ed3f68b2fcf373e977eebec318d00a10557a10d5868757"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/fixture.sql",
+                              "sha256":  "ea4724b1d80ab7bfbabd12c9276cf656a07dfd1ace536e79a198bd6f08fe96ec"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/Invoke-IsolatedSql.ps1",
+                              "sha256":  "2ccb18e80a80de251bc2a3dcec9e0ab507fd2253428c5f7dc9cd3cd7b36f730f"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/negative.sql",
+                              "sha256":  "29b091855e6cc758dcf202faaabd49543ec6708658c4e5bf1b8b6db6cc97d28c"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/obligation.sql",
+                              "sha256":  "b3215c28158e0b9a71fc01d1e404746c38fed99754229187d85538ba7a8470a6"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/observe.sql",
+                              "sha256":  "df904007569f58a595daaab09cf2b5090b8db283151ecf473bc09c722ecae9ae"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/payout.sql",
+                              "sha256":  "d98a16b4aacf28ba0088dc9597a9f9889a3257d96536e37d4e02a6b4496fa3cc"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/replay.sql",
+                              "sha256":  "ff2f2a29628367de88d9d85ea1a61fca54e8a5931796bc9e522c3b07e051449e"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/run-sql.sh",
+                              "sha256":  "9e141f79b44cc497acb4bea5b6a09320570cd6ab0d53202152811047c3ede95f"
+                          },
+                          {
+                              "path":  "services/backend/scripts/resilience/settlement.sql",
+                              "sha256":  "435196d5de2d96ae0c5ab5ee689c66e7feaff14e6e0e5b69f2d73d7fefc28a46"
+                          }
+                      ]
+}

@@ -1,0 +1,25 @@
+{
+    "recorded_utc":  "2026-10-19T18:53:45.1211981Z",
+    "docker_os":  "linux x86_64",
+    "cached_images":  [
+                          "postgres:16 sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54",
+                          "redis:7-alpine sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+                      ],
+    "installed_rust_targets":  [
+                                   "x86_64-pc-windows-gnu"
+                               ],
+    "http_adversarial_execution":  "NOT_RUN",
+    "missing_capability":  "Cached Linux-compatible actual backend/toolchain and Python harness in a fully constrained no-external-network namespace; host Windows Job Object is not network/filesystem isolation",
+    "no_pulls_or_installs":  true,
+    "ordinary_mocked_unit_tests":  "owner-authorized local execution; all HTTP sockets mocked",
+    "source_files":  [
+                         {
+                             "path":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\services\\backend\\scripts\\resilience\\attack-local.py",
+                             "sha256":  "A47070B56136C42210A74D5C1D6B65D1D0F31264212740FFE44E67284D289D3C"
+                         },
+                         {
+                             "path":  "C:\\Users\\CUBE\\Desktop\\helodoc old site\\services\\backend\\scripts\\resilience\\test_attack_local.py",
+                             "sha256":  "B7123C74E938C3A509A8D6673EE320A2B1ACA0EF8F6F9D008C5052761A23CAFD"
+                         }
+                     ]
+}

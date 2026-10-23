@@ -1,0 +1,13 @@
+﻿{
+    "scope":  "ordinary local integration under owner exception; not adversarial formal sandbox",
+    "label":  "hellodoctor.remediation.run=final-20261020",
+    "postgres":  "127.0.0.1:15433",
+    "redis":  "127.0.0.1:16380",
+    "new_database":  "hellodoctor_fixture",
+    "images_pulled":  0,
+    "shared_resources_touched":  0,
+    "network":  "hd-remediation-20261020",
+    "network_internal":  false,
+    "fixture_marker_key":  "hd:test-fixture:owner",
+    "fixture_marker_value":  "final-remediation-20261020"
+}

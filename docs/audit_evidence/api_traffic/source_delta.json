@@ -1,0 +1,358 @@
+{
+  "changed": [
+    {
+      "file": "apps/mobile/lib/app.dart",
+      "state": "modified",
+      "before_sha256": "24fcf1f0b0277322be58b6070f5187541ac9189e028c0f58ec44c3d8cdc29ba7",
+      "after_sha256": "88933b70fc427e365b9f2e132970cd6a4dc45fb6346baf4dac2cd8b9a095668d"
+    },
+    {
+      "file": "apps/mobile/lib/features/doctor/doctor_cubit.dart",
+      "state": "modified",
+      "before_sha256": "fd9e0493a9ef059e74477988cde6b354bf85ed86e5b776308b11b4b509f94092",
+      "after_sha256": "1c4f89fa4ee4c6eb6480c46cb73d7ceb827422b9c54bc53ea9688e113524dbbf"
+    },
+    {
+      "file": "apps/mobile/lib/features/doctor/doctor_pages.dart",
+      "state": "modified",
+      "before_sha256": "84326dbcff31f3c8f86be45a94e98f89a1e91e269649deb82d3c86a61f646f6c",
+      "after_sha256": "2f21d0b14de9125fa361ec6e6a37dfc720de060a07b3cb7aafc0445464ec16b4"
+    },
+    {
+      "file": "apps/mobile/lib/features/doctor/doctor_repository.dart",
+      "state": "modified",
+      "before_sha256": "125f3b0bd3a5baf393e789a5d07dbade1d3eedc168d0b3830f1881864fb3f726",
+      "after_sha256": "cd5072cdf351e1c6503321692cfcfddb138675fa5d166f19facbb1bfdeaa6f32"
+    },
+    {
+      "file": "apps/mobile/lib/features/notifications/notification_center_page.dart",
+      "state": "modified",
+      "before_sha256": "5a1ed287675fd734d1ada7043fc8f8ec9e9df77fbba455e5661f446d604f5e73",
+      "after_sha256": "46c45073c40a7e32e4180743af90d356104efe8463770aa9a9d21c7a47c21423"
+    },
+    {
+      "file": "apps/mobile/lib/features/notifications/notification_cubit.dart",
+      "state": "modified",
+      "before_sha256": "1eb3762f30f327dfc317a6f5318a08bd4002ddd804109e286d961269d7bb71aa",
+      "after_sha256": "b64d6d94dbfc9e57aa77ccc733836097709a79dad69ca3c7ba82b61f43f080e3"
+    },
+    {
+      "file": "apps/mobile/lib/features/notifications/notification_repository.dart",
+      "state": "modified",
+      "before_sha256": "00f44b765db432d70e1a6daf4c271865bcfc7e61850c80a75c4e7ad179f536ec",
+      "after_sha256": "986b5e48d56f963faccc523017d1edb8d24eeab938b1d04a5cac4099f17875e4"
+    },
+    {
+      "file": "apps/mobile/lib/core/network/api_client.dart",
+      "state": "modified",
+      "before_sha256": "1ac894887fd94a26052a2500543da827c00952e74d72df53e40204d3c8ccd9f1",
+      "after_sha256": "3d1b4172e6f16245723cd4092ad2d22a24031dabf1bf56e8718a9e2d46610079"
+    },
+    {
+      "file": "apps/mobile/test/consultation_pagination_test.dart",
+      "state": "modified",
+      "before_sha256": "03018844cd861514d2cb3179a4abb485cdecb1bd6f23cb179d97c9d81cbb45af",
+      "after_sha256": "5cf3644e30b26afcc1dc76fa80d98614348861196b5262e0ac562ca396ee4613"
+    },
+    {
+      "file": "apps/mobile/test/doctor_cubit_test.dart",
+      "state": "modified",
+      "before_sha256": "4def1be5546d08bd950d56fbf765b319eb0bb272c3a8f889cf19de2b855c9482",
+      "after_sha256": "d1d63bc85bf52c98bfeab2edbc96db8ca353943046ca29dbad35aeb7f9cee7ea"
+    },
+    {
+      "file": "apps/mobile/test/doctor_widgets_test.dart",
+      "state": "modified",
+      "before_sha256": "640287ce680365234cc8f0e8477e5cbd0c43174bd91454b8a4e69887cb3fece8",
+      "after_sha256": "695293c104064c72431a823e88f5d0b75b26170616f79836ed831b61fef66094"
+    },
+    {
+      "file": "apps/mobile/test/notification_cubit_test.dart",
+      "state": "modified",
+      "before_sha256": "01dccec20026b82c9b4c6c594bfade672ec404a30462149f30d4ceb57dc5070b",
+      "after_sha256": "7ae468312bb94ac5a07cf18f782d858d77282536915524835318bf412238b47b"
+    },
+    {
+      "file": "apps/mobile_patient/lib/app.dart",
+      "state": "modified",
+      "before_sha256": "791d90a07534c53fdfcce232ef0ab18eea8dd12e49737678d8a59a2a92c69d42",
+      "after_sha256": "a24cd113980b226797343f9e4d0ec7e8970634f5d21f8630bfbdb8254635bdd8"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/notifications/notification_center_page.dart",
+      "state": "modified",
+      "before_sha256": "e8a4dddac794cdf80531f99fad5ee824cce9ddfe202db69828064c676740c11f",
+      "after_sha256": "6ad11a48008342d661e375b0912c7a54eed93d5933d2f4245e24b5898ffc4998"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/notifications/notification_cubit.dart",
+      "state": "modified",
+      "before_sha256": "39a6a2f17113ef7bc5a0aa440150b90855d44ced5f279db730dd0a2eeb3d75fd",
+      "after_sha256": "6c6a455cd3005064c2560bbd4e1510b2be9e1d4a5f0644cc54cd6a2c233d64d0"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/notifications/notification_repository.dart",
+      "state": "modified",
+      "before_sha256": "091153ffea2dc8bcab18af6dfc2d67c0380921e64e20bd524d930503cddafc16",
+      "after_sha256": "03c881bb85ef6417b233a8dc311a867deba8688d1976d7768273c45e5b7842d7"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/patient/booking/patient_booking_page.dart",
+      "state": "modified",
+      "before_sha256": "32247b8a237c41f3ba9befec292c4f66b568778948fa0cb338279edbdb2d0a55",
+      "after_sha256": "839701408b89b0732ff034ad33e82b2d7daed65c34effdb9359bf1dba89ef63d"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/patient/chat/chat_cubit.dart",
+      "state": "modified",
+      "before_sha256": "99de5af5e415c70d1ed05846f7db184fec99f02dcb70d629d4fa2aa7755d689a",
+      "after_sha256": "eda3b44fb374d640e9cc95d9a407dbd183e5657a7c038b52bc4a0a67ab350801"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/patient/chat/chat_repository.dart",
+      "state": "modified",
+      "before_sha256": "f1a4f07e25e3ed611f42452120abac403713dc76256304e8fb161962aa87cf13",
+      "after_sha256": "af862de37795d9757d723e16759a408c09ba69af2688d1dc8872e957fcc50475"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/patient/chat/consultation_status_page.dart",
+      "state": "modified",
+      "before_sha256": "8405ea71cf458f6b7fb90b6a00273319dc4bee89461fa030306127fb0a29c992",
+      "after_sha256": "24d1254bfe54c1fc61ef992d5602b1752cf07026065da110fdde4065970ef9b3"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/patient/chat/patient_chat_list_page.dart",
+      "state": "modified",
+      "before_sha256": "2c3e96464785960220096878bb31a36c9bb5a97531dba0ddea3e274df8811d45",
+      "after_sha256": "141da8d9cb58e71ce02fcef3ddcc6f48e64087a9d43aba82bda91ed250f7a90b"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/patient/chat/patient_chat_page.dart",
+      "state": "modified",
+      "before_sha256": "f43ef177894b87568589bc1188ab0db397775b52b2eeda893a82bacfc91e6e29",
+      "after_sha256": "2cc1ba5a5be1e30ab13522a66d32aae58cf6e809bb7d170fdcad087bae74d821"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/patient/directory/doctor_profile_page.dart",
+      "state": "modified",
+      "before_sha256": "91065bc39652d357fb5ea102af3ff2d48fe4fe1b2274a98643b44ad0ef9ce36d",
+      "after_sha256": "2d744c61c90e5e7c83249633fc55daf68a567d052f640aa0d0a1a37ddb0a6bd4"
+    },
+    {
+      "file": "apps/mobile_patient/lib/core/network/api_client.dart",
+      "state": "modified",
+      "before_sha256": "9b6628f3e92b46af190783659ac85f68cef3548762ee8fd1ee3c8d50ce82b9e7",
+      "after_sha256": "c8ad8b6d9b27938240bf442cc51092a7cddc00f1425bc4c1f61557006e37964a"
+    },
+    {
+      "file": "apps/mobile_patient/lib/core/network/availability_refresh.dart",
+      "state": "modified",
+      "before_sha256": "819ed76e74d7c6af90ec6de35da2f1462bc3a93cb76ccb1a71c7082fcb0dec05",
+      "after_sha256": "82bb1df1a36d0a529d64fc8ff553923069beeffa9460ac7cf1faed172d32e046"
+    },
+    {
+      "file": "apps/mobile_patient/test/chat_cubit_test.dart",
+      "state": "modified",
+      "before_sha256": "946fcbe56c690cbd570d7e77c84f57dc71a0ce2a44ca381921f21a6c0440a500",
+      "after_sha256": "16072ade732612e6fb1d9c72588fa98e946a6ef1714609a29b3e8e0321f54230"
+    },
+    {
+      "file": "apps/mobile_patient/test/notification_cubit_test.dart",
+      "state": "modified",
+      "before_sha256": "2ef55b869bb2f1df9b282702fd90d55c39923a1cff5739ff1ec6e90acd5cf357",
+      "after_sha256": "88b3b0148f49cc971c7c41247e7619f0cf26b6fe63fc45bcf59f92578362b6e8"
+    },
+    {
+      "file": "apps/doctor-web/src/components/Chat.tsx",
+      "state": "modified",
+      "before_sha256": "92b86aff8e58ff6d0f09e8a6665c75cbaa5338e5ccb8777cb5f4106e1d4fb5c7",
+      "after_sha256": "a6ed9491de0ea763e5b2ac25664e1e462b9b32c946ae6af2e8fe9f459195f4dd"
+    },
+    {
+      "file": "apps/doctor-web/src/components/Clinical.tsx",
+      "state": "modified",
+      "before_sha256": "a574045e735207334d7eba5f3b7479e3eb9cd97b032bb28b604c06231ce5e939",
+      "after_sha256": "623402078dd1ff9001b3f4e5f02c6d9cd3fbd051b6ec9b66745383dbc540a357"
+    },
+    {
+      "file": "apps/doctor-web/src/components/Desktop.tsx",
+      "state": "modified",
+      "before_sha256": "6dff239fabeeabc87e115e3c4bedf9719467a25b9fb67c274da595a3af102168",
+      "after_sha256": "250e6d6ed4b190621da6f79610863ecc62dd68976c87ead43370568eb6b1bc1c"
+    },
+    {
+      "file": "apps/doctor-web/src/components/DoctorApplication.tsx",
+      "state": "modified",
+      "before_sha256": "2b74476df7b607df7d530792a5bc2ca9499af0c4c10859f429844ae9f6a9248a",
+      "after_sha256": "903cc52458b2a9b42092ca004add1add4e39c4f7c84be0c66dbc900bd2a94948"
+    },
+    {
+      "file": "apps/doctor-web/src/components/Queue.tsx",
+      "state": "modified",
+      "before_sha256": "fc88546cd362214b08ff642262fa68950140001cac441a759f07a7ce4ebab82e",
+      "after_sha256": "af235d343f53b63d018b550ba137f5726838724990d597edd87c30cc3b596f51"
+    },
+    {
+      "file": "apps/doctor-web/src/components/Schedule.tsx",
+      "state": "modified",
+      "before_sha256": "f844f96230bc4afd5002c1ee551de3dcc2c57a7a39fca8cc54e3061ca4de372f",
+      "after_sha256": "ab134aa9f1084b892609db9c89805b831af3c625ef6dd691719b296ba2f4822c"
+    },
+    {
+      "file": "apps/doctor-web/src/lib/client.ts",
+      "state": "modified",
+      "before_sha256": "355c9d26b2d792b6c2717f89929cbb32d82f920478e8952eb00e5a766f92e1a7",
+      "after_sha256": "868a6fa145406d87d9a70f490d85de85892b8ecc20353e74dba0aadb17b4901f"
+    },
+    {
+      "file": "apps/doctor-web/src/lib/schedule-sync.ts",
+      "state": "modified",
+      "before_sha256": "6972f2c5f5cb87e664b89e811157d2ea2dcf2439ae94171352e01f6dad414ce5",
+      "after_sha256": "6d715967427bde8452a0a4ae231d594cc7e05ee4620602fafb8bcc17cf975443"
+    },
+    {
+      "file": "apps/doctor-web/src/lib/slot-list.ts",
+      "state": "modified",
+      "before_sha256": "f87d00fa98d5c70c6516e142c12574eee7a2f650e6c3eeb78251d91b290a0748",
+      "after_sha256": "b8458f02caaa7377a4457401d16b4e82a0f1ed574e99d3fb258f28936a9e6c5a"
+    },
+    {
+      "file": "apps/admin-web/src/app/page.tsx",
+      "state": "modified",
+      "before_sha256": "bf71d595913a7da0df2611f6fd11f20cce6fc9ae249f85e9862211e95a3503fe",
+      "after_sha256": "f7475af10dc46e5eb15adc71510301aad228a0a9ff00bcb634625c934f92efac"
+    },
+    {
+      "file": "apps/admin-web/src/components/GrievanceInvestigation.tsx",
+      "state": "modified",
+      "before_sha256": "96d2d10555d75c496e798087cfb1282727775e60a2b5b1e8faec76059075f861",
+      "after_sha256": "1ffc646a42ed934c67f19e88a626ceb524e54879964a6b9543b816dcb7d360db"
+    },
+    {
+      "file": "apps/admin-web/src/lib/api.ts",
+      "state": "modified",
+      "before_sha256": "9281447b323cef3df0f15de8ceb96e8dcb74ef4a49de380a1852a8097159e84e",
+      "after_sha256": "f0e2d011a27f61ab267a47ee4cd54b2eca8872d53bd68332e54463ecec623543"
+    },
+    {
+      "file": "apps/admin-web/src/lib/useBackendSync.ts",
+      "state": "modified",
+      "before_sha256": "8477f292c13069a185f18e96686a30dfc7cd83a13d24ed3fcafc949001ae55f9",
+      "after_sha256": "48cd3a3907d57c1c3e6b545a4ce85ef4b67cf870cd6c53b831a5a8ea60934958"
+    },
+    {
+      "file": "apps/admin-web/src/lib/useSlotSync.ts",
+      "state": "modified",
+      "before_sha256": "07221e1d19295c32f2bda71475e1d7fea31e4436b3627d6bc9a8abf17f8842e6",
+      "after_sha256": "8287144c247b7c9a7145c47c926475e29c355e75ed71904715b5b364c0e9bfa4"
+    },
+    {
+      "file": "apps/admin-web/src/app/login/page.tsx",
+      "state": "modified",
+      "before_sha256": "385bf1a9e7bd2fa00c7fb1dd8848255596708aadd638e0847c29d67ca32d1544",
+      "after_sha256": "821073066a9c6d08afc3d38bffd866d7e2f32d22841f074e38e0f592faa08f99"
+    },
+    {
+      "file": "services/backend/src/repository/notification_repo.rs",
+      "state": "modified",
+      "before_sha256": "ad1bfd88bd3bae07955d957219afc5cc9e920bae57daa9e79d86368a58cd632a",
+      "after_sha256": "b11b012d0342d0d0ae81e7b906b81d436fff8bcde9605bb0a0ed6cf75ede216b"
+    },
+    {
+      "file": "services/backend/src/services/notification_service.rs",
+      "state": "modified",
+      "before_sha256": "b1840375c886327a8221afc9b6c3d5a0ec9b5e4df3afbe57540f03a200cff9a0",
+      "after_sha256": "8bb580a396623b9b449cae86c67cf82af105516eebd0c81bc5fe646ce8cf3bdd"
+    },
+    {
+      "file": "services/backend/src/api/v1/admin_handlers.rs",
+      "state": "modified",
+      "before_sha256": "ebdb849a041947fce7c79ffdff758379627f500d2d35b220eb572c1e568b4403",
+      "after_sha256": "0732e0663a3d759d1a875d592263b799f4fb8f8d7910102f9c0585a6d4ac63f2"
+    },
+    {
+      "file": "services/backend/src/api/v1/doctor_handlers.rs",
+      "state": "modified",
+      "before_sha256": "6039f07f4ff85e5d4b226a3715dee1fe3bcbc81b18e4e57e353604ca97d6e391",
+      "after_sha256": "577ee6ee74f5384dbd2ba35bb3da945998bc8c189886f29d0f914c8f00e2b049"
+    },
+    {
+      "file": "services/backend/src/api/v1/notification_handlers.rs",
+      "state": "modified",
+      "before_sha256": "a5b209c66abaf7d8dbc45ef114682dd08de3a5b88dde6e6d1ada8670f4147244",
+      "after_sha256": "8ec592e580b8a001d54e4e680c143c2ebb8cdff20948443fe85645922deab73f"
+    },
+    {
+      "file": "services/backend/src/api/v1/trace_handlers.rs",
+      "state": "modified",
+      "before_sha256": "646e5927594d817799d378676acf69a64e22a85f9c3b45f4e590aa466ca5bec5",
+      "after_sha256": "e7cfa4c7da604f52ffdb9937fb1e1688565344bff517fb2b376a806fe896025e"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "state": "modified",
+      "before_sha256": "72f36eb38e879b3198a668e5e621cfbe2330e80148ab2adebcc16193cecd1dcb",
+      "after_sha256": "379c437c0eec81d4cfd082d4bbd6ed8a92f8f6f2bd077a5fbce5ac4f04b60077"
+    },
+    {
+      "file": "apps/mobile_patient/lib/features/patient/booking/waiting_room_page.dart",
+      "state": "modified",
+      "before_sha256": "6b5d5e32d268f236e52dd59771bf9bf1f20eb4e6af76ffa71c84cdf059336c11",
+      "after_sha256": "274c0560c89e5395ebb336867a3f797ec0615a6169d09d35cc88276ec44a0ea6"
+    },
+    {
+      "file": "apps/doctor-web/src/lib/contracts.ts",
+      "state": "modified",
+      "before_sha256": "9612924d1b5975e74b7b90374fb8eff9b39a6225227f9f8af2b1f0274bb61bac",
+      "after_sha256": "7b3e4b25987edf15f640bd32061dea48d4f44e4e91faa88cd41c0f3751326527"
+    },
+    {
+      "file": "apps/doctor-web/src/lib/server.ts",
+      "state": "modified",
+      "before_sha256": "e459234135016d07d1372ecfe08c25815456d7cf0242c38678acc51999525fdb",
+      "after_sha256": "6d675572e14b9448277c9d39a9ba3d306b1a2b6f796f0df475da8e653b600164"
+    }
+  ],
+  "added": [
+    {
+      "file": "apps/mobile/lib/core/network/screen_refresh.dart",
+      "sha256": "b65d00b931ed7b165ee23e270f4fb23f06de16d5db0382346759bf31ad89b8e8"
+    },
+    {
+      "file": "apps/mobile/test/api_traffic_test.dart",
+      "sha256": "85570e6fdc21117e49c6262b9d56f115e19eeda647f519c842cb9a310532d236"
+    },
+    {
+      "file": "apps/mobile/test/notification_traffic_test.dart",
+      "sha256": "623439441007c1f68f97a2c0e7ac67f6fe93d401f73ca91c89570d8ef4c111c7"
+    },
+    {
+      "file": "apps/mobile_patient/lib/core/network/screen_refresh.dart",
+      "sha256": "b65d00b931ed7b165ee23e270f4fb23f06de16d5db0382346759bf31ad89b8e8"
+    },
+    {
+      "file": "apps/mobile_patient/test/api_traffic_test.dart",
+      "sha256": "4deca6e0a9b69817c3a26c10a04aa51a7d559223f576905154592ac578ecbb97"
+    },
+    {
+      "file": "apps/mobile_patient/test/notification_traffic_test.dart",
+      "sha256": "5a02084384ad031f0a5278c55b04b6129578e505aebd875410d82adf348a9fa8"
+    },
+    {
+      "file": "apps/doctor-web/src/lib/inflight.mjs",
+      "sha256": "7afdf6b4fba4897a2f20f395a1347b552895d1b355e77eedfa81dc3adb0ad13d"
+    },
+    {
+      "file": "apps/doctor-web/tests/api-traffic.test.ts",
+      "sha256": "2f48aec0a7169a70b966a529831792d21039a2ba3078bea4d1e7ef4c6eec5925"
+    },
+    {
+      "file": "apps/admin-web/src/lib/inflight.mjs",
+      "sha256": "7afdf6b4fba4897a2f20f395a1347b552895d1b355e77eedfa81dc3adb0ad13d"
+    },
+    {
+      "file": "apps/admin-web/tests/api-traffic.test.ts",
+      "sha256": "a475a2d3e4b7f276c305d8a5f9646abbb3d91e22c95e5917dabaee8bfa03787c"
+    }
+  ]
+}

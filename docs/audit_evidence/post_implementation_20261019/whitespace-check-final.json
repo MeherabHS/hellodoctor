@@ -1,0 +1,10 @@
+﻿{
+    "command":  "git -c core.safecrlf=false diff --check -- services/backend/src/rate_limit.rs services/backend/src/services/auth_abuse.rs services/backend/src/telemetry/mod.rs services/backend/src/api/router.rs services/backend/src/api/v1/webhook_handlers.rs services/backend/tests/api_tests.rs",
+    "exit_code":  0,
+    "elapsed_seconds":  0.0602893,
+    "output":  [
+
+               ],
+    "kind":  "FOCUSED_WHITESPACE_ONLY",
+    "collector_note":  "Uses existing Git CRLF normalization; disables only line-conversion warnings for this invocation. Earlier autocrlf=false check treated existing CRLF bytes as trailing whitespace and is retained separately; no source line-ending rewrite was performed."
+}

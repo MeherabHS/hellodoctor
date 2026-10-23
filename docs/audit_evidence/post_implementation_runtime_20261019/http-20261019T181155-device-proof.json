@@ -1,0 +1,219 @@
+{
+  "scope": "Synthetic P-256 client to actual Rust HTTP backend; not Android Keystore or physical-device acceptance",
+  "cases": [
+    {
+      "case_id": "legal-rotation",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "0c63353b-7f38-4766-abee-a10a9270e1df",
+      "result": "PASS"
+    },
+    {
+      "case_id": "otp-rotation",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "f5f15540-b0bb-477f-a0be-4f9aa2c1d7ea",
+      "result": "PASS"
+    },
+    {
+      "case_id": "bound-establishment-rotation",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "06d2631c-32a4-461c-8686-7d4a3212d73d",
+      "result": "PASS"
+    },
+    {
+      "case_id": "device-bound-flag-rotation",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-without-proof",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "2786f321-afb8-4ec5-89ca-cf1e2c954dc5",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-valid-proof",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "6b7efa62-16d0-43fe-959d-30b3ffe26439",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-wrong-key",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "ba7afcf0-5100-48d7-9a2d-e293132e9f12",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-wrong-method",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "45e66e2e-dbef-45fb-a3f5-251dc8ad09f2",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-wrong-path",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "d0a74fd4-a9cb-493d-800b-2db72c26dcd1",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-stale-proof",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "fb39d9b2-f334-4c4e-8721-a5be6583c99d",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-future-proof",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "d852200c-a700-444b-a64b-29add1ee92dd",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-wrong-token-binding",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "af7d5f9c-816b-4e20-960d-f188e194a27e",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-replay-first",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "d9f3ef4d-d9d7-42c6-9b38-1a1a78f706e5",
+      "result": "PASS"
+    },
+    {
+      "case_id": "access-replay-second",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "bcbb2b22-2d20-4cd4-adce-4cc821d81d51",
+      "result": "PASS"
+    },
+    {
+      "case_id": "stolen-refresh-without-proof",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "5671bd39-ee8b-4762-9f9c-c3445efeb35a",
+      "result": "PASS"
+    },
+    {
+      "case_id": "legitimate-access-after-stolen-refresh",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "ca86625d-223f-4467-a7f0-3d1055eda981",
+      "result": "PASS"
+    },
+    {
+      "case_id": "refresh-valid-proof",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "24a3fb93-5777-4762-8968-fe49a3916fc1",
+      "result": "PASS"
+    },
+    {
+      "case_id": "rotated-access-valid",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "c61af67e-e360-45bc-bec2-e2222e9264fb",
+      "result": "PASS"
+    },
+    {
+      "case_id": "used-refresh-with-valid-key",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "af938f7c-832e-4869-9aae-86d394dc0a2b",
+      "result": "PASS"
+    },
+    {
+      "case_id": "reused-family-access-revoked",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "279d4004-3976-4b40-a8d0-facc27c588da",
+      "result": "PASS"
+    },
+    {
+      "case_id": "legal-logout",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "25d1de4b-a2f1-4356-b012-99f6a59bedcb",
+      "result": "PASS"
+    },
+    {
+      "case_id": "otp-logout",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "921b266c-31dc-4cfe-b019-a067a0339b0f",
+      "result": "PASS"
+    },
+    {
+      "case_id": "bound-establishment-logout",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "972051f4-3e79-483d-ab54-4a53f884962d",
+      "result": "PASS"
+    },
+    {
+      "case_id": "device-bound-flag-logout",
+      "result": "PASS"
+    },
+    {
+      "case_id": "logout-bound-session",
+      "status": 200,
+      "expected_status": 200,
+      "request_id": "72a8405b-e2a9-49d1-815e-ef8b812275c6",
+      "result": "PASS"
+    },
+    {
+      "case_id": "logout-access-revoked",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "70c14ad7-e022-4d95-9589-a53372312643",
+      "result": "PASS"
+    },
+    {
+      "case_id": "logout-refresh-revoked",
+      "status": 401,
+      "expected_status": 401,
+      "request_id": "4f863a0e-e8e9-414a-891e-9de27c89dd03",
+      "result": "PASS"
+    }
+  ],
+  "passed": 27,
+  "failed": 0,
+  "failure": null,
+  "private_keys_saved": false,
+  "credentials_logged": false,
+  "verdict": "PASS",
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Users\\CUBE\\Desktop\\helodoc old site\\scratch\\acceptance-runtime-20261019\\http-fixture\\device-proof-http.cjs"
+  ],
+  "exit_code": 0,
+  "db_after": {
+    "users": 2,
+    "sessions": 3,
+    "bound_families": 2,
+    "revoked_session_rows": 3,
+    "active_family_leaves": 0,
+    "transactions": 0,
+    "economic_effects": 0,
+    "payment_events": 0,
+    "system_errors": 0,
+    "db_stats": {
+      "numbackends": 10,
+      "xact_commit": 229,
+      "xact_rollback": 0,
+      "blks_read": 85,
+      "blks_hit": 123222,
+      "tup_returned": 82274,
+      "tup_fetched": 74025
+    }
+  }
+}

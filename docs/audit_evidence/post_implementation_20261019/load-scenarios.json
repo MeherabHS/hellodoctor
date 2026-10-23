@@ -1,0 +1,972 @@
+﻿[
+    {
+        "scenario_id":  "A",
+        "name":  "distributed_authentication",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    },
+    {
+        "scenario_id":  "B",
+        "name":  "many_account_authentication",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    },
+    {
+        "scenario_id":  "C",
+        "name":  "expensive_endpoint_flood",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    },
+    {
+        "scenario_id":  "D",
+        "name":  "upload_saturation",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    },
+    {
+        "scenario_id":  "E",
+        "name":  "payment_initiation_saturation",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    },
+    {
+        "scenario_id":  "F",
+        "name":  "invalid_webhook_flood",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    },
+    {
+        "scenario_id":  "G",
+        "name":  "redis_loss",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    },
+    {
+        "scenario_id":  "H",
+        "name":  "db_pool_pressure",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    },
+    {
+        "scenario_id":  "I",
+        "name":  "recovery_stampede",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    },
+    {
+        "scenario_id":  "J",
+        "name":  "mixed_workload",
+        "executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT",
+        "metrics":  {
+                        "offered_rps":  {
+                                            "value":  null,
+                                            "status":  "NOT_MEASURED"
+                                        },
+                        "achieved_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "admitted_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "rejected_rps":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "http_429":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_503":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "http_5xx_unexpected":  {
+                                                    "value":  null,
+                                                    "status":  "NOT_MEASURED"
+                                                },
+                        "p50_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p95_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "p99_ms":  {
+                                       "value":  null,
+                                       "status":  "NOT_MEASURED"
+                                   },
+                        "cpu_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "rss_peak":  {
+                                         "value":  null,
+                                         "status":  "NOT_MEASURED"
+                                     },
+                        "redis_operation_count":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "db_pool_size":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_pool_idle":  {
+                                             "value":  null,
+                                             "status":  "NOT_MEASURED"
+                                         },
+                        "db_acquire_deadline_count":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "db_waiter_peak_if_observable":  {
+                                                             "value":  null,
+                                                             "status":  "NOT_MEASURED"
+                                                         },
+                        "argon2_active_workers_peak":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       },
+                        "sanitizer_active_workers_peak":  {
+                                                              "value":  null,
+                                                              "status":  "NOT_MEASURED"
+                                                          },
+                        "consultation_success_rate":  {
+                                                          "value":  null,
+                                                          "status":  "NOT_MEASURED"
+                                                      },
+                        "ordinary_success_rate":  {
+                                                      "value":  null,
+                                                      "status":  "NOT_MEASURED"
+                                                  },
+                        "webhook_validation_results":  {
+                                                           "value":  null,
+                                                           "status":  "NOT_MEASURED"
+                                                       }
+                    },
+        "defense_verdict":  "INCONCLUSIVE"
+    }
+]

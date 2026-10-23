@@ -1,0 +1,310 @@
+﻿{
+    "recorded_utc":  "2026-10-19T14:15:49.9502722+00:00",
+    "initial_failure":  "Own internal bridge suppresses published ports: both ephemeral and explicit 127.0.0.1:15432 binding yielded NetworkSettings.Ports=[]; host TCP connect timed out.",
+    "correction":  "Only previously empty, labelled disposable PG recreated with explicit port; retained internal bridge. Added own labelled forwarding bridge and cached-BusyBox dual-network forwarder; source/application untouched.",
+    "scope":  "Data containers are internal-network-only. Forwarder has an ordinary Docker bridge and internal bridge; composite is not network-none. Forwarder is trusted fixed-destination shell, readonly, no credentials, user999:1000, bounded64PIDs/128MiB/1CPU/1800s. It exposes only127.0.0.1:15432 and16379.",
+    "probe_command":  "python -I -S scratch/acceptance-runtime-20261019/fixture-forwarder/probe.py",
+    "probe_result":  "PASS;8 simultaneous PostgreSQL sessions independently observed from ninth SQL connection; Redis PONG",
+    "existing_shared_resources_modified":  0,
+    "fixture_snapshots":  [
+                              {
+                                  "name":  "/hd-acceptance-pg-20261019",
+                                  "id":  "33f5f9f20a80f3710e3aeed06beaede3110d4c59c7f193b0e036166121d213fc",
+                                  "image_id":  "sha256:1a6ab3f5345eb6dbe04a1349529caabdb0ab09293a09590fad07b2246bfa4b54",
+                                  "created_utc":  "2026-10-19T14:13:12.177830201Z",
+                                  "started_utc":  "2026-10-19T14:13:12.258764384Z",
+                                  "running":  true,
+                                  "labels":  {
+                                                 "hellodoctor.acceptance.run":  "runtime-20261019"
+                                             },
+                                  "root_readonly":  true,
+                                  "user":  "postgres",
+                                  "cpu_nanocpus":  1000000000,
+                                  "memory_bytes":  536870912,
+                                  "memory_swap_bytes":  536870912,
+                                  "pids_limit":  64,
+                                  "tmpfs":  {
+                                                "/var/lib/postgresql/data":  "rw,nosuid,nodev,noexec,size=384m,uid=999,gid=999,mode=0700",
+                                                "/var/run/postgresql":  "rw,nosuid,nodev,noexec,size=1m,uid=999,gid=999,mode=0700"
+                                            },
+                                  "cap_drop":  [
+                                                   "ALL"
+                                               ],
+                                  "security_options":  [
+                                                           "no-new-privileges"
+                                                       ],
+                                  "entrypoint":  [
+                                                     "docker-entrypoint.sh"
+                                                 ],
+                                  "command":  [
+                                                  "postgres"
+                                              ],
+                                  "host_bindings":  {
+                                                        "5432/tcp":  [
+                                                                         {
+                                                                             "HostIp":  "127.0.0.1",
+                                                                             "HostPort":  "15432"
+                                                                         }
+                                                                     ]
+                                                    },
+                                  "published_ports":  {
+                                                          "5432/tcp":  [
+
+                                                                       ]
+                                                      },
+                                  "networks":  {
+                                                   "hd-acceptance-20261019":  {
+                                                                                  "IPAMConfig":  null,
+                                                                                  "Links":  null,
+                                                                                  "Aliases":  null,
+                                                                                  "DriverOpts":  null,
+                                                                                  "GwPriority":  0,
+                                                                                  "NetworkID":  "5a09e379fdfa0116213b9793f9084d89edd00d6b2db3c0da99b3f02998f40728",
+                                                                                  "EndpointID":  "922d29e7282de2178e19c95504b1058719432b960a9bdc0f0fabccf00fcbdd5c",
+                                                                                  "Gateway":  "",
+                                                                                  "IPAddress":  "172.19.0.2",
+                                                                                  "MacAddress":  "d2:87:12:36:0b:6d",
+                                                                                  "IPPrefixLen":  16,
+                                                                                  "IPv6Gateway":  "",
+                                                                                  "GlobalIPv6Address":  "",
+                                                                                  "GlobalIPv6PrefixLen":  0,
+                                                                                  "DNSNames":  [
+                                                                                                   "hd-acceptance-pg-20261019",
+                                                                                                   "33f5f9f20a80"
+                                                                                               ]
+                                                                              }
+                                               }
+                              },
+                              {
+                                  "name":  "/hd-acceptance-redis-20261019",
+                                  "id":  "d24b2eb4d3f6badf78c979d75a5a1fe41d8453bd724e3ae72ff3a3017972472b",
+                                  "image_id":  "sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+                                  "created_utc":  "2026-10-19T14:11:39.496424557Z",
+                                  "started_utc":  "2026-10-19T14:11:39.559608807Z",
+                                  "running":  true,
+                                  "labels":  {
+                                                 "hellodoctor.acceptance.run":  "runtime-20261019"
+                                             },
+                                  "root_readonly":  true,
+                                  "user":  "999:1000",
+                                  "cpu_nanocpus":  1000000000,
+                                  "memory_bytes":  134217728,
+                                  "memory_swap_bytes":  134217728,
+                                  "pids_limit":  32,
+                                  "tmpfs":  {
+                                                "/data":  "rw,nosuid,nodev,noexec,size=64m,uid=999,gid=1000,mode=0700"
+                                            },
+                                  "cap_drop":  [
+                                                   "ALL"
+                                               ],
+                                  "security_options":  [
+                                                           "no-new-privileges"
+                                                       ],
+                                  "entrypoint":  [
+                                                     "redis-server"
+                                                 ],
+                                  "command":  [
+                                                  "--save",
+                                                  "--appendonly",
+                                                  "no",
+                                                  "--maxmemory",
+                                                  "64mb",
+                                                  "--maxmemory-policy",
+                                                  "noeviction",
+                                                  "--dir",
+                                                  "/data",
+                                                  "--bind",
+                                                  "0.0.0.0",
+                                                  "--protected-mode",
+                                                  "no"
+                                              ],
+                                  "host_bindings":  {
+                                                        "6379/tcp":  [
+                                                                         {
+                                                                             "HostIp":  "127.0.0.1",
+                                                                             "HostPort":  ""
+                                                                         }
+                                                                     ]
+                                                    },
+                                  "published_ports":  {
+                                                          "6379/tcp":  [
+
+                                                                       ]
+                                                      },
+                                  "networks":  {
+                                                   "hd-acceptance-20261019":  {
+                                                                                  "IPAMConfig":  null,
+                                                                                  "Links":  null,
+                                                                                  "Aliases":  null,
+                                                                                  "DriverOpts":  null,
+                                                                                  "GwPriority":  0,
+                                                                                  "NetworkID":  "5a09e379fdfa0116213b9793f9084d89edd00d6b2db3c0da99b3f02998f40728",
+                                                                                  "EndpointID":  "5972e3a2a2239db72fa9225be51735f8e7b79b18bddfdd80658ed6699ca6b9bb",
+                                                                                  "Gateway":  "",
+                                                                                  "IPAddress":  "172.19.0.3",
+                                                                                  "MacAddress":  "06:8f:ff:d1:ac:a7",
+                                                                                  "IPPrefixLen":  16,
+                                                                                  "IPv6Gateway":  "",
+                                                                                  "GlobalIPv6Address":  "",
+                                                                                  "GlobalIPv6PrefixLen":  0,
+                                                                                  "DNSNames":  [
+                                                                                                   "hd-acceptance-redis-20261019",
+                                                                                                   "d24b2eb4d3f6"
+                                                                                               ]
+                                                                              }
+                                               }
+                              },
+                              {
+                                  "name":  "/hd-acceptance-forwarder-20261019",
+                                  "id":  "f34b2a9aab6d11ced42cbf17449cdd48cc32f29bb5f80d75411556e680127e4f",
+                                  "image_id":  "sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+                                  "created_utc":  "2026-10-19T14:14:38.201055313Z",
+                                  "started_utc":  "2026-10-19T14:14:38.455557826Z",
+                                  "running":  true,
+                                  "labels":  {
+                                                 "hellodoctor.acceptance.run":  "runtime-20261019"
+                                             },
+                                  "root_readonly":  true,
+                                  "user":  "999:1000",
+                                  "cpu_nanocpus":  1000000000,
+                                  "memory_bytes":  134217728,
+                                  "memory_swap_bytes":  134217728,
+                                  "pids_limit":  64,
+                                  "tmpfs":  {
+                                                "/dev/mqueue":  "ro,nosuid,nodev,noexec,size=1m,mode=0555",
+                                                "/dev/shm":  "ro,nosuid,nodev,noexec,size=1m,mode=0555"
+                                            },
+                                  "cap_drop":  [
+                                                   "ALL"
+                                               ],
+                                  "security_options":  [
+                                                           "no-new-privileges"
+                                                       ],
+                                  "entrypoint":  [
+                                                     "/bin/busybox"
+                                                 ],
+                                  "command":  [
+                                                  "timeout",
+                                                  "-s",
+                                                  "KILL",
+                                                  "1800",
+                                                  "/usr/bin/env",
+                                                  "-i",
+                                                  "PATH=/usr/local/bin:/usr/bin:/bin",
+                                                  "/bin/sh",
+                                                  "-c",
+                                                  "/bin/busybox nc -lk -p 5432 -e /harness/forward-pg.sh \u0026 /bin/busybox nc -lk -p 6379 -e /harness/forward-redis.sh \u0026 wait"
+                                              ],
+                                  "host_bindings":  {
+                                                        "5432/tcp":  [
+                                                                         {
+                                                                             "HostIp":  "127.0.0.1",
+                                                                             "HostPort":  "15432"
+                                                                         }
+                                                                     ],
+                                                        "6379/tcp":  [
+                                                                         {
+                                                                             "HostIp":  "127.0.0.1",
+                                                                             "HostPort":  "16379"
+                                                                         }
+                                                                     ]
+                                                    },
+                                  "published_ports":  {
+                                                          "5432/tcp":  [
+                                                                           {
+                                                                               "HostIp":  "127.0.0.1",
+                                                                               "HostPort":  "15432"
+                                                                           }
+                                                                       ],
+                                                          "6379/tcp":  [
+                                                                           {
+                                                                               "HostIp":  "127.0.0.1",
+                                                                               "HostPort":  "16379"
+                                                                           }
+                                                                       ]
+                                                      },
+                                  "networks":  {
+                                                   "hd-acceptance-20261019":  {
+                                                                                  "IPAMConfig":  {
+
+                                                                                                 },
+                                                                                  "Links":  null,
+                                                                                  "Aliases":  [
+
+                                                                                              ],
+                                                                                  "DriverOpts":  {
+
+                                                                                                 },
+                                                                                  "GwPriority":  0,
+                                                                                  "NetworkID":  "5a09e379fdfa0116213b9793f9084d89edd00d6b2db3c0da99b3f02998f40728",
+                                                                                  "EndpointID":  "2c99615b7eff4c5c5b4a7969209f02d0b3d95aae2a8bff9c1e7ca9d78fd29682",
+                                                                                  "Gateway":  "",
+                                                                                  "IPAddress":  "172.19.0.4",
+                                                                                  "MacAddress":  "c6:b2:de:db:92:c2",
+                                                                                  "IPPrefixLen":  16,
+                                                                                  "IPv6Gateway":  "",
+                                                                                  "GlobalIPv6Address":  "",
+                                                                                  "GlobalIPv6PrefixLen":  0,
+                                                                                  "DNSNames":  [
+                                                                                                   "hd-acceptance-forwarder-20261019",
+                                                                                                   "f34b2a9aab6d"
+                                                                                               ]
+                                                                              },
+                                                   "hd-acceptance-forwarding-20261019":  {
+                                                                                             "IPAMConfig":  null,
+                                                                                             "Links":  null,
+                                                                                             "Aliases":  null,
+                                                                                             "DriverOpts":  null,
+                                                                                             "GwPriority":  0,
+                                                                                             "NetworkID":  "8b5ac5570726823d964be94544df2130fd95efd417002e4dfedb01e0a393283b",
+                                                                                             "EndpointID":  "abe4ad69c837ccb68083f3bb0c097ac6935438ba6a4af59de0d522a28e1974af",
+                                                                                             "Gateway":  "172.20.0.1",
+                                                                                             "IPAddress":  "172.20.0.2",
+                                                                                             "MacAddress":  "d6:be:57:a1:4a:10",
+                                                                                             "IPPrefixLen":  16,
+                                                                                             "IPv6Gateway":  "",
+                                                                                             "GlobalIPv6Address":  "",
+                                                                                             "GlobalIPv6PrefixLen":  0,
+                                                                                             "DNSNames":  [
+                                                                                                              "hd-acceptance-forwarder-20261019",
+                                                                                                              "f34b2a9aab6d"
+                                                                                                          ]
+                                                                                         }
+                                               }
+                              }
+                          ],
+    "network_snapshots":  [
+                              {
+                                  "name":  "hd-acceptance-20261019",
+                                  "id":  "5a09e379fdfa0116213b9793f9084d89edd00d6b2db3c0da99b3f02998f40728",
+                                  "internal":  true,
+                                  "driver":  "bridge",
+                                  "labels":  {
+                                                 "hellodoctor.acceptance.run":  "runtime-20261019"
+                                             }
+                              },
+                              {
+                                  "name":  "hd-acceptance-forwarding-20261019",
+                                  "id":  "8b5ac5570726823d964be94544df2130fd95efd417002e4dfedb01e0a393283b",
+                                  "internal":  false,
+                                  "driver":  "bridge",
+                                  "labels":  {
+                                                 "hellodoctor.acceptance.run":  "runtime-20261019"
+                                             }
+                              }
+                          ],
+    "forwarder_input_hashes":  [
+                                   {
+                                       "file":  "forward-pg.sh",
+                                       "sha256":  "371a55d5aa674229d507a1aa9a4dcbc3d19036279704f3e05db285c350beb2bc"
+                                   },
+                                   {
+                                       "file":  "forward-redis.sh",
+                                       "sha256":  "f87556452c0816477f509d0e63e3f7b6dcd2e080e8724ce8b78035cf40e620a2"
+                                   },
+                                   {
+                                       "file":  "probe.py",
+                                       "sha256":  "0a91edcebcc536ac7d74b281708fc7bdc458a817ba5afc92e59a4d60e86b0b0b"
+                                   }
+                               ]
+}

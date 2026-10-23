@@ -1,0 +1,10 @@
+{
+  "run_id": "faults-20261019T181650",
+  "scope": "Disposable loopback development fixture, real backend; no provider calls",
+  "cases": [],
+  "failure": {
+    "type": "FileNotFoundError",
+    "message": "[WinError 2] The system cannot find the file specified"
+  },
+  "backend_stopped": true
+}

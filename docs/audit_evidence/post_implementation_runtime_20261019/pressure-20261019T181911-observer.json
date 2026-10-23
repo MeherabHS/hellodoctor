@@ -1,0 +1,10 @@
+{
+  "run_id": "pressure-20261019T181911",
+  "scope": "Disposable loopback development fixture, real backend; no provider calls",
+  "cases": [],
+  "failure": {
+    "type": "RuntimeError",
+    "message": "Fixture readiness deadline"
+  },
+  "backend_stopped": true
+}

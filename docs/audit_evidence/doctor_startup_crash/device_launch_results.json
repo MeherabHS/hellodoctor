@@ -1,0 +1,34 @@
+{
+  "model": "moto g96 5G",
+  "android": "16",
+  "cold_launches": [
+    {
+      "attempt": 1,
+      "pid": "1554",
+      "alive_after_seconds": 5,
+      "resumed_activity": [
+        "topResumedActivity=ActivityRecord{208331889 u0 com.example.hellodoctor_mobile/.MainActivity t24647}"
+      ],
+      "native_fatal": false
+    },
+    {
+      "attempt": 2,
+      "pid": "1802",
+      "alive_after_seconds": 5,
+      "resumed_activity": [
+        "topResumedActivity=ActivityRecord{185292358 u0 com.example.hellodoctor_mobile/.MainActivity t24648}"
+      ],
+      "native_fatal": false
+    },
+    {
+      "attempt": 3,
+      "pid": "1937",
+      "alive_after_seconds": 5,
+      "resumed_activity": [
+        "topResumedActivity=ActivityRecord{31443755 u0 com.example.hellodoctor_mobile/.MainActivity t24649}"
+      ],
+      "native_fatal": false
+    }
+  ],
+  "app_data_cleared": false
+}

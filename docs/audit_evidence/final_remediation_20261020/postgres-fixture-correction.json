@@ -1,0 +1,9 @@
+﻿{
+    "exit":  1,
+    "oom_killed":  false,
+    "finished":  "2026-10-19T19:01:57.648233817Z",
+    "reason":  "ENOSPC confirmed by server logs; partial API run invalid as full acceptance",
+    "initial_data_limit_mib":  768,
+    "initial_ram_mib":  1024,
+    "corrective_action":  "Test-only role-pool idle reaping; new empty fixture with1536MiB data/2048MiB RAM reserve; application pool sizes unchanged"
+}

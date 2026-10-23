@@ -1,0 +1,56 @@
+{
+  "rust_format_exit": 0,
+  "rust_clippy_exit": 0,
+  "rust_library": {
+    "passed": 53,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 0,
+    "exit_code": 0
+  },
+  "backend_integration": {
+    "passed": 221,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 0,
+    "exit_code": 0
+  },
+  "flutter": {
+    "doctor": {
+      "passed": 197,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0
+    },
+    "patient": {
+      "passed": 195,
+      "failed": 0,
+      "skipped": 0,
+      "exit_code": 0
+    }
+  },
+  "doctor_web": {
+    "passed": 50,
+    "failed": 0,
+    "skipped": 0,
+    "typecheck_exit": 0,
+    "lint_exit": 0,
+    "format_exit": 0,
+    "build_exit": 0,
+    "test_exit": 0
+  },
+  "admin_web": {
+    "passed": 13,
+    "failed": 0,
+    "skipped": 0,
+    "typecheck_exit": 0,
+    "lint_exit": 0,
+    "build_exit": 0,
+    "test_exit": 0
+  },
+  "physical_device": "DEFERRED_BY_USER",
+  "full_physical_simulation": "NOT_STARTED",
+  "video_agora": "DEFERRED",
+  "live_payment_provider": "NOT_CONFIGURED",
+  "live_private_document_storage": "NOT_CONFIGURED"
+}

@@ -1,0 +1,130 @@
+{
+    "dependency_or_lockfile_edits":  0,
+    "changed_source_files":  13,
+    "existing_security_assertions_deleted":  0,
+    "results":  [
+                    {
+                        "original_named_test_count":  229,
+                        "test_evidence":  "tests-final-after-timezone",
+                        "discovered":  230,
+                        "passed":  230,
+                        "failed":  0,
+                        "not_run":  0,
+                        "duration_seconds":  27.3373238,
+                        "executed":  230,
+                        "app":  "mobile",
+                        "original_names_missing":  [
+
+                                                   ],
+                        "ignored":  0,
+                        "exit_code":  0
+                    },
+                    {
+                        "original_named_test_count":  229,
+                        "test_evidence":  "tests-final",
+                        "discovered":  229,
+                        "passed":  229,
+                        "failed":  0,
+                        "not_run":  0,
+                        "duration_seconds":  46.0630318,
+                        "executed":  229,
+                        "app":  "mobile_patient",
+                        "original_names_missing":  [
+
+                                                   ],
+                        "ignored":  0,
+                        "exit_code":  0
+                    }
+                ],
+    "copy_drift":  [
+
+                   ],
+    "assertions_weakened":  0,
+    "focused_and_failed_attempts":  [
+                                        {
+                                            "passed":  1,
+                                            "exit_code":  1,
+                                            "failed":  1,
+                                            "case":  "mobile-before-lifecycle-ready",
+                                            "ignored":  0,
+                                            "duration_seconds":  38.393487
+                                        },
+                                        {
+                                            "passed":  5,
+                                            "exit_code":  1,
+                                            "failed":  1,
+                                            "case":  "mobile-lifecycle-after-1",
+                                            "ignored":  0,
+                                            "duration_seconds":  8.1387352
+                                        },
+                                        {
+                                            "passed":  6,
+                                            "exit_code":  0,
+                                            "failed":  0,
+                                            "case":  "mobile-lifecycle-after-2",
+                                            "ignored":  0,
+                                            "duration_seconds":  6.5187203
+                                        },
+                                        {
+                                            "passed":  6,
+                                            "exit_code":  0,
+                                            "failed":  0,
+                                            "case":  "mobile-lifecycle-after-3",
+                                            "ignored":  0,
+                                            "duration_seconds":  6.3079959
+                                        },
+                                        {
+                                            "passed":  6,
+                                            "exit_code":  0,
+                                            "failed":  0,
+                                            "case":  "mobile-lifecycle-after-4",
+                                            "ignored":  0,
+                                            "duration_seconds":  6.3329249999999995
+                                        },
+                                        {
+                                            "passed":  18,
+                                            "exit_code":  0,
+                                            "failed":  0,
+                                            "case":  "mobile-schedule-timezone-after",
+                                            "ignored":  0,
+                                            "duration_seconds":  9.4141184
+                                        },
+                                        {
+                                            "passed":  227,
+                                            "exit_code":  1,
+                                            "failed":  3,
+                                            "case":  "mobile-tests-final",
+                                            "ignored":  0,
+                                            "duration_seconds":  26.6053361
+                                        }
+                                    ],
+    "production_jitter_changes":  0,
+    "existing_tests_deleted":  0,
+    "quality_gates":  [
+                          {
+                              "duration_seconds":  11.6188056,
+                              "case":  "mobile-analyze-final-after-timezone",
+                              "exit_code":  0
+                          },
+                          {
+                              "duration_seconds":  0.705611,
+                              "case":  "mobile-format-final-after-timezone",
+                              "exit_code":  0
+                          },
+                          {
+                              "duration_seconds":  14.862744099999999,
+                              "case":  "mobile_patient-analyze-final",
+                              "exit_code":  0
+                          },
+                          {
+                              "duration_seconds":  2.3299856,
+                              "case":  "mobile_patient-format-final",
+                              "exit_code":  0
+                          }
+                      ],
+    "native_compile":  "BLOCKED_ENVIRONMENT",
+    "formal_sandbox_certified":  false,
+    "new_skips_added":  0,
+    "native_compile_prerequisite":  "Cached Gradle 9.3.1-all distribution and AGP9.1.0/Kotlin2.4.0 dependency/plugin cache",
+    "physical_device":  "DEFERRED_BY_USER"
+}

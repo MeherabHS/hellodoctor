@@ -1,0 +1,74 @@
+{
+  "doctor_flutter_before": {
+    "total": 172,
+    "passed": 170,
+    "failed": 2,
+    "skipped": 0,
+    "complete": true
+  },
+  "doctor_flutter_after": {
+    "total": 180,
+    "passed": 180,
+    "failed": 0,
+    "skipped": 0,
+    "complete": true
+  },
+  "patient_flutter_before": {
+    "total": 171,
+    "passed": 171,
+    "failed": 0,
+    "skipped": 0,
+    "complete": true
+  },
+  "patient_flutter_after": {
+    "total": 181,
+    "passed": 181,
+    "failed": 0,
+    "skipped": 0,
+    "complete": true
+  },
+  "rust_library": {
+    "passed": 53,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "backend_first_full": {
+    "passed": 213,
+    "failed": 1,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "backend_final": {
+    "passed": 214,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "doctor-web": {
+    "tests": 47,
+    "pass": 47,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "admin-web": {
+    "tests": 13,
+    "pass": 13,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "artifacts": [
+    {
+      "file": "releases/hellodoctor-patient-arm64-consultations-20261014.apk",
+      "bytes": 20889612,
+      "sha256": "e9d80e2ceacdaf4804ca49f32a994497f36cb22cb782bc6a169ff6d40ac85f3b"
+    }
+  ]
+}

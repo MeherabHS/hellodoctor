@@ -1,0 +1,1276 @@
+{
+  "run_id": "faults-20261019T182031",
+  "scope": "Disposable loopback development fixture, real backend; no provider calls",
+  "cases": [
+    {
+      "case_id": "redis_dependency_loss",
+      "requests": [
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.6632000024547,
+          "retry_after": "1",
+          "request_id": "2320fb0d-c381-4556-93fd-b511ed32085d"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 274.2768000025535,
+          "retry_after": "1",
+          "request_id": "6241a89b-66f2-40c7-b3df-8adcb4b78a54"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 274.16770000127144,
+          "retry_after": "1",
+          "request_id": "37bba31a-bbc0-4eb1-825d-ae8ef78e553d"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.25139999890234,
+          "retry_after": "1",
+          "request_id": "11db8fab-0c63-43e9-af3e-c3f8cfb47bd5"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.4228000016301,
+          "retry_after": "1",
+          "request_id": "f492eb13-4c5c-4e21-b63c-13c1d265874f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.7573000055272,
+          "retry_after": "1",
+          "request_id": "aa10108c-40f4-4ed2-884d-cc42fe839df8"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.62070000584936,
+          "retry_after": "1",
+          "request_id": "ae0d2c92-b868-4726-9e2d-d912a5f6faf8"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 288.1297000058112,
+          "retry_after": "1",
+          "request_id": "6389110a-6e14-44c3-a9e1-e499fa29d2bf"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.0436999970698,
+          "retry_after": "1",
+          "request_id": "1f9903cf-261c-4008-8f1b-ea5c8305cddb"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.4025000006659,
+          "retry_after": "1",
+          "request_id": "63384b58-f896-419e-a996-706871cab81c"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.977200000023,
+          "retry_after": "1",
+          "request_id": "68206331-3a5c-460d-8f54-e6fbf7ab1b92"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.2125999953132,
+          "retry_after": "1",
+          "request_id": "ddb7ae6a-2dd5-4d47-b990-f618137b49a2"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.68529999651946,
+          "retry_after": "1",
+          "request_id": "b4d68f78-0c85-4256-a60a-5423816a903a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.3229000022984,
+          "retry_after": "1",
+          "request_id": "eb1545ea-8775-4e41-8677-6910dbf74d52"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.2840000044089,
+          "retry_after": "1",
+          "request_id": "523166d0-deb2-4ce6-a777-972bc6663317"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.1075000030687,
+          "retry_after": "1",
+          "request_id": "9464e5b3-f6ab-44e8-b0b2-b51955130c62"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.2977999999421,
+          "retry_after": "1",
+          "request_id": "25de97dc-395e-42e9-9ca2-de46aab24aa4"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 261.64600000629434,
+          "retry_after": "1",
+          "request_id": "925e75fd-5539-422a-adb5-291d51e1c788"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.5320000006468,
+          "retry_after": "1",
+          "request_id": "57b3454e-eaba-43e0-b137-66aa9ca2fe60"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.0247000013478,
+          "retry_after": "1",
+          "request_id": "a39e9a3d-1111-472a-9fcd-aad2936bd774"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 261.4897000021301,
+          "retry_after": "1",
+          "request_id": "f039e1aa-2dbb-4e3e-959d-919844a571c9"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 261.26949999888893,
+          "retry_after": "1",
+          "request_id": "f8896a74-cd7c-4e79-84f3-34a1ce97ac46"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 261.24750000599306,
+          "retry_after": "1",
+          "request_id": "21edcca9-5112-4823-a64c-6d72906c5b7e"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.8018999962951,
+          "retry_after": "1",
+          "request_id": "f6c082d1-9ef7-4afa-a7c2-21bcf16c2af3"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.5470999949612,
+          "retry_after": "1",
+          "request_id": "8b10a375-a749-4109-b975-8e8796f24261"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.69669999904,
+          "retry_after": "1",
+          "request_id": "8b3dfeca-2c28-4c45-a6e7-42dc1a8e6b73"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.7906000044313,
+          "retry_after": "1",
+          "request_id": "fbeb2a5d-d5cf-45cb-be91-d31a1c455479"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.8000999967335,
+          "retry_after": "1",
+          "request_id": "2e38652b-798e-4fc7-ae3c-469f6e3a8cfd"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.61170000280254,
+          "retry_after": "1",
+          "request_id": "cd9bec46-bd6f-494b-a544-376fe02f6b9f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.48440000158735,
+          "retry_after": "1",
+          "request_id": "ef8f55f6-baf4-4869-b9ad-4ed4c17eaa37"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.28080000105547,
+          "retry_after": "1",
+          "request_id": "afe9455a-a383-4d22-98af-4055c1494126"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.0716000015382,
+          "retry_after": "1",
+          "request_id": "c2a259c2-79dc-4f1c-aa9d-a3e1838d9e3b"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.57799999864073,
+          "retry_after": "1",
+          "request_id": "2d53d6e8-433e-445b-a1a4-d8312fab4dfe"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.50850000057835,
+          "retry_after": "1",
+          "request_id": "395acc51-89f1-4160-b4e6-72ab24e9180d"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.8837000053609,
+          "retry_after": "1",
+          "request_id": "12619e7b-96da-4ffb-9326-cfeb3e7524f3"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.4207999948994,
+          "retry_after": "1",
+          "request_id": "008418fe-ea3c-421c-831a-996d99f9acdd"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.8323000030359,
+          "retry_after": "1",
+          "request_id": "416876f9-d07c-40c3-b7ad-37d71a3bf1bd"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 251.52259999595117,
+          "retry_after": "1",
+          "request_id": "a4b8f673-2cb0-42cc-9649-dba70ad68fa5"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 251.54360000306042,
+          "retry_after": "1",
+          "request_id": "d9759ed6-76b5-4ac9-850a-8aab79970f0d"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.74400000006426,
+          "retry_after": "1",
+          "request_id": "8bcaf1e6-c192-47ce-8b40-449603c1083e"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.2661000029184,
+          "retry_after": "1",
+          "request_id": "9e215b26-cde9-444b-9c1f-29fed8ae1dd6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.89549999678275,
+          "retry_after": "1",
+          "request_id": "fb96c4ef-2b30-4303-8677-17941ccb8137"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.170799997577,
+          "retry_after": "1",
+          "request_id": "2cc956f0-e797-44e1-9d0a-e8a22679be5c"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.74210000014864,
+          "retry_after": "1",
+          "request_id": "a8e0518a-8ee1-4e18-ac37-a544f47d1005"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.2001999958884,
+          "retry_after": "1",
+          "request_id": "43acf154-3886-4584-8db3-1a0df28a319a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.8799999986077,
+          "retry_after": "1",
+          "request_id": "a891bc96-a8c1-40b6-bfdf-72efc32f3729"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.75719999871217,
+          "retry_after": "1",
+          "request_id": "a71fc89c-b5bb-411f-bf48-ea85df50be3a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.4924000016763,
+          "retry_after": "1",
+          "request_id": "bcc60e35-cb7a-41eb-a54c-44a54db0cc4e"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.3506999957026,
+          "retry_after": "1",
+          "request_id": "e848b9d2-cbb2-42a9-80f4-002f3da675e8"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.6896000005654,
+          "retry_after": "1",
+          "request_id": "654986f1-1441-46e4-a333-e3d4e7402830"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.8367000001599,
+          "retry_after": "1",
+          "request_id": "a769c680-be99-45de-b317-c2ead14ac58c"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.23390000127256,
+          "retry_after": "1",
+          "request_id": "4424257d-8826-44ad-898a-caf2cb3a1d4e"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.7724000014714,
+          "retry_after": "1",
+          "request_id": "b398ea36-4681-499e-878d-ac39de85a025"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.40220000222325,
+          "retry_after": "1",
+          "request_id": "47a15d0a-bb09-4161-ac23-fbcd20bbc1ab"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.75730000290787,
+          "retry_after": "1",
+          "request_id": "acd7248e-8b66-4ef4-8299-60ddf7a49293"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 252.07859999500215,
+          "retry_after": "1",
+          "request_id": "cd048710-4a3b-4f40-9271-ab5ef7a9f519"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 17.13789999485016,
+          "retry_after": "1",
+          "request_id": "5b859a09-5589-4882-ab3a-f8413af694f9"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.28830000339076,
+          "retry_after": "1",
+          "request_id": "62daa80e-ecc6-412e-a684-25315233eebe"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 16.03160000377102,
+          "retry_after": "1",
+          "request_id": "ddc0bf21-b299-466f-8e63-38d2bcdd21ab"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.8895000008051,
+          "retry_after": "1",
+          "request_id": "7f304500-72ec-4d4a-ab5c-96be8b93fd4e"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.4848999977112,
+          "retry_after": "1",
+          "request_id": "3a3cd572-6b49-46a8-902d-ac04f487daff"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.91479999700096,
+          "retry_after": "1",
+          "request_id": "1f86dc7d-9a51-4651-a167-050a34676748"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.3948000028613,
+          "retry_after": "1",
+          "request_id": "865be77f-effb-4ca2-82c2-eb3bfc25b2a0"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 1.9156999987899326,
+          "retry_after": "1",
+          "request_id": "76852c29-253e-4bf0-ae3d-25f51310096c"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 14.489400004094932,
+          "retry_after": "1",
+          "request_id": "753b3200-0534-443e-8dc2-1f2f2cc26731"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 13.492199999745935,
+          "retry_after": "1",
+          "request_id": "ab90d87a-72d5-42c0-8cf6-13536ddbd499"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 12.655900005484,
+          "retry_after": "1",
+          "request_id": "5ded4ccb-5eb0-4d26-a7b7-2ce9795e03b8"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 1.9823000038741156,
+          "retry_after": "1",
+          "request_id": "58d4f2fd-9697-4783-b212-06c80e8d2683"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 15.159400005359203,
+          "retry_after": "1",
+          "request_id": "9337a48e-b702-4fa3-b9fb-ec2433cd43ce"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 1.800799996999558,
+          "retry_after": "1",
+          "request_id": "83a057ae-b0f4-44c0-b4df-1ddae7948686"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 13.801000000967178,
+          "retry_after": "1",
+          "request_id": "b5ec6be7-a697-47a7-8ae9-42ddc8eb4ba9"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.054399999906309,
+          "retry_after": "1",
+          "request_id": "9e306cbd-ede4-461f-8325-bd40b195134a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 13.270100003865082,
+          "retry_after": "1",
+          "request_id": "8b4d2dbd-4623-4172-a508-8460d795cbb9"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.3567000025650486,
+          "retry_after": "1",
+          "request_id": "cd982ae9-04ff-4dba-b22c-48c893f7141b"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.3639999999431893,
+          "retry_after": "1",
+          "request_id": "dc1ec2e6-6096-4892-aed0-4d650d057ac0"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.082600003632251,
+          "retry_after": "1",
+          "request_id": "fa5131ea-6da2-4a0c-996b-10268e1d9a3a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.3127999957068823,
+          "retry_after": "1",
+          "request_id": "57efc822-bfb3-4b0b-885d-1d6c48bcda41"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.6108000020030886,
+          "retry_after": "1",
+          "request_id": "36b6f065-e1a4-4538-b4b2-4cc171a8d45d"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.217400004155934,
+          "retry_after": "1",
+          "request_id": "4dd94c7b-e69e-4b6a-bc39-5cbcd326845c"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 1.9253999998909421,
+          "retry_after": "1",
+          "request_id": "a32374f3-c796-4239-b9b2-1824a5c17712"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 25.983899999118876,
+          "retry_after": "1",
+          "request_id": "c0b0551a-d407-48a0-afd9-9d0576450798"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 1.9983999955002218,
+          "retry_after": "1",
+          "request_id": "ce358c47-4c4e-4676-9ffa-6298dd5eb0c0"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.078600002278108,
+          "retry_after": "1",
+          "request_id": "093ed7dd-7a64-4eda-9512-865720060268"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 22.855300005176105,
+          "retry_after": "1",
+          "request_id": "3328f5a2-e854-4ed7-876c-1898d8b7ae63"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 1.6089999990072101,
+          "retry_after": "1",
+          "request_id": "1a905808-cc8f-426b-875a-8f8d96cd0e28"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 1.8713000026764348,
+          "retry_after": "1",
+          "request_id": "27b114a5-962c-4a84-8fd4-f8011b6d7d09"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 18.549400003394112,
+          "retry_after": "1",
+          "request_id": "958681ff-ea34-464b-874c-442f4e7acb9d"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.2688999999663793,
+          "retry_after": "1",
+          "request_id": "ea006abf-23b5-4f10-ba85-951ec8ce75db"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.750199993897695,
+          "retry_after": "1",
+          "request_id": "ac32a4a6-3872-48a0-b9a2-0c28769553f8"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.9724999985774048,
+          "retry_after": "1",
+          "request_id": "fe1f5987-195a-4f31-81a2-ca8f2628cb20"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.346099994610995,
+          "retry_after": "1",
+          "request_id": "e2b7dafa-fcc9-441f-a3f8-96e9a2c33e2e"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.7230999985476956,
+          "retry_after": "1",
+          "request_id": "902410f1-7b66-48ac-9f4e-956df74f3ed6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.4986999997054227,
+          "retry_after": "1",
+          "request_id": "dcf548c7-6263-4be9-9e82-21a9832a6532"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.0054999986314215,
+          "retry_after": "1",
+          "request_id": "65dfb8ee-497a-43cf-856b-ed5847e253ed"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.197999994677957,
+          "retry_after": "1",
+          "request_id": "5854242d-8943-4090-ae3a-e462ea9c2519"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 1.7076000003726222,
+          "retry_after": "1",
+          "request_id": "0f200406-4d67-462c-b201-2cc282359afd"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.1762000033049844,
+          "retry_after": "1",
+          "request_id": "63c4cadb-f2b5-4988-9ce8-b24041211805"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.176800000597723,
+          "retry_after": "1",
+          "request_id": "ba2e8817-b80a-4d98-b064-1c8d31c69d28"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.0735999933094718,
+          "retry_after": "1",
+          "request_id": "5b932f30-8142-48ba-98ba-33e605cfaf82"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.3240000009536743,
+          "retry_after": "1",
+          "request_id": "8fce4c17-820a-46c3-acfa-c3f811b73c84"
+        }
+      ],
+      "health": {
+        "path": "/healthz",
+        "status": 503,
+        "latency_ms": 260.7960000023013,
+        "retry_after": null,
+        "request_id": "0c29c1cc-6d22-4799-adf3-fe53d05f1ab6"
+      },
+      "before": {
+        "system_errors": 0,
+        "error_occurrences": 0,
+        "transactions": 0,
+        "economic_effects": 0,
+        "blocked_auth_connections": 0
+      },
+      "after": {
+        "system_errors": 1,
+        "error_occurrences": 1,
+        "transactions": 0,
+        "economic_effects": 0,
+        "blocked_auth_connections": 0
+      },
+      "elapsed_seconds": 5.217683100003342,
+      "metrics": [
+        503,
+        {}
+      ],
+      "all_fail_closed": true,
+      "incident_row_delta": 1
+    },
+    {
+      "case_id": "auth_pool_pressure",
+      "lock_seconds": 12,
+      "offered_parallel_requests": 12,
+      "lock_process_exit": 0,
+      "samples": [
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"normal\"}": 110.0,
+              "admission_accepted_total{class=\"health\"}": 7.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"health\",reason=\"limiter_unavailable\"}": 1.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 104.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_size{role=\"api\"}": 4.0,
+              "db_pool_size{role=\"auth\"}": 4.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "db_pool_idle{role=\"api\"}": 4.0,
+              "db_pool_idle{role=\"auth\"}": 4.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.0014165,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.0016623882157663478,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"1\"}": 0.0099046,
+              "db_acquire_seconds_sum": 0.0414418,
+              "db_acquire_seconds_count": 11.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 38490112,
+            "private_bytes": 13045760,
+            "cpu_seconds": 0.515625
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 104.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"health\",reason=\"limiter_unavailable\"}": 1.0,
+              "admission_accepted_total{class=\"normal\"}": 110.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"health\"}": 8.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"auth\"}": 4.0,
+              "db_pool_size{role=\"api\"}": 4.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 4.0,
+              "db_pool_idle{role=\"auth\"}": 4.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.0014165,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.0016623882157663478,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"1\"}": 0.0099046,
+              "db_acquire_seconds_sum": 0.0414418,
+              "db_acquire_seconds_count": 11.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 38928384,
+            "private_bytes": 13586432,
+            "cpu_seconds": 0.515625
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"health\",reason=\"limiter_unavailable\"}": 1.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 104.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"health\"}": 9.0,
+              "admission_accepted_total{class=\"normal\"}": 110.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "db_pool_size{role=\"auth\"}": 4.0,
+              "db_pool_size{role=\"api\"}": 4.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "db_pool_idle{role=\"api\"}": 4.0,
+              "db_pool_idle{role=\"auth\"}": 4.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.0014165,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.0016623882157663478,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"1\"}": 0.0099046,
+              "db_acquire_seconds_sum": 0.0414418,
+              "db_acquire_seconds_count": 11.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 38694912,
+            "private_bytes": 13660160,
+            "cpu_seconds": 0.53125
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_accepted_total{class=\"health\"}": 10.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"normal\"}": 110.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 104.0,
+              "admission_rejected_total{class=\"health\",reason=\"limiter_unavailable\"}": 1.0,
+              "db_pool_idle{role=\"auth\"}": 4.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 4.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"api\"}": 4.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_size{role=\"auth\"}": 4.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.0014165,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.0016623882157663478,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"1\"}": 0.0099046,
+              "db_acquire_seconds_sum": 0.0414418,
+              "db_acquire_seconds_count": 11.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 38707200,
+            "private_bytes": 13656064,
+            "cpu_seconds": 0.5625
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_accepted_total{class=\"health\"}": 11.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"normal\"}": 110.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 104.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"health\",reason=\"limiter_unavailable\"}": 1.0,
+              "db_pool_size{role=\"auth\"}": 4.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"api\"}": 4.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 4.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"auth\"}": 4.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.0014165,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.0016623882157663478,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"1\"}": 0.0099046,
+              "db_acquire_seconds_sum": 0.0414418,
+              "db_acquire_seconds_count": 11.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 38563840,
+            "private_bytes": 12963840,
+            "cpu_seconds": 0.5625
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 104.0,
+              "admission_rejected_total{class=\"health\",reason=\"limiter_unavailable\"}": 1.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"normal\"}": 110.0,
+              "admission_accepted_total{class=\"health\"}": 12.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_size{role=\"auth\"}": 4.0,
+              "db_pool_size{role=\"api\"}": 4.0,
+              "db_pool_idle{role=\"auth\"}": 4.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 4.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.0014165,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.0016623882157663478,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"1\"}": 0.0099046,
+              "db_acquire_seconds_sum": 0.0414418,
+              "db_acquire_seconds_count": 11.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 38817792,
+            "private_bytes": 13479936,
+            "cpu_seconds": 0.578125
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"normal\"}": 110.0,
+              "admission_accepted_total{class=\"health\"}": 13.0,
+              "admission_rejected_total{class=\"health\",reason=\"limiter_unavailable\"}": 1.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 104.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 4.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"auth\"}": 4.0,
+              "db_pool_size{role=\"api\"}": 4.0,
+              "db_pool_size{role=\"auth\"}": 4.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.0014165,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.0016623882157663478,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"1\"}": 0.0099046,
+              "db_acquire_seconds_sum": 0.0414418,
+              "db_acquire_seconds_count": 11.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 38457344,
+            "private_bytes": 12685312,
+            "cpu_seconds": 0.59375
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            200,
+            {
+              "admission_rejected_total{class=\"health\",reason=\"limiter_unavailable\"}": 1.0,
+              "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 104.0,
+              "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 3.0,
+              "admission_accepted_total{class=\"consultation\"}": 4.0,
+              "admission_accepted_total{class=\"normal\"}": 110.0,
+              "admission_accepted_total{class=\"auth\"}": 2.0,
+              "admission_accepted_total{class=\"health\"}": 14.0,
+              "db_pool_size{role=\"finance\"}": 1.0,
+              "db_pool_size{role=\"auth\"}": 4.0,
+              "db_pool_size{role=\"api\"}": 4.0,
+              "db_pool_size{role=\"payment\"}": 1.0,
+              "admission_inflight{class=\"consultation\"}": 0.0,
+              "admission_inflight{class=\"health\"}": 1.0,
+              "admission_inflight{class=\"auth\"}": 0.0,
+              "admission_inflight{class=\"normal\"}": 0.0,
+              "db_pool_idle{role=\"finance\"}": 1.0,
+              "db_pool_idle{role=\"api\"}": 4.0,
+              "db_pool_idle{role=\"payment\"}": 1.0,
+              "db_pool_idle{role=\"auth\"}": 4.0,
+              "db_acquire_seconds{quantile=\"0\"}": 0.0014165,
+              "db_acquire_seconds{quantile=\"0.5\"}": 0.0016623882157663478,
+              "db_acquire_seconds{quantile=\"0.9\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.95\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.99\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"0.999\"}": 0.009376956640661415,
+              "db_acquire_seconds{quantile=\"1\"}": 0.0099046,
+              "db_acquire_seconds_sum": 0.0414418,
+              "db_acquire_seconds_count": 11.0
+            }
+          ],
+          "process": {
+            "rss_bytes": 38567936,
+            "private_bytes": 12963840,
+            "cpu_seconds": 0.609375
+          }
+        }
+      ],
+      "new_request_during_pressure": {
+        "path": "/api/v1/patients/me",
+        "status": 200,
+        "latency_ms": 24.270100002468098,
+        "retry_after": null,
+        "request_id": "0095d627-813d-4d38-9d1b-6c1b4c5bf07f"
+      },
+      "health_during_pressure": {
+        "path": "/healthz",
+        "status": 200,
+        "latency_ms": 5.963499999779742,
+        "retry_after": null,
+        "request_id": "0d7e1cdb-0d1d-4902-b765-e5250e316673"
+      },
+      "requests": [
+        {
+          "status": 200,
+          "latency_ms": 47.62279999704333,
+          "retry_after": null,
+          "request_id": "809368ab-8cbd-433b-96de-0eb15b282eac"
+        },
+        {
+          "status": 200,
+          "latency_ms": 32.98899999936111,
+          "retry_after": null,
+          "request_id": "4db79846-59f3-4b03-b8fe-567ad0befbb6"
+        },
+        {
+          "status": 200,
+          "latency_ms": 43.9433999999892,
+          "retry_after": null,
+          "request_id": "a2f172d3-01c8-4c81-af1a-bc657c2b56cc"
+        },
+        {
+          "status": 503,
+          "latency_ms": 267.6380999982939,
+          "retry_after": "1",
+          "request_id": "efb5df6a-67d3-46e2-9991-63afe354ae16"
+        },
+        {
+          "status": 200,
+          "latency_ms": 41.74290000082692,
+          "retry_after": null,
+          "request_id": "17c98143-070a-4e75-9a81-d754fc92e475"
+        },
+        {
+          "status": 503,
+          "latency_ms": 266.32290000270586,
+          "retry_after": "1",
+          "request_id": "0eb72bdd-9062-4476-b61d-4b663ec9fd52"
+        },
+        {
+          "status": 503,
+          "latency_ms": 266.56119999825023,
+          "retry_after": "1",
+          "request_id": "10de0537-e745-47d3-8f3e-4bb173f6116f"
+        },
+        {
+          "status": 503,
+          "latency_ms": 265.51190000463976,
+          "retry_after": "1",
+          "request_id": "b9dc047d-e57b-40e5-97de-f5c8eaa6281b"
+        },
+        {
+          "status": 503,
+          "latency_ms": 265.4633999991347,
+          "retry_after": "1",
+          "request_id": "1c557ce5-bdc3-4f73-abbd-771913ecc394"
+        },
+        {
+          "status": 503,
+          "latency_ms": 265.41290000022855,
+          "retry_after": "1",
+          "request_id": "2d154f4d-d071-4e8f-a190-2ff6d4d13ddd"
+        },
+        {
+          "status": 403,
+          "latency_ms": 27.496899994730484,
+          "retry_after": null,
+          "request_id": "f8c8286d-8c96-49f8-b37e-422733466435"
+        },
+        {
+          "status": 503,
+          "latency_ms": 263.89560000097845,
+          "retry_after": "1",
+          "request_id": "b72485ca-d489-443d-8f24-553c2944d591"
+        }
+      ],
+      "db_waiter_count": "NOT_MEASURED",
+      "sql_lock_waits_observed": false
+    }
+  ],
+  "baseline": {
+    "path": "/api/v1/patients/me",
+    "status": 200,
+    "latency_ms": 47.63459999958286,
+    "retry_after": null,
+    "request_id": "824f871f-2489-4561-bd6a-0b6b449f950a"
+  },
+  "redis_recovery": {
+    "path": "/healthz",
+    "status": 200,
+    "latency_ms": 9.978399997635279,
+    "retry_after": null,
+    "request_id": "78ae27ca-ac02-442f-a5f8-65253c6ee587"
+  },
+  "after_recovery": {
+    "path": "/api/v1/patients/me",
+    "status": 200,
+    "latency_ms": 26.090400002431124,
+    "retry_after": null,
+    "request_id": "1c59ae0e-83a9-4d96-94e3-54097255aba7"
+  },
+  "final_db": {
+    "system_errors": 1,
+    "error_occurrences": 1,
+    "transactions": 0,
+    "economic_effects": 0,
+    "blocked_auth_connections": 0
+  },
+  "final_metrics": [
+    200,
+    {
+      "admission_accepted_total{class=\"normal\"}": 112.0,
+      "admission_accepted_total{class=\"health\"}": 16.0,
+      "admission_accepted_total{class=\"consultation\"}": 4.0,
+      "admission_accepted_total{class=\"auth\"}": 2.0,
+      "admission_rejected_total{class=\"consultation\",reason=\"limiter_unavailable\"}": 3.0,
+      "admission_rejected_total{class=\"normal\",reason=\"limiter_unavailable\"}": 104.0,
+      "admission_rejected_total{class=\"health\",reason=\"limiter_unavailable\"}": 1.0,
+      "admission_inflight{class=\"auth\"}": 0.0,
+      "admission_inflight{class=\"normal\"}": 0.0,
+      "admission_inflight{class=\"consultation\"}": 0.0,
+      "admission_inflight{class=\"health\"}": 1.0,
+      "db_pool_idle{role=\"payment\"}": 1.0,
+      "db_pool_idle{role=\"auth\"}": 4.0,
+      "db_pool_idle{role=\"api\"}": 4.0,
+      "db_pool_idle{role=\"finance\"}": 1.0,
+      "db_pool_size{role=\"finance\"}": 1.0,
+      "db_pool_size{role=\"payment\"}": 1.0,
+      "db_pool_size{role=\"auth\"}": 4.0,
+      "db_pool_size{role=\"api\"}": 4.0,
+      "db_acquire_seconds{quantile=\"0\"}": 0.0014165,
+      "db_acquire_seconds{quantile=\"0.5\"}": 0.0016623882157663478,
+      "db_acquire_seconds{quantile=\"0.9\"}": 0.009224428699011956,
+      "db_acquire_seconds{quantile=\"0.95\"}": 0.009376956640661415,
+      "db_acquire_seconds{quantile=\"0.99\"}": 0.009376956640661415,
+      "db_acquire_seconds{quantile=\"0.999\"}": 0.009376956640661415,
+      "db_acquire_seconds{quantile=\"1\"}": 0.0099046,
+      "db_acquire_seconds_sum": 0.0483388,
+      "db_acquire_seconds_count": 15.0
+    }
+  ],
+  "credentials_logged": false,
+  "backend_stopped": true
+}

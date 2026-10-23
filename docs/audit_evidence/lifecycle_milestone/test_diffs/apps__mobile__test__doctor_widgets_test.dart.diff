@@ -1,0 +1,62 @@
+--- baseline/apps/mobile/test/doctor_widgets_test.dart
+
++++ current/apps/mobile/test/doctor_widgets_test.dart
+
+@@ -98,6 +98,19 @@
+
+ }
+ 
+ void main() {
++  testWidgets('Doctor home compose shortcut opens the existing article editor',
++      (tester) async {
++    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
++    await tester.pumpWidget(harness(const QueuePage(), const DoctorState()));
++    expect(find.byTooltip('Write an article'), findsOneWidget);
++    await tester.tap(find.byTooltip('Write an article'));
++    await tester.pumpAndSettle();
++    expect(
++        find.descendant(
++            of: find.byType(AppBar), matching: find.text('Article')),
++        findsOneWidget);
++    expect(find.byType(TextFormField), findsAtLeastNWidgets(3));
++  });
+   testWidgets('status chip and card render prototype primitives',
+       (tester) async {
+     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+@@ -141,12 +154,13 @@
+
+       'id': 'a',
+       'patient_id': 'p',
+       'patient_display_name': 'Server patient',
+-      'status': 'UPCOMING',
+-      'doctor_lifecycle': 'UPCOMING'
++      'status': 'CONFIRMED',
++      'queue_actionable': true,
++      'doctor_lifecycle': 'CONFIRMED'
+     });
+     await tester.pumpWidget(
+         harness(const QueuePage(), DoctorState(queue: [appointment])));
+-    await tester.tap(find.text('All Scheduled (1)'));
++    expect(find.text('Consultation History'), findsOneWidget);
+     await tester.pump();
+     expect(find.text('Server patient'), findsOneWidget);
+     expect(find.text('Scheduled'), findsOneWidget);
+@@ -172,6 +186,7 @@
+
+       'patient_id': 'p',
+       'patient_display_name': 'Mohammad Abdur Rahman Chowdhury',
+       'status': 'CONFIRMED',
++      'queue_actionable': true,
+       'modality': 'VIDEO',
+       'conversation_id': 'shared-conversation',
+       'doctor_lifecycle': 'UPCOMING',
+@@ -184,7 +199,7 @@
+
+           harness(const QueuePage(), DoctorState(queue: [appointment])));
+       await tester.pumpAndSettle();
+       expect(tester.takeException(), isNull, reason: 'width=$width');
+-      await tester.tap(find.text('All Scheduled (1)'));
++      expect(find.text('Consultation History'), findsOneWidget);
+       await tester.pump();
+       expect(find.text('Start video consultation'), findsOneWidget,
+           reason: 'width=$width');

@@ -1,0 +1,3215 @@
+[
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "production cannot enable LAN cleartext with a development flag",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "release deployment rejects missing environment and all development flags in production",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "development OTP requires both explicit development and its own flag",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "public hosts https is always allowed",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "public hosts http on a public host is rejected without the explicit flag",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "public hosts even the development flag cannot enable public cleartext traffic",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "LAN / loopback test hosts private and loopback addresses require the development flag",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "LAN / loopback test hosts addresses just outside the private ranges are not exempt",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "equivalent GETs share only the in-flight transport, then refetch",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "different resources and queries are not coalesced",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "failed GET is not cached and a later authorized retry reaches server",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "account change never joins a previous account in-flight GET",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "direct publish statuses do not introduce a review state",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "repository sends server version and excludes author/status mass assignment",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "screen timer stops under another route and in background, resumes once",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/api_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "repeated hasError polls back off, jitter stays bounded",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/api_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "concurrent timer, reconnect and explicit refresh share one read",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "refresh never automatically replays a clinical mutation",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "a rejected old refresh does not sign out the new Doctor",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "late protected response cannot reach cache after account switch",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "late refresh cannot restore a logged-out account or expire a new account",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "tokens are persisted and clearSession removes both credentials",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "unexpected backend debug OTP does not bypass the manual MFA screen",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor writes a structured article and publishes without Admin review",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/articles_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "login validates required credentials before network access",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "MFA verification cannot run without a server challenge",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor registration validates required fields before network access",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "restore() flags SessionRestoring synchronously so a cold start with a saved session never flashes the login form",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "computeNewNotifications 3 notifications newer than the cursor and 2 older -\u003e exactly 3 new decisions, cursor advances to the newest",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "computeNewNotifications nothing newer than the cursor -\u003e zero decisions, cursor unchanged",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "computeNewNotifications the same notification list run twice in a row -\u003e the second run produces zero new decisions (no duplicate)",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "computeNewNotifications an empty fetch with an existing cursor leaves the cursor unchanged",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "runGracefully an ApiException (e.g. an expired/revoked session) is swallowed and the run still reports success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "runGracefully any other unexpected error is also swallowed, never propagated",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "runGracefully a successful body still reports success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "doctorIdentifierFromAccessToken extracts user_id/sub (the JWT subject) when no doctor_id claim exists, matching the real backend Claims shape",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "doctorIdentifierFromAccessToken prefers an explicit doctor_id claim if one is ever present",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "doctorIdentifierFromAccessToken returns null for a malformed token rather than throwing",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "logout clears local credentials even when the server is offline",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "concurrent statement writes remain indexed and logout removes all",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "monthly statements and payout setup cache are protected and cleared",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "statement cache is bounded and rejects arbitrary keys",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cache is scoped, versioned and records freshness metadata",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "corrupt and incompatible cache entries are discarded safely",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "expired entries remain readable as stale data and expose expiry",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "a different authenticated scope cannot read prior doctor data",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "global FlutterError hook invokes reporter once",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "zone unhandled async hook uploads",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "PlatformDispatcher hook invokes reporter",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "uses current authenticated session without client user identity",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "pre-auth errors are journaled and cleared sessions cannot upload",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normal 409 is not a crash",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normal 422 is not a crash",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "offline timeout/cancellation is not a crash",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "report failure does not recurse, refresh or expire session",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "secret and PHI prose is omitted before transmission",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "stack is bounded and preserves Dart source frames",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "native installed app version and build are correlated",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "caught unexpected repository parsing failure is reported",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Dio JSON decoding failure reports once without leaking response data",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "offline startup keeps a secure session for cached read-only data",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "CHAT thread exposes video control only for its paid modality",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/consultation_actions_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "VIDEO thread exposes video control only for its paid modality",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/consultation_actions_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "authoritative patient identity, modality and conversation survive mapping",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "CHAT renders one modality-specific action at 320dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/consultation_actions_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "VIDEO renders one modality-specific action at 320dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/consultation_actions_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "conversation metadata controls closure and action without creating a new booking",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "consultation completion dialog offers all four clinical outcomes, including Escalate (CLAUDE.md Business Rule 6)",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/consultation_completion_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor loads a Patient-specific paid CHAT booking beyond both first pages without changing order",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "a failed later queue page is an error, never a silently truncated successful queue",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "prototype design tokens remain centralized",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "domain error retains HTTP status for user mapping",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "doctor state defaults to safe empty read state",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "duty mutation state can disable repeated actions",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "updateSlotStatus PATCHes the slot with the requested status",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "bindPayoutDestination posts the real binding endpoint, not the legacy payout-method pair",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "bindPayoutDestination surfaces the honest 409 when no platform provider is configured",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "setPrimaryPayoutDestination posts the real set-primary endpoint",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "updateSlotStatus surfaces a 409 conflict as an ApiException the caller can catch, same as cancelSlot",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "pending and rejected review states load without requesting clinical data",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "logout disposes account state and discards a late queue response",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "schedule refresh observes server admin block and unblock without reloading other data",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "late schedule poll after logout is discarded",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "loadAll populates every backend-driven collection",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "duty remains server-confirmed and rolls back on conflict",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cached data is emitted before the fresh backend result",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "known offline duty mutation is rejected without a local success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "message chronology compares real instants across fractional seconds and UTC offsets",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "appointment DTO preserves server lifecycle and contextual access",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "slot, chat, message, question and wallet DTOs map backend fields",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "profile DTO keeps verified fields available for read-only rendering",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "error mapper gives domain-specific safe messages",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "professional review uses explicit state and never treats rejected as pending",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cleanupPickedRxFile deletes an image_picker-sourced (owned cache) file",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cleanupPickedRxFile never raw-deletes a file_picker-sourced path — only calls the plugin-safe clear function",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cleanupPickedRxFile defers the plugin-safe clear call while another file_picker page is still pending, so a concurrent upload is never starved",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cleanupPickedRxFile a missing/already-deleted file does not throw",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cleanupPickedRxFile a clearFilePickerTemp failure is swallowed, not rethrown",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 320.0dp / 0.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 320.0dp / 24.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 320.0dp / 34.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 320.0dp / 48.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 360.0dp / 0.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 360.0dp / 24.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 360.0dp / 34.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 360.0dp / 48.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor home compose shortcut opens the existing article editor",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "status chip and card render prototype primitives",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "queue renders empty state without fake patient data",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 412.0dp / 0.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "queue profile header shows the real signed-in doctor",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "queue renders server appointment data",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 412.0dp / 24.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "queue shows safe retry state for server failure",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 412.0dp / 34.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "queue action toolbar stays on one line at common Android widths",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor navigation stays usable at 412.0dp / 48.0 inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "schedule shows human-readable time and real patient linkage, no overflow",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "blocked Web slots do not become mobile patient bookings",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "booked slot cannot be self-cancelled; open slot cancel requires confirmation",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "wallet shows real settlement breakdown, business-rule wording, no overflow",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts a bare local 07... number and normalizes it",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts an already-international number unchanged",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts an international number with spaces",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts a local number with hyphens",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "payout method card shows real configured state, not a placeholder",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts a bare local 01... number and normalizes it",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts an already-international 01... number unchanged",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "ledger payment_status maps honestly — PAYMENT_HELD is never shown as settled/escrow",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects by length, not by leading digit — the real bug report (8 national digits, not 9)",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone prefix-agnostic: a structurally complete 9-digit number starting with a non-7/1 digit now passes — proves the old prefix restriction is gone",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects other wrong-length shapes",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects an obviously too-short number",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects a bare country code with nothing after it",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects a too-short local number",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects a number containing letters",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects a non-Kenyan international number",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts a bare international-shaped number with no leading plus",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A shows real unanswered questions, quick presets, no overflow",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cached content exposes refresh and offline state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "schedule gates Block/Unblock exactly like Cancel: AVAILABLE shows Block, BOOKED shows neither",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "BLOCKED slot shows only Unblock, never Cancel or Block",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "tapping Block on an available slot calls the repository and updates the displayed status",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/doctor_widgets_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Nairobi schedule date crosses midnight using real instant, independent of input offset",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor picker fields map to Nairobi UTC instants across date boundary and round trip",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "RegistrationPage phone validation invalid phone number blocks navigation and shows a field error",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/kenya_phone_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "RegistrationPage phone validation valid phone number proceeds to the legal consent page",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/kenya_phone_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Doctor latest 50 plus cursor pages expose all 200 persisted messages",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "uncertain send retry retains its key; next intentional identical send has a new key",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "RegistrationPage phone validation a structurally valid 9-digit number with a non-7/1 prefix also proceeds — proves the prefix restriction was removed end-to-end",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/kenya_phone_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "load() populates items and unread count",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "load() surfaces a user-facing error on failure",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cached items are kept visible (as \"refreshing\") while a reload runs",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "markRead() is optimistic, decrements unread count, then confirms",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "markRead() rolls back the optimistic update on a server failure",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "markAllRead() marks every item read and zeroes the unread count",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "markAllRead() is a no-op when nothing is unread",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "markAllRead() rolls back on failure and surfaces an error",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "startPolling() (called explicitly once) polls every 20s while resumed, and stops after close()",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "a poll tick is skipped while the app is not resumed",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "first load() only establishes the createdAt baseline (no backlog renotification), and a later strictly-newer item is processed without throwing",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "duplicate discovery of an already-seen item across repeated fetches does not change unreadCount unexpectedly",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "schedule reconciliation is skipped (no crash, no queue() call) when doctorRepo/doctorId are not supplied — keeps the app.dart single-argument call site working",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "schedule reconciliation fetches doctorRepo.queue() once both doctorRepo and doctorId are supplied",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "notification center loading rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/notification_center_page_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "notification center empty rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/notification_center_page_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "notification center error rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/notification_center_page_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "notification center populated rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/notification_center_page_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "upcoming consultation uses the high-priority Android reminder channel",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "tapping an unread row marks it read and clears its dot",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/notification_center_page_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "\"Mark all read\" is hidden once there is nothing unread",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/notification_center_page_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "NotificationDto reads notification_type, not serde-absent \"type\"",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "list() requests GET /notifications with limit/offset and parses rows",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "unreadCount() requests GET /notifications/unread-count",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "markRead() posts to /notifications/:id/read",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "markAllRead() posts to /notifications/read-all and returns the count",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "registerDevice() posts platform and push_token to /notifications/devices",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "devicePlaceholderToken() is generated once and persisted across calls (never a fresh value per app launch)",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "a transport failure is wrapped as ApiException and rethrown",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "application-wide notification cadence is one delta and count per foreground minute",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/notification_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "quiet notification sync uses deltas, bounds catchup and stops HTTP in background",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/notification_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "earlier notification pages remain accessible and survive delta reconciliation",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/notification_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "default queue uses server eligibility and preserves completed history",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/pre_e2e_queue_chat_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "legacy cached records without server eligibility cannot enter upcoming",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "sender identity controls own green right on history reload",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/pre_e2e_queue_chat_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "sender identity controls incoming white left on history reload",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/pre_e2e_queue_chat_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A long registration and accessible text at 360.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A long registration and accessible text at 390.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A long registration and accessible text at 412.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "paperclip opens clinical attachment flow; failed uploads have no false sent message and retry same key",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/pre_e2e_queue_chat_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A long registration and accessible text at 480.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "oversized selected image clears picker temporary files without sending",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/pre_e2e_queue_chat_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "narrow chat composer stays above keyboard and navigation; empty send is disabled",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/pre_e2e_queue_chat_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A actual modal editor remains reachable above keyboard at 360.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A actual modal editor remains reachable above keyboard at 390.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A actual modal editor remains reachable above keyboard at 412.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "409 refreshes only Q\u0026A and renders authoritative answer",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "successful publication with failed refresh never reopens editor",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "409 with failed refresh closes stale editor and offers safe retry",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A unanswered rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A long-question rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A answered rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A loading rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A empty rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A error rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "Q\u0026A offline-cache rendered state",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/qna_rendering_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "resume, Queue return and foreground tick replace stale operational data; background does not poll",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/queue_lifecycle_refresh_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "rapid resumes coalesce and disposal cancels pending refresh",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/queue_lifecycle_refresh_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "new backend notification reconciles Queue once; repeated notification state and disposed shell do not refresh",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/queue_lifecycle_refresh_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "1000 clients spread recovery and coalesce event bursts",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/recovery_stampede_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "manual refresh stays immediate and recovery cannot overlap it",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/recovery_stampede_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "recovery preserves failure history and disposal cancels recovery",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile/test/recovery_stampede_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "daily summary 6 valid CONFIRMED/WAITING appointments today -\u003e one schedule decision with correct count",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "daily summary 0 appointments today -\u003e no schedule decision, cancels stale pending",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "daily summary CANCELLED appointment is excluded from the daily count",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "daily summary Nairobi date boundary: 23:30 UTC appointment counts toward the next Nairobi day, not its own UTC calendar date",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "T-15 reminders future CONFIRMED appointment -\u003e exactly one T-15 decision at start - 15m",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "T-15 reminders CANCELLED appointment with a previously pending T-15 payload -\u003e cancel decision",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "T-15 reminders RESCHEDULED appointment (same id, new start) -\u003e exactly one schedule decision, no duplicate",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "T-15 reminders 20 appointments -\u003e 20 distinct T-15 decisions, no duplicates",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "T-15 reminders appointment whose start is already in the past -\u003e no T-15 decision, cancels any previously pending one",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "T-15 reminders appointment booked with under 15 minutes notice fires at \"now\", never in the past",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cleanup of unrelated payloads a payload matching neither prefix is left untouched",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "cleanup of unrelated payloads a stale prior-day daily_schedule payload is cancelled",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "notification text never contains patient name or complaint (PHI)",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "unavailable native keystore never makes startup reporting throw",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "failure before API construction persists sanitized reference across restart",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "pre-auth and failed deliveries remain queued until authenticated acceptance",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "queue bounds, retry deduplication and expiry are enforced",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile",
+        "result":  "success",
+        "name":  "queued startup uses real session transport without refresh on reporting failure",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "production cannot enable LAN cleartext with a development flag",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "release deployment rejects missing environment and all development flags in production",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "development OTP requires both explicit development and its own flag",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "public hosts https is always allowed",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "public hosts http on a public host is rejected without the explicit flag",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "public hosts even the development flag cannot enable public cleartext traffic",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "LAN / loopback test hosts private and loopback addresses require the development flag",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "LAN / loopback test hosts addresses just outside the private ranges are not exempt",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "equivalent GETs share only the in-flight transport, then refetch",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "different resources and queries are not coalesced",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "failed GET is not cached and a later authorized retry reaches server",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "account change never joins a previous account in-flight GET",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "screen timer stops under another route and in background, resumes once",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/api_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "repeated hasError polls back off, jitter stays bounded",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/api_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "concurrent timer, reconnect and explicit refresh share one read",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "requestOtp rejects a structurally invalid phone number without any network call",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "requestOtp normalizes a valid local number before calling the repository",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "requestOtp surfaces a repository failure as AuthFailure",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "verifyOtp does nothing if no phone number was requested first",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "verifyOtp rejects a malformed code without calling the repository",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "verifyOtp transitions to SignedIn on a valid code, not using session_token",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "verifyOtp an invalid/expired code surfaces a specific message",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "an unconfigured ENVIRONMENT is safely caught by the startup error page rather than a blank screen or an uncaught exception",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/app_boot_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "refresh never automatically replays a clinical mutation",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "a rejected old refresh does not sign out the new Patient",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "late protected response cannot cross an account switch",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "tokens are persisted and clearSession removes both credentials",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "logout clears local credentials when the server is offline",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "registration OTP opens main menu immediately and logout clears protected routes",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/auth_navigation_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "registration OTP rejection stays on verification without granting access",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/auth_navigation_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "login OTP opens main menu immediately and logout clears protected routes",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/auth_navigation_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "login OTP rejection stays on verification without granting access",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/auth_navigation_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "offline startup keeps a secure session for cached read-only data",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "loadSlots groups slots by date and defaults the earliest date selected",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "loadSlots surfaces a repository failure as state.slotsError",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "canProceed — real date/slot/payment-method-required validation false until a date, a slot, and a payment method are all selected",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "canProceed — real date/slot/payment-method-required validation selecting a new date clears the previously selected slot",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "submit does nothing and returns false when canProceed is false",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "submit does nothing when a slot is selected but no payment method is chosen",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "submit books with the selected slot, modality, payment method, and profile id on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "submit a slot-conflict failure surfaces as state.submitError, not thrown",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "loadPaymentMethods auto-selects the primary method when one is marked primary",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "loadPaymentMethods auto-selects the only method when none is marked primary",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "loadPaymentMethods selects nothing when the patient has no saved methods",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "loadPaymentMethods surfaces a repository failure as state.paymentMethodsError",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "addMpesaPaymentMethod saves and immediately selects the new method on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "addMpesaPaymentMethod a provider-not-configured failure surfaces as addPaymentMethodError",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "uploadIntake is a no-op before a booking result exists",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "uploadIntake uploads against the booked appointment id on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "cache is scoped, versioned and records freshness metadata",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "corrupt and incompatible cache entries are discarded safely",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "expired entries remain readable as stale data and expose expiry",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "a different authenticated scope cannot read prior patient data",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "an arbitrary, non-allowlisted key is silently ignored",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "logout clears every scoped resource key",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load populates messages on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load surfaces a repository failure as state.error",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "poll silently updates messages without flipping loading",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "poll a transient failure during poll is silent",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "send a no-op for blank content",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "send sends trimmed content and reloads on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "send a send failure sets notSent without throwing",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "send a second send while one is in flight is ignored",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "global FlutterError hook invokes reporter once",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "zone unhandled async hook uploads",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "PlatformDispatcher hook invokes reporter",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "uses current authenticated session without client user identity",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "pre-auth errors are journaled and cleared sessions cannot upload",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normal 409 is not a crash",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normal 422 is not a crash",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "offline timeout/cancellation is not a crash",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "report failure does not recurse, refresh or expire session",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "secret and PHI prose is omitted before transmission",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "stack is bounded and preserves Dart source frames",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "native installed app version and build are correlated",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "caught unexpected repository parsing failure is reported",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Dio JSON decoding failure reports once without leaking response data",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "double tap and repeat after success cannot create another booking",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "only confirmed backend appointment states unlock consultation",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "a backend forbidden send closes the composer without losing unsent text/history",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "INITIATED renders server truth and preserves narrow layout",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/consultation_booking_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "FAILED renders server truth and preserves narrow layout",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/consultation_booking_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "PAYMENT_HELD renders server truth and preserves narrow layout",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/consultation_booking_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load populates doctors on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load surfaces a repository failure as state.error",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setModalityTab a no-op for the same tab does not re-query",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setModalityTab switching to video re-queries with the VIDEO modality filter",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setModalityTab switching to chat re-queries with the CHAT modality filter",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "specialty and search filtering (state.visible) specialty narrows the visible list without a new request",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "specialty and search filtering (state.visible) search matches name, specialty, or hospital case-insensitively",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "specialty and search filtering (state.visible) resetFilters clears both specialty and search",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load populates profiles and defaults activeProfile to the self row",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load surfaces a repository failure as state.error",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setActiveProfile switches the active profile to a known dependent id",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setActiveProfile ignores an id that is not in the loaded profile list",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setActiveProfile switching back to null returns to the self profile",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "createDependent appends the created dependent to state.profiles on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "createDependent a double-submit while creating is in flight is ignored",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "createDependent surfaces a repository failure as state.createError, not thrown",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "paid CHAT chooser through booking, payment polling and real repository chat at 320.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/consultation_flow_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load() with no active profile queries appointments without profile_id",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "paid CHAT chooser through booking, payment polling and real repository chat at 360.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/consultation_flow_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setActiveProfile reloads scoped to the dependent id",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setActiveProfile with the same id already active is a no-op",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "switching back to null re-queries the self profile",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "paid CHAT chooser through booking, payment polling and real repository chat at 390.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/consultation_flow_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts a bare local 07... number and normalizes it",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts an already-international number unchanged",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts an international number with spaces",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts a local number with hyphens",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts a bare local 01... number and normalizes it",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects by length, not by leading digit (8 national digits)",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone prefix-agnostic: a structurally complete 9-digit number starting with a non-7/1 digit still passes",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects other wrong-length shapes",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects an obviously too-short number",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects a bare country code with nothing after it",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects a number containing letters",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone rejects a non-Kenyan international number",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "normalizeKenyaPhone accepts a bare international-shaped number with no leading plus",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "paid CHAT chooser through booking, payment polling and real repository chat at 412.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/consultation_flow_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "200 messages remain reachable while a newer message arrives during older pagination",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "uncertain send retry retains its key; next intentional identical send has a new key",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "locale preference survives controller recreation and rejects unknown codes",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "English and Swahili provide translated M10 patient labels",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load populates items and unread count",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load a repository failure surfaces as state.error",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load does not re-notify for items that already existed on first load",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "markRead optimistically marks read and decrements unread count",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "markRead a no-op for an unknown id",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "markRead a no-op for an already-read item",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "markRead rolls back on a server failure",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "markAllRead marks every item read and zeroes the unread count",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "markAllRead a no-op when nothing is unread",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "markAllRead rolls back on a server failure",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "application-wide notification cadence is one delta and count per foreground minute",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/notification_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "quiet notification sync uses deltas, bounds catchup and stops HTTP in background",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/notification_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "earlier notification pages remain accessible and survive delta reconciliation",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/notification_traffic_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "isValidOtpFormat accepts a 6-digit code",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "isValidOtpFormat tolerates surrounding whitespace",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "isValidOtpFormat rejects a short code",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "isValidOtpFormat rejects a long code",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "isValidOtpFormat rejects non-digit characters",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "isValidOtpFormat rejects an empty string",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "deletePickedSourceFile (image_picker-sourced) deletes the plugin\u0027s own cache-dir copy",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "deletePickedSourceFile (image_picker-sourced) a missing/already-deleted file does not throw",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "cleanupFilePickerTemp (file_picker-sourced) never raw-deletes any path — only calls the plugin-safe clear function",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "cleanupFilePickerTemp (file_picker-sourced) a clearFilePickerTemp failure is swallowed, not rethrown",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "full directory route filters and long profile at 320.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "full directory route filters and long profile at 360.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "full directory route filters and long profile at 390.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Patient shell geometry at 320.0 dp / 0.0 system inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "full directory route filters and long profile at 412.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Patient shell geometry at 320.0 dp / 24.0 system inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Swahili consultation and Q\u0026A at 320dp enlarged text",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "discovery and profile fit 320.0dp text 1.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "discovery and profile fit 320.0dp text 1.5",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Patient shell geometry at 320.0 dp / 34.0 system inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "discovery and profile fit 360.0dp text 1.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "discovery and profile fit 360.0dp text 1.5",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "discovery and profile fit 390.0dp text 1.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "discovery and profile fit 390.0dp text 1.5",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Patient shell geometry at 320.0 dp / 48.0 system inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "discovery and profile fit 412.0dp text 1.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "discovery and profile fit 412.0dp text 1.5",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "available mode VIDEO routes correct booking",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "available mode CHAT routes correct booking",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Patient shell geometry at 390.0 dp / 0.0 system inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "available mode BOTH routes correct booking",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "modality rules reject zero negative and malformed fees",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "neither mode offers profile without fake booking",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "specific historic fixture command removed from name",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "editorial Q\u0026A open and answered at 320.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Patient shell geometry at 390.0 dp / 24.0 system inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "editorial Q\u0026A open and answered at 360.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "editorial Q\u0026A open and answered at 390.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "editorial Q\u0026A open and answered at 412.0dp",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Patient shell geometry at 390.0 dp / 34.0 system inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Patient shell geometry at 390.0 dp / 48.0 system inset",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_navigation_safe_area_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "question form validation success OPEN and repeat entry",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "submission failure retains question and permits retry",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/patient_discovery_qna_correction_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "real repository sends owned-open query and validates creation response",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "empty oversized and duplicate submits never reach repository twice",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "availability refresh clears obsolete selection and disables stale booking during fetch",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "refresh preserves a still-valid selected slot and its matching date",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "failed availability refresh cannot leave stale slots actionable",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "Nairobi availability dates preserve UTC instants across local midnight",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "resume and network recovery request new server availability and unsubscribe on disposal",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/pre_e2e_availability_payment_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "an invalid phone number shows a field error and never leaves this screen",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/phone_entry_page_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "unpaid consultation has one payment CTA, no fake success, and safe layout at 320.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/pre_e2e_availability_payment_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "unpaid consultation has one payment CTA, no fake success, and safe layout at 360.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/pre_e2e_availability_payment_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "unpaid consultation has one payment CTA, no fake success, and safe layout at 390.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/pre_e2e_availability_payment_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "unpaid consultation has one payment CTA, no fake success, and safe layout at 412.0",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/pre_e2e_availability_payment_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "attachment metadata maps to shared message identity without raw storage URLs",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load populates the answered feed on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load surfaces a repository failure as state.error",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "submit forwards text/category/profileId and marks submitted on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "submit surfaces a repository failure as state.submitError",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "submit resetSubmitState clears submitted and submitError",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "1000 clients spread recovery and coalesce event bursts",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/recovery_stampede_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "manual refresh stays immediate and recovery cannot overlap it",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/recovery_stampede_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "recovery preserves failure history and disposal cancels recovery",
+        "source":  "file:///C:/Users/CUBE/Desktop/helodoc%20old%20site/scratch/final-remediation-20261020/flutter/flutter-mobile_patient/test/recovery_stampede_test.dart"
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "unavailable native keystore never makes startup reporting throw",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "failure before API construction persists sanitized reference across restart",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "pre-auth and failed deliveries remain queued until authenticated acceptance",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "queue bounds, retry deduplication and expiry are enforced",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "queued startup uses real session transport without refresh on reporting failure",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "telemetryEvent builds the exact shape ConsultationService::NewTelemetryEvent expects",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "telemetryEvent always normalizes occurred_at to UTC regardless of input",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "TelemetryEventType values match the backend CHECK constraint vocabulary exactly",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "isValidIntakeImageCount accepts the documented 1-20 range",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "isValidIntakeImageCount rejects zero and anything above 20",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "excessIntakeImageCount is zero within bounds",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "excessIntakeImageCount reports exactly how many must be dropped",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "encodeIntakeFile base64-encodes the bytes with the mime type alongside",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "encodeIntakeFile accepts a PDF, matching the backend\u0027s real accepted mime types",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "encodeIntakeFile rejects a mime type outside the allowed set",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load populates both document kinds on success",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load surfaces a repository failure as state.error",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "load requests the self profile (profile_id omitted) by default",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setActiveProfile re-queries scoped to the dependent id",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setActiveProfile a no-op for the same id already active does not re-query",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "setActiveProfile switching back to null re-queries the self profile",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "initial state a PENDING_PAYMENT appointment is not terminal",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "initial state a CANCELLED appointment starts terminal",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "poll updates status and terminal from the server response",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "poll a terminal status stops being joinable",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "poll a transient failure is silent and does not change state",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "poll a terminal state is never re-polled",
+        "source":  null
+    },
+    {
+        "skipped":  false,
+        "app":  "mobile_patient",
+        "result":  "success",
+        "name":  "poll a COMPLETED response carries the clinical outcome and completedAt",
+        "source":  null
+    }
+]

@@ -1,0 +1,15 @@
+--- baseline/apps/mobile/test/doctor_cubit_test.dart
+
++++ current/apps/mobile/test/doctor_cubit_test.dart
+
+@@ -35,7 +35,8 @@
+
+   }
+ 
+   @override
+-  Future<List<SlotDto>> slots({int limit = 25, int offset = 0}) async =>
++  Future<List<SlotDto>> slots(
++          {int limit = 25, int offset = 0, DateTime? day}) async =>
+       slotResponse == null
+           ? [SlotDto(id: 's1', status: slotStatus)]
+           : await slotResponse!.future;

@@ -1,0 +1,748 @@
+--- before/services/backend/tests/api_tests.rs
++++ after/services/backend/tests/api_tests.rs
+@@ -2279,29 +2279,39 @@
+         ("+254700009993", StatusCode::OK),
+         ("+254700000101", StatusCode::UNAUTHORIZED),
+     ] {
+-        let otp = json_body(
+-            post(
+-                &app,
+-                "/api/v1/auth/register-otp",
+-                None,
+-                &serde_json::json!({"phone_number":phone}),
+-            )
+-            .await,
++        let otp_response = post(
++            &app,
++            "/api/v1/auth/register-otp",
++            None,
++            &serde_json::json!({"phone_number":phone}),
+         )
+         .await;
++        assert_eq!(otp_response.status(), expected);
++        let otp = json_body(otp_response).await;
++        // Password accounts correctly reject the legacy OTP request already.
++        // Send a well-formed negative OTP to exercise the authorization guard,
++        // rather than JSON null, which only tests request deserialization (422).
++        let otp_code = otp["data"]["debug_otp_code"].as_str().unwrap_or("000000");
+         let login = post(
+             &app,
+             "/api/v1/auth/verify-otp-and-login",
+             None,
+             &serde_json::json!({
+                 "phone_number": phone,
+-                "otp_code": otp["data"]["debug_otp_code"],
++                "otp_code": otp_code,
+                 "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0"}]
+             }),
+         )
+         .await;
+         assert_eq!(login.status(), expected);
+     }
++    let doctor_patient_profiles: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM patient_profiles WHERE user_id=$1")
++            .bind(uid(DOCTOR1_USER_ID))
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(doctor_patient_profiles, 0);
+     let count:i64=sqlx::query_scalar("SELECT count(*) FROM users u JOIN patient_profiles p ON p.user_id=u.id WHERE u.phone_number='+254700009993' AND u.role='PATIENT'").fetch_one(&pool).await.unwrap();
+     assert_eq!(count, 1);
+     // A forced profile write failure must roll back the newly created account.
+@@ -11119,7 +11129,13 @@
+             .as_str()
+             .unwrap()
+             .to_string();
+-        let payload = serde_json::json!({"phone_number":phone,"otp_code":code});
++        let documents = legal_repo::list_current(&pool).await.unwrap();
++        let consent = documents
++            .iter()
++            .find(|d| d.document_type.as_str() == "PATIENT_DATA_SHARING_CONSENT")
++            .unwrap();
++        let payload = serde_json::json!({"phone_number":phone,"otp_code":code,
++            "accepted_documents":[{"type":consent.document_type.as_str(),"version":consent.version}]});
+         let key = Uuid::new_v4().to_string();
+         let (first, second) = tokio::join!(
+             post_idem(
+@@ -14404,3 +14420,437 @@
+         "no authenticated context gives no owned IDs"
+     );
+ }
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_consultation_chat_booking_payment_shared_history_and_ownership(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let other_doctor = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
++    let other_patient = fresh_patient_token(&pool).await;
++    sqlx::query("UPDATE patient_profiles SET full_name='Meherab Shafin' WHERE id=$1")
++        .bind(uid(PATIENT_PROFILE_ID))
++        .execute(&pool)
++        .await
++        .unwrap();
++    let slots = json_body(
++        get(
++            &app,
++            &format!("/api/v1/doctors/{DOCTOR1_PROFILE_ID}/slots"),
++            Some(&patient),
++        )
++        .await,
++    )
++    .await;
++    let slot = &slots["data"][0]["id"];
++    let payload = serde_json::json!({"doctor_id":DOCTOR1_PROFILE_ID,"slot_id":slot,"modality":"CHAT","gateway":"BKASH"});
++    let key = Uuid::new_v4().to_string();
++    let results = futures_util::future::join_all((0..10).map(|_| {
++        post_idem(
++            &app,
++            "/api/v1/appointments/book",
++            Some(&patient),
++            &payload,
++            &key,
++        )
++    }))
++    .await;
++    let mut booking = None;
++    for response in results {
++        assert!(matches!(
++            response.status(),
++            StatusCode::CREATED | StatusCode::CONFLICT
++        ));
++        if response.status() == StatusCode::CREATED {
++            let data = json_body(response).await["data"].clone();
++            if let Some(ref previous) = booking {
++                assert_eq!(&data, previous);
++            } else {
++                booking = Some(data);
++            }
++        }
++    }
++    let booking = booking.expect("at least one booking succeeds");
++    assert_eq!(booking["status"], "PENDING_PAYMENT");
++    let id = Uuid::parse_str(booking["appointment_id"].as_str().unwrap()).unwrap();
++    let session = booking["payment_session_id"].as_str().unwrap();
++    let price: bigdecimal::BigDecimal =
++        sqlx::query_scalar("SELECT consultation_fee_chat FROM doctor_profiles WHERE id=$1")
++            .bind(uid(DOCTOR1_PROFILE_ID))
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(
++        booking["amount"]
++            .as_str()
++            .unwrap()
++            .parse::<bigdecimal::BigDecimal>()
++            .unwrap(),
++        price
++    );
++    let counts:(i64,i64)=sqlx::query_as("SELECT (SELECT COUNT(*) FROM appointments WHERE slot_id=$1),(SELECT COUNT(*) FROM transactions WHERE appointment_id=$2)").bind(Uuid::parse_str(slot.as_str().unwrap()).unwrap()).bind(id).fetch_one(&pool).await.unwrap();
++    assert_eq!(counts, (1, 1));
++    let pending =
++        json_body(get(&app, &format!("/api/v1/appointments/{id}"), Some(&patient)).await).await;
++    assert_eq!(pending["data"]["payment_status"], "INITIATED");
++    assert_eq!(
++        get(
++            &app,
++            &format!("/api/v1/appointments/{id}/conversation"),
++            Some(&patient)
++        )
++        .await
++        .status(),
++        StatusCode::NOT_FOUND
++    );
++    sqlx::query("UPDATE transactions SET payment_status='FAILED' WHERE appointment_id=$1")
++        .bind(id)
++        .execute(&pool)
++        .await
++        .unwrap();
++    let failed =
++        json_body(get(&app, &format!("/api/v1/appointments/{id}"), Some(&patient)).await).await;
++    assert_eq!(failed["data"]["payment_status"], "FAILED");
++    assert_eq!(
++        get(
++            &app,
++            &format!("/api/v1/appointments/{id}/conversation"),
++            Some(&doctor)
++        )
++        .await
++        .status(),
++        StatusCode::NOT_FOUND
++    );
++    sqlx::query("UPDATE transactions SET payment_status='INITIATED' WHERE appointment_id=$1")
++        .bind(id)
++        .execute(&pool)
++        .await
++        .unwrap();
++    let callback=serde_json::json!({"payment_session_id":session,"transaction_reference":"CHAT-TEST","status":"SUCCESS","event_timestamp":Utc::now().to_rfc3339(),"provider_event_id":Uuid::new_v4().to_string()}).to_string();
++    let sig = sign_webhook_body(&callback, TEST_WEBHOOK_SECRET);
++    let callbacks =
++        futures_util::future::join_all((0..8).map(|_| send_webhook(&app, &callback, &sig))).await;
++    for response in callbacks {
++        assert_eq!(response.status(), StatusCode::OK);
++    }
++    let activated =
++        json_body(get(&app, &format!("/api/v1/appointments/{id}"), Some(&patient)).await).await;
++    assert_eq!(activated["data"]["status"], "CONFIRMED");
++    assert_eq!(activated["data"]["payment_status"], "PAYMENT_HELD");
++    let counts:(i64,i64,i64)=sqlx::query_as("SELECT (SELECT COUNT(*) FROM consultation_sessions WHERE appointment_id=$1),(SELECT COUNT(*) FROM chat_conversations WHERE appointment_id=$1),(SELECT COUNT(*) FROM payment_events e JOIN transactions t ON t.id=e.transaction_id WHERE t.appointment_id=$1)").bind(id).fetch_one(&pool).await.unwrap();
++    assert_eq!(counts, (1, 1, 1));
++    let conversation = json_body(
++        get(
++            &app,
++            &format!("/api/v1/appointments/{id}/conversation"),
++            Some(&patient),
++        )
++        .await,
++    )
++    .await["data"]
++        .clone();
++    let conv = conversation["id"].as_str().unwrap();
++    for _ in 0..4 {
++        let same = json_body(
++            get(
++                &app,
++                &format!("/api/v1/appointments/{id}/conversation"),
++                Some(&doctor),
++            )
++            .await,
++        )
++        .await;
++        assert_eq!(same["data"]["id"], conv);
++    }
++    let queue =
++        json_body(get(&app, "/api/v1/doctor/appointments?limit=100", Some(&doctor)).await).await;
++    let item = queue["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .find(|a| a["id"] == id.to_string())
++        .unwrap();
++    assert_eq!(item["patient_display_name"], "Meherab Shafin");
++    assert_eq!(item["modality"], "CHAT");
++    assert_eq!(item["conversation_id"], conv);
++    let inbox = json_body(get(&app, "/api/v1/doctor/chats?limit=100", Some(&doctor)).await).await;
++    let chat = inbox["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .find(|c| c["id"] == conv)
++        .unwrap();
++    assert_eq!(chat["patient_display_name"], "Meherab Shafin");
++    assert_eq!(chat["modality"], "CHAT");
++    assert_eq!(chat["appointment_status"], "CONFIRMED");
++    let path = format!("/api/v1/chat/{conv}/messages");
++    assert_eq!(
++        post(
++            &app,
++            &path,
++            Some(&patient),
++            &serde_json::json!({"content":"Hello doctor"})
++        )
++        .await
++        .status(),
++        StatusCode::CREATED
++    );
++    let on_doctor = json_body(get(&app, &path, Some(&doctor)).await).await;
++    assert_eq!(on_doctor["data"][0]["content"], "Hello doctor");
++    assert_eq!(
++        post(
++            &app,
++            &path,
++            Some(&doctor),
++            &serde_json::json!({"content":"Hello, how can I help?"})
++        )
++        .await
++        .status(),
++        StatusCode::CREATED
++    );
++    let on_patient = json_body(get(&app, &path, Some(&patient)).await).await;
++    assert_eq!(on_patient["data"].as_array().unwrap().len(), 2);
++    assert_eq!(
++        on_patient["data"],
++        json_body(get(&app, &path, Some(&doctor)).await).await["data"]
++    );
++    for attacker in [&other_doctor, &other_patient] {
++        assert_eq!(
++            get(&app, &format!("/api/v1/appointments/{id}"), Some(attacker))
++                .await
++                .status(),
++            StatusCode::NOT_FOUND
++        );
++        assert_eq!(
++            get(
++                &app,
++                &format!("/api/v1/appointments/{id}/conversation"),
++                Some(attacker)
++            )
++            .await
++            .status(),
++            StatusCode::NOT_FOUND
++        );
++        assert_eq!(
++            get(&app, &path, Some(attacker)).await.status(),
++            StatusCode::NOT_FOUND
++        );
++        assert_eq!(
++            post(
++                &app,
++                &path,
++                Some(attacker),
++                &serde_json::json!({"content":"unauthorized"})
++            )
++            .await
++            .status(),
++            StatusCode::NOT_FOUND
++        );
++    }
++    sqlx::query("UPDATE appointments SET status='CANCELLED' WHERE id=$1")
++        .bind(id)
++        .execute(&pool)
++        .await
++        .unwrap();
++    assert_eq!(
++        post(
++            &app,
++            &path,
++            Some(&patient),
++            &serde_json::json!({"content":"cancelled"})
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
++    assert_eq!(
++        post(
++            &app,
++            &path,
++            Some(&doctor),
++            &serde_json::json!({"content":"cancelled doctor send"})
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
++    sqlx::query("UPDATE appointments SET status='CONFIRMED' WHERE id=$1")
++        .bind(id)
++        .execute(&pool)
++        .await
++        .unwrap();
++    sqlx::query("UPDATE chat_conversations SET expires_at=NOW()-INTERVAL '1 second' WHERE appointment_id=$1").bind(id).execute(&pool).await.unwrap();
++    assert_eq!(
++        post(
++            &app,
++            &path,
++            Some(&doctor),
++            &serde_json::json!({"content":"expired"})
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
++    let final_counts:(i64,i64,i64)=sqlx::query_as("SELECT (SELECT COUNT(*) FROM appointments WHERE id=$1),(SELECT COUNT(*) FROM transactions WHERE appointment_id=$1),(SELECT COUNT(*) FROM chat_conversations WHERE appointment_id=$1)").bind(id).fetch_one(&pool).await.unwrap();
++    assert_eq!(final_counts, (1, 1, 1));
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_consultation_video_retains_identity_and_separate_chat_booking(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let (video, _) = book_and_confirm(&app, &patient).await;
++    let queue =
++        json_body(get(&app, "/api/v1/doctor/appointments?limit=100", Some(&doctor)).await).await;
++    let item = queue["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .find(|a| a["id"] == video.to_string())
++        .unwrap();
++    assert_eq!(item["modality"], "VIDEO");
++    let name: String = sqlx::query_scalar("SELECT full_name FROM patient_profiles WHERE id=$1")
++        .bind(uid(PATIENT_PROFILE_ID))
++        .fetch_one(&pool)
++        .await
++        .unwrap();
++    assert_eq!(item["patient_display_name"], name);
++    let conv = json_body(
++        get(
++            &app,
++            &format!("/api/v1/appointments/{video}/conversation"),
++            Some(&patient),
++        )
++        .await,
++    )
++    .await;
++    assert_eq!(item["conversation_id"], conv["data"]["id"]);
++
++    let slots = json_body(
++        get(
++            &app,
++            &format!("/api/v1/doctors/{DOCTOR1_PROFILE_ID}/slots"),
++            Some(&patient),
++        )
++        .await,
++    )
++    .await;
++    let booked = post_idem(
++        &app,
++        "/api/v1/appointments/book",
++        Some(&patient),
++        &serde_json::json!({
++            "doctor_id": DOCTOR1_PROFILE_ID, "slot_id": slots["data"][0]["id"],
++            "modality": "CHAT", "gateway": "BKASH"
++        }),
++        &Uuid::new_v4().to_string(),
++    )
++    .await;
++    assert_eq!(booked.status(), StatusCode::CREATED);
++    let booked = json_body(booked).await;
++    let chat_id = booked["data"]["appointment_id"].as_str().unwrap();
++    assert_ne!(chat_id, video.to_string());
++    let callback = serde_json::json!({"payment_session_id":booked["data"]["payment_session_id"],
++        "transaction_reference":format!("BK-SEPARATE-{}",Uuid::new_v4()),"status":"SUCCESS",
++        "event_timestamp":chrono::Utc::now().to_rfc3339(),"provider_event_id":Uuid::new_v4().to_string()}).to_string();
++    assert_eq!(
++        send_webhook(
++            &app,
++            &callback,
++            &sign_webhook_body(&callback, TEST_WEBHOOK_SECRET)
++        )
++        .await
++        .status(),
++        StatusCode::OK
++    );
++    let both =
++        json_body(get(&app, "/api/v1/doctor/appointments?limit=100", Some(&doctor)).await).await;
++    let rows = both["data"].as_array().unwrap();
++    let chat = rows.iter().find(|a| a["id"] == chat_id).unwrap();
++    let video_row = rows.iter().find(|a| a["id"] == video.to_string()).unwrap();
++    assert_eq!(chat["modality"], "CHAT");
++    assert_eq!(video_row["modality"], "VIDEO");
++    assert_eq!(
++        chat["patient_display_name"],
++        video_row["patient_display_name"]
++    );
++    assert_ne!(chat["conversation_id"], video_row["conversation_id"]);
++    assert_eq!(
++        post(
++            &app,
++            &format!("/api/v1/consultations/{chat_id}/rtc-token"),
++            Some(&doctor),
++            &serde_json::json!({})
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
++    assert_eq!(
++        post(
++            &app,
++            &format!("/api/v1/consultations/{chat_id}/rtc-token"),
++            Some(&patient),
++            &serde_json::json!({})
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
++    sqlx::query("UPDATE doctor_schedule_slots SET start_time=NOW()+INTERVAL '3 days',end_time=NOW()+INTERVAL '3 days 30 minutes' WHERE id=(SELECT slot_id FROM appointments WHERE id=$1)").bind(video).execute(&pool).await.unwrap();
++    assert_eq!(
++        post(
++            &app,
++            &format!("/api/v1/consultations/{video}/rtc-token"),
++            Some(&doctor),
++            &serde_json::json!({})
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_consultation_concurrent_video_start_shares_persisted_channel(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let (id, _) = book_and_confirm(&app, &patient).await;
++    sqlx::query("UPDATE doctor_schedule_slots SET start_time=NOW()-INTERVAL '1 minute',end_time=NOW()+INTERVAL '9 minutes' WHERE id=(SELECT slot_id FROM appointments WHERE id=$1)").bind(id).execute(&pool).await.unwrap();
++    sqlx::query("DELETE FROM consultation_sessions WHERE appointment_id=$1")
++        .bind(id)
++        .execute(&pool)
++        .await
++        .unwrap();
++    let path = format!("/api/v1/consultations/{id}/rtc-token");
++    let payload = serde_json::json!({});
++    let responses = futures_util::future::join_all((0..8).map(|i| {
++        post(
++            &app,
++            &path,
++            Some(if i % 2 == 0 { &patient } else { &doctor }),
++            &payload,
++        )
++    }))
++    .await;
++    let stored: String = sqlx::query_scalar(
++        "SELECT agora_channel_name FROM consultation_sessions WHERE appointment_id=$1",
++    )
++    .bind(id)
++    .fetch_one(&pool)
++    .await
++    .unwrap();
++    for response in responses {
++        assert_eq!(response.status(), StatusCode::OK);
++        assert_eq!(json_body(response).await["data"]["channel_name"], stored);
++    }
++    let count: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM consultation_sessions WHERE appointment_id=$1")
++            .bind(id)
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(count, 1);
++}
+--- before/apps/mobile/test/doctor_widgets_test.dart
++++ after/apps/mobile/test/doctor_widgets_test.dart
+@@ -169,7 +169,9 @@
+       'id': 'a',
+       'patient_id': 'p',
+       'patient_display_name': 'Mohammad Abdur Rahman Chowdhury',
+-      'status': 'UPCOMING',
++      'status': 'CONFIRMED',
++      'modality': 'VIDEO',
++      'conversation_id': 'shared-conversation',
+       'doctor_lifecycle': 'UPCOMING',
+       'chief_complaint':
+           'Severe abdominal pain with recurring fever since yesterday',
+@@ -180,15 +182,100 @@
+           harness(const QueuePage(), DoctorState(queue: [appointment])));
+       await tester.pumpAndSettle();
+       expect(tester.takeException(), isNull, reason: 'width=$width');
+-      expect(find.text('Call Patient'), findsOneWidget, reason: 'width=$width');
+-      expect(find.text('Chat'), findsOneWidget, reason: 'width=$width');
+-      expect(find.text('Write Rx'), findsOneWidget, reason: 'width=$width');
++      expect(find.text('Start video consultation'), findsOneWidget,
++          reason: 'width=$width');
++      expect(find.text('Follow-up messages'), findsOneWidget,
++          reason: 'width=$width');
++      expect(find.text('Write prescription'), findsOneWidget,
++          reason: 'width=$width');
++      expect(find.text('Start chat consultation'), findsNothing,
++          reason: 'width=$width');
+     }
+     await tester.binding.setSurfaceSize(null);
+   });
+ 
+   testWidgets(
+       'schedule shows human-readable time and real patient linkage, no overflow',
++      (tester) async {
++    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
++    final tomorrow = DateTime.now().add(const Duration(days: 1));
++    final bookedStart =
++        DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 10, 30);
++    final booked = SlotDto(
++        id: 's-booked',
++        status: 'BOOKED',
++        start: bookedStart,
++        end: bookedStart.add(const Duration(minutes: 10)),
++        appointmentId: 'a-booked',
++        patientId: 'p1',
++        patientName: 'Mohammad Abdur Rahman Chowdhury');
++    final available = SlotDto(
++        id: 's-open',
++        status: 'AVAILABLE',
++        start: bookedStart.add(const Duration(hours: 1)),
++        end: bookedStart.add(const Duration(hours: 1, minutes: 10)));
++    final appointment = AppointmentDto.fromJson({
++      'id': 'a-booked',
++      'patient_id': 'p1',
++      'patient_display_name': 'Mohammad Abdur Rahman Chowdhury',
++      'status': 'CONFIRMED',
++      'modality': 'VIDEO',
++      'doctor_lifecycle': 'BOOKED',
++    });
++
++    for (final width in [360.0, 390.0, 412.0]) {
++      await tester.binding.setSurfaceSize(Size(width, 800));
++      await tester.pumpWidget(harness(const SchedulePage(),
++          DoctorState(slots: [booked, available], queue: [appointment])));
++      await tester.pumpAndSettle();
++      // Jump the date slider to the slots' date (they're seeded "tomorrow"
++      // so this always exercises the non-today card, not just day one).
++      await tester.tap(find.text('${bookedStart.day}').first);
++      await tester.pumpAndSettle();
++      expect(tester.takeException(), isNull, reason: 'width=$width');
++      // Must never show a raw ISO timestamp.
++      expect(find.textContaining('T00:00:00'), findsNothing,
++          reason: 'width=$width');
++      expect(find.textContaining('Mohammad Abdur Rahman Chowdhury'),
++          findsOneWidget,
++          reason: 'width=$width');
++      expect(find.text('Start video consultation'), findsOneWidget,
++          reason: 'width=$width');
++      expect(find.text('Start chat consultation'), findsNothing,
++          reason: 'width=$width');
++      expect(find.text('Cancel Slot ✕'), findsOneWidget,
++          reason: 'width=$width');
++    }
++    await tester.binding.setSurfaceSize(null);
++  });
++
++  testWidgets('blocked Web slots do not become mobile patient bookings',
++      (tester) async {
++    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
++    final now = DateTime.now();
++    final start = DateTime(now.year, now.month, now.day, 23);
++    final blocked = SlotDto.fromJson({
++      'id': 'blocked-web-slot',
++      'status': 'BLOCKED',
++      'start_time': start.toIso8601String(),
++      'end_time': start.add(const Duration(minutes: 10)).toIso8601String()
++    });
++    expect(blocked.status, 'BLOCKED');
++    await tester.pumpWidget(
++        harness(const SchedulePage(), DoctorState(slots: [blocked])));
++    await tester.pumpAndSettle();
++    expect(find.text('Blocked'), findsWidgets);
++    expect(
++        find.text('Blocked ? unavailable for patient booking'), findsOneWidget);
++    expect(find.text('Booked (0)'), findsOneWidget);
++    expect(find.text('Available (0)'), findsOneWidget);
++    expect(find.text('Call Patient'), findsNothing);
++    expect(find.textContaining('Cancel Slot'), findsNothing);
++    expect(tester.takeException(), isNull);
++  });
++
++  testWidgets(
++      'booked slot cannot be self-cancelled; open slot cancel requires confirmation',
+       (tester) async {
+     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+     final tomorrow = DateTime.now().add(const Duration(days: 1));
+@@ -215,82 +302,6 @@
+       'doctor_lifecycle': 'BOOKED',
+     });
+ 
+-    for (final width in [360.0, 390.0, 412.0]) {
+-      await tester.binding.setSurfaceSize(Size(width, 800));
+-      await tester.pumpWidget(harness(const SchedulePage(),
+-          DoctorState(slots: [booked, available], queue: [appointment])));
+-      await tester.pumpAndSettle();
+-      // Jump the date slider to the slots' date (they're seeded "tomorrow"
+-      // so this always exercises the non-today card, not just day one).
+-      await tester.tap(find.text('${bookedStart.day}').first);
+-      await tester.pumpAndSettle();
+-      expect(tester.takeException(), isNull, reason: 'width=$width');
+-      // Must never show a raw ISO timestamp.
+-      expect(find.textContaining('T00:00:00'), findsNothing,
+-          reason: 'width=$width');
+-      expect(find.textContaining('Mohammad Abdur Rahman Chowdhury'),
+-          findsOneWidget,
+-          reason: 'width=$width');
+-      expect(find.text('Call Patient'), findsOneWidget, reason: 'width=$width');
+-      expect(find.text('Cancel Slot ✕'), findsOneWidget,
+-          reason: 'width=$width');
+-    }
+-    await tester.binding.setSurfaceSize(null);
+-  });
+-
+-  testWidgets('blocked Web slots do not become mobile patient bookings',
+-      (tester) async {
+-    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+-    final now = DateTime.now();
+-    final start = DateTime(now.year, now.month, now.day, 23);
+-    final blocked = SlotDto.fromJson({
+-      'id': 'blocked-web-slot',
+-      'status': 'BLOCKED',
+-      'start_time': start.toIso8601String(),
+-      'end_time': start.add(const Duration(minutes: 10)).toIso8601String()
+-    });
+-    expect(blocked.status, 'BLOCKED');
+-    await tester.pumpWidget(
+-        harness(const SchedulePage(), DoctorState(slots: [blocked])));
+-    await tester.pumpAndSettle();
+-    expect(find.text('Blocked'), findsWidgets);
+-    expect(
+-        find.text('Blocked ? unavailable for patient booking'), findsOneWidget);
+-    expect(find.text('Booked (0)'), findsOneWidget);
+-    expect(find.text('Available (0)'), findsOneWidget);
+-    expect(find.text('Call Patient'), findsNothing);
+-    expect(find.textContaining('Cancel Slot'), findsNothing);
+-    expect(tester.takeException(), isNull);
+-  });
+-
+-  testWidgets(
+-      'booked slot cannot be self-cancelled; open slot cancel requires confirmation',
+-      (tester) async {
+-    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+-    final tomorrow = DateTime.now().add(const Duration(days: 1));
+-    final bookedStart =
+-        DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 10, 30);
+-    final booked = SlotDto(
+-        id: 's-booked',
+-        status: 'BOOKED',
+-        start: bookedStart,
+-        end: bookedStart.add(const Duration(minutes: 10)),
+-        appointmentId: 'a-booked',
+-        patientId: 'p1',
+-        patientName: 'Mohammad Abdur Rahman Chowdhury');
+-    final available = SlotDto(
+-        id: 's-open',
+-        status: 'AVAILABLE',
+-        start: bookedStart.add(const Duration(hours: 1)),
+-        end: bookedStart.add(const Duration(hours: 1, minutes: 10)));
+-    final appointment = AppointmentDto.fromJson({
+-      'id': 'a-booked',
+-      'patient_id': 'p1',
+-      'patient_display_name': 'Mohammad Abdur Rahman Chowdhury',
+-      'status': 'BOOKED',
+-      'doctor_lifecycle': 'BOOKED',
+-    });
+-
+     await tester.pumpWidget(harness(const SchedulePage(),
+         DoctorState(slots: [booked, available], queue: [appointment])));
+     await tester.pumpAndSettle();
+--- before/apps/mobile/test/notification_center_page_test.dart
++++ after/apps/mobile/test/notification_center_page_test.dart
+@@ -95,7 +95,10 @@
+         (tester) async {
+       await tester.binding.setSurfaceSize(const Size(390, 844));
+       addTearDown(() => tester.binding.setSurfaceSize(null));
+-      final cubit = NotificationCubit(entry.value);
++      // Freeze only the displayed refresh time. The original golden images
++      // contain 14:45; wall-clock time made their exact pixel checks flaky.
++      final cubit = NotificationCubit(entry.value,
++          now: () => DateTime(2026, 10, 5, 14, 45));
+       addTearDown(cubit.close);
+       await tester.pumpWidget(harness(cubit));
+       await tester.pump(const Duration(milliseconds: 200));
+--- before/services/backend/src/services/consultation_service.rs
++++ after/services/backend/src/services/consultation_service.rs
+@@ -110,6 +110,12 @@
+             ));
+         }
+ 
++        if apt.modality != Modality::Video {
++            return Err(AppError::Forbidden(
++                "Video access is only available for video consultations.".into(),
++            ));
++        }
++
+         if apt.status != AppointmentStatus::Confirmed
+             && apt.status != AppointmentStatus::InConsultation
+         {
+@@ -160,7 +166,13 @@
+                     created_at: Utc::now(),
+                 };
+                 consultation_repo::insert_session(&mut *tx, &s).await?;
+-                s
++                // Another authorized participant may have created the session
++                // concurrently. Always mint for the stored shared channel.
++                consultation_repo::find_by_appointment(&mut *tx, appointment_id)
++                    .await?
++                    .ok_or_else(|| {
++                        AppError::internal("Consultation session was not persisted.".into())
++                    })?
+             }
+         };
+ 

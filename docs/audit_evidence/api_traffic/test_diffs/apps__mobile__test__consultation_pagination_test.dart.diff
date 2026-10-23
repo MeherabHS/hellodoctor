@@ -1,0 +1,17 @@
+--- baseline/apps/mobile/test/consultation_pagination_test.dart
+
++++ current/apps/mobile/test/consultation_pagination_test.dart
+
+@@ -44,6 +44,11 @@
+
+     final repo = PagedRepository();
+     final cubit = DoctorCubit(repo);
+     await cubit.loadAll();
++    expect(cubit.state.chats, hasLength(100));
++    expect(cubit.state.hasMoreChats, isTrue);
++    expect(repo.chatOffsets, [0]);
++    await cubit.refreshChats(older: true);
++    expect(cubit.state.hasMoreChats, isFalse);
+     expect(repo.queueOffsets, [0, 100]);
+     expect(repo.chatOffsets, [0, 100]);
+     expect(cubit.state.queue, hasLength(101));

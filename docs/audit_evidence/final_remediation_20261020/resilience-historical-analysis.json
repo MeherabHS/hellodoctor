@@ -1,0 +1,42 @@
+{
+  "historical_run": "http-20261019T181155",
+  "scope": "retained JSON only; no target execution",
+  "request_count": 30000,
+  "identities_unique": 30000,
+  "http_statuses": {
+    "503": 10074,
+    "None": 19750,
+    "401": 31,
+    "429": 145
+  },
+  "error_count": 19750,
+  "errors_under_100_ms": 19731,
+  "errors_at_least_1900_ms": 19,
+  "error_latency_ms": {
+    "min": 1.71,
+    "p50": 7.117,
+    "p95": 11.395,
+    "p99": 14.123,
+    "max": 2024.827
+  },
+  "recorded_error_keys": [
+    "index",
+    "latency_ms",
+    "logical_ip",
+    "request_id",
+    "status",
+    "trace_id",
+    "transport_error"
+  ],
+  "admission_metric_deltas": {
+    "admission_accepted_total{class=\"health\"}": 104.0,
+    "admission_accepted_total{class=\"auth\"}": 87.0,
+    "admission_accepted_total{class=\"normal\"}": 21.0,
+    "admission_rejected_total{class=\"auth\",reason=\"budget\"}": 29913.0,
+    "admission_rejected_total{class=\"auth\",reason=\"limiter_unavailable\"}": 1.0
+  },
+  "sources": {
+    "docs\\audit_evidence\\post_implementation_runtime_20261019\\http-20261019T181155-stage-3-attack.json": "e3a4fd0dd2c181bc588d16969ced8b21fc9be173b8d7ea3a37f960a2b0a7cbf6",
+    "docs\\audit_evidence\\post_implementation_runtime_20261019\\http-20261019T181155-observer.json": "4dba1a500867bd578a895a731783582f263b867b4da59fff9427ae0d904313b9"
+  }
+}

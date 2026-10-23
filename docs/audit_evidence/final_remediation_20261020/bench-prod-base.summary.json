@@ -1,0 +1,9 @@
+﻿{
+    "test_name":  "admission_capacity_bench::bench_admission_capacity_prod_base",
+    "exit_code":  0,
+    "duration_seconds":  2.8114995,
+    "peak_working_set_mb":  10.3,
+    "avg_working_set_mb":  10.300000000000004,
+    "total_cpu_seconds":  0,
+    "sample_count":  24
+}

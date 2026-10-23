@@ -1,0 +1,530 @@
+[
+    {
+        "path":  "apps/doctor-web\\tsconfig.json",
+        "sha256":  "CDCAE131E30473FB3BCFB79E241818868E5679BCC2FD10AE427731E6D2F9B824"
+    },
+    {
+        "path":  "apps/doctor-web\\package.json",
+        "sha256":  "53E0E5EB10E73EF2D21D6E02329C1B52287992DEC9336F022170885905A7849F"
+    },
+    {
+        "path":  "apps/doctor-web\\next.config.js",
+        "sha256":  "E305A3E74674869886CCBF9D7C86E84EDF75044390E2CAA0282472064783B373"
+    },
+    {
+        "path":  "apps/doctor-web\\README.md",
+        "sha256":  "50A88DED617EE325069C0EC4A27433AA47767DE32CBEEB9C8E77BDB5A03F9D78"
+    },
+    {
+        "path":  "apps/doctor-web\\package-lock.json",
+        "sha256":  "39037A41A1DB8559B4CF0B3BC6E79125D8E5D271CC12AE35C57F75127EA687A8"
+    },
+    {
+        "path":  "apps/doctor-web\\next-env.d.ts",
+        "sha256":  "F4E8976C19FC926644D72610BF1058BD6BF52ADD97E46A02BC0B912A751625C0"
+    },
+    {
+        "path":  "apps/doctor-web\\scripts\\check-source.mjs",
+        "sha256":  "04DFC6BAD2C0CAF415DFCD46397B3630F06A0C6495E7FB9C4498F2C579B9693A"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\contracts.test.ts",
+        "sha256":  "4EF15075829D89F0323F9EC37D5B3F0EE3A3C391A40DC1AA46B40348D63075C4"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\consultation-actions.test.ts",
+        "sha256":  "65CE2657F11333C384119FF7A30841449DCCC609C6AAA74774C08F1D9D3029E5"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\client-incidents.test.ts",
+        "sha256":  "0A026AD9718CB5E1127B63A89C09A1846A1A52D43CB974C3E816DEC9DFEF87BA"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\articles.test.ts",
+        "sha256":  "C424FDB587BEDB5746EE96939C4B3AF8CFA7699C53EFA0854F35B9DF2D11274A"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\api-traffic.test.ts",
+        "sha256":  "2F48AEC0A7169A70B966A529831792D21039A2BA3078BEA4D1E7EF4C6EEC5925"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\pre-e2e-queue-chat.test.ts",
+        "sha256":  "6A62061AB3E77969C2398141D3AA3F5FB0E0FA8EE5240C1BA16484A5E74E29A2"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\origin.test.ts",
+        "sha256":  "AA473EC826BA10614C31366EFF4BF71453D1F92BE59C7860736B82F95984E58A"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\historical-chat-context.test.ts",
+        "sha256":  "FD8D6E83203F4E410C3B37C22A6DC1E61E2183726CE2E02758775F326D8170CB"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\professional-verification.test.ts",
+        "sha256":  "5C0ED053FD61C0009B8E561DAA04C64260122C825A6688BFDBDBC294871FF03D"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\public-exposure.test.ts",
+        "sha256":  "C232A8C8F44D832D6A439446348C9DF51DA99086D0300B14DD9188010F5213F2"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\rx-compression.test.ts",
+        "sha256":  "BC4B65388A6F0C99506A2F004FFBC1B8D6744D91BDA05DF5D9071BD7FBB5739B"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\middleware.ts",
+        "sha256":  "00A4CA462799C2D09F05E25DCD8021DBA873F5998606452AF1F7E31C158685B0"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\turnstile.test.ts",
+        "sha256":  "E9E4E127F182E2CF8E39AE4352566AEF62C13C274E99272E2AA8E5DB919F41EE"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\slot-list.test.ts",
+        "sha256":  "D09447D934CF7CE0392843D2EB3E2A7A0B88FF2E0E2430EED3ACFA72CE62C590"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\schedule-sync.test.ts",
+        "sha256":  "ADDF3869D436D7D774A179B918D446091B071CD3CEFC068B672E995B29768C03"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\sanitize.test.ts",
+        "sha256":  "3ABD734479B356831F90F8E3CDC7B9CBC0F3F779DB35849145101113194F63CA"
+    },
+    {
+        "path":  "apps/doctor-web\\tests\\rx-upload.test.ts",
+        "sha256":  "4DF6E926091DF814D32ACD5123D6BCF54E717B1E3BFBF27C0108AABE779616E4"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\icons\\calendar.svg",
+        "sha256":  "683A1B55E8FFD2E3CAD12E663332DAEF1C40C86CF32F0A835405D2AA2BB5727E"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\icons\\bell.svg",
+        "sha256":  "792723459009C66A2564BCAB359E3BB89D0964D1F8D7B81D11C845A4AFC2F66E"
+    },
+    {
+        "path":  "apps/admin-web\\tsconfig.json",
+        "sha256":  "A48946544AB682ABEEABBF40D361CC76D8DF597EEAF897A71141DD1E69209B59"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\web.css",
+        "sha256":  "1AF8EAB4909CA50DBCDD7F80AFBC7217A2DF4DE72E7B7248A1992B298286766B"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\prototype.css",
+        "sha256":  "CA7BA4405D05CE579060F92AB2DC985008B8A4F6EB831CC7EB625E5AAA6BF138"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\page.tsx",
+        "sha256":  "7648527B11C924CA6F6CBC75AF3ECC5A1BC4947DEBCB03C27A6D3B559B2836C8"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\layout.tsx",
+        "sha256":  "59F7943DFE884A05C80DC4B99C309F7579E5A9A83284216293FD109788B01742"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\fonts.css",
+        "sha256":  "86D2BF2ECF23F16BEE33CB946CCA7E111CFB268B7E8D39CBF45898EC7D239B66"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\fonts\\plus-jakarta-sans-800.ttf",
+        "sha256":  "D9E0DDB4A15A0054AD84B4DED3B4B9F354A0B7DF426E21A1363D6933728DA9D5"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\fonts\\plus-jakarta-sans-700.ttf",
+        "sha256":  "32971AD7976930539A11C79CE91CE84092DF7F25C5BE716B594601842F10A7AE"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\fonts\\plus-jakarta-sans-600.ttf",
+        "sha256":  "50357DF108C5D297EC4ECE76AEDDF49561F3794F67AF077CFC2C711B7A75B439"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\fonts\\plus-jakarta-sans-500.ttf",
+        "sha256":  "B4FC14EC283D54236FD302CDB92546F98AE0FF061CA5EE23453A02BDF4628791"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\fonts\\plus-jakarta-sans-400.ttf",
+        "sha256":  "076831B98043F50F829B6C91DB3BE4A844641F1C95BCCFF5C886ED87C661A852"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\fonts\\inter-700.ttf",
+        "sha256":  "B37284B5701B6B168DFC770AA1A4AC492106422FD3BA76BC7641E37434E8019C"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\fonts\\inter-600.ttf",
+        "sha256":  "E7A1AAF7EDA9F2FAD4131725FA556265EC75CA7B2D756260173A040363E8D4F7"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\fonts\\inter-500.ttf",
+        "sha256":  "8C883F63B2C4157D997319F2C8BC6995ED4357EF371940D31CA159004A4AAE63"
+    },
+    {
+        "path":  "apps/doctor-web\\public\\fonts\\inter-400.ttf",
+        "sha256":  "1B08E7FC267A5C7E1D614100F604B83E7E8A0BE241F0F288FAA2B3AC93A683BA"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\turnstile.ts",
+        "sha256":  "1AFD13094890E523AEA7C44BC42470023CAE4A112C413683D740CC4B71CBDBF1"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\slot-list.ts",
+        "sha256":  "B8458F02CAAA7377A4457401D16B4E82A0F1ED574E99D3FB258F28936A9E6C5A"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\server.ts",
+        "sha256":  "15859E9496A40AD215AB4C7241D174221DF7D802D1F08B946D33BD77C56C8011"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\schedule-sync.ts",
+        "sha256":  "B8425742F814B587301BFE57AEADA822B7443FBA6AA1D627E44CAA79C1379E43"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\sanitize.ts",
+        "sha256":  "1687CC5B6A2AA6ED745ED7BA1DD301FF6639F0DE3A28A7FB8F5FDA2A54D09ABC"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\rx-upload.ts",
+        "sha256":  "05D2C7DB294A5C38944DA271D52D0FA7F9AAB596C4082F14732B556477A49B62"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\rx-compression.ts",
+        "sha256":  "DEEF642C62203F6089367F191908158256069BE9D67D8236400DB039F474EACF"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\professionalVerification.ts",
+        "sha256":  "2E2D46083BC6A48D7CA82B319E495283814ACAE67A7A57982B5C2924375A8B32"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\origin.ts",
+        "sha256":  "3DBBD3EA2A514D06116EF06A91B2BE8C45E04B8F0D10B8E7DCCB2B4EF2B8FB5E"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\inflight.mjs",
+        "sha256":  "7AFDF6B4FBA4897A2F20F395A1347B552895D1B355E77EEDFA81DC3ADB0AD13D"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\exposure.ts",
+        "sha256":  "A3962BF9AAFC4B7BA0E4F3FD654E78F022E1B651520CBD0CE4B3FAA40B6D3E33"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\contracts.ts",
+        "sha256":  "7B3E4B25987EDF15F640BD32061DEA48D4F44E4E91FAA88CD41C0F3751326527"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\client.ts",
+        "sha256":  "868A6FA145406D87D9A70F490D85DE85892B8ECC20353E74DBA0AADB17B4901F"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\client-incidents.ts",
+        "sha256":  "51C43C809DE4915E3B1BCEA872E8BEAE0661496BFF76E633641F06679DF2BAAE"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\call-telemetry.ts",
+        "sha256":  "641637925AE92DFA589BF0A556383F748F7A881D404C8CBC22C32F9E2992D603"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\lib\\articles.ts",
+        "sha256":  "8524E2ABC571594095B042A9A24BAA719E7767F06B73141B03C2183CF2FCB565"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Wallet.tsx",
+        "sha256":  "0BA6F6F3EEAE88C0FAE16A63D581945D12EAF7BA8D28D4E0687672FD9575C18F"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Statement.tsx",
+        "sha256":  "D4A09F1A7C2EDB8816EA621667B7E91365DB2EB82C30CD36940F24999E51468B"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Settings.tsx",
+        "sha256":  "B8ED3EF1211358EFF52AB6FF280FC8276FF6ACD25830C558B0A6089A6266DC83"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Schedule.tsx",
+        "sha256":  "AB134AA9F1084B892609DB9C89805B831AF3C625EF6DD691719B296BA2F4822C"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Rx.tsx",
+        "sha256":  "5FFC3431DC8864AE26404C194629E4255B4159A2E1C8E5D38BBE6C49B047FB5C"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Queue.tsx",
+        "sha256":  "AF235D343F53B63D018B550BA137F5726838724990D597EDD87C30CC3B596F51"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Qna.tsx",
+        "sha256":  "C28CB71CC2DECEAC3FA89F59705C0B5AF0453C1362E5C2EA3AD42494C11B2CF8"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Prototype.tsx",
+        "sha256":  "A38548C1C6771C88FE07A42B17734F9D33F414A8214D60965012C4DAB0B2F070"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Notifications.tsx",
+        "sha256":  "D96D403EF3CF59E696BC67F8DB69F0CE3FF25DB0620C4F01F7DF85E1BC541FDA"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\DoctorApplication.tsx",
+        "sha256":  "903CC52458B2A9B42092CA004ADD1ADD4E39C4F7C84BE0C66DBC900BD2A94948"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Desktop.tsx",
+        "sha256":  "250E6D6ED4B190621DA6F79610863ECC62DD68976C87EAD43370568EB6B1BC1C"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\ConsultationHistory.tsx",
+        "sha256":  "8B5239719C27210C93490D273940EC57189CEEC0C67E9DA362C2B1A4CF66D81A"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Common.tsx",
+        "sha256":  "A37000F0F59056A245354117D3725765C8F2CE8041962BCF3E390264C86CBE8D"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\ClinicalAttachment.tsx",
+        "sha256":  "C5E9FF8DCA76AD4DF891CB2855D31455EE44324C7697170FBD6D06D04D7B649D"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Clinical.tsx",
+        "sha256":  "623402078DD1FF9001B3F4E5F02C6D9CD3FBD051B6EC9B66745383DBC540A357"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Chat.tsx",
+        "sha256":  "C3C9BF5A756527A277C28B0E4CAAA67B33CEB697EC4BD80C28153905B6121E7B"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\BotChallenge.tsx",
+        "sha256":  "49ED11D8DE6D0BB21ADE8355D4C4A6967A9880DCC32607A531720BB37D1C2CD6"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Auth.tsx",
+        "sha256":  "2957DBDA8065501795659697DBC138250AE721F961AD446B8F38408E467FAC20"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\Articles.tsx",
+        "sha256":  "95E7317F89EFD19D8E95359CB990C9E7130D580EC340AA71990C5340CCC2C611"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\components\\AccountMenu.tsx",
+        "sha256":  "B84A32655621BFB8D129F2BA66053A7095CD457A0E3A04880D5F60B1375634C1"
+    },
+    {
+        "path":  "apps/admin-web\\tailwind.config.js",
+        "sha256":  "FEF4AE028A78B1B123ACCAB2CBEBE4482AC25CBA21FCE3BD4C74F28D65F19CD0"
+    },
+    {
+        "path":  "apps/admin-web\\tests\\web-assertion.test.ts",
+        "sha256":  "24DD1B585B17F0A324D00E03FB44E22E9EEE803E3AFFB00FCC3DDC5DFE9D9490"
+    },
+    {
+        "path":  "apps/admin-web\\tests\\turnstile.test.ts",
+        "sha256":  "E9E4E127F182E2CF8E39AE4352566AEF62C13C274E99272E2AA8E5DB919F41EE"
+    },
+    {
+        "path":  "apps/admin-web\\tests\\schedule.test.ts",
+        "sha256":  "BF57E7B93C8914B516B26A2F4C3C477B7730271DCBB3524542A6330FD92DD45D"
+    },
+    {
+        "path":  "apps/admin-web\\tests\\refresh.test.ts",
+        "sha256":  "56EF12320FA26EC408D599AA03F490DF3CE4FBB64B68556A41FC3C2B3574E79C"
+    },
+    {
+        "path":  "apps/admin-web\\tests\\public-exposure.test.ts",
+        "sha256":  "C232A8C8F44D832D6A439446348C9DF51DA99086D0300B14DD9188010F5213F2"
+    },
+    {
+        "path":  "apps/admin-web\\tests\\professional-verification.test.ts",
+        "sha256":  "BA23C2BE4F480EC50DBB71870B0936E03763D41958B753B6608F643EBC978A9D"
+    },
+    {
+        "path":  "apps/admin-web\\tests\\polling.test.ts",
+        "sha256":  "41F11DA280D7F6018749D9040115A8E403CB5058D3C0EA1B843A441F9C099C5E"
+    },
+    {
+        "path":  "apps/admin-web\\tests\\investigation.test.ts",
+        "sha256":  "5B301DC4ECC20FA323565E08BCDE178150624598B5302853269DB696BC4F8D34"
+    },
+    {
+        "path":  "apps/admin-web\\tests\\api-traffic.test.ts",
+        "sha256":  "A475A2D3E4B7F276C305D8A5F9646ABBB3D91E22C95E5917DABAEE8BFA03787C"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\doctor\\chats\\page.tsx",
+        "sha256":  "B3FD89D84ADDED83F05F5C723B70730C73C707B7C91FEAEA3C5DD5BD457F45E6"
+    },
+    {
+        "path":  "apps/admin-web\\next.config.js",
+        "sha256":  "609C4494A95096227E5B9145221FC42FFBBF91D05FACF39ACE7D4104CE3AD164"
+    },
+    {
+        "path":  "apps/admin-web\\eslint.config.mjs",
+        "sha256":  "03784EB2419F93CABD8D88120BC016C2292BC63C34F5ADD91C632F7B5F557AF8"
+    },
+    {
+        "path":  "apps/admin-web\\AGENTS.md",
+        "sha256":  "063098F6CB31BB44C6F8FBEA25B3876DE7EE1E5F7D00A50DBAB506F6415EB7F0"
+    },
+    {
+        "path":  "apps/admin-web\\package.json",
+        "sha256":  "26079C6395DBB47B5EB34EBDAADE6D07302B76DF9F85D3CE86A8E7250C52D1B5"
+    },
+    {
+        "path":  "apps/admin-web\\package-lock.json",
+        "sha256":  "F4C33214E0B9D8B2822FAB8E783D783890BC5E76DB025155CCF8636C06649B92"
+    },
+    {
+        "path":  "apps/admin-web\\postcss.config.js",
+        "sha256":  "FA650B380ADFABB151A0B352F7135E107E6352345F899060F1C5C231228F94BF"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\generated\\templates.json",
+        "sha256":  "73772775D718881C659B650F916B43976C3032ED935508B9F0BDCD13F7471E09"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\api\\auth\\[action]\\route.ts",
+        "sha256":  "68412C9698A92B6EF4CFD60D9E70899913F4AF0EAB5273C3BD48F9EC1FC7AFCD"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\api\\proxy\\[...path]\\route.ts",
+        "sha256":  "9AAD39C137299C5DBA75C83393ACE902E01C61CC19835C6CE248466DA99407A9"
+    },
+    {
+        "path":  "apps/admin-web\\src\\types\\admin.ts",
+        "sha256":  "60E8F5E605B0FDDB16B7032343012F623D002ECBBA47B8163BF2BA1B6C0AF20B"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\api\\diagnostics\\route.ts",
+        "sha256":  "A036FEE6396095BCCD5E5DFD677DC4CC053590A5445D8E80F618DC520E14FBBE"
+    },
+    {
+        "path":  "apps/admin-web\\src\\middleware.ts",
+        "sha256":  "7F0B758BA93C8BB3DBF5F608622AE935F779F469A287C5FCBF6DC64EC8B67F32"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\api\\bot-challenge\\route.ts",
+        "sha256":  "4BDE317D9FD0A4D650EB8F28BC05F2A7CBFE63DC4627D4446D7B8F860C206476"
+    },
+    {
+        "path":  "apps/doctor-web\\src\\app\\api\\document\\[appointment]\\[document]\\route.ts",
+        "sha256":  "9EFA116C2274A966E4A6150959A2A269AEF6D3C18A9974704412C1EDD1773B78"
+    },
+    {
+        "path":  "apps/admin-web\\src\\data\\adminStore.ts",
+        "sha256":  "8A36D79AC8DFCB677A33C97B25C093BBD4F40A7402976E7C3B869DC3FE7E682B"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\page.tsx",
+        "sha256":  "11C5E9B00B21B0B2A0DBC99D5B627F8D6FB0AAE760B004F1DA4ECF44D72F5DDA"
+    },
+    {
+        "path":  "apps/admin-web\\src\\components\\GrievanceInvestigation.tsx",
+        "sha256":  "1FFC646A42ED934C67F19E88A626CEB524E54879964A6B9543B816DCB7D360DB"
+    },
+    {
+        "path":  "apps/admin-web\\src\\components\\ErrorBoundary.tsx",
+        "sha256":  "563BDE765847E3099B37B5834A6E0474937AF683B311033093AD0D052E298F6B"
+    },
+    {
+        "path":  "apps/admin-web\\src\\components\\BotChallenge.tsx",
+        "sha256":  "49ED11D8DE6D0BB21ADE8355D4C4A6967A9880DCC32607A531720BB37D1C2CD6"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\globals.css",
+        "sha256":  "6B0F75780766456FE8E41216A43924E8B302508A80236743B2D6B78BF993E088"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\web-assertion.ts",
+        "sha256":  "8486C40FB81869D813353A607D954E21B14040FB5207B9F64CAA9BF3AE2452CE"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\useSlotSync.ts",
+        "sha256":  "8BE1E3F35F5329F544CFEF42D41FD1C65F996010EFCCED863D22C9325F2E8130"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\useBackendSync.ts",
+        "sha256":  "80C823A17DAEE426932DD702E1B12489432ADD645DE30102CADDFE4610F6AFCA"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\turnstile.ts",
+        "sha256":  "1AFD13094890E523AEA7C44BC42470023CAE4A112C413683D740CC4B71CBDBF1"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\session.ts",
+        "sha256":  "8C27095C8DD187D8A7B3B20EF83D066781E43C876FFD6906AE78306EFCD838D0"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\schedule.ts",
+        "sha256":  "675307AC568127CF68DF769F4BCE2C43B3F545F8A63B1ECC09A77BDC247E6B36"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\refresh.ts",
+        "sha256":  "B0E498798FC203DDC131A3C08788478CC18D1CEDF4927D3C7BB8FD540BBB68D2"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\polling.ts",
+        "sha256":  "B8425742F814B587301BFE57AEADA822B7443FBA6AA1D627E44CAA79C1379E43"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\investigation.ts",
+        "sha256":  "56CA8DEBCB32EFC4280CD351472ED52118D1DB7478B0B6B25A25B0A4A940531B"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\inflight.mjs",
+        "sha256":  "7AFDF6B4FBA4897A2F20F395A1347B552895D1B355E77EEDFA81DC3ADB0AD13D"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\exposure.ts",
+        "sha256":  "A3962BF9AAFC4B7BA0E4F3FD654E78F022E1B651520CBD0CE4B3FAA40B6D3E33"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\diagnostics.ts",
+        "sha256":  "DBFD29ED6696DBE876F2F9D6262DCE96E54731657D683B255D47995B85F8B96F"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\client-incidents.ts",
+        "sha256":  "FAABEC3C2AECEB258AA88BB5461130906D534AD08538614233508752D63BA491"
+    },
+    {
+        "path":  "apps/admin-web\\src\\lib\\api.ts",
+        "sha256":  "C4E3AB8AAFE184E3239C53631D45F6C42CF0D0EBDAE7213FC72632361F8545E9"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\layout.tsx",
+        "sha256":  "2E454A36AA889DEB9FE89437C421D49FDBBDDEEA34C2724FFA4BED5E4F03563F"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\login\\page.tsx",
+        "sha256":  "1FDC8C675F70C8E5B1E7B4B9CC798368DBA0C50629E401084CCE1E47362D10A5"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\api\\runtime\\route.ts",
+        "sha256":  "E710582C067400DD0F850814FB706811B9AC4A2AF6A28DEC8DAB53DBBB48D050"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\api\\bot-challenge\\route.ts",
+        "sha256":  "5B03694FD5E9398ABC1BACEC5C253585466EEF2240982BA6914BA7FEE3A8A2CF"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\api\\login\\route.ts",
+        "sha256":  "9478107CEECB835148FD8F60A6381DA3938CE5A0D3337DD207CC6FC3DA1394C1"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\api\\logout\\route.ts",
+        "sha256":  "EA6FC75E1D659FD14A2939680DBB721AE97ECD60116B9D9AEA69F31A70F599AC"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\api\\proxy\\[...path]\\route.ts",
+        "sha256":  "8EE7468614665EC010A172546C45E4869FF5B0ADA42641F44454B23430BDA465"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\api\\diagnostics\\route.ts",
+        "sha256":  "C7BC0A612A5007CDE0102A3F57759092BA13F88DF0C30D37FD68FF9D7A7D43FB"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\api\\login\\verify\\route.ts",
+        "sha256":  "8E258D2985B7565267F15524E798CC54C3D011E8C67213AE6E72AC9F358BF003"
+    },
+    {
+        "path":  "apps/admin-web\\src\\app\\api\\documents\\download\\route.ts",
+        "sha256":  "2F3422FF35C402BC4C0B0CD167F55C2544BF52051297888CFFAB2C102CBFA4ED"
+    }
+]

@@ -1,0 +1,30 @@
+[
+  {
+    "role": "doctor",
+    "version": "1.0.1+7",
+    "path": "releases/hellodoctor-doctor-arm64-lifecycle-20261016.apk",
+    "bytes": 20587936,
+    "sha256": "36b3613836ac4e96089d09a8b5851f07b84aa5e7143592b904a36f7dbd424921",
+    "signature_verified": true,
+    "build_exit_code": 0,
+    "installed_on_phone": false,
+    "physical_acceptance": "PENDING_USB_DEVICE",
+    "environment": "development",
+    "api_base": "http://192.168.0.105:8080/api/v1",
+    "development_otp": true
+  },
+  {
+    "role": "patient",
+    "version": "1.0.1+6",
+    "path": "releases/hellodoctor-patient-arm64-lifecycle-20261016.apk",
+    "bytes": 21479436,
+    "sha256": "075a85ff73bbfadb3106cb10c84e6800e3c231965afad0e9f7cac35c838ef832",
+    "signature_verified": true,
+    "build_exit_code": 0,
+    "installed_on_phone": false,
+    "physical_acceptance": "PENDING_USB_DEVICE",
+    "environment": "development",
+    "api_base": "http://192.168.0.105:8080/api/v1",
+    "development_otp": true
+  }
+]

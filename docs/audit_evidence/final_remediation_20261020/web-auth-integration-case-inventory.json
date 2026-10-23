@@ -1,0 +1,49 @@
+{
+    "file":  "services/backend/tests/cases/security_acceptance.rs",
+    "sha256":  "F18E52B313C18A8EE0DEFCC61E4E076C865B09EAC32E481E424A9F997AF591C4",
+    "named_tests_authored":  8,
+    "compiled":  "NOT_RUN_BY_AUTHOR",
+    "executed":  "NOT_RUN_BY_AUTHOR",
+    "execution_owner":  "root coordinator, serial against owned disposable fixtures",
+    "source_changes":  "new test module only; no production source modified",
+    "fixture_scope":  "Actual capability-role pools and real disposable Redis; synthetic SQL setup and independent privileged observations; no providers",
+    "cases":  [
+                  {
+                      "name":  "admin_totp_mandatory_algorithm_window_and_account_fail_closed",
+                      "coverage":  "Missing/malformed/out-of-window TOTP, wrong email OTP, SHA1 enrollment, unenrolled credential, disabled Admin; no sessions issued or TOTP step consumed on invalid input"
+                  },
+                  {
+                      "name":  "admin_totp_concurrent_step_issues_one_session_and_replay_is_denied",
+                      "coverage":  "Two independent pending challenges, one SHA256 time-step, row-lock race; exactly one session, last step recorded once, fresh-challenge replay denied"
+                  },
+                  {
+                      "name":  "device_proof_real_redis_concurrent_replay_reserves_once",
+                      "coverage":  "16 identical signed proofs race through real Redis NX; exactly one success,15 authorization failures, independent GET and boundedTTL"
+                  },
+                  {
+                      "name":  "bound_refresh_stolen_credential_cannot_revoke_or_cross_family",
+                      "coverage":  "Missing private-key proof, token binding mismatch, other installation/family, valid rotation, missing-key ancestor attack leaves family active, valid-key ancestor reuse revokes all descendants"
+                  },
+                  {
+                      "name":  "bound_refresh_concurrent_valid_proofs_preserve_reuse_revocation",
+                      "coverage":  "Two distinct valid proof JTIs race one refresh identity; exactly one rotation, loser detects ancestor reuse and revokes winner successor"
+                  },
+                  {
+                      "name":  "device_proof_dependency_loss_denies_before_refresh_mutation",
+                      "coverage":  "Real fixture-owned Redis AUTH connection denial; bounded503 and unchanged family rows; this is dependency rejection, not a full stopped-service recovery scenario"
+                  },
+                  {
+                      "name":  "device_proof_http_enforces_original_path_replay_and_logout",
+                      "coverage":  "Actual Axum profile200 with own Patient row; missing/wrong binding/replay401; proof-required logout, SQL revocation, nextJWT401; separate legacy unbound family remains valid"
+                  },
+                  {
+                      "name":  "admin_web_hmac_http_exact_body_and_real_redis_nonce_replay",
+                      "coverage":  "Actual middleware missing/forged/modifiedbody403,valid proof reaches credential401,replay403; nonce GET/TTL and no session issuance"
+                  }
+              ],
+    "limitations":  [
+                        "Admin tests seed post-password challenges, so they verify mandatory emailOTP/TOTP completion and session issuance rather than password-provider delivery",
+                        "Synthetic P256 proofs verify server protocol, not Android Keystore interoperability",
+                        "No physical-device, live provider or production acceptance claim"
+                    ]
+}

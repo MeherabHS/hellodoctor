@@ -1,0 +1,94 @@
+﻿{
+    "results":  [
+                    {
+                        "app":  "mobile_patient",
+                        "exit_code":  0,
+                        "duration_seconds":  59.0552582,
+                        "visible_tests":  229,
+                        "passed":  229,
+                        "failed":  0,
+                        "skipped":  0,
+                        "hidden_loader_setup_events":  37,
+                        "runner_success":  [
+                                               true
+                                           ],
+                        "test_errors":  [
+
+                                        ],
+                        "physical_device":  "DEFERRED_BY_USER",
+                        "formal_sandbox_certified":  false
+                    },
+                    {
+                        "app":  "mobile",
+                        "exit_code":  1,
+                        "duration_seconds":  47.320343799999996,
+                        "visible_tests":  229,
+                        "passed":  228,
+                        "failed":  1,
+                        "skipped":  0,
+                        "hidden_loader_setup_events":  37,
+                        "runner_success":  [
+                                               false
+                                           ],
+                        "test_errors":  [
+                                            {
+                                                "testID":  294,
+                                                "error":  "Test failed. See exception logs above.\nThe test description was: resume, Queue return and foreground tick replace stale operational data; background does not poll"
+                                            }
+                                        ],
+                        "physical_device":  "DEFERRED_BY_USER",
+                        "formal_sandbox_certified":  false
+                    }
+                ],
+    "focused_reexecutions":  [
+                                 {
+                                     "case":  "flutter-mobile-queue-lifecycle-reproduction",
+                                     "passed":  1,
+                                     "failed":  1,
+                                     "skipped":  0,
+                                     "exit_code":  1,
+                                     "duration_seconds":  6.432173
+                                 },
+                                 {
+                                     "case":  "flutter-mobile-security-recovery-focused",
+                                     "passed":  15,
+                                     "failed":  0,
+                                     "skipped":  0,
+                                     "exit_code":  0,
+                                     "duration_seconds":  8.9201067
+                                 }
+                             ],
+    "doctor_failure":  {
+                           "file":  "apps/mobile/test/queue_lifecycle_refresh_test.dart",
+                           "line":  73,
+                           "expected_queue_reads":  2,
+                           "actual_queue_reads":  1,
+                           "reproduced_without_changes":  true,
+                           "analysis":  "The unchanged test expects a resume read after pumpAndSettle without advancing the intentional 250-2000ms recovery timer. Timing-contract mismatch is an inference from source, not a corrected/accepted test.",
+                           "changed":  false
+                       },
+    "preservation":  {
+                         "original_files_checked":  425,
+                         "changed_count":  0,
+                         "changed":  [
+
+                                     ],
+                         "source_test_configuration_edits":  0,
+                         "assertion_edits":  0
+                     },
+    "android":  {
+                    "status":  "BLOCKED_MISSING_CACHED_TOOLCHAIN",
+                    "compile_executed":  false,
+                    "sdk":  "C:\\Users\\CUBE\\AppData\\Local\\Android\\Sdk",
+                    "sdk_platform_36_present":  true,
+                    "gradle_user_home":  "C:\\g",
+                    "cached_gradle_9_3_1_present":  false,
+                    "missing":  [
+                                    "Cached Gradle 9.3.1 distribution; wrapper would download it before --offline takes effect",
+                                    "Cached AGP 9.1.0/Kotlin 2.4.0 plugin artifacts and transitive dependencies not established"
+                                ],
+                    "no_downloads":  true,
+                    "physical_device":  "DEFERRED_BY_USER",
+                    "dedicated_device_proof_flutter_tests_found":  false
+                }
+}

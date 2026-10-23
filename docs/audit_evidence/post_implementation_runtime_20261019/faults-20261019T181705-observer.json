@@ -1,0 +1,1015 @@
+{
+  "run_id": "faults-20261019T181705",
+  "scope": "Disposable loopback development fixture, real backend; no provider calls",
+  "cases": [
+    {
+      "case_id": "redis_dependency_loss",
+      "requests": [
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 255.9432999987621,
+          "retry_after": "1",
+          "request_id": "537701f5-de18-4107-963f-06f608545dd0"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 254.82349999947473,
+          "retry_after": "1",
+          "request_id": "41fe6031-8699-4b1f-a52b-f73f7d288918"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 254.41419999697246,
+          "retry_after": "1",
+          "request_id": "692d2dd8-2471-4c48-94b8-b4946712da21"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 254.92669999948703,
+          "retry_after": "1",
+          "request_id": "0983b39f-163d-4a26-8e09-4bb890d29ac3"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 256.6461000023992,
+          "retry_after": "1",
+          "request_id": "664cb2db-baf9-4699-a836-818cee45164c"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 253.7021000025561,
+          "retry_after": "1",
+          "request_id": "507af33a-f4c4-4487-bebc-a98873f51b85"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 253.7741000051028,
+          "retry_after": "1",
+          "request_id": "31328d8e-01c5-47b1-9c4a-da2091f37ce4"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 254.30729999789037,
+          "retry_after": "1",
+          "request_id": "bb776963-4b02-4b07-9a9a-dbd0ecb07bed"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.96999999531545,
+          "retry_after": "1",
+          "request_id": "b5978e62-b41d-4be9-be67-6945f0a00ca0"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 273.57710000069346,
+          "retry_after": "1",
+          "request_id": "fb8abe54-b397-486e-8eb8-08fe9efc0171"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.721099999093,
+          "retry_after": "1",
+          "request_id": "701f0027-89a4-4d3a-b95e-ee16ed0c1ba6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.4041000047582,
+          "retry_after": "1",
+          "request_id": "bd9de6ba-1a72-491a-823b-a20d46f4afa6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.426899999904,
+          "retry_after": "1",
+          "request_id": "6e4fbaa3-3f4d-4663-a10f-7a07003eac0b"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.45180000032997,
+          "retry_after": "1",
+          "request_id": "ef670dc4-9fba-432c-8e8b-840b3777b0c4"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.48750000295695,
+          "retry_after": "1",
+          "request_id": "0dc80b39-8bfe-4cd0-8dc5-da0e2ab52ab8"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 256.5915000013774,
+          "retry_after": "1",
+          "request_id": "e985d679-d6d3-488a-8f6e-ebf41c9f492b"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.9725000002072,
+          "retry_after": "1",
+          "request_id": "e72af9c3-7976-4ad6-b113-2421397eb5e6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.1297000001068,
+          "retry_after": "1",
+          "request_id": "206ba845-c971-4f67-ada3-9ac103b13dc2"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.467800006154,
+          "retry_after": "1",
+          "request_id": "26696858-bd37-4487-9b21-753cebfdb3d4"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.62180000008084,
+          "retry_after": "1",
+          "request_id": "90ae6da0-d894-4b52-9fbc-873c26582d7a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.996200002206,
+          "retry_after": "1",
+          "request_id": "02eabb6b-d4c4-4568-a7f7-2644ba140443"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.0181000016164,
+          "retry_after": "1",
+          "request_id": "da1df414-19c2-494d-8f3a-479e82197249"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.5426999978372,
+          "retry_after": "1",
+          "request_id": "c60d01f4-13bc-4658-883f-929619961ad6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.9770999988541,
+          "retry_after": "1",
+          "request_id": "63d57593-d175-4921-ba71-9e2301eea155"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.3715000008815,
+          "retry_after": "1",
+          "request_id": "5fad411c-e926-4f22-855b-eee364a7ff4f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.51529999717604,
+          "retry_after": "1",
+          "request_id": "4b3fdd64-ade7-4cb8-a0cf-14404759403f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.1322999984841,
+          "retry_after": "1",
+          "request_id": "378ba9c9-b7ab-423e-ac78-b672f64d057f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.064899998426,
+          "retry_after": "1",
+          "request_id": "4ba568aa-7467-41cf-bd3b-fdebc101e1f3"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.49880000250414,
+          "retry_after": "1",
+          "request_id": "77824035-7b6c-457d-9cfa-41520a8a1996"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.08349999797065,
+          "retry_after": "1",
+          "request_id": "2d871ddf-9d72-4c8b-86b3-ade1933aedd8"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 261.7229000024963,
+          "retry_after": "1",
+          "request_id": "2d559eff-88f5-4b7f-b2b8-9a8b03559777"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 278.43120000034105,
+          "retry_after": "1",
+          "request_id": "6cf38968-06e0-4ea4-b5f8-2a2aadf20ae0"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.4805000014021,
+          "retry_after": "1",
+          "request_id": "79763e5d-3d66-4d97-898f-2c56124e4a29"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.61329999397276,
+          "retry_after": "1",
+          "request_id": "da3b04cb-cad6-46fb-8255-79473534fa72"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.24879999790573,
+          "retry_after": "1",
+          "request_id": "fe09c421-316b-4ece-9547-9a3999883eed"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.2737000021734,
+          "retry_after": "1",
+          "request_id": "8d623eb0-7441-400b-b947-ba2f8a86732a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.42269999784185,
+          "retry_after": "1",
+          "request_id": "f996e54b-8275-4087-8eaf-fe0da2c07e7c"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.41920000029495,
+          "retry_after": "1",
+          "request_id": "ba9e6cf4-4adf-4be2-9581-0f1d803d756f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 261.8210000000545,
+          "retry_after": "1",
+          "request_id": "00603c2d-e7ab-4bd0-90d3-a6345f5bf0c0"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 262.89570000517415,
+          "retry_after": "1",
+          "request_id": "35ac7d1d-b349-43c6-b86e-09c6e3eeb902"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.53940000303555,
+          "retry_after": "1",
+          "request_id": "dd9b64a6-57f5-4612-93e3-c38b4a6c449f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.4521000004024,
+          "retry_after": "1",
+          "request_id": "846dc55c-8a1b-43a4-93c1-b363e9124dea"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.72139999916544,
+          "retry_after": "1",
+          "request_id": "22ddb675-2cb6-41ea-a94c-cdad76bd7ad3"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.5397999988054,
+          "retry_after": "1",
+          "request_id": "a736d0dc-3b52-42f7-9860-4dc1c2b79ea1"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.9777999977232,
+          "retry_after": "1",
+          "request_id": "039e3f43-6a0b-4a8d-bc8a-433048c02a45"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 265.5592000010074,
+          "retry_after": "1",
+          "request_id": "84b77f18-0a4a-4054-9244-1c5a80a661ad"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 264.4685999985086,
+          "retry_after": "1",
+          "request_id": "5c8644b5-9a68-45a3-a864-9afdc2e9000f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 266.0124999965774,
+          "retry_after": "1",
+          "request_id": "21874ec3-e9e7-486b-9847-95f03c60c31a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.52330000372604,
+          "retry_after": "1",
+          "request_id": "dedfd32e-6927-43bd-b052-201048333140"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.2084999931976,
+          "retry_after": "1",
+          "request_id": "8301e2d7-80be-45d9-b51d-21cc18cafba1"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.36430000083055,
+          "retry_after": "1",
+          "request_id": "c87f0c30-9351-45be-9b85-23becc760948"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.0721999958041,
+          "retry_after": "1",
+          "request_id": "33ab3b44-d7cb-40df-a013-bf2de4ba7cde"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.5919999956968,
+          "retry_after": "1",
+          "request_id": "51b45903-fce6-46a0-99e7-17d3c9779ed2"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.27790000505047,
+          "retry_after": "1",
+          "request_id": "89e81355-af7f-400d-813a-15e8c5ebf167"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.2524000000558,
+          "retry_after": "1",
+          "request_id": "e0b91c88-6cd3-43ba-9ea9-9b1ec3eb8f2a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 263.1249000041862,
+          "retry_after": "1",
+          "request_id": "7b6fb6f1-5f73-480c-a5ee-b630fd33cb4f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.7159999932046,
+          "retry_after": "1",
+          "request_id": "4e8375f8-d1aa-4b25-bc79-6b47e803f645"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.5757999952184,
+          "retry_after": "1",
+          "request_id": "3765787c-7cea-44e3-91b3-b3c8445b821a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.30220000009285,
+          "retry_after": "1",
+          "request_id": "8ef0fc1a-aa69-4649-bd2e-027a51bd5b5b"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.48459999926854,
+          "retry_after": "1",
+          "request_id": "d51cb499-4964-4302-b642-30a6505793d1"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 259.5283999980893,
+          "retry_after": "1",
+          "request_id": "f4992533-a407-4ff2-aaf6-80347af6f111"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.58870000229217,
+          "retry_after": "1",
+          "request_id": "0a117401-ee33-4a68-865b-ff86a9037659"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 258.64590000128374,
+          "retry_after": "1",
+          "request_id": "ba2282ff-e8e9-4561-bd96-684eddac9eb9"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 260.159699995711,
+          "retry_after": "1",
+          "request_id": "54c6b033-3ffb-4fcb-bc9d-3dc8e8ec2a12"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.9345000002649613,
+          "retry_after": "1",
+          "request_id": "67488e5f-372b-4215-b3d9-7b58e77a86a1"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.740000000107102,
+          "retry_after": "1",
+          "request_id": "bdbd07c6-1b7d-4125-9f5b-4d3b585a075a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.248500004701782,
+          "retry_after": "1",
+          "request_id": "39c1aae1-7cc4-4a65-9086-149eaa2323d8"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.7611000007018447,
+          "retry_after": "1",
+          "request_id": "c6d4626f-8e0d-429f-9478-bc5de1672f34"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.3848000020952895,
+          "retry_after": "1",
+          "request_id": "9fbc7e3a-75b6-4397-9b77-048514582269"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 4.085299995495006,
+          "retry_after": "1",
+          "request_id": "26bde370-78a7-44d7-bd73-0e89f35fb4a6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.8870999997016042,
+          "retry_after": "1",
+          "request_id": "32975198-6526-424c-986e-710c8a239997"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.583599998615682,
+          "retry_after": "1",
+          "request_id": "406be8fd-1a92-4e4f-a378-8ad062daed68"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.2037999990279786,
+          "retry_after": "1",
+          "request_id": "f2c155ba-eca4-4f94-b065-d34ee0b26f1d"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.707799998461269,
+          "retry_after": "1",
+          "request_id": "5fa397f6-abf2-4111-9cf0-18bd7ae0b8a5"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.7788000006694347,
+          "retry_after": "1",
+          "request_id": "d6949056-b9c9-415d-8711-381d154876a6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.7160000026924536,
+          "retry_after": "1",
+          "request_id": "eabdceb1-85e4-4238-8c8e-df86f4680ac6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.838500004145317,
+          "retry_after": "1",
+          "request_id": "db417cda-3c5c-43a0-beed-4465d9fe5bd5"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.130299999611452,
+          "retry_after": "1",
+          "request_id": "cfa74b90-dad6-49fe-ac4f-a5adae9dd56e"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 4.542700000456534,
+          "retry_after": "1",
+          "request_id": "2d8364c7-e998-424b-8c70-4b2d379e1e97"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.6731000034487806,
+          "retry_after": "1",
+          "request_id": "1a7f61b5-3a70-4c28-8c5c-85561f28875c"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.9693000033148564,
+          "retry_after": "1",
+          "request_id": "6640be18-2204-4b7c-bfe8-e0802697b379"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.2815999982412905,
+          "retry_after": "1",
+          "request_id": "29ff4d7f-cccf-4e1f-9a49-f68e538edf7a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.4241999999503605,
+          "retry_after": "1",
+          "request_id": "830552f4-2cba-4217-8b13-90be7199d17d"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.077800000028219,
+          "retry_after": "1",
+          "request_id": "352674ea-8337-4cd0-9e6f-c95193d2d5b1"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.3533999992650934,
+          "retry_after": "1",
+          "request_id": "80e4968b-846b-470b-bfdc-e3a8eb68b28a"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.0576999997720122,
+          "retry_after": "1",
+          "request_id": "7a71de92-e4fe-4d3b-be18-badea094af22"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 4.293300000426825,
+          "retry_after": "1",
+          "request_id": "57c56d02-7e43-4e56-8a16-898bf8df715c"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.3528000058140606,
+          "retry_after": "1",
+          "request_id": "363757aa-0f05-40e6-9684-3e097e2e5208"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.706300001591444,
+          "retry_after": "1",
+          "request_id": "b563cb5e-bf0e-4b0c-8588-352b211a3627"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.1482000049436465,
+          "retry_after": "1",
+          "request_id": "f95632ed-9c5e-4153-9e9a-ba9a3aca5fd5"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 4.057199999806471,
+          "retry_after": "1",
+          "request_id": "a73643ec-664c-4ecd-87c8-1d57ffec572b"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.0141999959596433,
+          "retry_after": "1",
+          "request_id": "707e2978-4672-45f1-97e1-652dd30e692e"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.7053999947384,
+          "retry_after": "1",
+          "request_id": "3826e672-21a1-43d2-a3ac-35ac13a3ace5"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.7240999988862313,
+          "retry_after": "1",
+          "request_id": "43620228-0a37-4eda-81e4-1369335f2d6b"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.6498000044957735,
+          "retry_after": "1",
+          "request_id": "7b48cc7f-853b-4d95-9d0a-89c4d3b4fed5"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.6177000001771376,
+          "retry_after": "1",
+          "request_id": "49f8d644-0e3e-4c12-bfb6-b61a92217499"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.2190999991144054,
+          "retry_after": "1",
+          "request_id": "d5425e3c-7cac-4a70-9546-ce1a868c2032"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.535899995767977,
+          "retry_after": "1",
+          "request_id": "7bf8a419-14fc-4997-a8e4-5c14678e880f"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 3.2330000030924566,
+          "retry_after": "1",
+          "request_id": "9d5ade91-1921-4881-ac4d-b9f399ab39e6"
+        },
+        {
+          "path": "/api/v1/patients/me",
+          "status": 503,
+          "latency_ms": 2.321699997992255,
+          "retry_after": "1",
+          "request_id": "6a5f5cf1-8e30-4416-a149-24f16f65d029"
+        }
+      ],
+      "health": {
+        "path": "/healthz",
+        "status": 503,
+        "latency_ms": 261.6028000047663,
+        "retry_after": null,
+        "request_id": "746b6cf7-0e61-46df-b2f4-8018c8e5989d"
+      },
+      "before": {
+        "system_errors": 0,
+        "error_occurrences": 0,
+        "transactions": 0,
+        "economic_effects": 0,
+        "blocked_auth_connections": 0
+      },
+      "after": {
+        "system_errors": 1,
+        "error_occurrences": 1,
+        "transactions": 0,
+        "economic_effects": 0,
+        "blocked_auth_connections": 0
+      },
+      "elapsed_seconds": 5.248877699996228,
+      "metrics": [
+        503,
+        {}
+      ],
+      "all_fail_closed": true,
+      "incident_row_delta": 1
+    },
+    {
+      "case_id": "auth_pool_pressure",
+      "lock_seconds": 12,
+      "offered_parallel_requests": 12,
+      "lock_process_exit": 0,
+      "samples": [
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            503,
+            {}
+          ],
+          "process": {
+            "rss_bytes": 35815424,
+            "private_bytes": 10240000,
+            "cpu_seconds": 0.515625
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            503,
+            {}
+          ],
+          "process": {
+            "rss_bytes": 35815424,
+            "private_bytes": 10240000,
+            "cpu_seconds": 0.515625
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            503,
+            {}
+          ],
+          "process": {
+            "rss_bytes": 35766272,
+            "private_bytes": 10149888,
+            "cpu_seconds": 0.515625
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            503,
+            {}
+          ],
+          "process": {
+            "rss_bytes": 35766272,
+            "private_bytes": 10149888,
+            "cpu_seconds": 0.53125
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 1,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            503,
+            {}
+          ],
+          "process": {
+            "rss_bytes": 35766272,
+            "private_bytes": 10149888,
+            "cpu_seconds": 0.53125
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 2,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            503,
+            {}
+          ],
+          "process": {
+            "rss_bytes": 35782656,
+            "private_bytes": 10149888,
+            "cpu_seconds": 0.546875
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 2,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            503,
+            {}
+          ],
+          "process": {
+            "rss_bytes": 35782656,
+            "private_bytes": 10149888,
+            "cpu_seconds": 0.546875
+          }
+        },
+        {
+          "db": {
+            "system_errors": 1,
+            "error_occurrences": 2,
+            "transactions": 0,
+            "economic_effects": 0,
+            "blocked_auth_connections": 0
+          },
+          "metrics": [
+            503,
+            {}
+          ],
+          "process": {
+            "rss_bytes": 35782656,
+            "private_bytes": 10149888,
+            "cpu_seconds": 0.546875
+          }
+        }
+      ],
+      "new_request_during_pressure": {
+        "path": "/api/v1/patients/me",
+        "status": 503,
+        "latency_ms": 2.702900004805997,
+        "retry_after": "1",
+        "request_id": "1b405a9d-9901-491d-a708-b48d0341859c"
+      },
+      "health_during_pressure": {
+        "path": "/healthz",
+        "status": 503,
+        "latency_ms": 3.660800000943709,
+        "retry_after": null,
+        "request_id": "123c3a3e-95b7-43cc-9789-6e92c979ca94"
+      },
+      "requests": [
+        {
+          "status": 503,
+          "latency_ms": 4.177899994829204,
+          "retry_after": "1",
+          "request_id": "0d9cd328-283a-4c6f-ace2-89fe5e199190"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.66809999832185,
+          "retry_after": "1",
+          "request_id": "52ee3ee0-a87f-4cd1-a3de-5b051bc64cab"
+        },
+        {
+          "status": 503,
+          "latency_ms": 4.280499997548759,
+          "retry_after": "1",
+          "request_id": "84d3ced9-051e-45c3-9622-969b3a7f3ef4"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.3210000037797727,
+          "retry_after": "1",
+          "request_id": "87ac4a3b-ab8d-438f-bbd5-8e1a486d2ea4"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.4474999993108213,
+          "retry_after": "1",
+          "request_id": "22ee1990-4d63-4a01-ad2f-f0f03e219b08"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.4406999984639697,
+          "retry_after": "1",
+          "request_id": "1ff97455-05e9-48f0-8cdd-6b38a5c19881"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.144100002828054,
+          "retry_after": "1",
+          "request_id": "11c1636c-b165-4e0d-9bef-f74d45be6523"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.4544000009191222,
+          "retry_after": "1",
+          "request_id": "92d408e4-7e6d-4327-9907-e716652d8f81"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.2576000012340955,
+          "retry_after": "1",
+          "request_id": "835131a9-7ece-4532-9ec7-97dcf19b32f4"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.4006999994744547,
+          "retry_after": "1",
+          "request_id": "ce4303c5-247c-4808-9494-a2c2d70e809c"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.8507999997818843,
+          "retry_after": "1",
+          "request_id": "f31a5fc6-8ac8-4401-b5d0-ca04a160aa65"
+        },
+        {
+          "status": 503,
+          "latency_ms": 3.290799999376759,
+          "retry_after": "1",
+          "request_id": "c26fd12c-f340-4460-bf21-4b0b64fb182f"
+        }
+      ],
+      "db_waiter_count": "NOT_MEASURED",
+      "sql_lock_waits_observed": true
+    }
+  ],
+  "baseline": {
+    "path": "/api/v1/patients/me",
+    "status": 200,
+    "latency_ms": 76.0112999996636,
+    "retry_after": null,
+    "request_id": "d02b6a69-fa41-478f-8f91-795211746c0b"
+  },
+  "redis_recovery": {
+    "path": "/healthz",
+    "status": 503,
+    "latency_ms": 4.887700000836048,
+    "retry_after": null,
+    "request_id": "7445b96b-7a83-47fb-a1cd-6f5ad9cb36a9"
+  },
+  "after_recovery": {
+    "path": "/api/v1/patients/me",
+    "status": 503,
+    "latency_ms": 2.729400002863258,
+    "retry_after": "1",
+    "request_id": "e761c770-a6df-4010-867f-a5817d392079"
+  },
+  "final_db": {
+    "system_errors": 1,
+    "error_occurrences": 2,
+    "transactions": 0,
+    "economic_effects": 0,
+    "blocked_auth_connections": 0
+  },
+  "final_metrics": [
+    503,
+    {}
+  ],
+  "credentials_logged": false,
+  "backend_stopped": true
+}

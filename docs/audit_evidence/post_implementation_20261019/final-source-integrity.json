@@ -1,0 +1,58 @@
+﻿{
+    "recorded_utc":  "2026-10-19T13:49:43.1306881Z",
+    "baseline_scoped_files":  539,
+    "changed_files":  [
+                          {
+                              "path":  "services/backend/src/api/router.rs",
+                              "baseline_sha256":  "7aafca1e564216c0b5070a369b078e2c091ba736b22590e0fca97b2f6c60c20e",
+                              "final_sha256":  "49808c8ab3ad5d4bf3cfcba70dcdd05c84a3fc52bd4f0c4cdeb05b396de2ecf1",
+                              "changed":  true
+                          },
+                          {
+                              "path":  "services/backend/src/api/v1/webhook_handlers.rs",
+                              "baseline_sha256":  "645d851f4919849a2debcd9ac91c534be6d03fc3a0031a189a889aca356a21d9",
+                              "final_sha256":  "1677971312bc8756a06408551b8151c033cbab3368fbc307695f46a185b2e87b",
+                              "changed":  true
+                          },
+                          {
+                              "path":  "services/backend/src/rate_limit.rs",
+                              "baseline_sha256":  "17acf443ef9299a0b666cf48e711f8b314820bb40017a85dea6ab9a8497a0432",
+                              "final_sha256":  "eefc9a59e0556470b91f12677ee26371f36fd13fb0e011fbc090663b9ad4acae",
+                              "changed":  true
+                          },
+                          {
+                              "path":  "services/backend/src/services/auth_abuse.rs",
+                              "baseline_sha256":  "781e47dcd22a6202ce40402e10ae6b4129a3890e956be6140879cf804da13d59",
+                              "final_sha256":  "c61b71db751227a4401320ce16da21c937ae5027acd289b5273922140db02ae3",
+                              "changed":  true
+                          },
+                          {
+                              "path":  "services/backend/src/telemetry/mod.rs",
+                              "baseline_sha256":  "8df728824bdced80afa710b8a61e76aad0ef24ef57ad71fe3d34c6d809c3bc79",
+                              "final_sha256":  "6e3ecb08af95db2c555834e252b7f887015a91217be23adc5edc5c4b102680e6",
+                              "changed":  true
+                          },
+                          {
+                              "path":  "services/backend/tests/api_tests.rs",
+                              "baseline_sha256":  "291d0d3b84e15879071efdb140dfea5ee25a8ed0c9104acb57277585b5ea5a43",
+                              "final_sha256":  "8819b63514abdb3569d475311f092c79335845d11fe696b8361d9921f9d7a738",
+                              "changed":  true
+                          }
+                      ],
+    "unchanged_files":  533,
+    "baseline_test_files":  92,
+    "unchanged_test_files":  91,
+    "changed_test_paths":  [
+                               "services/backend/tests/api_tests.rs"
+                           ],
+    "migration_files_changed":  0,
+    "source_files_deleted":  0,
+    "unrelated_baseline_files_preserved":  true,
+    "assertion_preservation_evidence":  "Parent patch review and independent economic/auth/resilience source reviews; baseline hashes prove all other test files unchanged. Not an automated semantic proof of pre-existing dirty edits.",
+    "EXISTING_TESTS_DELETED":  0,
+    "EXISTING_ASSERTIONS_DELETED":  0,
+    "TEST_ASSERTIONS_WEAKENED":  0,
+    "TEST_SKIP_IGNORE_ADDED":  0,
+    "TEST_FAILURES_SWALLOWED":  0,
+    "runtime_acceptance":  "UNFINISHED_BLOCKED_ENVIRONMENT"
+}

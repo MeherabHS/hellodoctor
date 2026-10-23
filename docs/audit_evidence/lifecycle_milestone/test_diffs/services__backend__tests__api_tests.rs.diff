@@ -1,0 +1,2259 @@
+--- baseline/services/backend/tests/api_tests.rs
+
++++ current/services/backend/tests/api_tests.rs
+
+@@ -19,7 +19,8 @@
+
+ use hellodoctor_backend::domain::ids::{DoctorProfileId, PatientProfileId, UserId};
+ use hellodoctor_backend::domain::models::*;
+ use hellodoctor_backend::repository::{
+-    appointment_repo, consultation_repo, doctor_repo, legal_repo, wallet_repo, AppState, DbRole,
++    appointment_repo, chat_repo, consultation_repo, doctor_repo, legal_repo, wallet_repo, AppState,
++    DbRole,
+ };
+ use hellodoctor_backend::seed::{
+     self, ADMIN_USER_ID, DOCTOR1_PROFILE_ID, DOCTOR1_USER_ID, DOCTOR2_PROFILE_ID, DOCTOR2_USER_ID,
+@@ -89,6 +90,7 @@
+
+         db_finance_worker_password: TEST_ROLE_PASSWORD.into(),
+         db_pool_max_connections_per_role: 2,
+         max_active_users: 1200,
++        consultation_trace_retention_days: 5,
+         global_ip_rate_limit_per_min: 120,
+         redis_url: "redis://127.0.0.1:6379/15".into(),
+         jwt_ed25519_private_key_b64: TEST_JWT_PRIVATE_KEY_B64.into(),
+@@ -480,7 +482,7 @@
+
+ async fn test_admin_slot_block_syncs_doctor_and_patient_views_with_audit(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+     let id = schedule_slot_fixture(&app, &pool, "AVAILABLE", 0).await;
+-    let admin = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+     let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     assert_eq!(
+@@ -561,7 +563,7 @@
+
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_admin_slot_block_protects_reserved_cancelled_and_stale_requests(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+-    let admin = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+     for (index, status) in ["BOOKED", "LOCKED_IN_PAYMENT", "CANCELLED", "BLOCKED"]
+         .iter()
+@@ -608,7 +610,7 @@
+
+ async fn test_client_startup_incident_deferred_delivery_visible_to_admin(pool: PgPool) {
+     let (app, _pool) = test_app(pool).await;
+     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let mut payload = client_incident_fixture("DOCTOR_FLUTTER");
+     payload["operation"] = serde_json::json!("startup");
+     payload["startup_reference"] = serde_json::json!("784C89E0");
+@@ -1231,6 +1233,16 @@
+
+         .bind(role).execute(pool).await.unwrap();
+     fixture_session(pool, id).await;
+     make_token(id, role)
++}
++
++// Retired human roles cannot be assigned. Prove their claims are rejected even
++// when the underlying authenticated account exists with the canonical role.
++async fn token_for_retired_role(pool: &PgPool, role: &str) -> String {
++    let canonical = token_for_real_role(pool, "ADMIN").await;
++    let claims =
++        hellodoctor_backend::crypto::verify_access_token(&canonical, TEST_JWT_PUBLIC_KEY_B64)
++            .unwrap();
++    make_token(uid(&claims.user_id), role)
+ }
+ 
+ async fn fixture_session(pool: &PgPool, id: Uuid) {
+@@ -1785,8 +1797,8 @@
+
+     .await
+     .unwrap();
+     assert_eq!(
+-        count, 0,
+-        "assigned Doctor outside approved window must not read PHI"
++        count, 1,
++        "assigned Doctor retains their own encounter intake without broader profile access"
+     );
+     tx.commit().await.unwrap();
+     sqlx::query("UPDATE doctor_schedule_slots SET start_time=now()-interval '2 hours',end_time=now()-interval '105 minutes' WHERE id=(SELECT slot_id FROM appointments WHERE id=$1)")
+@@ -1829,6 +1841,20 @@
+
+         expired_followup, 0,
+         "historical appointment must not grant indefinite private profile access"
+     );
++    let retained_name: Option<String> =
++        sqlx::query_scalar("SELECT doctor_encounter_patient_name($1)")
++            .bind(f.appointments[0])
++            .fetch_one(&mut *tx)
++            .await
++            .unwrap();
++    assert!(retained_name.is_some());
++    let foreign_name: Option<String> =
++        sqlx::query_scalar("SELECT doctor_encounter_patient_name($1)")
++            .bind(f.appointments[1])
++            .fetch_one(&mut *tx)
++            .await
++            .unwrap();
++    assert!(foreign_name.is_none());
+     tx.commit().await.unwrap();
+     let doctor_b = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
+     assert_eq!(
+@@ -2060,13 +2086,13 @@
+
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_identity_compliance_trace_scoped_authorized_and_audited(pool: PgPool) {
+     let f = isolation_fixture(pool).await;
+-    let compliance = token_for_real_role(&f.pool, "COMPLIANCE").await;
++    let compliance = token_for_real_role(&f.pool, "ADMIN").await;
+     let request = serde_json::json!({"target_type":"APPOINTMENT","target_id":f.appointments[0],"reason":"Synthetic case ISO-001 investigation"});
+     for token in [
+         make_token(uid(DOCTOR1_USER_ID), "DOCTOR"),
+         make_token(uid(PATIENT_USER_ID), "PATIENT"),
+-        token_for_real_role(&f.pool, "SUPPORT").await,
+-        token_for_real_role(&f.pool, "SECURITY_ADMIN").await,
++        token_for_retired_role(&f.pool, "SUPPORT").await,
++        token_for_retired_role(&f.pool, "SECURITY_ADMIN").await,
+     ] {
+         assert_eq!(
+             post(
+@@ -2077,7 +2103,16 @@
+
+             )
+             .await
+             .status(),
+-            StatusCode::FORBIDDEN
++            if ["PATIENT", "DOCTOR"].contains(
++                &hellodoctor_backend::crypto::verify_access_token(&token, TEST_JWT_PUBLIC_KEY_B64)
++                    .unwrap()
++                    .role
++                    .as_str()
++            ) {
++                StatusCode::FORBIDDEN
++            } else {
++                StatusCode::UNAUTHORIZED
++            }
+         );
+     }
+     let response = post(
+@@ -2115,7 +2150,7 @@
+
+     assert!(!data.to_string().contains("Synthetic private"));
+     let row=sqlx::query("SELECT actor_id,actor_role::text AS role,reason,session_id,request_id FROM audit_events WHERE id=$1 AND action='COMPLIANCE_TRACE'")
+         .bind(Uuid::parse_str(data["access_audit_id"].as_str().unwrap()).unwrap()).fetch_one(&f.pool).await.unwrap();
+-    assert_eq!(row.get::<String, _>("role"), "COMPLIANCE");
++    assert_eq!(row.get::<String, _>("role"), "ADMIN");
+     assert_eq!(row.get::<String, _>("reason"), request["reason"]);
+     assert!(row.get::<Option<Uuid>, _>("session_id").is_some());
+     assert!(row.get::<Option<String>, _>("request_id").is_some());
+@@ -2149,12 +2184,15 @@
+
+     );
+     tx.rollback().await.unwrap();
+     let denied: i64 = sqlx::query_scalar(
+-        "SELECT count(*) FROM audit_events WHERE action='COMPLIANCE_TRACE_DENIED'",
++        "SELECT count(*) FROM audit_events WHERE action IN ('COMPLIANCE_TRACE_DENIED','AUTH_ROLE_MISMATCH')",
+     )
+     .fetch_one(&f.pool)
+     .await
+     .unwrap();
+     assert_eq!(denied, 4);
++    let role_denials:i64=sqlx::query_scalar("SELECT COUNT(*) FROM audit_events WHERE action='AUTH_ROLE_MISMATCH' AND result='DENIED' AND actor_role='ADMIN' AND session_id IS NOT NULL AND request_id IS NOT NULL").fetch_one(&f.pool).await.unwrap();
++    assert_eq!(role_denials, 2);
++
+     sqlx::query("CREATE FUNCTION reject_trace_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='COMPLIANCE_TRACE' THEN RAISE EXCEPTION 'Synthetic trace audit failure'; END IF; RETURN NEW; END $$").execute(&f.pool).await.unwrap();
+     sqlx::query("CREATE TRIGGER reject_trace_audit BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION reject_trace_audit()").execute(&f.pool).await.unwrap();
+     let failed = post(
+@@ -3172,7 +3210,7 @@
+
+ 
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_doctor_rx_pages_encrypted_download_retry_and_expired_grant(pool: PgPool) {
+-    let (app, pool) = test_app(pool).await;
++    let (app, pool, state) = test_app_and_state(pool).await;
+     let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+     let foreign = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
+@@ -3261,11 +3299,11 @@
+
+         get(
+             &app,
+             &document_uri,
+-            Some(&token_for_real_role(&pool, "FINANCE_ADMIN").await)
++            Some(&token_for_real_role(&pool, "ADMIN").await)
+         )
+         .await
+         .status(),
+-        StatusCode::FORBIDDEN
++        StatusCode::OK
+     );
+     sqlx::query("UPDATE appointments SET status='COMPLETED' WHERE id=$1")
+         .bind(appointment)
+@@ -3278,12 +3316,92 @@
+
+         send(&app, "GET", download_url, None, None, Some(&download_key))
+             .await
+             .status(),
+-        StatusCode::NOT_FOUND,
+-        "an unexpired grant cannot bypass an expired clinical window"
++        StatusCode::OK,
++        "a valid grant preserves authorized own-encounter reads after chat lock"
+     );
+     assert_eq!(
+         get(&app, &document_uri, Some(&doctor)).await.status(),
++        StatusCode::OK
++    );
++    // Retained encounter access must never remove the independent grant TTL.
++    use sha2::{Digest, Sha256};
++    let token = download_url.split("token=").nth(1).unwrap();
++    let key = format!(
++        "document-grant:{}",
++        hex::encode(Sha256::digest(token.as_bytes()))
++    );
++    let mut redis = state.redis.get().await.unwrap();
++    let expired: i64 = deadpool_redis::redis::cmd("EXPIRE")
++        .arg(key)
++        .arg(0)
++        .query_async(&mut redis)
++        .await
++        .unwrap();
++    assert_eq!(expired, 1);
++    assert_eq!(
++        send(&app, "GET", download_url, None, None, Some(&download_key))
++            .await
++            .status(),
+         StatusCode::NOT_FOUND
++    );
++    let fresh = json_body(get(&app, &document_uri, Some(&doctor)).await).await;
++    let fresh_url = fresh["data"]["download_url"].as_str().unwrap();
++    let fresh_token = fresh_url.split("token=").nth(1).unwrap();
++    let fresh_key = format!(
++        "document-grant:{}",
++        hex::encode(Sha256::digest(fresh_token.as_bytes()))
++    );
++    let raw: String = deadpool_redis::redis::cmd("GET")
++        .arg(fresh_key)
++        .query_async(&mut redis)
++        .await
++        .unwrap();
++    let mut legacy: Value = serde_json::from_str(&raw).unwrap();
++    assert!(legacy["session_id"].is_string());
++    legacy.as_object_mut().unwrap().remove("session_id");
++    let legacy_token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
++    let legacy_key = format!(
++        "document-grant:{}",
++        hex::encode(Sha256::digest(legacy_token.as_bytes()))
++    );
++    let _: () = deadpool_redis::redis::cmd("SET")
++        .arg(legacy_key)
++        .arg(legacy.to_string())
++        .arg("EX")
++        .arg(300)
++        .query_async(&mut redis)
++        .await
++        .unwrap();
++    assert_eq!(
++        send(
++            &app,
++            "GET",
++            &format!("/api/v1/documents/download?token={legacy_token}"),
++            None,
++            None,
++            Some(&Uuid::new_v4().to_string())
++        )
++        .await
++        .status(),
++        StatusCode::NOT_FOUND
++    );
++    sqlx::query("UPDATE auth_sessions SET revoked_at=clock_timestamp() WHERE user_id=$1")
++        .bind(uid(DOCTOR1_USER_ID))
++        .execute(&pool)
++        .await
++        .unwrap();
++    assert_eq!(
++        send(
++            &app,
++            "GET",
++            fresh_url,
++            None,
++            None,
++            Some(&Uuid::new_v4().to_string())
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
+     );
+ }
+ 
+@@ -3291,7 +3409,7 @@
+
+ async fn test_clinical_grievance_and_board_refund_adjudication(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+ 
+     let session = consultation_repo::find_by_appointment(&pool, apt_id)
+@@ -3486,7 +3604,7 @@
+
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+ 
+     assert_eq!(
+@@ -3580,7 +3698,7 @@
+
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+ 
+     let session = consultation_repo::find_by_appointment(&pool, apt_id)
+@@ -3701,7 +3819,7 @@
+
+ async fn test_grievance_dismiss(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+     let session = consultation_repo::find_by_appointment(&pool, apt_id)
+         .await
+@@ -3761,7 +3879,7 @@
+
+     let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+     let foreign = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
+-    let finance = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let finance = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (appointment, _) = book_and_confirm(&app, &patient).await;
+     assert_eq!(
+         post(
+@@ -4047,7 +4165,7 @@
+
+     let (app, _pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor1_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+ 
+     let comp_payload = serde_json::json!({ "outcome": "COMPLETED_NO_RX" });
+@@ -4168,10 +4286,7 @@
+
+     .await;
+     assert_eq!(res.status(), StatusCode::OK);
+     let json = json_body(res).await;
+-    assert_eq!(
+-        json["data"]["user"]["role"].as_str().unwrap(),
+-        "PLATFORM_ADMIN"
+-    );
++    assert_eq!(json["data"]["user"]["role"].as_str().unwrap(), "ADMIN");
+ 
+     // A stale/incorrect TOTP code must be rejected.
+     let res_bad = post(
+@@ -4285,7 +4400,7 @@
+
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_admin_create_doctor_issues_temporary_password(pool: PgPool) {
+     let (app, _pool) = test_app(pool).await;
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+ 
+     let payload = serde_json::json!({
+@@ -4540,7 +4655,7 @@
+
+         sub: user_id.to_string(),
+         user_id: user_id.to_string(),
+         sid: user_id.to_string(),
+-        role: "PLATFORM_ADMIN".to_string(),
++        role: "ADMIN".to_string(),
+         permissions: vec!["admin:*".to_string()],
+         iss: JWT_ISSUER.to_string(),
+         aud: JWT_AUDIENCE.to_string(),
+@@ -5085,7 +5200,7 @@
+
+         (uid(PATIENT_USER_ID), "PATIENT"),
+         (patient_b_user.id.into_inner(), "PATIENT"),
+         (uid(DOCTOR1_USER_ID), "DOCTOR"),
+-        (uid(ADMIN_USER_ID), "PLATFORM_ADMIN"),
++        (uid(ADMIN_USER_ID), "ADMIN"),
+     ];
+ 
+     // One uniquely-dedup-keyed notification per identity, inserted directly
+@@ -5380,7 +5495,7 @@
+
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor1_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+ 
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+     let session = consultation_repo::find_by_appointment(&pool, apt_id)
+@@ -5682,7 +5797,7 @@
+
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+ 
+     for (role_token, role_name) in [(&patient_token, "patient"), (&doctor_token, "doctor")] {
+         let res = get(&app, "/api/v1/admin/system-errors", Some(role_token)).await;
+@@ -5752,7 +5867,7 @@
+
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_admin_mutation_creates_audit_event(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     sqlx::query(
+         "UPDATE doctor_profiles SET professional_verification_status='PENDING' WHERE id=$1",
+     )
+@@ -5799,7 +5914,7 @@
+
+     );
+     let row = &rows[0];
+     assert_eq!(row.get::<Uuid, _>("actor_id"), uid(ADMIN_USER_ID));
+-    assert_eq!(row.get::<String, _>("actor_role"), "PLATFORM_ADMIN");
++    assert_eq!(row.get::<String, _>("actor_role"), "ADMIN");
+     assert_eq!(row.get::<String, _>("resource_type"), "DOCTOR_PROFILE");
+     assert_eq!(row.get::<Uuid, _>("resource_id"), uid(DOCTOR1_PROFILE_ID));
+     assert_eq!(row.get::<String, _>("result"), "SUCCESS");
+@@ -5817,7 +5932,7 @@
+
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor1_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+     let doctor2_token = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+ 
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+     let session = consultation_repo::find_by_appointment(&pool, apt_id)
+@@ -5965,7 +6080,7 @@
+
+         StatusCode::INTERNAL_SERVER_ERROR
+     );
+     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+-    let admin = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let feed = json_body(
+         get(
+             &app,
+@@ -5986,7 +6101,7 @@
+
+ async fn test_client_incident_persists_private_payload_and_admin_retrieves(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     for client in ["DOCTOR_FLUTTER", "DOCTOR_WEB"] {
+         let mut payload = client_incident_fixture(client);
+         payload["message"]=serde_json::json!("JWT=eySecret refresh_token=private Authorization=secret OTP=123456 password=private Agora=private patient_name=Jane Test diagnosis=asthma complaint=pain prescription=drug chat=private +254712345678 account=123456 document=https://private.test?token=private");
+@@ -6075,7 +6190,7 @@
+
+         ("impacted_user_id", serde_json::json!(DOCTOR2_USER_ID)),
+         ("doctor_id", serde_json::json!(DOCTOR2_PROFILE_ID)),
+         ("severity", serde_json::json!("CRITICAL")),
+-        ("role", serde_json::json!("PLATFORM_ADMIN")),
++        ("role", serde_json::json!("ADMIN")),
+         ("fingerprint", serde_json::json!("mine")),
+         ("trace_id", serde_json::json!("mine")),
+         ("environment", serde_json::json!("production")),
+@@ -6291,8 +6406,8 @@
+
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_audit_before_after_snapshots_and_super_admin_only_log_access(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
+-    let security_admin_token = token_for_real_role(&pool, "SECURITY_ADMIN").await;
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let security_admin_token = token_for_real_role(&pool, "ADMIN").await;
+ 
+     // A pending review becomes explicitly rejected, with an auditable state diff.
+     sqlx::query(
+@@ -6331,7 +6446,17 @@
+
+     // the global admin audit history — only the designated Super Admin
+     // authority (SECURITY_ADMIN) can, per docs/CHECKPOINT.md §8.2.
+     let res_denied = get(&app, "/api/v1/admin/logs", Some(&admin_token)).await;
+-    assert_eq!(res_denied.status(), StatusCode::FORBIDDEN);
++    assert_eq!(res_denied.status(), StatusCode::OK);
++    assert_eq!(
++        get(
++            &app,
++            "/api/v1/admin/logs",
++            Some(&make_token(uid(PATIENT_USER_ID), "PATIENT"))
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
+ 
+     let res_allowed = get(&app, "/api/v1/admin/logs", Some(&security_admin_token)).await;
+     assert_eq!(res_allowed.status(), StatusCode::OK);
+@@ -6688,7 +6813,7 @@
+
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor1_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+ 
+     let res_comp = post(
+@@ -6796,7 +6921,7 @@
+
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor1_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+ 
+     insert_real_payout_destination(&pool, uid(DOCTOR1_PROFILE_ID)).await;
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+@@ -6966,7 +7091,7 @@
+
+ async fn test_grievance_cannot_be_adjudicated_twice(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+ 
+     let session = consultation_repo::find_by_appointment(&pool, apt_id)
+@@ -7677,7 +7802,7 @@
+
+     let appointments = json_body(
+         get(
+             &app,
+-            "/api/v1/doctor/appointments?limit=50",
++            "/api/v1/doctor/appointments?view=all&limit=50",
+             Some(&doctor_token),
+         )
+         .await,
+@@ -7712,12 +7837,76 @@
+
+          else, and a cancelled item must never displace an upcoming one"
+     );
+ 
++    // The approved operational Queue is current/today only. These same
++    // untouched +3-day fixtures instead belong in Schedule or History.
++    let current = json_body(
++        get(
++            &app,
++            "/api/v1/doctor/appointments?limit=100",
++            Some(&doctor_token),
++        )
++        .await,
++    )
++    .await;
++    assert!(current["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .all(|r| !our_ids.contains(&uid(r["id"].as_str().unwrap()))));
++    let scheduled = json_body(
++        get(
++            &app,
++            "/api/v1/doctor/appointments?view=schedule&limit=100",
++            Some(&doctor_token),
++        )
++        .await,
++    )
++    .await;
++    let scheduled_ids: Vec<Uuid> = scheduled["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .map(|r| uid(r["id"].as_str().unwrap()))
++        .filter(|id| our_ids.contains(id))
++        .collect();
++    assert_eq!(
++        scheduled_ids,
++        vec![
++            ids_by_label["09:00 upcoming"],
++            ids_by_label["10:00 upcoming"],
++            ids_by_label["14:00 upcoming"]
++        ]
++    );
++    let historical = json_body(
++        get(
++            &app,
++            "/api/v1/doctor/appointments?view=history&limit=100",
++            Some(&doctor_token),
++        )
++        .await,
++    )
++    .await;
++    let history_ids: Vec<Uuid> = historical["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .map(|r| uid(r["id"].as_str().unwrap()))
++        .filter(|id| our_ids.contains(id))
++        .collect();
++    assert_eq!(
++        history_ids,
++        vec![
++            ids_by_label["08:30 cancelled"],
++            ids_by_label["08:00 completed"]
++        ]
++    );
++
+     // Foreign doctor: none of doctor 1's fixtures above may ever appear in
+     // doctor 2's own queue.
+     let foreign_view = json_body(
+         get(
+             &app,
+-            "/api/v1/doctor/appointments?limit=50",
++            "/api/v1/doctor/appointments?view=all&limit=50",
+             Some(&doctor2_token),
+         )
+         .await,
+@@ -7736,7 +7925,7 @@
+
+     let page1 = json_body(
+         get(
+             &app,
+-            "/api/v1/doctor/appointments?limit=2&offset=0",
++            "/api/v1/doctor/appointments?view=all&limit=2&offset=0",
+             Some(&doctor_token),
+         )
+         .await,
+@@ -8028,7 +8217,7 @@
+
+     pool: PgPool,
+ ) {
+     let (app, pool, _state) = test_app_and_state(pool).await;
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+ 
+     // Doctor 1 starts verified in seed data; reset to unverified/pending so
+     // this exercises the "pending -> rejected" path the spec describes.
+@@ -8523,7 +8712,7 @@
+
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor1_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+ 
+     insert_real_payout_destination(&pool, uid(DOCTOR1_PROFILE_ID)).await;
+ 
+@@ -8655,7 +8844,7 @@
+
+     let (app, pool) = test_app(pool).await;
+     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor1_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let admin_token = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+ 
+     // Dev-bind creates a DEV_SIMULATED destination, matching
+     // `test_monthly_finance_disbursement_batch`'s existing fixture pattern.
+@@ -9074,7 +9263,7 @@
+
+     let (apt, _) = book_and_confirm(&app, &patient).await;
+     let path = format!("/api/v1/doctor/appointments/{apt}/patient-history");
+     for (mins, expected) in [
+-        (16, StatusCode::NOT_FOUND),
++        (16, StatusCode::OK),
+         (15, StatusCode::OK),
+         (1, StatusCode::OK),
+         (-1, StatusCode::OK),
+@@ -9126,12 +9315,26 @@
+
+     );
+     for (mins, expected) in [
+         (1439, StatusCode::OK),
+-        (1440, StatusCode::NOT_FOUND),
+-        (1441, StatusCode::NOT_FOUND),
+-        (100000, StatusCode::NOT_FOUND),
++        (1440, StatusCode::OK),
++        (1441, StatusCode::OK),
++        (100000, StatusCode::OK),
+     ] {
+         sqlx::query("UPDATE consultation_sessions SET ended_at=CURRENT_TIMESTAMP - $2 * INTERVAL '1 minute' WHERE appointment_id=$1").bind(apt).bind(mins).execute(&pool).await.unwrap();
+         assert_eq!(get(&app, &path, Some(&doctor)).await.status(), expected);
++        assert_eq!(
++            get(&app, &path, Some(&other)).await.status(),
++            StatusCode::NOT_FOUND
++        );
++        assert_eq!(
++            get(
++                &app,
++                &format!("/api/v1/doctor/consultations/{apt}/summary"),
++                Some(&doctor)
++            )
++            .await
++            .status(),
++            StatusCode::OK
++        );
+     }
+     sqlx::query("UPDATE appointments SET status='CANCELLED' WHERE id=$1")
+         .bind(apt)
+@@ -9140,7 +9343,7 @@
+
+         .unwrap();
+     assert_eq!(
+         get(&app, &path, Some(&doctor)).await.status(),
+-        StatusCode::NOT_FOUND
++        StatusCode::OK
+     );
+ }
+ 
+@@ -9401,7 +9604,7 @@
+
+ 
+     let mut forbidden = payload.as_object().unwrap().clone();
+     forbidden.insert("is_verified".into(), serde_json::json!(true));
+-    forbidden.insert("role".into(), serde_json::json!("PLATFORM_ADMIN"));
++    forbidden.insert("role".into(), serde_json::json!("ADMIN"));
+     let rejected = post(
+         &app,
+         "/api/v1/auth/doctor/register",
+@@ -9947,8 +10150,8 @@
+
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_admin_system_error_simulation_environment_abac_and_persistence(pool: PgPool) {
+     let (app, pool, mut state) = test_app_and_state(pool).await;
+-    let platform = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
+-    let security = token_for_real_role(&pool, "SECURITY_ADMIN").await;
++    let platform = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let security = token_for_real_role(&pool, "ADMIN").await;
+     let payload = serde_json::json!({
+         "scenario":"sms_otp", "severity":"WARNING",
+         "custom_note":"Synthetic route coverage", "impacted_user_id":DOCTOR1_USER_ID
+@@ -9966,10 +10169,18 @@
+
+         "COMPLIANCE",
+         "SUPPORT",
+     ] {
+-        let token = token_for_real_role(&pool, role).await;
++        let token = if ["PATIENT", "DOCTOR"].contains(&role) {
++            token_for_real_role(&pool, role).await
++        } else {
++            token_for_retired_role(&pool, role).await
++        };
+         assert_eq!(
+             post(&app, uri, Some(&token), &payload).await.status(),
+-            StatusCode::FORBIDDEN,
++            if ["PATIENT", "DOCTOR"].contains(&role) {
++                StatusCode::FORBIDDEN
++            } else {
++                StatusCode::UNAUTHORIZED
++            },
+             "{role}"
+         );
+     }
+@@ -10047,7 +10258,7 @@
+
+     config.dev_simulation_enabled = false;
+     state.config = Arc::new(config);
+     let production_app = create_router(state);
+-    let production_platform = token_for_real_role(&pool, "PLATFORM_ADMIN").await;
++    let production_platform = token_for_real_role(&pool, "ADMIN").await;
+     for token in [&production_platform, &security] {
+         assert_eq!(
+             through_tls_proxy(&production_app, "POST", uri, Some(token), Some(&payload))
+@@ -10071,9 +10282,9 @@
+
+     let (app, pool) = test_app(pool).await;
+     let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+-    let platform = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
+-    let compliance = token_for_real_role(&pool, "COMPLIANCE").await;
+-    let security = token_for_real_role(&pool, "SECURITY_ADMIN").await;
++    let platform = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let compliance = token_for_real_role(&pool, "ADMIN").await;
++    let security = token_for_real_role(&pool, "ADMIN").await;
+     let uri = "/api/v1/admin/compliance/alerts";
+     assert_eq!(
+         get(&app, uri, None).await.status(),
+@@ -10082,13 +10293,22 @@
+
+     for token in [
+         &patient,
+         &doctor,
+-        &token_for_real_role(&pool, "FINANCE_ADMIN").await,
+-        &token_for_real_role(&pool, "CLINICAL_ADMIN").await,
+-        &token_for_real_role(&pool, "SUPPORT").await,
++        &token_for_retired_role(&pool, "FINANCE_ADMIN").await,
++        &token_for_retired_role(&pool, "CLINICAL_ADMIN").await,
++        &token_for_retired_role(&pool, "SUPPORT").await,
+     ] {
+         assert_eq!(
+             get(&app, uri, Some(token)).await.status(),
+-            StatusCode::FORBIDDEN
++            if ["PATIENT", "DOCTOR"].contains(
++                &hellodoctor_backend::crypto::verify_access_token(token, TEST_JWT_PUBLIC_KEY_B64)
++                    .unwrap()
++                    .role
++                    .as_str()
++            ) {
++                StatusCode::FORBIDDEN
++            } else {
++                StatusCode::UNAUTHORIZED
++            }
+         );
+     }
+     let (appointment, _) = book_and_confirm(&app, &patient).await;
+@@ -10154,8 +10374,8 @@
+
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_admin_audit_log_simulation_abac_and_persistence(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+-    let platform = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
+-    let security = token_for_real_role(&pool, "SECURITY_ADMIN").await;
++    let platform = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let security = token_for_real_role(&pool, "ADMIN").await;
+     let uri = "/api/v1/admin/logs/simulate";
+     let payload = serde_json::json!({"action":"SYNTHETIC_ROUTE_COVERAGE", "subsystem":"TEST_AUDIT",
+         "severity":"warning", "error_summary":"Synthetic audit fixture", "stack_trace":"synthetic"});
+@@ -10171,10 +10391,18 @@
+
+         "COMPLIANCE",
+         "SUPPORT",
+     ] {
+-        let token = token_for_real_role(&pool, role).await;
++        let token = if ["PATIENT", "DOCTOR"].contains(&role) {
++            token_for_real_role(&pool, role).await
++        } else {
++            token_for_retired_role(&pool, role).await
++        };
+         assert_eq!(
+             post(&app, uri, Some(&token), &payload).await.status(),
+-            StatusCode::FORBIDDEN,
++            if ["PATIENT", "DOCTOR"].contains(&role) {
++                StatusCode::FORBIDDEN
++            } else {
++                StatusCode::UNAUTHORIZED
++            },
+             "{role}"
+         );
+     }
+@@ -10186,7 +10414,7 @@
+
+     .unwrap();
+     assert_eq!(count, 0);
+     let mut identifiers = Vec::new();
+-    for (token, role) in [(&platform, "PLATFORM_ADMIN"), (&security, "SECURITY_ADMIN")] {
++    for (token, role) in [(&platform, "ADMIN"), (&security, "ADMIN")] {
+         let response = post(&app, uri, Some(token), &payload).await;
+         assert_eq!(response.status(), StatusCode::CREATED);
+         let body = json_body(response).await;
+@@ -10235,8 +10463,8 @@
+
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_admin_professional_verification_queue_pending_only_and_abac(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+-    let platform = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
+-    let clinical = token_for_real_role(&pool, "CLINICAL_ADMIN").await;
++    let platform = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let clinical = token_for_real_role(&pool, "ADMIN").await;
+     sqlx::query(
+         "UPDATE doctor_profiles SET professional_verification_status='PENDING' WHERE id=$1",
+     )
+@@ -10257,10 +10485,18 @@
+
+         "COMPLIANCE",
+         "SUPPORT",
+     ] {
+-        let token = token_for_real_role(&pool, role).await;
++        let token = if ["PATIENT", "DOCTOR"].contains(&role) {
++            token_for_real_role(&pool, role).await
++        } else {
++            token_for_retired_role(&pool, role).await
++        };
+         assert_eq!(
+             get(&app, uri, Some(&token)).await.status(),
+-            StatusCode::FORBIDDEN,
++            if ["PATIENT", "DOCTOR"].contains(&role) {
++                StatusCode::FORBIDDEN
++            } else {
++                StatusCode::UNAUTHORIZED
++            },
+             "{role}"
+         );
+     }
+@@ -10321,7 +10557,7 @@
+
+     let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+     let stranger = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
+-    let platform = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let platform = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (appointment, _) = book_and_confirm(&app, &patient).await;
+     let session = consultation_repo::find_by_appointment(&pool, appointment)
+         .await
+@@ -10418,8 +10654,8 @@
+
+ async fn test_admin_finance_transactions_month_filter_changes_result_set(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+     let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+-    let platform = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
+-    let finance = token_for_real_role(&pool, "FINANCE_ADMIN").await;
++    let platform = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let finance = token_for_real_role(&pool, "ADMIN").await;
+     let (december, _) = book_and_confirm(&app, &patient).await;
+     let (january, _) = book_and_confirm(&app, &patient).await;
+     for (appointment, timestamp) in [
+@@ -10676,7 +10912,7 @@
+
+ ) {
+     let (app, pool) = test_app(pool).await;
+     let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+-    let admin = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let (december, _) = book_and_confirm(&app, &patient).await;
+     let (january, _) = book_and_confirm(&app, &patient).await;
+     for (appointment, timestamp) in [
+@@ -11484,12 +11720,20 @@
+
+                 "COMPLIANCE",
+                 "SECURITY_ADMIN",
+             ] {
+-                let token = token_for_real_role(&pool, role).await;
++                let token = if ["PATIENT", "DOCTOR"].contains(&role) {
++                    token_for_real_role(&pool, role).await
++                } else {
++                    token_for_retired_role(&pool, role).await
++                };
+                 assert_eq!(
+                     post(&app, &uri, Some(&token), &serde_json::json!({}))
+                         .await
+                         .status(),
+-                    StatusCode::FORBIDDEN,
++                    if ["PATIENT", "DOCTOR"].contains(&role) {
++                        StatusCode::FORBIDDEN
++                    } else {
++                        StatusCode::UNAUTHORIZED
++                    },
+                     "{role} {id} {action}"
+                 );
+             }
+@@ -11502,7 +11746,7 @@
+
+             );
+         }
+     }
+-    let admin = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     for field in [
+         "professional_verification_status",
+         "is_verified",
+@@ -11543,7 +11787,7 @@
+
+     pool: PgPool,
+ ) {
+     let (app, pool) = test_app(pool).await;
+-    let clinical = token_for_real_role(&pool, "CLINICAL_ADMIN").await;
++    let clinical = token_for_real_role(&pool, "ADMIN").await;
+     sqlx::query(
+         "UPDATE doctor_profiles SET professional_verification_status='PENDING' WHERE id=$1",
+     )
+@@ -11643,8 +11887,8 @@
+
+ #[sqlx::test(migrations = "./migrations")]
+ async fn test_professional_verify_reject_race_has_one_terminal_winner(pool: PgPool) {
+     let (app, pool) = test_app(pool).await;
+-    let platform = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
+-    let clinical = token_for_real_role(&pool, "CLINICAL_ADMIN").await;
++    let platform = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let clinical = token_for_real_role(&pool, "ADMIN").await;
+     for (id, user_id) in [
+         (DOCTOR1_PROFILE_ID, DOCTOR1_USER_ID),
+         (DOCTOR2_PROFILE_ID, DOCTOR2_USER_ID),
+@@ -11703,7 +11947,7 @@
+
+     pool: PgPool,
+ ) {
+     let (app, pool) = test_app(pool).await;
+-    let admin = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+     let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+     let (appointment, _) = book_and_confirm(&app, &patient).await;
+@@ -11854,7 +12098,7 @@
+
+     .await
+     .unwrap();
+     sqlx::raw_sql("CREATE FUNCTION fail_professional_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action LIKE 'DOCTOR_PROFESSIONAL_%' THEN RAISE EXCEPTION 'synthetic audit failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER fail_professional_audit BEFORE INSERT ON audit_events FOR EACH ROW EXECUTE FUNCTION fail_professional_audit();").execute(&pool).await.unwrap();
+-    let admin = make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+     assert_eq!(
+         post(
+             &app,
+@@ -12080,7 +12324,7 @@
+
+     let (app, pool, state) = test_app_and_state(pool).await;
+     for user_id in [uid(DOCTOR1_USER_ID), uid(ADMIN_USER_ID)] {
+         let role = if user_id == uid(ADMIN_USER_ID) {
+-            "PLATFORM_ADMIN"
++            "ADMIN"
+         } else {
+             "DOCTOR"
+         };
+@@ -12258,7 +12502,7 @@
+
+         .to_str()
+         .unwrap()
+         .contains("text/plain"));
+-    for role in ["SECURITY_ADMIN", "PLATFORM_ADMIN"] {
++    for role in ["ADMIN", "ADMIN"] {
+         let token = token_for_real_role(&pool, role).await;
+         let response=through_tls_proxy(&app,"POST","/api/v1/admin/logs/simulate",Some(&token),Some(&serde_json::json!({"action":"TEST","subsystem":"TEST","severity":"ERROR","error_summary":"synthetic"}))).await;
+         assert_eq!(response.status(), StatusCode::FORBIDDEN);
+@@ -12278,7 +12522,7 @@
+
+             &app,
+             "GET",
+             "/api/v1/admin/overview",
+-            Some(&make_token(uid(ADMIN_USER_ID), "PLATFORM_ADMIN")),
++            Some(&make_token(uid(ADMIN_USER_ID), "ADMIN")),
+             None
+         )
+         .await
+@@ -12535,10 +12779,7 @@
+
+         get(&app, "/api/v1/doctor/articles", None).await.status(),
+         StatusCode::UNAUTHORIZED
+     );
+-    for (user, role) in [
+-        (PATIENT_USER_ID, "PATIENT"),
+-        (ADMIN_USER_ID, "PLATFORM_ADMIN"),
+-    ] {
++    for (user, role) in [(PATIENT_USER_ID, "PATIENT"), (ADMIN_USER_ID, "ADMIN")] {
+         let token = make_token(uid(user), role);
+         assert_eq!(
+             post(
+@@ -14941,10 +15182,7 @@
+
+         .iter()
+         .map(|v| v["id"].as_str().unwrap().to_owned())
+         .collect();
+-    assert_eq!(
+-        ids,
+-        vec![near.to_string(), later.to_string(), tomorrow.to_string()]
+-    );
++    assert_eq!(ids, vec![near.to_string(), later.to_string()]);
+     assert!(body["data"]
+         .as_array()
+         .unwrap()
+@@ -14953,7 +15191,7 @@
+
+     let history = json_body(
+         get(
+             &app,
+-            "/api/v1/doctor/appointments?status=COMPLETED",
++            "/api/v1/doctor/appointments?view=history&status=COMPLETED",
+             Some(&doctor),
+         )
+         .await,
+@@ -14962,7 +15200,8 @@
+
+     assert_eq!(history["data"].as_array().unwrap().len(), 1);
+     assert_eq!(history["data"][0]["id"], completed.to_string());
+     assert_eq!(history["data"][0]["queue_actionable"], false);
+-    let all = json_body(get(&app, "/api/v1/doctor/appointments", Some(&doctor)).await).await;
++    let all =
++        json_body(get(&app, "/api/v1/doctor/appointments?view=all", Some(&doctor)).await).await;
+     assert_eq!(all["data"].as_array().unwrap().len(), 5);
+     assert_eq!(all["data"][0]["id"], near.to_string());
+     assert_eq!(all["data"][3]["id"], completed.to_string());
+@@ -14982,9 +15221,25 @@
+
+         .await,
+     )
+     .await;
+-    assert_eq!(queue["data"].as_array().unwrap().len(), 4);
++    assert_eq!(queue["data"].as_array().unwrap().len(), 3);
+     assert_eq!(queue["data"][0]["id"], active.to_string());
+     assert_eq!(queue["data"][1]["id"], near.to_string());
++    let scheduled = json_body(
++        get(
++            &app,
++            "/api/v1/doctor/appointments?view=schedule",
++            Some(&doctor),
++        )
++        .await,
++    )
++    .await;
++    assert_eq!(scheduled["data"].as_array().unwrap().len(), 1);
++    assert_eq!(scheduled["data"][0]["id"], tomorrow.to_string());
++    assert!(!queue["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .any(|row| row["id"] == tomorrow.to_string()));
+     let other = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
+     let isolated = json_body(
+         get(
+@@ -15176,6 +15431,13 @@
+
+             .status(),
+         StatusCode::FORBIDDEN
+     );
++    let rejected:Vec<(Uuid,String,String)>=sqlx::query_as("SELECT actor_user_id,result,reason_code FROM consultation_trace_events WHERE appointment_id=$1 AND event_type='PAYMENT_INITIATION_REJECTED'").bind(uid(id)).fetch_all(&pool).await.unwrap();
++    assert_eq!(rejected.len(), 4);
++    assert!(rejected
++        .iter()
++        .all(|(actor, result, reason)| *actor == uid(PATIENT_USER_ID)
++            && result == "REJECTED"
++            && reason == "PROVIDER_UNAVAILABLE"));
+ }
+ 
+ #[sqlx::test(migrations = "./migrations")]
+@@ -15368,3 +15630,1138 @@
+
+             .unwrap();
+     assert_eq!(count, 0);
+ }
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_trace_base_and_single_admin(pool: PgPool) {
++    let (app, pool, state) = test_app_and_state(pool).await;
++    let role: String = sqlx::query_scalar("SELECT role::text FROM users WHERE id=$1")
++        .bind(uid(ADMIN_USER_ID))
++        .fetch_one(&pool)
++        .await
++        .unwrap();
++    assert_eq!(role, "ADMIN");
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let response = get(
++        &app,
++        &format!("/api/v1/appointments/{appointment}/conversation"),
++        Some(&patient),
++    )
++    .await;
++    assert_eq!(response.status(), StatusCode::OK);
++    let body = json_body(response).await;
++    let conversation = body["data"]["id"].as_str().unwrap();
++    let path = format!("/api/v1/chat/{conversation}/messages");
++    let key = Uuid::new_v4().to_string();
++    let message = serde_json::json!({"content":"Milestone synthetic message"});
++    let first = post_idem(&app, &path, Some(&patient), &message, &key).await;
++    assert_eq!(first.status(), StatusCode::CREATED);
++    let first = json_body(first).await;
++    let second = post_idem(&app, &path, Some(&patient), &message, &key).await;
++    assert_eq!(second.status(), StatusCode::CREATED);
++    assert_eq!(json_body(second).await["data"]["id"], first["data"]["id"]);
++    let count: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages WHERE conversation_id=$1")
++            .bind(uid(conversation))
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(count, 1);
++    let notices: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM notifications WHERE type='NEW_CHAT_MESSAGE'")
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(notices, 1);
++    let traces: i64 = sqlx::query_scalar(
++        "SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1",
++    )
++    .bind(appointment)
++    .fetch_one(&pool)
++    .await
++    .unwrap();
++    assert!(traces >= 3);
++    let forbidden = sqlx::query("DELETE FROM consultation_trace_events")
++        .execute(&state.db)
++        .await;
++    assert!(forbidden.is_err());
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_grievance_preservation_and_timeline(pool: PgPool) {
++    let (app, pool, state) = test_app_and_state(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let session = consultation_repo::find_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    let case=post(&app,"/api/v1/grievances",Some(&patient),&serde_json::json!({"consultation_id":session.id,"target":"DOCTOR","category":"Trace investigation","claim_summary":"Synthetic grievance for preservation acceptance"})).await;
++    assert_eq!(case.status(), StatusCode::CREATED);
++    let case = json_body(case).await;
++    let grievance = case["data"]["grievance_id"].as_str().unwrap();
++    let held:i64=sqlx::query_scalar("SELECT COUNT(*) FROM consultation_trace_holds WHERE appointment_id=$1 AND release_at IS NULL").bind(appointment).fetch_one(&pool).await.unwrap();
++    assert_eq!(held, 1);
++    let timeline = get(
++        &app,
++        &format!("/api/v1/admin/grievances/{grievance}/timeline"),
++        Some(&admin),
++    )
++    .await;
++    let status = timeline.status();
++    let timeline = json_body(timeline).await;
++    assert_eq!(status, StatusCode::OK, "{timeline}");
++    assert_eq!(
++        timeline["data"]["facts"]["doctor_id"],
++        serde_json::json!(DOCTOR1_PROFILE_ID)
++    );
++    assert_eq!(
++        timeline["data"]["facts"]["appointment_id"],
++        serde_json::json!(appointment)
++    );
++    assert_eq!(
++        timeline["data"]["preservation_holds"]
++            .as_array()
++            .unwrap()
++            .len(),
++        1
++    );
++    assert!(timeline["data"]["trace_events"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .any(|e| e["event_type"] == "GRIEVANCE_CREATED"));
++    let denied = get(
++        &app,
++        &format!("/api/v1/admin/grievances/{grievance}/timeline"),
++        Some(&patient),
++    )
++    .await;
++    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
++    let before: i64 = sqlx::query_scalar(
++        "SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1",
++    )
++    .bind(appointment)
++    .fetch_one(&pool)
++    .await
++    .unwrap();
++    sqlx::query("UPDATE consultation_trace_events SET expires_at=clock_timestamp()-INTERVAL '1 day' WHERE appointment_id=$1").bind(appointment).execute(&pool).await.unwrap();
++    let deleted = hellodoctor_backend::services::consultation_trace::maintenance(&state)
++        .await
++        .unwrap();
++    assert_eq!(deleted, 0);
++    let after: i64 = sqlx::query_scalar(
++        "SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1",
++    )
++    .bind(appointment)
++    .fetch_one(&pool)
++    .await
++    .unwrap();
++    assert_eq!(after, before);
++    let audit:(Uuid,String)=sqlx::query_as("SELECT actor_id,actor_role::text FROM audit_events WHERE action='ADMIN_GRIEVANCE_OPENED' AND resource_id=$1").bind(uid(grievance)).fetch_one(&pool).await.unwrap();
++    assert_eq!(audit, (uid(ADMIN_USER_ID), "ADMIN".into()));
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_latest_200_cursor_pagination(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let conv = chat_repo::find_conversation_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    for i in 0..200 {
++        sqlx::query("INSERT INTO chat_messages(id,conversation_id,sender_id,content,sent_at) VALUES($1,$2,$3,$4,clock_timestamp()-INTERVAL '1 hour'+$5*INTERVAL '1 second')").bind(Uuid::new_v4()).bind(conv.id).bind(uid(PATIENT_USER_ID)).bind(format!("Pagination fixture {i:03}")).bind(i as f64).execute(&pool).await.unwrap();
++    }
++    let mut path = format!("/api/v1/chat/{}/messages", conv.id);
++    let mut seen = std::collections::HashSet::new();
++    for page in 0..4 {
++        let response = get(&app, &path, Some(&patient)).await;
++        assert_eq!(response.status(), StatusCode::OK);
++        let body = json_body(response).await;
++        let rows = body["data"].as_array().unwrap();
++        assert_eq!(rows.len(), 50);
++        assert_eq!(
++            rows.last().unwrap()["content"],
++            format!("Pagination fixture {:03}", 199 - page * 50)
++        );
++        for row in rows {
++            assert!(
++                seen.insert(row["id"].as_str().unwrap().to_owned()),
++                "Duplicate cursor boundary"
++            );
++        }
++        let first = &rows[0];
++        let time = first["sent_at"].as_str().unwrap().replace('+', "%2B");
++        path = format!(
++            "/api/v1/chat/{}/messages?before_time={time}&before_id={}",
++            conv.id,
++            first["id"].as_str().unwrap()
++        );
++    }
++    assert_eq!(seen.len(), 200);
++    let final_page = get(&app, &path, Some(&patient)).await;
++    assert_eq!(final_page.status(), StatusCode::OK);
++    assert_eq!(
++        json_body(final_page).await["data"]
++            .as_array()
++            .unwrap()
++            .len(),
++        0
++    );
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_trace_cleanup_never_touches_clinical_records(pool: PgPool) {
++    let (app, pool, state) = test_app_and_state(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let retention:f64=sqlx::query_scalar("SELECT EXTRACT(EPOCH FROM expires_at-event_time_server)::float8/86400 FROM consultation_trace_events WHERE appointment_id=$1 LIMIT 1").bind(appointment).fetch_one(&pool).await.unwrap();
++    assert_eq!(retention, 5.0);
++    let expected: i64 = sqlx::query_scalar(
++        "SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1",
++    )
++    .bind(appointment)
++    .fetch_one(&pool)
++    .await
++    .unwrap();
++    assert!(expected > 0);
++    for role in [UserRole::Patient, UserRole::Admin] {
++        let user = if role == UserRole::Patient {
++            PATIENT_USER_ID
++        } else {
++            ADMIN_USER_ID
++        };
++        let ctx = isolation_ctx(uid(user).into(), role);
++        for statement in [
++            "DELETE FROM consultation_trace_events",
++            "UPDATE consultation_trace_events SET result='ALTERED'",
++        ] {
++            let mut tx = state.begin_authed(&ctx).await.unwrap();
++            let error = sqlx::query(statement).execute(&mut *tx).await.unwrap_err();
++            assert_eq!(
++                error.as_database_error().unwrap().code().as_deref(),
++                Some("42501")
++            );
++            tx.rollback().await.unwrap();
++        }
++    }
++    let before:(i64,i64,i64,i64)=sqlx::query_as("SELECT (SELECT COUNT(*) FROM appointments),(SELECT COUNT(*) FROM transactions),(SELECT COUNT(*) FROM chat_conversations),(SELECT COUNT(*) FROM audit_events)").fetch_one(&pool).await.unwrap();
++    sqlx::query("UPDATE consultation_trace_events SET expires_at=clock_timestamp()-INTERVAL '1 second' WHERE appointment_id=$1").bind(appointment).execute(&pool).await.unwrap();
++    assert_eq!(
++        hellodoctor_backend::services::consultation_trace::maintenance(&state)
++            .await
++            .unwrap(),
++        expected as u64
++    );
++    let after:(i64,i64,i64,i64)=sqlx::query_as("SELECT (SELECT COUNT(*) FROM appointments),(SELECT COUNT(*) FROM transactions),(SELECT COUNT(*) FROM chat_conversations),(SELECT COUNT(*) FROM audit_events)").fetch_one(&pool).await.unwrap();
++    assert_eq!(after, before);
++    let traces: i64 = sqlx::query_scalar(
++        "SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1",
++    )
++    .bind(appointment)
++    .fetch_one(&pool)
++    .await
++    .unwrap();
++    assert_eq!(traces, 0);
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_chat_concurrent_replay_distinct_keys_and_privacy(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let conv = chat_repo::find_conversation_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    let path = format!("/api/v1/chat/{}/messages", conv.id);
++    let body = serde_json::json!({"content":"Private synthetic clinical text must not enter notifications"});
++    let key = Uuid::new_v4().to_string();
++    let responses = futures_util::future::join_all(
++        (0..8).map(|_| post_idem(&app, &path, Some(&patient), &body, &key)),
++    )
++    .await;
++    let mut ids = std::collections::HashSet::new();
++    for response in responses {
++        assert_eq!(response.status(), StatusCode::CREATED);
++        ids.insert(
++            json_body(response).await["data"]["id"]
++                .as_str()
++                .unwrap()
++                .to_owned(),
++        );
++    }
++    assert_eq!(ids.len(), 1);
++    let different_key = post_idem(
++        &app,
++        &path,
++        Some(&patient),
++        &body,
++        &Uuid::new_v4().to_string(),
++    )
++    .await;
++    assert_eq!(different_key.status(), StatusCode::CREATED);
++    assert!(!ids.contains(
++        json_body(different_key).await["data"]["id"]
++            .as_str()
++            .unwrap()
++    ));
++    let collision = post_idem(
++        &app,
++        &path,
++        Some(&patient),
++        &serde_json::json!({"content":"Changed content"}),
++        &key,
++    )
++    .await;
++    assert_eq!(collision.status(), StatusCode::CONFLICT);
++    let count: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages WHERE conversation_id=$1")
++            .bind(conv.id)
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(count, 2);
++    let notifications: Vec<String> = sqlx::query_scalar(
++        "SELECT body FROM notifications WHERE type='NEW_CHAT_MESSAGE' AND related_entity_id=$1",
++    )
++    .bind(conv.id)
++    .fetch_all(&pool)
++    .await
++    .unwrap();
++    assert_eq!(notifications.len(), 2);
++    for notice in notifications {
++        assert!(!notice.contains("Private synthetic"));
++    }
++    let leaked:i64=sqlx::query_scalar("SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1 AND safe_metadata::text LIKE '%Private synthetic%'").bind(appointment).fetch_one(&pool).await.unwrap();
++    assert_eq!(leaked, 0);
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_chat_expiry_wall_clock_and_historical_reads(pool: PgPool) {
++    let (app, pool, state) = test_app_and_state(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let conv = chat_repo::find_conversation_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    let path = format!("/api/v1/chat/{}/messages", conv.id);
++    assert_eq!(
++        post_idem(
++            &app,
++            &path,
++            Some(&patient),
++            &serde_json::json!({"content":"Persisted before expiry"}),
++            &Uuid::new_v4().to_string()
++        )
++        .await
++        .status(),
++        StatusCode::CREATED
++    );
++    sqlx::query("UPDATE chat_conversations SET expires_at=clock_timestamp()+INTERVAL '150 milliseconds' WHERE id=$1").bind(conv.id).execute(&pool).await.unwrap();
++    let ctx = isolation_ctx(uid(PATIENT_USER_ID).into(), UserRole::Patient);
++    let mut tx = state.begin_authed(&ctx).await.unwrap();
++    sqlx::query("SELECT pg_sleep(0.2)")
++        .execute(&mut *tx)
++        .await
++        .unwrap();
++    let error=sqlx::query("INSERT INTO chat_messages(conversation_id,sender_id,content) VALUES($1,$2,'Rejected after transaction crossed expiry')").bind(conv.id).bind(ctx.user_id).execute(&mut *tx).await.unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().code().as_deref(),
++        Some("42501")
++    );
++    tx.rollback().await.unwrap();
++    for token in [&patient, &doctor] {
++        let rejected = post_idem(
++            &app,
++            &path,
++            Some(token),
++            &serde_json::json!({"content":"Rejected after lock"}),
++            &Uuid::new_v4().to_string(),
++        )
++        .await;
++        assert_eq!(rejected.status(), StatusCode::FORBIDDEN);
++        let read = get(&app, &path, Some(token)).await;
++        assert_eq!(read.status(), StatusCode::OK);
++        assert_eq!(json_body(read).await["data"].as_array().unwrap().len(), 1);
++    }
++    let notices: i64 = sqlx::query_scalar(
++        "SELECT COUNT(*) FROM notifications WHERE type='NEW_CHAT_MESSAGE' AND related_entity_id=$1",
++    )
++    .bind(conv.id)
++    .fetch_one(&pool)
++    .await
++    .unwrap();
++    assert_eq!(notices, 1);
++    let rejected:i64=sqlx::query_scalar("SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1 AND event_type='CHAT_MESSAGE_REJECTED' AND result='REJECTED'").bind(appointment).fetch_one(&pool).await.unwrap();
++    assert_eq!(rejected, 2);
++}
++
++async fn milestone_book_chat(
++    app: &axum::Router,
++    patient_token: &str,
++    doctor: &str,
++) -> (Uuid, Uuid) {
++    let res_slots = get(
++        app,
++        &format!("/api/v1/doctors/{}/slots", doctor),
++        Some(patient_token),
++    )
++    .await;
++    assert_eq!(res_slots.status(), StatusCode::OK);
++    let json_slots = json_body(res_slots).await;
++    let slot_id = Uuid::parse_str(json_slots["data"][0]["id"].as_str().unwrap()).unwrap();
++
++    let book_payload = serde_json::json!({
++        "doctor_id": doctor,
++        "slot_id": slot_id,
++        "modality": "CHAT",
++        "gateway": "BKASH",
++        "chief_complaint": "Persistent fever and joint pain"
++    });
++    let res_book = post_idem(
++        app,
++        "/api/v1/appointments/book",
++        Some(patient_token),
++        &book_payload,
++        &Uuid::new_v4().to_string(),
++    )
++    .await;
++    assert_eq!(res_book.status(), StatusCode::CREATED);
++    let book_json = json_body(res_book).await;
++    let apt_id = Uuid::parse_str(book_json["data"]["appointment_id"].as_str().unwrap()).unwrap();
++    let payment_sess_id =
++        Uuid::parse_str(book_json["data"]["payment_session_id"].as_str().unwrap()).unwrap();
++
++    let webhook_payload = serde_json::json!({
++        "payment_session_id": payment_sess_id,
++        "transaction_reference": format!("BK-TEST-{}", Uuid::new_v4()),
++        "status": "SUCCESS",
++        "event_timestamp": chrono::Utc::now().to_rfc3339(),
++        "provider_event_id": Uuid::new_v4().to_string(),
++    });
++    let body_str = serde_json::to_string(&webhook_payload).unwrap();
++    let sig = sign_webhook_body(&body_str, TEST_WEBHOOK_SECRET);
++    let res_webhook = send_webhook(app, &body_str, &sig).await;
++    assert_eq!(res_webhook.status(), StatusCode::OK);
++
++    (apt_id, payment_sess_id)
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_same_patient_two_doctors_historical_isolation(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctors = [
++        make_token(uid(DOCTOR1_USER_ID), "DOCTOR"),
++        make_token(uid(DOCTOR2_USER_ID), "DOCTOR"),
++    ];
++    let mut appointments = Vec::new();
++    let mut conversations = Vec::new();
++    let mut prescriptions = Vec::new();
++    for (i, doctor) in [DOCTOR1_PROFILE_ID, DOCTOR2_PROFILE_ID].iter().enumerate() {
++        if i == 1 {
++            let slot=post(&app,"/api/v1/doctor/slots",Some(&doctors[i]),&serde_json::json!({"start_time":(Utc::now()+Duration::hours(4)).to_rfc3339(),"end_time":(Utc::now()+Duration::hours(4)+Duration::minutes(20)).to_rfc3339()})).await;
++            let status = slot.status();
++            let body = json_body(slot).await;
++            assert_eq!(status, StatusCode::CREATED, "{body}");
++        }
++        let (appointment, _) = milestone_book_chat(&app, &patient, doctor).await;
++        open_clinical_window(&pool, appointment).await;
++        let rx = post(
++            &app,
++            &format!("/api/v1/consultations/{appointment}/prescription"),
++            Some(&doctors[i]),
++            &serde_json::json!({"base64_photo":minimal_jpeg_base64()}),
++        )
++        .await;
++        let status = rx.status();
++        let rx = json_body(rx).await;
++        assert_eq!(status, StatusCode::CREATED, "{rx}");
++        appointments.push(appointment);
++        prescriptions.push(rx["data"]["id"].as_str().unwrap().to_owned());
++        conversations.push(
++            chat_repo::find_conversation_by_appointment(&pool, appointment)
++                .await
++                .unwrap()
++                .unwrap()
++                .id,
++        );
++    }
++    sqlx::query("UPDATE chat_conversations SET expires_at=clock_timestamp()-INTERVAL '2 days'")
++        .execute(&pool)
++        .await
++        .unwrap();
++    sqlx::query("UPDATE consultation_sessions SET ended_at=clock_timestamp()-INTERVAL '2 days',status='COMPLETED'").execute(&pool).await.unwrap();
++    for i in 0..2 {
++        for j in 0..2 {
++            let own = i == j;
++            let summary = get(
++                &app,
++                &format!("/api/v1/doctor/consultations/{}/summary", appointments[j]),
++                Some(&doctors[i]),
++            )
++            .await;
++            assert_eq!(
++                summary.status(),
++                if own {
++                    StatusCode::OK
++                } else {
++                    StatusCode::FORBIDDEN
++                }
++            );
++            let chat = get(
++                &app,
++                &format!("/api/v1/chat/{}/messages", conversations[j]),
++                Some(&doctors[i]),
++            )
++            .await;
++            assert_eq!(
++                chat.status(),
++                if own {
++                    StatusCode::OK
++                } else {
++                    StatusCode::NOT_FOUND
++                }
++            );
++            let rx = get(
++                &app,
++                &format!(
++                    "/api/v1/appointments/{}/documents/{}",
++                    appointments[j], prescriptions[j]
++                ),
++                Some(&doctors[i]),
++            )
++            .await;
++            assert_eq!(
++                rx.status(),
++                if own {
++                    StatusCode::OK
++                } else {
++                    StatusCode::NOT_FOUND
++                }
++            );
++        }
++        let history = get(
++            &app,
++            &format!(
++                "/api/v1/doctor/appointments/{}/patient-history",
++                appointments[i]
++            ),
++            Some(&doctors[i]),
++        )
++        .await;
++        assert_eq!(history.status(), StatusCode::OK);
++        let rows = json_body(history).await;
++        assert!(rows["data"]
++            .as_array()
++            .unwrap()
++            .iter()
++            .all(|row| row["historical_appointment_id"] != serde_json::json!(appointments[1 - i])));
++    }
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_admin_reschedule_preserves_time_account_and_conversation(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    let (appointment, _) = milestone_book_chat(&app, &patient, DOCTOR1_PROFILE_ID).await;
++    let original:(Uuid,DateTime<Utc>)=sqlx::query_as("SELECT a.slot_id,s.start_time FROM appointments a JOIN doctor_schedule_slots s ON s.id=a.slot_id WHERE a.id=$1").bind(appointment).fetch_one(&pool).await.unwrap();
++    let conversation = chat_repo::find_conversation_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    let slots = json_body(
++        get(
++            &app,
++            &format!("/api/v1/doctors/{DOCTOR1_PROFILE_ID}/slots"),
++            Some(&patient),
++        )
++        .await,
++    )
++    .await;
++    let new_slot = slots["data"][0]["id"].as_str().unwrap();
++    let payload = serde_json::json!({"slot_id":new_slot,"reason":"Synthetic Admin-approved schedule correction"});
++    let path = format!("/api/v1/admin/appointments/{appointment}/reschedule");
++    assert_eq!(
++        post(&app, &path, Some(&patient), &payload).await.status(),
++        StatusCode::FORBIDDEN
++    );
++    let response = post(&app, &path, Some(&admin), &payload).await;
++    let status = response.status();
++    let body = json_body(response).await;
++    assert_eq!(status, StatusCode::OK, "{body}");
++    let stored:(Uuid,Uuid,Uuid,DateTime<Utc>)=sqlx::query_as("SELECT actor_user_id,original_slot_id,new_slot_id,original_start FROM appointment_reschedules WHERE appointment_id=$1").bind(appointment).fetch_one(&pool).await.unwrap();
++    assert_eq!(
++        stored,
++        (uid(ADMIN_USER_ID), original.0, uid(new_slot), original.1)
++    );
++    let after = chat_repo::find_conversation_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(after.id, conversation.id);
++    assert_eq!(after.expires_at, conversation.expires_at);
++    assert_eq!(
++        post(&app, &path, Some(&admin), &payload).await.status(),
++        StatusCode::CONFLICT
++    );
++    let count: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM appointment_reschedules WHERE appointment_id=$1")
++            .bind(appointment)
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(count, 1);
++    let transactions: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM transactions WHERE appointment_id=$1")
++            .bind(appointment)
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(transactions, 1);
++}
++
++#[sqlx::test(migrations = false)]
++async fn test_milestone_legacy_admin_upgrade_specific_accounts_and_reversible_schema(pool: PgPool) {
++    let full = sqlx::migrate!("./migrations");
++    let previous = full
++        .iter()
++        .filter(|m| m.version < 20261106000001)
++        .map(|m| m.version)
++        .max()
++        .unwrap();
++    let mut old = sqlx::migrate!("./migrations");
++    old.migrations = std::borrow::Cow::Owned(
++        old.iter()
++            .filter(|m| m.version < 20261106000001)
++            .cloned()
++            .collect(),
++    );
++    old.run(&pool).await.unwrap();
++    let mut accounts = Vec::new();
++    for (i, role) in [
++        "PLATFORM_ADMIN",
++        "CLINICAL_ADMIN",
++        "FINANCE_ADMIN",
++        "SUPPORT",
++        "COMPLIANCE",
++        "SECURITY_ADMIN",
++    ]
++    .iter()
++    .enumerate()
++    {
++        let id = Uuid::new_v4();
++        sqlx::query("INSERT INTO users(id,phone_number,role,is_active,is_verified) VALUES($1,$2,$3::user_role_enum,true,true)").bind(id).bind(format!("+2547100000{i:02}")).bind(role).execute(&pool).await.unwrap();
++        sqlx::query("INSERT INTO auth_sessions(user_id,token_family_id,refresh_token_hash,expires_at) VALUES($1,$1,$2,clock_timestamp()+INTERVAL '7 days')")
++            .bind(id).bind(format!("legacy-migration-{id}")).execute(&pool).await.unwrap();
++        sqlx::query("INSERT INTO audit_events(actor_id,actor_role,action,resource_type,resource_id) VALUES($1,$2::user_role_enum,'LEGACY_ADMIN_EVIDENCE','USER',$1)").bind(id).bind(role).execute(&pool).await.unwrap();
++        accounts.push((id, *role));
++    }
++    full.run(&pool).await.unwrap();
++    for (id, legacy) in &accounts {
++        let role: String = sqlx::query_scalar("SELECT role::text FROM users WHERE id=$1")
++            .bind(id)
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++        assert_eq!(role, "ADMIN");
++        let old_role:String=sqlx::query_scalar("SELECT actor_role::text FROM audit_events WHERE actor_id=$1 AND action='LEGACY_ADMIN_EVIDENCE'").bind(id).fetch_one(&pool).await.unwrap();
++        assert_eq!(old_role, *legacy);
++        let active: i64 = sqlx::query_scalar(
++            "SELECT COUNT(*) FROM auth_sessions WHERE user_id=$1 AND revoked_at IS NULL",
++        )
++        .bind(id)
++        .fetch_one(&pool)
++        .await
++        .unwrap();
++        assert_eq!(active, 0);
++        let error =
++            sqlx::query("INSERT INTO users(phone_number,role) VALUES($1,$2::user_role_enum)")
++                .bind(format!(
++                    "+254799{:06}",
++                    rand::thread_rng().gen_range(0..1_000_000)
++                ))
++                .bind(legacy)
++                .execute(&pool)
++                .await
++                .unwrap_err();
++        assert_eq!(
++            error.as_database_error().unwrap().code().as_deref(),
++            Some("23514")
++        );
++    }
++    full.undo(&pool, previous).await.unwrap();
++    for (id, legacy) in &accounts {
++        let restored: String = sqlx::query_scalar("SELECT role::text FROM users WHERE id=$1")
++            .bind(id)
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++        assert_eq!(restored, *legacy);
++    }
++    full.run(&pool).await.unwrap();
++    let (app, pool) = test_app(pool).await;
++    for (id, _) in accounts.iter().take(2) {
++        // A fresh family authenticates the migrated account; its pre-upgrade family stays revoked.
++        let family = Uuid::new_v4();
++        sqlx::query("INSERT INTO auth_sessions(user_id,token_family_id,refresh_token_hash,expires_at) VALUES($1,$2,$2::text,clock_timestamp()+INTERVAL '1 day')").bind(id).bind(family).execute(&pool).await.unwrap();
++        let token = hellodoctor_backend::crypto::create_access_token(
++            *id,
++            "ADMIN",
++            family,
++            TEST_JWT_PRIVATE_KEY_B64,
++        )
++        .unwrap();
++        let response=post(&app,"/api/v1/admin/logs/simulate",Some(&token),&serde_json::json!({"action":"MILESTONE_SPECIFIC_ADMIN","subsystem":"TEST_AUDIT","severity":"warning","error_summary":"Synthetic account attribution evidence"})).await;
++        let status = response.status();
++        let body = json_body(response).await;
++        assert_eq!(status, StatusCode::CREATED, "{body}");
++        let actor: (Uuid, String) =
++            sqlx::query_as("SELECT actor_id,actor_role::text FROM audit_events WHERE id=$1")
++                .bind(uid(body["data"]["id"].as_str().unwrap()))
++                .fetch_one(&pool)
++                .await
++                .unwrap();
++        assert_eq!(actor, (*id, "ADMIN".into()));
++    }
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_queue_today_schedule_future_and_history_separate(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let (base, _) = book_and_confirm(&app, &patient).await;
++    let template = appointment_repo::find_by_id(&pool, base)
++        .await
++        .unwrap()
++        .unwrap();
++    let mut appointments = Vec::new();
++    sqlx::query("UPDATE appointments SET status='CANCELLED' WHERE id=$1")
++        .bind(base)
++        .execute(&pool)
++        .await
++        .unwrap();
++    for (kind, status) in [
++        ("ACTIVE", AppointmentStatus::InConsultation),
++        ("TODAY", AppointmentStatus::Confirmed),
++        ("TOMORROW", AppointmentStatus::Confirmed),
++        ("PAST", AppointmentStatus::Completed),
++    ] {
++        let mut a = template.clone();
++        a.id = Uuid::new_v4();
++        a.appointment_number = format!("L-{}", a.id);
++        a.status = status;
++        a.modality = Modality::Video;
++        let start: DateTime<Utc> = sqlx::query_scalar(match kind {
++            "ACTIVE" => "SELECT clock_timestamp()-INTERVAL '20 minutes'",
++            "PAST" => "SELECT clock_timestamp()-INTERVAL '1 day'",
++            "TOMORROW" => "SELECT clock_timestamp()+INTERVAL '1 day'",
++            _ => "SELECT clock_timestamp()",
++        })
++        .fetch_one(&pool)
++        .await
++        .unwrap();
++        a.slot_id=sqlx::query_scalar("INSERT INTO doctor_schedule_slots(doctor_id,start_time,end_time,status) VALUES($1,$2,$2+INTERVAL '20 minutes','BOOKED') RETURNING id").bind(a.doctor_id).bind(start).fetch_one(&pool).await.unwrap();
++        appointment_repo::insert(&pool, &a).await.unwrap();
++        appointments.push(a.id);
++    }
++    let response = get(&app, "/api/v1/doctor/appointments", Some(&doctor)).await;
++    let status = response.status();
++    let rows = json_body(response).await;
++    assert_eq!(status, StatusCode::OK, "{rows}");
++    let ids: Vec<&str> = rows["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .map(|r| r["id"].as_str().unwrap())
++        .collect();
++    assert_eq!(
++        ids,
++        vec![appointments[0].to_string(), appointments[1].to_string()]
++    );
++    let future = json_body(
++        get(
++            &app,
++            "/api/v1/doctor/appointments?view=schedule",
++            Some(&doctor),
++        )
++        .await,
++    )
++    .await;
++    assert!(future["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .any(|r| r["id"] == serde_json::json!(appointments[2])));
++    let past = json_body(
++        get(
++            &app,
++            "/api/v1/doctor/appointments?view=history",
++            Some(&doctor),
++        )
++        .await,
++    )
++    .await;
++    assert!(past["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .any(|r| r["id"] == serde_json::json!(appointments[3])));
++    assert!(!past["data"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .any(|r| r["id"] == serde_json::json!(appointments[0])));
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_read_ack_first_access_and_request_correlation(pool: PgPool) {
++    let (app, pool) = test_app(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let stranger = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let conv = chat_repo::find_conversation_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    let sent = post_idem(
++        &app,
++        &format!("/api/v1/chat/{}/messages", conv.id),
++        Some(&patient),
++        &serde_json::json!({"content":"Synthetic first contact"}),
++        "read-evidence-message",
++    )
++    .await;
++    assert_eq!(sent.status(), StatusCode::CREATED);
++    let message = uid(json_body(sent).await["data"]["id"].as_str().unwrap());
++    let path = format!("/api/v1/appointments/{appointment}/trace-ack");
++    let request_id = Uuid::new_v4().to_string();
++    let request=Request::builder().method("POST").uri(&path)
++      .header("Authorization",format!("Bearer {doctor}"))
++      .header("Content-Type","application/json").header("x-request-id",&request_id)
++      .header("x-client-type","DOCTOR_FLUTTER").header("x-client-build","42")
++      .body(Body::from(serde_json::json!({"event":"CHAT_OPENED","conversation_id":conv.id,"client_occurred_at":"2000-01-01T00:00:00Z"}).to_string())).unwrap();
++    let mut request = request;
++    request
++        .extensions_mut()
++        .insert(ConnectInfo(SocketAddr::from(([127, 0, 0, 1], 12345))));
++    let response = app.clone().oneshot(request).await.unwrap();
++    assert_eq!(response.status(), StatusCode::OK);
++    assert_eq!(response.headers()["x-request-id"], request_id);
++    let evidence:(Uuid,Uuid,String,String,DateTime<Utc>)=sqlx::query_as("SELECT actor_user_id,auth_session_id,request_id,trace_id,event_time_server FROM consultation_trace_events WHERE request_id=$1 AND event_type='CHAT_OPENED'").bind(&request_id).fetch_one(&pool).await.unwrap();
++    assert_eq!(evidence.0, uid(DOCTOR1_USER_ID));
++    let session_user: Uuid = sqlx::query_scalar("SELECT user_id FROM auth_sessions WHERE id=$1")
++        .bind(evidence.1)
++        .fetch_one(&pool)
++        .await
++        .unwrap();
++    assert_eq!(session_user, uid(DOCTOR1_USER_ID));
++    assert_eq!(evidence.2, request_id);
++    assert_eq!(evidence.3, request_id);
++    assert!(evidence.4 > Utc::now() - Duration::minutes(1));
++    let ack = serde_json::json!({"event":"CHAT_READ_ACKNOWLEDGED","conversation_id":conv.id,"message_ids":[message]});
++    assert_eq!(
++        post(&app, &path, Some(&doctor), &ack).await.status(),
++        StatusCode::OK
++    );
++    let first:DateTime<Utc>=sqlx::query_scalar("SELECT first_acknowledged_at FROM chat_read_acknowledgements WHERE user_id=$1 AND message_id=$2").bind(uid(DOCTOR1_USER_ID)).bind(message).fetch_one(&pool).await.unwrap();
++    assert_eq!(
++        post(&app, &path, Some(&doctor), &ack).await.status(),
++        StatusCode::OK
++    );
++    let timestamps:Vec<DateTime<Utc>>=sqlx::query_scalar("SELECT first_acknowledged_at FROM chat_read_acknowledgements WHERE user_id=$1 AND message_id=$2").bind(uid(DOCTOR1_USER_ID)).bind(message).fetch_all(&pool).await.unwrap();
++    assert_eq!(timestamps, vec![first]);
++    let trace_count:i64=sqlx::query_scalar("SELECT COUNT(*) FROM consultation_trace_events WHERE resource_id=$1 AND event_type='CHAT_READ_ACKNOWLEDGED'").bind(message).fetch_one(&pool).await.unwrap();
++    assert_eq!(trace_count, 1);
++    assert_eq!(
++        post(&app, &path, Some(&stranger), &ack).await.status(),
++        StatusCode::NOT_FOUND
++    );
++    let spoof = serde_json::json!({"event":"CHAT_OPENED","conversation_id":conv.id,"actor_user_id":DOCTOR2_USER_ID});
++    assert_eq!(
++        post(&app, &path, Some(&doctor), &spoof).await.status(),
++        StatusCode::UNPROCESSABLE_ENTITY
++    );
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_deduplicated_errors_preserve_each_consultation_request(pool: PgPool) {
++    use hellodoctor_backend::api::middleware::request_context::{
++        RequestContext, RequestEvidence, REQUEST_CONTEXT,
++    };
++    use hellodoctor_backend::auth_context::AuthContext;
++    use hellodoctor_backend::system_error::{self, ErrorEvent};
++    let (app, pool, state) = test_app_and_state(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let (appointment, _) = book_and_confirm(&app, &patient).await;
++    let session: Uuid = sqlx::query_scalar(
++        "SELECT id FROM auth_sessions WHERE user_id=$1 AND revoked_at IS NULL LIMIT 1",
++    )
++    .bind(uid(PATIENT_USER_ID))
++    .fetch_one(&pool)
++    .await
++    .unwrap();
++    let mut groups = Vec::new();
++    let mut requests = Vec::new();
++    for _ in 0..2 {
++        let request = Uuid::new_v4().to_string();
++        requests.push(request.clone());
++        let actor = AuthContext {
++            user_id: UserId::from(uid(PATIENT_USER_ID)),
++            role: UserRole::Patient,
++            permissions: vec![],
++            session_id: Some(session),
++            request_id: Some(request.clone()),
++        };
++        let context = RequestContext {
++            id: request.clone(),
++            client_type: Some("PATIENT_FLUTTER".into()),
++            client_build: Some("1".into()),
++            evidence: Arc::new(std::sync::Mutex::new(RequestEvidence {
++                actor: Some(actor),
++                appointment: Some(appointment),
++                conversation: None,
++                retention_days: 5,
++            })),
++        };
++        let group = REQUEST_CONTEXT
++            .scope(context, async {
++                system_error::report_sync(
++                    &state.system_db,
++                    ErrorEvent::new(
++                        ErrorSeverity::Error,
++                        "INTERNAL",
++                        "MilestoneCorrelation",
++                        "MILESTONE_SAFE_FAILURE",
++                        "Synthetic infrastructure failure",
++                        request,
++                    ),
++                )
++                .await
++                .unwrap()
++            })
++            .await;
++        groups.push(group);
++    }
++    assert_eq!(groups[0], groups[1]);
++    let count: i32 =
++        sqlx::query_scalar("SELECT occurrence_count FROM system_error_logs WHERE id=$1")
++            .bind(groups[0])
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(count, 2);
++    let refs:Vec<(String,Uuid,Uuid)>=sqlx::query_as("SELECT request_id,resource_id,actor_user_id FROM consultation_trace_events WHERE appointment_id=$1 AND event_type='CONSULTATION_REQUEST_FAILED' ORDER BY event_time_server,id").bind(appointment).fetch_all(&pool).await.unwrap();
++    assert_eq!(refs.len(), 2);
++    for (index, (request, group, actor)) in refs.iter().enumerate() {
++        assert_eq!(request, &requests[index]);
++        assert_eq!(*group, groups[0]);
++        assert_eq!(*actor, uid(PATIENT_USER_ID));
++    }
++    let unsafe_rows:i64=sqlx::query_scalar("SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1 AND safe_metadata::text LIKE '%Synthetic infrastructure failure%'").bind(appointment).fetch_one(&pool).await.unwrap();
++    assert_eq!(unsafe_rows, 0);
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_unpaid_cancelled_booking_is_not_own_historical_encounter(pool: PgPool) {
++    let (app, pool, state) = test_app_and_state(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let slots = json_body(
++        get(
++            &app,
++            &format!("/api/v1/doctors/{DOCTOR1_PROFILE_ID}/slots"),
++            Some(&patient),
++        )
++        .await,
++    )
++    .await;
++    let slot = uid(slots["data"][0]["id"].as_str().unwrap());
++    let response = post_idem(
++        &app,
++        "/api/v1/appointments/book",
++        Some(&patient),
++        &schedule_booking(slot),
++        &Uuid::new_v4().to_string(),
++    )
++    .await;
++    assert_eq!(response.status(), StatusCode::CREATED);
++    let appointment = uid(json_body(response).await["data"]["appointment_id"]
++        .as_str()
++        .unwrap());
++    sqlx::query("UPDATE appointments SET status='CANCELLED' WHERE id=$1")
++        .bind(appointment)
++        .execute(&pool)
++        .await
++        .unwrap();
++    let ctx = hellodoctor_backend::auth_context::AuthContext {
++        user_id: UserId::from(uid(DOCTOR1_USER_ID)),
++        role: UserRole::Doctor,
++        permissions: vec![],
++        session_id: None,
++        request_id: None,
++    };
++    let mut tx = state.begin_authed(&ctx).await.unwrap();
++    let allowed: bool = sqlx::query_scalar("SELECT doctor_own_encounter_allowed($1,$2)")
++        .bind(appointment)
++        .bind(ctx.user_id)
++        .fetch_one(&mut *tx)
++        .await
++        .unwrap();
++    assert!(!allowed);
++    tx.commit().await.unwrap();
++    let history = get(
++        &app,
++        &format!("/api/v1/doctor/appointments/{appointment}/patient-history"),
++        Some(&doctor),
++    )
++    .await;
++    assert_eq!(history.status(), StatusCode::NOT_FOUND);
++    let sessions: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM consultation_sessions WHERE appointment_id=$1")
++            .bind(appointment)
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(sessions, 0);
++}
++
++#[sqlx::test(migrations = "./migrations")]
++async fn test_milestone_text_attachment_keys_share_one_logical_message(pool: PgPool) {
++    let (app, pool, state) = test_app_and_state(pool).await;
++    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
++    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
++    let (appointment, _) = milestone_book_chat(&app, &patient, DOCTOR1_PROFILE_ID).await;
++    let ctx = isolation_ctx(UserId::from(uid(DOCTOR1_USER_ID)), UserRole::Doctor);
++    let mut check = state.begin_authed(&ctx).await.unwrap();
++    let windows: (bool, bool) = sqlx::query_as(
++        "SELECT doctor_own_encounter_allowed($1,$2),doctor_history_context_allowed($1,$2)",
++    )
++    .bind(appointment)
++    .bind(ctx.user_id)
++    .fetch_one(&mut *check)
++    .await
++    .unwrap();
++    assert_eq!(
++        windows,
++        (true, false),
++        "Active paid Chat must not inherit the Video pre-slot history gate"
++    );
++    check.commit().await.unwrap();
++    let conv = chat_repo::find_conversation_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    let text_path = format!("/api/v1/chat/{}/messages", conv.id);
++    let image_path = format!("/api/v1/chat/{}/attachments", conv.id);
++    let text = serde_json::json!({"content":"Synthetic attachment replay contract"});
++    let image =
++        serde_json::json!({"mime_type":"image/jpeg","base64_content":minimal_jpeg_base64()});
++    assert_eq!(
++        post_idem(&app, &text_path, Some(&doctor), &text, "text-first-key")
++            .await
++            .status(),
++        StatusCode::CREATED
++    );
++    assert_eq!(
++        post_idem(&app, &image_path, Some(&doctor), &image, "text-first-key")
++            .await
++            .status(),
++        StatusCode::CONFLICT
++    );
++    let uploaded = post_idem(&app, &image_path, Some(&doctor), &image, "image-first-key").await;
++    assert_eq!(uploaded.status(), StatusCode::CREATED);
++    let uploaded = json_body(uploaded).await;
++    assert_eq!(
++        post_idem(&app, &text_path, Some(&doctor), &text, "image-first-key")
++            .await
++            .status(),
++        StatusCode::CONFLICT
++    );
++    let retry = post_idem(&app, &image_path, Some(&doctor), &image, "image-first-key").await;
++    assert_eq!(retry.status(), StatusCode::CREATED);
++    assert_eq!(json_body(retry).await["data"]["id"], uploaded["data"]["id"]);
++    let counts:(i64,i64)=sqlx::query_as("SELECT (SELECT COUNT(*) FROM chat_messages WHERE conversation_id=$1),(SELECT COUNT(*) FROM notifications WHERE related_entity_id=$1 AND type='NEW_CHAT_MESSAGE')").bind(conv.id).fetch_one(&pool).await.unwrap();
++    assert_eq!(counts, (2, 2));
++    let message = uploaded["data"]["id"].as_str().unwrap();
++    let view = format!("/api/v1/chat/{}/messages/{message}/attachment", conv.id);
++    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
++    assert_eq!(
++        get(&app, &view, Some(&patient)).await.status(),
++        StatusCode::OK
++    );
++    assert_eq!(
++        get(&app, &view, Some(&admin)).await.status(),
++        StatusCode::OK
++    );
++    let views:i64=sqlx::query_scalar("SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1 AND resource_id=$2 AND event_type='ATTACHMENT_VIEWED'").bind(appointment).bind(uid(message)).fetch_one(&pool).await.unwrap();
++    assert_eq!(views, 2);
++    let session = consultation_repo::find_by_appointment(&pool, appointment)
++        .await
++        .unwrap()
++        .unwrap();
++    let case=post(&app,"/api/v1/grievances",Some(&patient),&serde_json::json!({"consultation_id":session.id,"target":"DOCTOR","category":"Attachment trace","claim_summary":"Synthetic investigation of authorized retrieval"})).await;
++    assert_eq!(case.status(), StatusCode::CREATED);
++    let case = json_body(case).await;
++    let case_id = case["data"]["grievance_id"].as_str().unwrap();
++    let timeline = get(
++        &app,
++        &format!("/api/v1/admin/grievances/{case_id}/timeline"),
++        Some(&admin),
++    )
++    .await;
++    assert_eq!(timeline.status(), StatusCode::OK);
++    let data = json_body(timeline).await;
++    assert_eq!(data["data"]["facts"]["modality"], "CHAT");
++    assert!(data["data"]["audit_events"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .any(|event| event["action"] == "ADMIN_ATTACHMENT_VIEWED"
++            && event["resource_id"] == message
++            && event["actor_user_id"] == ADMIN_USER_ID));
++    assert_eq!(
++        data["data"]["trace_events"]
++            .as_array()
++            .unwrap()
++            .iter()
++            .filter(|event| event["event_type"] == "ATTACHMENT_VIEWED")
++            .count(),
++        2
++    );
++    // Cross the expiry boundary during INSERT itself, after upload authorization.
++    // The existing request timeout and concurrency controls remain unchanged.
++    sqlx::query("CREATE FUNCTION milestone_delay_chat_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(2.2); RETURN NEW; END $$").execute(&pool).await.unwrap();
++    sqlx::query("CREATE TRIGGER a_milestone_delay BEFORE INSERT ON chat_messages FOR EACH ROW EXECUTE FUNCTION milestone_delay_chat_insert()").execute(&pool).await.unwrap();
++    sqlx::query("UPDATE chat_conversations SET expires_at=clock_timestamp()+INTERVAL '2 seconds' WHERE id=$1").bind(conv.id).execute(&pool).await.unwrap();
++    assert_eq!(
++        post_idem(
++            &app,
++            &image_path,
++            Some(&doctor),
++            &image,
++            "crossing-expiry-key"
++        )
++        .await
++        .status(),
++        StatusCode::FORBIDDEN
++    );
++    let final_count: i64 =
++        sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages WHERE conversation_id=$1")
++            .bind(conv.id)
++            .fetch_one(&pool)
++            .await
++            .unwrap();
++    assert_eq!(final_count, 2);
++    let rejected:i64=sqlx::query_scalar("SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1 AND event_type='ATTACHMENT_UPLOAD_REJECTED' AND reason_code='WINDOW_CLOSED_OR_DENIED'").bind(appointment).fetch_one(&pool).await.unwrap();
++    assert_eq!(rejected, 1);
++}

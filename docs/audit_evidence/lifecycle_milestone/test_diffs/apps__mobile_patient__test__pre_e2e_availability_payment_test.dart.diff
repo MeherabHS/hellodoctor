@@ -1,0 +1,19 @@
+--- baseline/apps/mobile_patient/test/pre_e2e_availability_payment_test.dart
+
++++ current/apps/mobile_patient/test/pre_e2e_availability_payment_test.dart
+
+@@ -170,11 +170,11 @@
+
+               familyProfilesCubit: family)));
+       await tester.pump();
+       expect(find.byType(FilledButton), findsOneWidget);
+-      expect(find.text('Proceed to payment'), findsOneWidget);
++      expect(find.text('Proceed to payment method'), findsOneWidget);
+       expect(find.text('Open waiting room'), findsNothing);
+       expect(find.text('Open consultation'), findsNothing);
+       expect(find.textContaining('development environment'), findsNothing);
+-      await tester.tap(find.text('Proceed to payment'));
++      await tester.tap(find.text('Proceed to payment method'));
+       await tester.pump();
+       expect(repo.calls, 1);
+       expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,

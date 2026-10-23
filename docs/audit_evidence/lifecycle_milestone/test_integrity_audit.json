@@ -1,0 +1,316 @@
+{
+  "baseline_counts": {
+    "rust_library": 53,
+    "backend_integration": 221,
+    "patient_flutter": 195,
+    "doctor_flutter": 197,
+    "doctor_web": 50,
+    "admin_web": 13
+  },
+  "baseline_source": "Last observed complete correction quality gates, not a fresh run",
+  "modified_existing_test_files": [
+    "services/backend/tests/api_tests.rs",
+    "apps/mobile/test/doctor_models_test.dart",
+    "apps/mobile/test/doctor_navigation_safe_area_test.dart",
+    "apps/mobile/test/doctor_widgets_test.dart",
+    "apps/mobile/test/pre_e2e_queue_chat_test.dart",
+    "apps/mobile_patient/test/consultation_booking_test.dart",
+    "apps/mobile_patient/test/consultation_flow_test.dart",
+    "apps/mobile_patient/test/pre_e2e_availability_payment_test.dart"
+  ],
+  "missing_existing_test_files": [],
+  "removed_existing_test_functions": [],
+  "added_skip_ignore_lines": [],
+  "existing_assertions_deleted_without_replacement": [],
+  "intentionally_changed_assertions": [
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_identity_doctor_private_financial_and_treatment_context_rls",
+      "baseline_line": 1787,
+      "old_assertion": "assert_eq!(\n        count, 0,\n        \"assigned Doctor outside approved window must not read PHI\"\n    )",
+      "new_assertion": [
+        "assert_eq!(\n        count, 1,\n        \"assigned Doctor retains their own encounter intake without broader profile access\"\n    )"
+      ],
+      "reason": "Approved retained own-encounter intake reads. The original private-profile cutoff and foreign/private/financial isolation assertions remain unchanged.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_identity_compliance_trace_scoped_authorized_and_audited",
+      "baseline_line": 2071,
+      "old_assertion": "assert_eq!(\n            post(\n                &f.app,\n                \"/api/v1/admin/compliance/trace\",\n                Some(&token),\n                &request\n            )\n            .await\n            .status(),\n            StatusCode::FORBIDDEN\n        )",
+      "new_assertion": [
+        "assert_eq!(\n            post(\n                &f.app,\n                \"/api/v1/admin/compliance/trace\",\n                Some(&token),\n                &request\n            )\n            .await\n            .status(),\n            if [\"PATIENT\", \"DOCTOR\"].contains(\n                &hellodoctor_backend::crypto::verify_access_token(&token, TEST_JWT_PUBLIC_KEY_B64)\n                    .unwrap()\n                    .role\n                    .as_str()\n            ) {\n                StatusCode::FORBIDDEN\n            } else {\n                StatusCode::UNAUTHORIZED\n            }\n        )"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_identity_compliance_trace_scoped_authorized_and_audited",
+      "baseline_line": 2118,
+      "old_assertion": "assert_eq!(row.get::<String, _>(\"role\"), \"COMPLIANCE\")",
+      "new_assertion": [
+        "assert_eq!(row.get::<String, _>(\"role\"), \"ADMIN\")"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_doctor_rx_pages_encrypted_download_retry_and_expired_grant",
+      "baseline_line": 3260,
+      "old_assertion": "assert_eq!(\n        get(\n            &app,\n            &document_uri,\n            Some(&token_for_real_role(&pool, \"FINANCE_ADMIN\").await)\n        )\n        .await\n        .status(),\n        StatusCode::FORBIDDEN\n    )",
+      "new_assertion": [
+        "assert_eq!(\n        get(\n            &app,\n            &document_uri,\n            Some(&token_for_real_role(&pool, \"ADMIN\").await)\n        )\n        .await\n        .status(),\n        StatusCode::OK\n    )",
+        "assert_eq!(\n        send(&app, \"GET\", download_url, None, None, Some(&download_key))\n            .await\n            .status(),\n        StatusCode::OK,\n        \"a valid grant preserves authorized own-encounter reads after chat lock\"\n    )",
+        "assert_eq!(\n        get(&app, &document_uri, Some(&doctor)).await.status(),\n        StatusCode::OK\n    )",
+        "assert_eq!(expired, 1)",
+        "assert_eq!(\n        send(&app, \"GET\", download_url, None, None, Some(&download_key))\n            .await\n            .status(),\n        StatusCode::NOT_FOUND\n    )",
+        "assert!(legacy[\"session_id\"].is_string())",
+        "assert_eq!(\n        send(\n            &app,\n            \"GET\",\n            &format!(\"/api/v1/documents/download?token={legacy_token}\"),\n            None,\n            None,\n            Some(&Uuid::new_v4().to_string())\n        )\n        .await\n        .status(),\n        StatusCode::NOT_FOUND\n    )",
+        "assert_eq!(\n        send(\n            &app,\n            \"GET\",\n            fresh_url,\n            None,\n            None,\n            Some(&Uuid::new_v4().to_string())\n        )\n        .await\n        .status(),\n        StatusCode::FORBIDDEN\n    )"
+      ],
+      "reason": "Approved ADMIN access and retained own-encounter Rx reads. Independent download expiry, legacy no-session denial and session-revocation checks were added; foreign Doctor denial remains.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_doctor_rx_pages_encrypted_download_retry_and_expired_grant",
+      "baseline_line": 3277,
+      "old_assertion": "assert_eq!(\n        send(&app, \"GET\", download_url, None, None, Some(&download_key))\n            .await\n            .status(),\n        StatusCode::NOT_FOUND,\n        \"an unexpired grant cannot bypass an expired clinical window\"\n    )",
+      "new_assertion": [
+        "assert_eq!(\n        get(\n            &app,\n            &document_uri,\n            Some(&token_for_real_role(&pool, \"ADMIN\").await)\n        )\n        .await\n        .status(),\n        StatusCode::OK\n    )",
+        "assert_eq!(\n        send(&app, \"GET\", download_url, None, None, Some(&download_key))\n            .await\n            .status(),\n        StatusCode::OK,\n        \"a valid grant preserves authorized own-encounter reads after chat lock\"\n    )",
+        "assert_eq!(\n        get(&app, &document_uri, Some(&doctor)).await.status(),\n        StatusCode::OK\n    )",
+        "assert_eq!(expired, 1)",
+        "assert_eq!(\n        send(&app, \"GET\", download_url, None, None, Some(&download_key))\n            .await\n            .status(),\n        StatusCode::NOT_FOUND\n    )",
+        "assert!(legacy[\"session_id\"].is_string())",
+        "assert_eq!(\n        send(\n            &app,\n            \"GET\",\n            &format!(\"/api/v1/documents/download?token={legacy_token}\"),\n            None,\n            None,\n            Some(&Uuid::new_v4().to_string())\n        )\n        .await\n        .status(),\n        StatusCode::NOT_FOUND\n    )",
+        "assert_eq!(\n        send(\n            &app,\n            \"GET\",\n            fresh_url,\n            None,\n            None,\n            Some(&Uuid::new_v4().to_string())\n        )\n        .await\n        .status(),\n        StatusCode::FORBIDDEN\n    )"
+      ],
+      "reason": "Approved ADMIN access and retained own-encounter Rx reads. Independent download expiry, legacy no-session denial and session-revocation checks were added; foreign Doctor denial remains.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_doctor_rx_pages_encrypted_download_retry_and_expired_grant",
+      "baseline_line": 3284,
+      "old_assertion": "assert_eq!(\n        get(&app, &document_uri, Some(&doctor)).await.status(),\n        StatusCode::NOT_FOUND\n    )",
+      "new_assertion": [
+        "assert_eq!(\n        get(\n            &app,\n            &document_uri,\n            Some(&token_for_real_role(&pool, \"ADMIN\").await)\n        )\n        .await\n        .status(),\n        StatusCode::OK\n    )",
+        "assert_eq!(\n        send(&app, \"GET\", download_url, None, None, Some(&download_key))\n            .await\n            .status(),\n        StatusCode::OK,\n        \"a valid grant preserves authorized own-encounter reads after chat lock\"\n    )",
+        "assert_eq!(\n        get(&app, &document_uri, Some(&doctor)).await.status(),\n        StatusCode::OK\n    )",
+        "assert_eq!(expired, 1)",
+        "assert_eq!(\n        send(&app, \"GET\", download_url, None, None, Some(&download_key))\n            .await\n            .status(),\n        StatusCode::NOT_FOUND\n    )",
+        "assert!(legacy[\"session_id\"].is_string())",
+        "assert_eq!(\n        send(\n            &app,\n            \"GET\",\n            &format!(\"/api/v1/documents/download?token={legacy_token}\"),\n            None,\n            None,\n            Some(&Uuid::new_v4().to_string())\n        )\n        .await\n        .status(),\n        StatusCode::NOT_FOUND\n    )",
+        "assert_eq!(\n        send(\n            &app,\n            \"GET\",\n            fresh_url,\n            None,\n            None,\n            Some(&Uuid::new_v4().to_string())\n        )\n        .await\n        .status(),\n        StatusCode::FORBIDDEN\n    )"
+      ],
+      "reason": "Approved ADMIN access and retained own-encounter Rx reads. Independent download expiry, legacy no-session denial and session-revocation checks were added; foreign Doctor denial remains.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_admin_login_with_real_totp",
+      "baseline_line": 4171,
+      "old_assertion": "assert_eq!(\n        json[\"data\"][\"user\"][\"role\"].as_str().unwrap(),\n        \"PLATFORM_ADMIN\"\n    )",
+      "new_assertion": [
+        "assert_eq!(json[\"data\"][\"user\"][\"role\"].as_str().unwrap(), \"ADMIN\")"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_admin_mutation_creates_audit_event",
+      "baseline_line": 5802,
+      "old_assertion": "assert_eq!(row.get::<String, _>(\"actor_role\"), \"PLATFORM_ADMIN\")",
+      "new_assertion": [
+        "assert_eq!(row.get::<String, _>(\"actor_role\"), \"ADMIN\")"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_audit_before_after_snapshots_and_super_admin_only_log_access",
+      "baseline_line": 6334,
+      "old_assertion": "assert_eq!(res_denied.status(), StatusCode::FORBIDDEN)",
+      "new_assertion": [
+        "assert_eq!(res_denied.status(), StatusCode::OK)",
+        "assert_eq!(\n        get(\n            &app,\n            \"/api/v1/admin/logs\",\n            Some(&make_token(uid(PATIENT_USER_ID), \"PATIENT\"))\n        )\n        .await\n        .status(),\n        StatusCode::FORBIDDEN\n    )"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_doctor_history_window_pagination_and_cutoff",
+      "baseline_line": 9141,
+      "old_assertion": "assert_eq!(\n        get(&app, &path, Some(&doctor)).await.status(),\n        StatusCode::NOT_FOUND\n    )",
+      "new_assertion": [
+        "assert_eq!(\n            get(&app, &path, Some(&other)).await.status(),\n            StatusCode::NOT_FOUND\n        )",
+        "assert_eq!(\n            get(\n                &app,\n                &format!(\"/api/v1/doctor/consultations/{apt}/summary\"),\n                Some(&doctor)\n            )\n            .await\n            .status(),\n            StatusCode::OK\n        )",
+        "assert_eq!(\n        get(&app, &path, Some(&doctor)).await.status(),\n        StatusCode::OK\n    )"
+      ],
+      "reason": "Approved retained own-encounter history after 24 hours, with unrelated-Doctor denials retained and summary reads added.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_admin_system_error_simulation_environment_abac_and_persistence",
+      "baseline_line": 9970,
+      "old_assertion": "assert_eq!(\n            post(&app, uri, Some(&token), &payload).await.status(),\n            StatusCode::FORBIDDEN,\n            \"{role}\"\n        )",
+      "new_assertion": [
+        "assert_eq!(\n            post(&app, uri, Some(&token), &payload).await.status(),\n            if [\"PATIENT\", \"DOCTOR\"].contains(&role) {\n                StatusCode::FORBIDDEN\n            } else {\n                StatusCode::UNAUTHORIZED\n            },\n            \"{role}\"\n        )"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_admin_compliance_alerts_abac_and_real_prescription_data",
+      "baseline_line": 10089,
+      "old_assertion": "assert_eq!(\n            get(&app, uri, Some(token)).await.status(),\n            StatusCode::FORBIDDEN\n        )",
+      "new_assertion": [
+        "assert_eq!(\n            get(&app, uri, Some(token)).await.status(),\n            if [\"PATIENT\", \"DOCTOR\"].contains(\n                &hellodoctor_backend::crypto::verify_access_token(token, TEST_JWT_PUBLIC_KEY_B64)\n                    .unwrap()\n                    .role\n                    .as_str()\n            ) {\n                StatusCode::FORBIDDEN\n            } else {\n                StatusCode::UNAUTHORIZED\n            }\n        )"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_admin_audit_log_simulation_abac_and_persistence",
+      "baseline_line": 10175,
+      "old_assertion": "assert_eq!(\n            post(&app, uri, Some(&token), &payload).await.status(),\n            StatusCode::FORBIDDEN,\n            \"{role}\"\n        )",
+      "new_assertion": [
+        "assert_eq!(\n            post(&app, uri, Some(&token), &payload).await.status(),\n            if [\"PATIENT\", \"DOCTOR\"].contains(&role) {\n                StatusCode::FORBIDDEN\n            } else {\n                StatusCode::UNAUTHORIZED\n            },\n            \"{role}\"\n        )"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_admin_professional_verification_queue_pending_only_and_abac",
+      "baseline_line": 10261,
+      "old_assertion": "assert_eq!(\n            get(&app, uri, Some(&token)).await.status(),\n            StatusCode::FORBIDDEN,\n            \"{role}\"\n        )",
+      "new_assertion": [
+        "assert_eq!(\n            get(&app, uri, Some(&token)).await.status(),\n            if [\"PATIENT\", \"DOCTOR\"].contains(&role) {\n                StatusCode::FORBIDDEN\n            } else {\n                StatusCode::UNAUTHORIZED\n            },\n            \"{role}\"\n        )"
+      ],
+      "reason": "Approved default Queue contains current/today only. Explicit All retains exact aggregate row count and ordering; Schedule and History receive exact separate assertions.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_professional_review_denies_self_cross_doctor_patient_and_other_admin_roles",
+      "baseline_line": 11488,
+      "old_assertion": "assert_eq!(\n                    post(&app, &uri, Some(&token), &serde_json::json!({}))\n                        .await\n                        .status(),\n                    StatusCode::FORBIDDEN,\n                    \"{role} {id} {action}\"\n                )",
+      "new_assertion": [
+        "assert_eq!(\n                    post(&app, &uri, Some(&token), &serde_json::json!({}))\n                        .await\n                        .status(),\n                    if [\"PATIENT\", \"DOCTOR\"].contains(&role) {\n                        StatusCode::FORBIDDEN\n                    } else {\n                        StatusCode::UNAUTHORIZED\n                    },\n                    \"{role} {id} {action}\"\n                )"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_exposure_production_metrics_and_simulation_have_independent_backend_guards",
+      "baseline_line": 12276,
+      "old_assertion": "assert_eq!(\n        through_tls_proxy(\n            &app,\n            \"GET\",\n            \"/api/v1/admin/overview\",\n            Some(&make_token(uid(ADMIN_USER_ID), \"PLATFORM_ADMIN\")),\n            None\n        )\n        .await\n        .status(),\n        StatusCode::UNAUTHORIZED\n    )",
+      "new_assertion": [
+        "assert_eq!(\n        through_tls_proxy(\n            &app,\n            \"GET\",\n            \"/api/v1/admin/overview\",\n            Some(&make_token(uid(ADMIN_USER_ID), \"ADMIN\")),\n            None\n        )\n        .await\n        .status(),\n        StatusCode::UNAUTHORIZED\n    )"
+      ],
+      "reason": "Approved canonical ADMIN role: exact active role/audit identity becomes ADMIN, retired claims are rejected with exact 401, and Patient/Doctor remain exact 403. All-Admin privileges are intentional; durable denial/account-attribution checks are preserved or strengthened.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_pre_e2e_queue_excludes_stale_and_terminal_but_preserves_history",
+      "baseline_line": 14944,
+      "old_assertion": "assert_eq!(\n        ids,\n        vec![near.to_string(), later.to_string(), tomorrow.to_string()]\n    )",
+      "new_assertion": [
+        "assert_eq!(ids, vec![near.to_string(), later.to_string()])"
+      ],
+      "reason": "Approved default Queue contains current/today only. Explicit All retains exact aggregate row count and ordering; Schedule and History receive exact separate assertions.",
+      "opcode": "replace"
+    },
+    {
+      "file": "services/backend/tests/api_tests.rs",
+      "test": "test_pre_e2e_queue_excludes_stale_and_terminal_but_preserves_history",
+      "baseline_line": 14985,
+      "old_assertion": "assert_eq!(queue[\"data\"].as_array().unwrap().len(), 4)",
+      "new_assertion": [
+        "assert_eq!(queue[\"data\"].as_array().unwrap().len(), 3)"
+      ],
+      "reason": "Approved default Queue contains current/today only. Explicit All retains exact aggregate row count and ordering; Schedule and History receive exact separate assertions.",
+      "opcode": "replace"
+    },
+    {
+      "file": "apps/mobile/test/pre_e2e_queue_chat_test.dart",
+      "test": "default queue uses server eligibility and preserves completed history",
+      "baseline_line": 167,
+      "old_assertion": "expect(tester.getTopLeft(find.text('Later')).dy,\r\n        lessThan(tester.getTopLeft(find.text('Tomorrow')).dy))",
+      "new_assertion": [
+        "expect(find.text('Later'), findsOneWidget)",
+        "expect(find.text('Tomorrow'), findsNothing)",
+        "expect(find.textContaining('Completed ('), findsNothing)"
+      ],
+      "reason": "Approved current/today operational Queue and separate History; tomorrow is asserted absent in Queue and history remains available separately.",
+      "opcode": "replace"
+    },
+    {
+      "file": "apps/mobile/test/pre_e2e_queue_chat_test.dart",
+      "test": "default queue uses server eligibility and preserves completed history",
+      "baseline_line": 169,
+      "old_assertion": "expect(find.text('Tomorrow'), findsOneWidget)",
+      "new_assertion": [
+        "expect(find.text('Later'), findsOneWidget)",
+        "expect(find.text('Tomorrow'), findsNothing)",
+        "expect(find.textContaining('Completed ('), findsNothing)"
+      ],
+      "reason": "Approved current/today operational Queue and separate History; tomorrow is asserted absent in Queue and history remains available separately.",
+      "opcode": "replace"
+    },
+    {
+      "file": "apps/mobile_patient/test/consultation_booking_test.dart",
+      "test": "$payment renders server truth and preserves narrow layout",
+      "baseline_line": 114,
+      "old_assertion": "expect(find.text('Proceed to payment'),\r\n          payment == 'PAYMENT_HELD' ? findsNothing : findsOneWidget)",
+      "new_assertion": [
+        "expect(find.text('Proceed to payment method'),\n          payment == 'PAYMENT_HELD' ? findsNothing : findsOneWidget)"
+      ],
+      "reason": "Approved exact CTA wording: Proceed to payment method. Enabled/disabled state, backend state and financial checks remain.",
+      "opcode": "replace"
+    },
+    {
+      "file": "apps/mobile_patient/test/consultation_flow_test.dart",
+      "test": "paid CHAT chooser through booking, payment polling and real repository chat at ${width}dp",
+      "baseline_line": 157,
+      "old_assertion": "expect(\r\n          tester\r\n              .widget<FilledButton>(\r\n                  find.widgetWithText(FilledButton, 'Proceed to payment'))\r\n              .onPressed,\r\n          isNotNull)",
+      "new_assertion": [
+        "expect(\n          tester\n              .widget<FilledButton>(find.widgetWithText(\n                  FilledButton, 'Proceed to payment method'))\n              .onPressed,\n          isNotNull)"
+      ],
+      "reason": "Approved exact CTA wording: Proceed to payment method. Enabled/disabled state, backend state and financial checks remain.",
+      "opcode": "replace"
+    },
+    {
+      "file": "apps/mobile_patient/test/pre_e2e_availability_payment_test.dart",
+      "test": "unpaid consultation has one payment CTA, no fake success, and safe layout at $width",
+      "baseline_line": 173,
+      "old_assertion": "expect(find.text('Proceed to payment'), findsOneWidget)",
+      "new_assertion": [
+        "expect(find.text('Proceed to payment method'), findsOneWidget)"
+      ],
+      "reason": "Approved exact CTA wording: Proceed to payment method. Enabled/disabled state, backend state and financial checks remain.",
+      "opcode": "replace"
+    }
+  ],
+  "private_profile_cutoff_assertion_preserved": true,
+  "additional_approved_contract_changes": [
+    "test_doctor_history_window_pagination_and_cutoff: own-encounter list reads at +16 min and at/after 1440 min completion now return exact 200; unrelated Doctor still exact 404; own summary after cutoff is additionally exact 200.",
+    "test_doctor_queue_shows_upcoming_consultations_first: old +3-day fixtures remain unchanged; original exact All ordering/pagination checks now explicitly request view=all, with new default Queue absence and exact Schedule/History assertions.",
+    "test_pre_e2e_queue_excludes_stale_and_terminal_but_preserves_history: default Queue 3-to-2 and active Queue 4-to-3 intentionally move tomorrow into a separately asserted one-row Schedule. All retains exact five rows and historical ordering.",
+    "test_identity_compliance_trace_scoped_authorized_and_audited: four durable denials remain required; the query includes two AUTH_ROLE_MISMATCH audit rows for retired claims, with a new exact two-row/session/request/account-role assertion."
+  ],
+  "note": "Product-contract replacements are listed exactly. Full diffs also include fixture role/endpoint changes and additions. No security/business/concurrency assertion is silently removed."
+}

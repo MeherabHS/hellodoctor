@@ -1,0 +1,14 @@
+--- baseline/apps/mobile/test/doctor_navigation_safe_area_test.dart
+
++++ current/apps/mobile/test/doctor_navigation_safe_area_test.dart
+
+@@ -25,7 +25,7 @@
+
+ 
+ void main() {
+   for (final width in [320.0, 360.0, 412.0]) {
+-    for (final inset in [0.0, 24.0, 48.0]) {
++    for (final inset in [0.0, 24.0, 34.0, 48.0]) {
+       testWidgets('Doctor navigation stays usable at ${width}dp / $inset inset',
+           (tester) async {
+         tester.view.physicalSize = Size(width, 800);

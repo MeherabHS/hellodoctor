@@ -1,0 +1,222 @@
+﻿[
+    {
+        "control":  "financial_obligation_uniqueness",
+        "source":  "services/backend/migrations/20261110000001_economic_idempotency.up.sql",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/tests/economic_idempotency.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "callback_replay_protection",
+        "source":  "services/backend/src/services/appointment_service.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/tests/api_tests.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "economic_journal",
+        "source":  "services/backend/migrations/20261110000001_economic_idempotency.up.sql",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/tests/economic_idempotency.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "consultation_settlement",
+        "source":  "services/backend/src/services/consultation_service.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/tests/economic_idempotency.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "payout_uniqueness",
+        "source":  "services/backend/src/repository/wallet_repo.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/tests/economic_idempotency.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "global_admission",
+        "source":  "services/backend/src/admission.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/src/admission.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "local_concurrency",
+        "source":  "services/backend/src/admission.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/src/admission.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "redis_global_budgets",
+        "source":  "services/backend/src/admission.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/tests/api_tests.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "db_pool_pressure",
+        "source":  "services/backend/src/repository/mod.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/src/admission.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "argon2_workers",
+        "source":  "services/backend/src/crypto.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/src/crypto.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "sanitizer_workers",
+        "source":  "services/backend/src/services/upload_security_service.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/src/services/upload_security_service.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "account_login_throttling",
+        "source":  "services/backend/src/services/auth_abuse.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/tests/api_tests.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "otp_delivery_budgets",
+        "source":  "services/backend/src/rate_limit.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/tests/api_tests.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "turnstile",
+        "source":  "apps/admin-web/src/lib/turnstile.ts",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "apps/admin-web/tests/turnstile.test.ts",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "admin_assertion",
+        "source":  "services/backend/src/api/middleware/web_auth.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "apps/admin-web/tests/web-assertion.test.ts",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "admin_totp",
+        "source":  "services/backend/src/services/admin_totp.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/src/services/admin_totp.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "android_keystore",
+        "source":  "apps/mobile_patient/android/app/src/main/kotlin/com/hellodoctor/patient/DeviceProof.kt",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  null,
+        "test_exists":  false,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "backend_device_proof",
+        "source":  "services/backend/src/services/device_proof.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/src/services/device_proof.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "refresh_proof_replay",
+        "source":  "services/backend/src/services/auth_service.rs",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "services/backend/src/services/device_proof.rs",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    },
+    {
+        "control":  "recovery_jitter",
+        "source":  "apps/mobile_patient/lib/core/network/screen_refresh.dart",
+        "present":  "SOURCE_PRESENT",
+        "source_reviewed":  true,
+        "test_source":  "apps/mobile_patient/test/recovery_stampede_test.dart",
+        "test_exists":  true,
+        "coverage":  "Partial or pure helper coverage; see security acceptance matrix for missing scenarios",
+        "test_executed":  false,
+        "result":  "BLOCKED_ENVIRONMENT"
+    }
+]

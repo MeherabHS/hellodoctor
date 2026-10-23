@@ -1,0 +1,15 @@
+{
+  "backend": {
+    "url": "http://127.0.0.1:8080/healthz",
+    "http_status": 200,
+    "schema_ready": true
+  },
+  "doctor_web": {
+    "url": "http://127.0.0.1:3001",
+    "http_status": 200
+  },
+  "admin_web": {
+    "url": "http://127.0.0.1:3000/login",
+    "http_status": 200
+  }
+}

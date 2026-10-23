@@ -1,0 +1,10 @@
+{
+  "reason": "Disposable Redis forwarding listener exited after controlled Redis pause; initial recovery/pool results contaminated by fixture transport failure",
+  "application_source_changed": false,
+  "repair": "Only labelled owned forwarder recreated; same cached image, ports, CPU/memory/PID limits, mounts and networks; both nc listeners wrapped in while loops with one-second restart delay",
+  "initial_fault_record": "faults-20261019T181705-observer.json",
+  "invalid_pool_record": "pressure-20261019T181911-observer.json",
+  "repaired_fault_record": "faults-20261019T182031-observer.json",
+  "independent_lock_record": "pressure-20261019T182204-observer.json",
+  "grading": "Redis fail-closed/recovery scoped PASS; actual full-pool saturation INCONCLUSIVE. Ignore initial hardcoded sql_lock_waits_observed flag; independent counts were zero."
+}

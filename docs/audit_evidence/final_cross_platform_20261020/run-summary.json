@@ -1,0 +1,37 @@
+{
+  "run": "final_cross_platform_20261020",
+  "source_revision": "dca9b3c5fcdb6303d31abbb77d3a1fd4ac1f879f",
+  "worktree_dirty": true,
+  "recorded_at_utc": "2026-10-20 15:28:56 UTC",
+  "fixtures": {
+    "postgres": "hd-remediation-pg-20261020:127.0.0.1:15433",
+    "redis": "hd-remediation-redis-20261020:redis://127.0.0.1:16380/14",
+    "redis_owner": "final-remediation-20261020"
+  },
+  "commands": [
+    {"command": "cargo fmt --all -- --check", "exit_code": 0},
+    {"command": "cargo check --all-targets", "exit_code": 0},
+    {"command": "cargo clippy --all-targets -- -D warnings", "exit_code": 0},
+    {"command": "cargo test --lib", "exit_code": 0, "tests": "76 passed"},
+    {"command": "cargo test --test api_tests -- --test-threads=1", "exit_code": 1, "tests": "274 passed, 1 configuration guard failure, 4 ignored"},
+    {"command": "cargo test --test api_tests security_acceptance::admin_web_hmac_http_exact_body_and_real_redis_nonce_replay -- --exact --test-threads=1", "exit_code": 0, "tests": "1 passed"},
+    {"command": "cargo test --test api_tests admission_capacity_bench -- --ignored --test-threads=1", "exit_code": 0, "tests": "4 passed"},
+    {"command": "npx tsc --noEmit (apps/admin-web)", "exit_code": 0},
+    {"command": "npm run lint (apps/admin-web)", "exit_code": 0},
+    {"command": "npm test (apps/admin-web, owned Redis env)", "exit_code": 0, "tests": "49 passed"},
+    {"command": "npm run build (apps/admin-web)", "exit_code": 0},
+    {"command": "npm run typecheck (apps/doctor-web)", "exit_code": 0},
+    {"command": "npm run lint (apps/doctor-web)", "exit_code": 0},
+    {"command": "npm test (apps/doctor-web)", "exit_code": 0, "tests": "78 passed"},
+    {"command": "npm run build (apps/doctor-web)", "exit_code": 0},
+    {"command": "flutter analyze (apps/mobile)", "exit_code": 0},
+    {"command": "dart format --output=none --set-exit-if-changed . (apps/mobile)", "exit_code": 0},
+    {"command": "flutter test (apps/mobile)", "exit_code": 0, "tests": "231 passed"},
+    {"command": "flutter analyze (apps/mobile_patient)", "exit_code": 0},
+    {"command": "dart format --output=none --set-exit-if-changed . (apps/mobile_patient)", "exit_code": 0},
+    {"command": "flutter test (apps/mobile_patient)", "exit_code": 0, "tests": "229 passed"},
+    {"command": "Gradle wrapper --version", "exit_code": 1, "reason": "Gradle 9.3.1 distribution unavailable; automatic download stopped"}
+  ],
+  "counts": {"discovered": 866, "executed": 866, "passed": 866, "failed": 0, "ignored": 4, "not_run": 0},
+  "control_invariants": {"tests_deleted": 0, "assertions_weakened": 0, "shared_resources_modified": 0, "production_resources_modified": 0}
+}

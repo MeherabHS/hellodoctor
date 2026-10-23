@@ -1,0 +1,507 @@
+﻿{
+    "source_up_migrations":  62,
+    "unique_versions":  true,
+    "all_down_pairs_present":  true,
+    "sha384_meaning":  "Raw source bytes SHA384; matches SQLx0.8.6 Migration::new hashing mechanism, not an applied database checksum comparison",
+    "applied_state_queried":  false,
+    "source_renamed_or_rewritten":  false,
+    "records":  [
+                    {
+                        "version":  20261001000001,
+                        "path":  "services/backend/migrations/20261001000001_initial_schema.up.sql",
+                        "sha384":  "966793638dfc306be22b8297a276972cfc39c25bfd78024b8ba535f8bdb496cf146aec12a6e2b6d989b75d4dbd925a8b",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261002000001,
+                        "path":  "services/backend/migrations/20261002000001_add_phone_otps.up.sql",
+                        "sha384":  "1dc4c612e237b2c7d47bdc843d2af3d3d747756693d3d67e13d7defdfb5f8261db86fa332d5289cf4db5215396889df1",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261002000002,
+                        "path":  "services/backend/migrations/20261002000002_idempotency_response_body.up.sql",
+                        "sha384":  "ea7c30b115f2c52471bb4911293720b9053bb0bd2ae12de28a1be6acb13bbee17f76acaf7b3988b7ce5707ffbd74b7e0",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261002000003,
+                        "path":  "services/backend/migrations/20261002000003_pending_mfa_challenges.up.sql",
+                        "sha384":  "6b752b67c8ac4651a25d91260fa9a97b95debba77beb011e755c1de62eff84276ee241845935c694ea0ad1f0daceef07",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261002000004,
+                        "path":  "services/backend/migrations/20261002000004_idempotency_nullable_user.up.sql",
+                        "sha384":  "af6a3d1b36a3e435df3cb99a611ca4680bf77b440ff7a6f0f62f979952f8132a35b9243865dbaa222c51a7143f831c18",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261003000001,
+                        "path":  "services/backend/migrations/20261003000001_rls_hardening.up.sql",
+                        "sha384":  "899dfd3f4303acde075fd0ba14e839214517d7b41b332bf46f6caf1f676333f0c54709e3a45bee07c26bc11d61ad52fc",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261004000001,
+                        "path":  "services/backend/migrations/20261004000001_system_error_service.up.sql",
+                        "sha384":  "7c29bcd2ecbfa4da86161cb91b93d6f962e892b5840d8ec286af48fa88e90d2ace44a1ce996e39ee6193b414790c1c25",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261004000002,
+                        "path":  "services/backend/migrations/20261004000002_consultation_telemetry_events.up.sql",
+                        "sha384":  "5efeba13e4e850e819a82a98d80af73656aa1136b59f5809503ba6a051f561e369ba96df982d700b5af3e5b4f6c0db77",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261004000003,
+                        "path":  "services/backend/migrations/20261004000003_admin_audit_snapshots.up.sql",
+                        "sha384":  "456e039b221d274b61d5589d0747fc252cae4604b5a6d913921c29541838c865e5e1e1e388e98afd83010f9ba0c18cd6",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261004000004,
+                        "path":  "services/backend/migrations/20261004000004_security_correctness_fixes.up.sql",
+                        "sha384":  "0790aa37f964d246ecede4727d1f3052767b58653a59b037c9a5af0264622ec3df2629f8add6d300b0f8a7b78154aae6",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261004000005,
+                        "path":  "services/backend/migrations/20261004000005_pass2_fixes.up.sql",
+                        "sha384":  "7a42acb5fc08fe5e9a04ee7a8ad17150e0747f72eb9bf3ec91923eb30dfa8cc6d0749aa6b10da4fdc2271f9c4e8d5768",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261005000001,
+                        "path":  "services/backend/migrations/20261005000001_doctor_contract_qna.up.sql",
+                        "sha384":  "c92c28f003787e9de7fe7c98561d6d488b9292ae80ab2845e126ef0a5fa20e7637a44a3bc677d767e66a3ef050974fbe",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261005000002,
+                        "path":  "services/backend/migrations/20261005000002_history_access_window.up.sql",
+                        "sha384":  "7da9ab30800fb42bf7afe235dc15ca5512acd53e720e3efbde388d2b3c845a6fd6bea6673b4441b004653b3ffc039e05",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261006000001,
+                        "path":  "services/backend/migrations/20261006000001_doctor_payout_methods.up.sql",
+                        "sha384":  "3292b6bfd6130eb2f570274f399c7580c94de5f9aa040736632548ac295ee527678a34b68cc64c61404ced91b55a03af",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261007000001,
+                        "path":  "services/backend/migrations/20261007000001_kenya_payout_routing.up.sql",
+                        "sha384":  "08929af8499351f5d0057cfc363c21a6b9dd986cca2ec496a897060c27c0ffc65fb186aa35b996feda7bd31fc53a0665",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261008000001,
+                        "path":  "services/backend/migrations/20261008000001_financial_state_machine.up.sql",
+                        "sha384":  "3b1215b0355066db6e42da892f2a97e33076137daae974728eccbc25538ee3c6ab12e7af286859a2e4ea7e8c77d65766",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261009000001,
+                        "path":  "services/backend/migrations/20261009000001_fix_disbursement_allocation_index.up.sql",
+                        "sha384":  "93f67c0530e756eff32ba2063ec636a736241332a4dab6d760fed6be36a87e4c54939fa54ccefc73d9fb8d5db0882d19",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261010000001,
+                        "path":  "services/backend/migrations/20261010000001_add_kenya_bank_gateway.up.sql",
+                        "sha384":  "e6d157ce9444babf31f4f8f2a573f67e6a54741a7a1be034b0fe11059a18527afdda77aa8c926b49c9b0ad458a417934",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261011000001,
+                        "path":  "services/backend/migrations/20261011000001_statement_payout_snapshot.up.sql",
+                        "sha384":  "fabdb37768d5a301ee264b390270db3562f3441c17eb2566b09b44b6020e599bf4573a59f1b458b8086bb6290f9f7427",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261012000001,
+                        "path":  "services/backend/migrations/20261012000001_financial_close_integrity.up.sql",
+                        "sha384":  "fc2d8e21b66c18b87e72c3a9439fa4328968266e7a705170e05174ffdbe2c6192fe83ebc17abff7ec40e6c550ca8ba39",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261013000001,
+                        "path":  "services/backend/migrations/20261013000001_atomic_doctor_onboarding.up.sql",
+                        "sha384":  "c3224da0b4441931d99ecee8c490ffa998c75ea3c5c151f7cb18182a6d8c977f4a0a42a2795ae6e4150373cd90bb95a3",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261014000001,
+                        "path":  "services/backend/migrations/20261014000001_rx_pages_document_authorization.up.sql",
+                        "sha384":  "e0a2a00e49036eef3eed4ef51819e52f02904e7d1df70736fd8f902a991a936a17afdf32cda6c150ef4eddc9131087f4",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261015000001,
+                        "path":  "services/backend/migrations/20261015000001_refund_approval_not_payment.up.sql",
+                        "sha384":  "806ac78de6e31873711d32bcbd8b04f662671d66c74cc3364718a2a2e6d982a9c914c745bd9a8a7a663f08d4362b7e42",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261016000001,
+                        "path":  "services/backend/migrations/20261016000001_atomic_consultation_completion.up.sql",
+                        "sha384":  "654bc0cc8b384948092dc3b0f50e4236bbabde2f9cf0ecd83cc68c07f7d884dc3e1757ed4e73013de6cdb12ab30b9626",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261017000001,
+                        "path":  "services/backend/migrations/20261017000001_clinical_and_payout_invariants.up.sql",
+                        "sha384":  "fde2586a67f5a37059d3c3c7743d51bb7808a526dd939847f46efce408e5079edd0fc9810f7d16388308ad6daeefbfc4",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261018000001,
+                        "path":  "services/backend/migrations/20261018000001_audit_corrections.up.sql",
+                        "sha384":  "79e3ea305da6fdd335bc668c7be06f19ebc47a2cc9e930fbebf0503cb1064b187009209064d5e0f4293536501afa4795",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261019000001,
+                        "path":  "services/backend/migrations/20261019000001_migration_status_grant.up.sql",
+                        "sha384":  "98ace5899e14b24b9c782bad9efb0141f6c86ca4f3ae802181fa9f1be77ecd0cb3bdfb0dbd3190a1ca1fb600e5e6da9d",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261020000001,
+                        "path":  "services/backend/migrations/20261020000001_doctor_engagement_notifications.up.sql",
+                        "sha384":  "e97c2b252e7a57a2679cb076e81c690fbd4c8856c4d64efee1bcdf6c1de822ede013b4c4c6aab5f80e41361d9656b231",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261021000001,
+                        "path":  "services/backend/migrations/20261021000001_doctor_slot_blocking.up.sql",
+                        "sha384":  "b7a6d564a80a6268aae5f5bf13633bc73235185d8f01f4bdc04eb4f04f56cfde85755a200a9220e10e5b321f795223eb",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261022000001,
+                        "path":  "services/backend/migrations/20261022000001_client_incident_context.up.sql",
+                        "sha384":  "af88f984e4b56f246781436c8e24fbae9c507553db0749ec99e6f373821ee93bff9c4eead13979b949db5652c4959796",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261023000001,
+                        "path":  "services/backend/migrations/20261023000001_refresh_token_lineage.up.sql",
+                        "sha384":  "b6fcae2e7f88b0f0fe2d5830dbea377d3f77fb70adb03ea486192e9ec348fa69d4ca0bd280d474479ea52ed580a37a53",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261024000001,
+                        "path":  "services/backend/migrations/20261024000001_professional_verification.up.sql",
+                        "sha384":  "364bb63e2197fd873e748a2adc2871096b5917cd4909cd57837ef500db68365eec324e51056e6f81554785f0b10b35a8",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261025000001,
+                        "path":  "services/backend/migrations/20261025000001_doctor_articles.up.sql",
+                        "sha384":  "1f320c01125542096077e058044351d995011f58f50564ab8b373edfd98c181a27ab9fc05b8d78a3c0bfa1fa5b8c0d44",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261026000001,
+                        "path":  "services/backend/migrations/20261026000001_canonical_user_isolation.up.sql",
+                        "sha384":  "75dbe7ce0113beb27734d30e07f590d3104a00f18fc7e7e76074a725dee191d0a90a9285cf85aef07e367730afe8415f",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261027000001,
+                        "path":  "services/backend/migrations/20261027000001_legal_acceptances.up.sql",
+                        "sha384":  "411b268bdb46f975145ef579cdb96c106c88d943964a35098465846930a3ecf913d0ab82f98de82e260d8e03c77ffbb0",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261028000001,
+                        "path":  "services/backend/migrations/20261028000001_grievance_number_sequence.up.sql",
+                        "sha384":  "969413cdf401dc76f0d92ccb2c43182f6ab9172ca292fc308d8e45145701ca7aaeb27440863f4fd5499bba58d65ac861",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261029000001,
+                        "path":  "services/backend/migrations/20261029000001_notification_finance_worker_insert.up.sql",
+                        "sha384":  "fb213311cc46e9f294479e1efcb45d667ec98c83833a8ad924ecdd4ebf238cac4ca085368c6c50ed63113678f9575dfd",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261030000001,
+                        "path":  "services/backend/migrations/20261030000001_prescription_intake_20_image_cap.up.sql",
+                        "sha384":  "fdecc81c06cb83dba0ee728946933832630e2d55a9a498e9e7b78eb38463bd0752e13172a29319e8bff5aea74f87b03d",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261031000001,
+                        "path":  "services/backend/migrations/20261031000001_statement_transactions_doctor_ownership.up.sql",
+                        "sha384":  "a6b53223ba3214826c0ea687121fbaf83cf71df57cb1562b7f50c213a49015650aaad9e94a2fc90b467a3fc25b9d05ed",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261101000001,
+                        "path":  "services/backend/migrations/20261101000001_patient_profile_dependents.up.sql",
+                        "sha384":  "d4be056cbf31850ade362b900ade18d1ea9581a09b1ea5f2fb1b4199c1a7144c91c2f6d36a54ec90298a10496ecf0808",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261101000002,
+                        "path":  "services/backend/migrations/20261101000002_patient_qna_submission.up.sql",
+                        "sha384":  "d9b5fe2fa05e88edf1cfd47acaef106412ab95bdd8d54479a77fdc1fd5b07294bae02fafe42e986935d14f7e6e2ae8a4",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261102000001,
+                        "path":  "services/backend/migrations/20261102000001_patient_data_consent.up.sql",
+                        "sha384":  "cd6bc2cb88e85b28bf9be31fa9ce9075ff5120a51bf964ab194118698e71516f9b259498a78adac8caca4f06336c83e9",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261102000002,
+                        "path":  "services/backend/migrations/20261102000002_patient_data_consent_document.up.sql",
+                        "sha384":  "d31097d56bf08f01100f59f50aaff439a0a6305b7b805d64e2fbc91cd4fdfc514116639625d5df60ee1809ac45d1799f",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261103000001,
+                        "path":  "services/backend/migrations/20261103000001_patient_email_auth.up.sql",
+                        "sha384":  "9c785d706264f4d2bd628c137614019ac1d6fe3a2a3d88d903b40f02e979c6c00440874447de5b2270e362112f44385d",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261104000001,
+                        "path":  "services/backend/migrations/20261104000001_patient_registration_details.up.sql",
+                        "sha384":  "aad6fa3eb937b0655a6bc85a897e6ebcf4d10c700e5992b67479a31efcc4ffdde7bfb2ea3e7a58ab6cafd1cdb96f3bb3",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261104000002,
+                        "path":  "services/backend/migrations/20261104000002_patient_policies_and_rights.up.sql",
+                        "sha384":  "1d3b373979d18174c40a37aeec66251615268023a0181b46e8a0a839b6db14fc122914b1418a4229a75789d7c51db513",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261105000001,
+                        "path":  "services/backend/migrations/20261105000001_patient_own_open_questions.up.sql",
+                        "sha384":  "b721116016c49a71d4a5993baf7a1f5357a2f91535c2f21905cf9930d62e986f73712acb03015be8cbbe296086076721",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261106000001,
+                        "path":  "services/backend/migrations/20261106000001_canonical_admin_enum.up.sql",
+                        "sha384":  "11559893f1a70bd040ef7b369788483b4381cd11fed2210a583839a6eb43a5607839f3eb723f27f2ec400c16625d532f",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261106000002,
+                        "path":  "services/backend/migrations/20261106000002_single_admin.up.sql",
+                        "sha384":  "2d10a105b711947dc8211c67f0ab3f205b8956282d1b3235e4d0acec568202c35706b805f5ceeb064d43f200ba6ad5bd",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261106000003,
+                        "path":  "services/backend/migrations/20261106000003_consultation_trace.up.sql",
+                        "sha384":  "012d1afa2ee200511a4450efca93a7e0d8bb8df71fda62041e4d84b9e138f8b2b640590f2a91e14f3cc12d63e689f7bf",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261106000004,
+                        "path":  "services/backend/migrations/20261106000004_encounter_history_reschedule.up.sql",
+                        "sha384":  "d4716368254c6032ec23a0dfe0f306709339d1218bd8da72f9ba1401d55c6c0b90f05515715bf875c8b58a1ef810b801",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261106000005,
+                        "path":  "services/backend/migrations/20261106000005_chat_helpers.up.sql",
+                        "sha384":  "d25d3ce2f44e5eba09dabf7b1f0f558541a80cccd9bc173fc3f077e0c455964b411f22395877f9e4d9d16e828f3b8b9d",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261106000006,
+                        "path":  "services/backend/migrations/20261106000006_investigation_evidence.up.sql",
+                        "sha384":  "efa7355d7d206747d6751942e0abe9a56f744bd22d4d5af84afdf51c82055057ddf5b96b7a57aaa08c7bdbf979c30bab",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261107000001,
+                        "path":  "services/backend/migrations/20261107000001_totp_replay_protection.up.sql",
+                        "sha384":  "a97070c8d5125ea2da57e1cda11ae5d1987431432e8435c2f8c9ed356d89ead1e4cf382bb2b2bcb7d327f231e83d5a9a",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261107000002,
+                        "path":  "services/backend/migrations/20261107000002_doctor_verification_revocation.up.sql",
+                        "sha384":  "c39b99a2a28219ed4cfabee3feb41590368ab99f845cd64aaa4d4a691ab19f58dc981d00b239be35195fc91e29100076",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261107000003,
+                        "path":  "services/backend/migrations/20261107000003_chat_rls_backstop.up.sql",
+                        "sha384":  "83ed0bd80af5ae58db723533a355f503e55312ea524176b7d02a28b3df7b18ecbf80b4eba11986bf5d69b988ba9d9950",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261108000001,
+                        "path":  "services/backend/migrations/20261108000001_patient_payment_methods.up.sql",
+                        "sha384":  "bdaed265eb47e346ee9b845627ef7fc2e8d4d74834b72a87d6821ad190774e969bd3b5fa8a02c060994b3839dd4433f5",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261108000002,
+                        "path":  "services/backend/migrations/20261108000002_platform_payment_methods.up.sql",
+                        "sha384":  "d8277b226bc2823dd728ab339c298c2f31eeb41f893d82a7b29c66da54ed7f0cad5eb102bb859e613c3068bad07d8b1b",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261109000001,
+                        "path":  "services/backend/migrations/20261109000001_data_rights_execution.up.sql",
+                        "sha384":  "d5b95dd7fac6670bc98f258153715a464cd7dc72237e6eb005180c8ad1518427fe2b5361b0b57fc74092b86c64e24a6b",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261110000001,
+                        "path":  "services/backend/migrations/20261110000001_economic_idempotency.up.sql",
+                        "sha384":  "3f072827ea213740e736fe65d9f276764f626c1304cc8e56d40181c84a7fc90596b1e383e0c9ffff3e6f3ea89a42455d",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261110000003,
+                        "path":  "services/backend/migrations/20261110000003_auth_session_device_keys.up.sql",
+                        "sha384":  "1f2443fb0626e5edecdd27fcc11d71b3fb4b002a6e414445ee88c029223104f622927a5628149fb54ea1d274365b315e",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    },
+                    {
+                        "version":  20261110000004,
+                        "path":  "services/backend/migrations/20261110000004_admin_totp_algorithm.up.sql",
+                        "sha384":  "e7464dd7d1944c9132efbd3d39892747f3e68f4937be47fad3829f3e5002433a6898616baa8686d98854b557fdd5309a",
+                        "down_present":  true,
+                        "applied_checksum_status":  "NOT_QUERIED",
+                        "execution_status":  "BLOCKED_ENVIRONMENT"
+                    }
+                ],
+    "collector_correction":  "Initial parent-side OrderedDictionary Select-Object enumeration errored; recomputed from retained JSON with ForEach-Object and ErrorActionPreference=Stop. This was evidence collection, not target test execution."
+}

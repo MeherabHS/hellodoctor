@@ -1,0 +1,22 @@
+{
+  "version": "1.0.1+4",
+  "model": "moto g96 5G",
+  "android": "16",
+  "analyze_exit": 0,
+  "full_tests_exit": 0,
+  "build_exit": 0,
+  "install_exit": 0,
+  "tests_passed": 189,
+  "tests_failed": 0,
+  "tests_skipped": 0,
+  "existing_test_files_changed": 0,
+  "app_data_cleared": false,
+  "startup_native_fatal": false,
+  "startup_alive_after_seconds": 5,
+  "artifact": "releases/hellodoctor-doctor-arm64-navigation-fix-20261015.apk",
+  "bytes": 20456432,
+  "sha256": "6a4062bcc7d1e10d327b67fcf177895d5212f95e918ab540d083445707297f33",
+  "physical_navigation_visually_verified": true,
+  "all_six_labels_above_android_navigation": true,
+  "user_confirmed_position_correct": true
+}

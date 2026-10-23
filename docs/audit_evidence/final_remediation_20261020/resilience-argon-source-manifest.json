@@ -1,0 +1,9 @@
+{
+    "before_sha256":  "26EC8F91D58953D62D096CAD4DB45DE7EB801B21D65BDD95A3FE5A8052AECA77",
+    "after_sha256":  "81AC487E64D34598EAF6232AFFFF7512F19C400C781B0D3DF9458234754A481F",
+    "outside_test_module_unchanged":  true,
+    "new_named_cases":  3,
+    "existing_test_assertions_retained":  true,
+    "modified_production_functions":  0,
+    "arbitrary_sleeps_added":  0
+}

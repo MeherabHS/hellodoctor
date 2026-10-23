@@ -1,0 +1,27 @@
+{
+  "case_id": "distributed_login",
+  "request_count": 30000,
+  "checks": {
+    "inflight_peak": true,
+    "argon2_peak": true,
+    "sanitizer_peak": null,
+    "db_waiters_peak": null,
+    "rejected_excess": true,
+    "ordinary_latency_budget": null,
+    "core_database_protected": null,
+    "same_fixture": true
+  },
+  "db_before": {
+    "fixture_id": "runtime-20261019/hd_http_fixture"
+  },
+  "db_after": {
+    "fixture_id": "runtime-20261019/hd_http_fixture",
+    "inflight_peak": 4.0,
+    "inflight_ceiling": 4,
+    "argon2_peak": 4.0,
+    "argon2_ceiling": 4,
+    "ordinary_p95_ms": 52.622700000938494,
+    "rss_bytes": 127909888
+  },
+  "verdict": "INCONCLUSIVE"
+}

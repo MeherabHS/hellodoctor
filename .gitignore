@@ -41,3 +41,20 @@ out/
 *.pem
 *.key
 *.der
+
+# Tool-internal agent metadata and local Claude Code config — never product
+# code, never meant to be shared across clones.
+.agents/
+.claude/
+skills-lock.json
+
+# Ad-hoc session scratch work (debug scripts, logs, full-repo backups made
+# during a remediation pass). Never a source of truth; use a real scratchpad
+# directory outside the repo for future sessions instead of writing here.
+scratch/
+grievances_out.json
+
+# Built APK artifacts bloat the repo as binaries; keep release *docs* (e.g.
+# releases/*.md test-session notes) tracked, but never the signed binaries
+# themselves.
+releases/*.apk

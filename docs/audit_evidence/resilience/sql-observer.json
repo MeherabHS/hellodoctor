@@ -1,0 +1,29 @@
+﻿{
+    "fixture":  "isolated-postgres-no-network",
+    "recorded_utc":  "2026-10-18T18:27:55.3327187Z",
+    "command":  "./services/backend/scripts/resilience/Invoke-IsolatedSql.ps1",
+    "success":  true,
+    "elapsed_seconds":  6.6152682999999994,
+    "request_scope":  "600 raw SQL operations; maximum eight client processes per phase; no HTTP/provider execution",
+    "limits":  {
+                   "memory_mib":  512,
+                   "cpus":  2,
+                   "external_network":  false,
+                   "empty_child_environment":  true,
+                   "scratch_mib":  512,
+                   "pids":  64,
+                   "wall_seconds":  180,
+                   "source_read_only":  true
+               },
+    "observations":  [
+                         "MIGRATIONS_UP=DEFENSE_PASS",
+                         "psql:/harness/observe.sql:24: NOTICE:  case=obligation requests=100 active_obligations=1 confirmations=0 settlements=0 provider_events=0 winner=\u003cNULL\u003e verdict=DEFENSE_PASS",
+                         "psql:/harness/observe.sql:24: NOTICE:  case=confirmation requests=100 active_obligations=1 confirmations=1 settlements=0 provider_events=100 winner=\u003cNULL\u003e verdict=DEFENSE_PASS",
+                         "psql:/harness/observe.sql:24: NOTICE:  case=replay requests=100 active_obligations=1 confirmations=1 settlements=0 provider_events=100 winner=\u003cNULL\u003e verdict=DEFENSE_PASS",
+                         "psql:/harness/observe.sql:24: NOTICE:  case=settlement requests=100 active_obligations=1 confirmations=1 settlements=1 provider_events=100 winner=\u003cNULL\u003e verdict=DEFENSE_PASS",
+                         "psql:/harness/observe.sql:24: NOTICE:  case=approval requests=100 active_obligations=1 confirmations=1 settlements=1 provider_events=100 winner=44444444-4444-4444-4444-444444444444 verdict=DEFENSE_PASS",
+                         "psql:/harness/observe.sql:24: NOTICE:  case=payout requests=100 active_obligations=1 confirmations=1 settlements=1 provider_events=100 winner=44444444-4444-4444-4444-444444444444 verdict=DEFENSE_PASS",
+                         "psql:/harness/negative.sql:14: NOTICE:  case=settled_regression_and_reference_change verdict=DEFENSE_PASS",
+                         "ECONOMIC_DOWN_UP=DEFENSE_PASS"
+                     ]
+}

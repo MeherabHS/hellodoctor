@@ -1,0 +1,9 @@
+{
+  "fixture_id": "runtime-20261019/hd_http_fixture",
+  "inflight_peak": 4.0,
+  "inflight_ceiling": 4,
+  "argon2_peak": 4.0,
+  "argon2_ceiling": 4,
+  "ordinary_p95_ms": 52.622700000938494,
+  "rss_bytes": 127909888
+}
