@@ -1,6 +1,7 @@
 import '../../../core/network/api_client.dart';
 import '../../../core/network/client_error_reporter.dart';
 import 'blogs_models.dart';
+import 'quiz_repository.dart';
 
 /// Backs `GET /articles` and `GET /articles/:id` — fully real today, no
 /// backend gap (plan confirms this directly). Plain repository, no cubit:
@@ -8,8 +9,17 @@ import 'blogs_models.dart';
 /// own, matching the plan's own "Blogs ... single-fetch ... no cubit needed"
 /// architecture note.
 class BlogsRepository {
-  BlogsRepository(this.api);
+  BlogsRepository(this.api, {ArticleQuizRepository? quizzes})
+      : quizzes = quizzes ?? ArticleQuizRepository(api);
   final ApiClient api;
+  final ArticleQuizRepository quizzes;
+
+  Future<List<int>> cover(String id) {
+    if (!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(id)) {
+      throw const FormatException('Invalid article ID.');
+    }
+    return api.getBytes('/articles/$id/cover');
+  }
 
   dynamic _data(dynamic r) {
     final body = r.data;

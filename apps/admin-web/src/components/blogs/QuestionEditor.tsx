@@ -1,0 +1,11 @@
+'use client';
+import {newOption,type QuizQuestion,type QuizLanguage} from '../../lib/quizContent';
+export function QuestionEditor({question,index,total,language,onChange,onRemove,onMove}:{question:QuizQuestion;index:number;total:number;language:QuizLanguage;onChange:(q:QuizQuestion)=>void;onRemove:()=>void;onMove:(offset:number)=>void}){
+  const label=language==='en'?'English':'Kiswahili';
+  return <section className="cms-question" aria-label={`Question ${index+1}`}><div className="cms-actions"><strong>Question {index+1}</strong><button type="button" disabled={index===0} onClick={()=>onMove(-1)}>Move up</button><button type="button" disabled={index===total-1} onClick={()=>onMove(1)}>Move down</button><button type="button" onClick={onRemove}>Remove question</button></div>
+    <label>{label} question<textarea rows={3} maxLength={2000} value={question[`text_${language}`]} onChange={e=>onChange({...question,[`text_${language}`]:e.target.value})}/></label>
+    {question.options.map((option,i)=><div className="cms-quiz-option" key={option.id}><label>{label} option {String.fromCharCode(65+i)}<input maxLength={500} value={option[`text_${language}`]} onChange={e=>onChange({...question,options:question.options.map(o=>o.id===option.id?{...o,[`text_${language}`]:e.target.value}:o)})}/></label><label className="cms-check"><input type="radio" name={`answer-${question.id}`} checked={question.correct_option_id===option.id} onChange={()=>onChange({...question,correct_option_id:option.id})}/>Correct answer {String.fromCharCode(65+i)}</label><button type="button" disabled={question.options.length<=2} onClick={()=>onChange({...question,options:question.options.filter(o=>o.id!==option.id),correct_option_id:question.correct_option_id===option.id?null:question.correct_option_id})}>Remove option {String.fromCharCode(65+i)}</button></div>)}
+    <button type="button" disabled={question.options.length>=6} onClick={()=>onChange({...question,options:[...question.options,newOption()]})}>Add answer option</button>
+    <label>{label} explanation<textarea rows={3} maxLength={4000} value={question[`explanation_${language}`]} onChange={e=>onChange({...question,[`explanation_${language}`]:e.target.value})}/></label>
+  </section>;
+}

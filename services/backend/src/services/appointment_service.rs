@@ -373,6 +373,11 @@ impl AppointmentService {
                 .await?;
                 doctor_repo::set_slot_status(&mut *payment_tx, apt.slot_id, SlotStatus::Booked)
                     .await?;
+                crate::services::NotificationService::notify_booking_confirmed(
+                    &mut payment_tx,
+                    txn.appointment_id,
+                )
+                .await?;
             } else {
                 consultation_trace::record(
                     &mut payment_tx,

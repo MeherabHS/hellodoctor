@@ -5,9 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_client.dart';
 import '../../core/notifications/local_notification_service.dart';
 import '../../core/notifications/notification_ids.dart';
-import '../../core/notifications/schedule_notification_reconciler.dart';
-import '../doctor/doctor_models.dart';
-import '../doctor/doctor_repository.dart';
 import 'notification_models.dart';
 import 'notification_repository.dart';
 
@@ -62,40 +59,33 @@ class NotificationState {
 /// architecture (docs/DOCTOR_NOTIFICATION_DELIVERY_ARCHITECTURE.md):
 /// real-time synchronization while the Doctor app process is alive. There is
 /// no WebSocket/SSE client anywhere in this codebase to subscribe to, so
-/// this is a 20-second `Timer.periodic` poll — the same shape as
+/// this is a `Timer.periodic` poll — the same shape as
 /// `features/doctor/doctor_pages.dart`'s `_ScheduleState` (15s) and
 /// `app.dart`'s own simpler 30s timer: only actually fires its fetch while
 /// `WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed`.
-/// 20s is a deliberate middle ground between those two existing precedents:
-/// lighter than the 15s schedule poll feels justified for (this is just
-/// `unread-count` + a small page of `list`, not a heavy query), but tighter
-/// than the 30s incident-retry timer since a doctor should see a brand-new
-/// notification promptly. The poll itself is started by an explicit call to
-/// [startPolling] (see its own doc comment for why this isn't automatic).
+/// [startPolling]'s own default interval (20s) is a deliberate middle ground
+/// between those two existing precedents, but the real production call site
+/// (`app.dart`'s `BlocProvider<NotificationCubit>.create`) currently passes
+/// an explicit 1-minute interval instead — a doctor should still see a
+/// brand-new notification promptly, just not as tightly as this class's own
+/// default. The poll itself is started by an explicit call to [startPolling]
+/// (see its own doc comment for why this isn't automatic).
+///
+/// NOTE (notification-architecture consolidation): this cubit previously also
+/// drove Layer 3's local `DAILY_CONSULTATION_SUMMARY` schedule reconciliation
+/// via optional `doctorRepo`/`doctorId` constructor parameters. That local
+/// scheduler was removed once the backend's own `DAILY_CONSULTATION_SUMMARY`
+/// (`services/backend/src/services/notification_scheduler.rs::run_daily_summary_pass`,
+/// covered by `services/backend/tests/api_tests.rs`) was confirmed as the
+/// sole, reliable source — this cubit's own Layer 1 poll above already
+/// surfaces that backend-created row through the ordinary dedup/bridging
+/// path below, so no separate local reconciliation is needed.
 class NotificationCubit extends Cubit<NotificationState> {
-  NotificationCubit(this.repo,
-      {this.doctorRepo, this.doctorId, DateTime Function()? now})
+  NotificationCubit(this.repo, {DateTime Function()? now})
       : _now = now ?? DateTime.now,
         super(const NotificationState());
   final DateTime Function() _now;
   final NotificationRepository repo;
-
-  /// Optional — supplies the appointment queue the schedule reconciler
-  /// (Layer 3) needs. Left null, [_maybeReconcileSchedule] simply skips
-  /// reconciliation. Mutable (not `final`): `app.dart` resolves the signed-in
-  /// doctor's identity asynchronously (a secure-storage token read) after
-  /// this cubit is already constructed via `BlocProvider`'s one-shot
-  /// `create`, so it assigns both this and [doctorId] once resolution
-  /// completes rather than racing construction with an awaited value.
-  DoctorRepository? doctorRepo;
-
-  /// Optional — the signed-in doctor's id, required by
-  /// `ScheduleNotificationReconciler.reconcile`. This cubit deliberately does
-  /// not try to derive it itself (e.g. from auth state); the caller that
-  /// knows the doctor's id is responsible for supplying it. Reconciliation
-  /// is skipped whenever this is null, same as [doctorRepo]. See [doctorRepo]
-  /// for why this isn't `final`.
-  String? doctorId;
 
   bool _loadInFlight = false;
 
@@ -160,11 +150,6 @@ class NotificationCubit extends Cubit<NotificationState> {
         lastUpdatedAt: _now().toUtc(),
       ));
       _processFetchedItems(items);
-      // Fire-and-forget: reconciliation does its own network fetch
-      // (`doctorRepo.queue`) and must never add latency to `load()`'s own
-      // Future, which the notification-center page awaits to stop its
-      // pull-to-refresh spinner.
-      unawaited(_maybeReconcileSchedule());
     } catch (e) {
       if (isClosed) return;
       emit(state.copyWith(
@@ -268,7 +253,6 @@ class NotificationCubit extends Cubit<NotificationState> {
         lastUpdatedAt: DateTime.now().toUtc(),
       ));
       _processFetchedItems(items);
-      await _maybeReconcileSchedule();
     } catch (_) {
       // Swallowed — see doc comment above.
     } finally {
@@ -336,50 +320,6 @@ class NotificationCubit extends Cubit<NotificationState> {
       );
     } catch (_) {
       // Best-effort — see doc comment above.
-    }
-  }
-
-  /// Schedule reconciliation trigger (Layer 3 hookup) — runs on the same
-  /// cadence as the realtime sync above (the initial `load()` and every
-  /// poll tick). Only does anything when both [doctorRepo] and [doctorId]
-  /// were supplied to the constructor; see their doc comments.
-  DateTime? _lastScheduleReconciliation;
-  Set<String> _scheduleNoticeIds = {};
-  Future<void> _maybeReconcileSchedule() async {
-    final repo = doctorRepo;
-    final id = doctorId;
-    if (repo == null || id == null || isClosed) return;
-    final notices = state.items
-        .where((item) =>
-            item.type.contains('CONSULTATION') ||
-            item.type.contains('APPOINTMENT') ||
-            item.type.contains('PAYMENT'))
-        .map((item) => item.id)
-        .toSet();
-    final now = _now().toUtc();
-    if (_lastScheduleReconciliation != null &&
-        now.difference(_lastScheduleReconciliation!) <
-            const Duration(minutes: 5) &&
-        notices.difference(_scheduleNoticeIds).isEmpty) {
-      return;
-    }
-    try {
-      // Generous single-page fetch (`limit: 100`) — a known simplification,
-      // same as the Layer 2 background-sync worker: no pagination beyond
-      // this first page of the doctor's appointment queue.
-      final List<AppointmentDto> appointments = await repo.queue(limit: 100);
-      if (isClosed) return;
-      _lastScheduleReconciliation = now;
-      _scheduleNoticeIds = notices;
-      await ScheduleNotificationReconciler.reconcile(
-        doctorId: id,
-        appointments: appointments,
-        nowUtc: DateTime.now().toUtc(),
-      );
-    } catch (_) {
-      // Best-effort, same reasoning as `_poll()`'s own error handling: a
-      // schedule-reconciliation failure must never surface as a visible
-      // notifications-list error or interrupt realtime sync.
     }
   }
 

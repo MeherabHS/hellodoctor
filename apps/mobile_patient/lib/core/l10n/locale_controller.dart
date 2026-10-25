@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../network/api_client.dart';
@@ -7,8 +9,14 @@ import '../network/api_client.dart';
 /// `features/patient/profile/language_modal.dart`).
 ///
 /// Deliberately a plain [ChangeNotifier], not a cubit: this is pure UI-chrome
-/// state (no network call, no business logic), so the lighter-weight tool is
-/// the right fit, per the implementation plan's explicit call on this.
+/// state, so the lighter-weight tool is the right fit, per the implementation
+/// plan's explicit call on this. Milestone 3 adds one narrow exception to
+/// "no network call": a best-effort backend sync of the chosen language via
+/// [bindBackendSync], so `users.preferred_language` (previously never
+/// actually written anywhere in the backend) reflects what the Patient
+/// actually sees, for notification-content localization
+/// (`NotificationService::render`). That sync is fire-and-forget and never
+/// blocks or fails the local, synchronous language switch below.
 ///
 /// Stored directly via [TokenStore] under its own device-level key — NOT
 /// through `PatientCacheStore`'s JWT-subject-scoped cache, since a language
@@ -23,6 +31,7 @@ class LocaleController extends ChangeNotifier {
 
   final TokenStore _store;
   Locale _locale = const Locale('en');
+  Future<void> Function(String languageCode)? _backendSync;
 
   Locale get locale => _locale;
 
@@ -34,11 +43,23 @@ class LocaleController extends ChangeNotifier {
     }
   }
 
+  /// Wires the best-effort backend sync call (`NotificationRepository.
+  /// syncLanguage`), set once a signed-in session's `api`/repository exists
+  /// — construction of this controller itself happens earlier, before login,
+  /// per `app.dart`.
+  void bindBackendSync(Future<void> Function(String languageCode) sync) {
+    _backendSync = sync;
+  }
+
   Future<void> setLocale(String languageCode) async {
     if (!supportedLanguageCodes.contains(languageCode)) return;
     if (_locale.languageCode == languageCode) return;
     _locale = Locale(languageCode);
     notifyListeners();
     await _store.write(_storageKey, languageCode);
+    final sync = _backendSync;
+    if (sync != null) {
+      unawaited(sync(languageCode).catchError((_) {}));
+    }
   }
 }

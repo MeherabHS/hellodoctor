@@ -8,7 +8,7 @@ test('paid CHAT and VIDEO expose only their respective start action', () => {
   assert.equal(consultationActionLabel({modality:'CHAT',status:'CONFIRMED'}),'Start chat consultation');
   assert.equal(consultationAction({modality:'VIDEO',status:'CONFIRMED'}),'call');
   assert.equal(consultationActionLabel({modality:'VIDEO',status:'CONFIRMED'}),'Start video consultation');
-  for (const modality of ['CHAT','VIDEO']) for (const status of ['PENDING_PAYMENT','CANCELLED','REFUNDED','NO_SHOW','COMPLETED'])
+  for (const modality of ['CHAT','VIDEO']) for (const status of ['PENDING_PAYMENT','CANCELLED','REFUNDED','EXPIRED','PREMATURE_TERMINATION','DISPUTED','COMPLETED'])
     assert.equal(consultationAction({modality,status}),null);
   assert.equal(consultationAction({modality:'UNKNOWN',status:'CONFIRMED'}),null);
   assert.equal(consultationAction({modality:'VIDEO',status:'WAITING'}),null);
@@ -21,7 +21,7 @@ test('paid chat start opens existing conversation; closed and video follow-up wo
   assert.equal(chatActionLabel(c,0),'Start chat consultation');
   assert.equal(chatActionLabel({...c,last_message_at:'2026-01-01'},0),'Open chat');
   assert.equal(chatActionLabel({...c,modality:'VIDEO'},0),'Open chat');
-  for (const appointment_status of ['CANCELLED','REFUNDED','PENDING_PAYMENT','NO_SHOW']) {
+  for (const appointment_status of ['CANCELLED','REFUNDED','PENDING_PAYMENT','EXPIRED','PREMATURE_TERMINATION','DISPUTED']) {
     assert.equal(chatLocked({...c,appointment_status},0),true);
     assert.equal(chatActionLabel({...c,appointment_status},0),'View consultation history');
   }

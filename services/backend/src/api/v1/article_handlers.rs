@@ -6,7 +6,7 @@ use crate::{
         ids::DoctorProfileId,
     },
     error::AppError,
-    repository::{article_repo, AppState},
+    repository::{admin_article_repo, article_repo, AppState},
     services::audit_service::{AuditLogEntry, AuditService},
 };
 use axum::{
@@ -93,7 +93,15 @@ pub async fn feed(
     Query(query): Query<ArticleQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     abac::authorize(&ctx, Action::AnyAuthenticated)?;
-    list(&state, &ctx, None, query).await
+    let mut tx = state.begin_authed(&ctx).await?;
+    let rows = admin_article_repo::feed(
+        &mut *tx,
+        query.limit.unwrap_or(20).clamp(1, 50),
+        query.offset.unwrap_or(0).max(0),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(Json(json!({"success":true,"data":rows})))
 }
 async fn list(
     state: &AppState,
@@ -119,7 +127,7 @@ pub async fn detail(
 ) -> Result<Json<serde_json::Value>, AppError> {
     abac::authorize(&ctx, Action::AnyAuthenticated)?;
     let mut tx = state.begin_authed(&ctx).await?;
-    let article = article_repo::find(&mut *tx, id, None)
+    let article = admin_article_repo::published(&mut *tx, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Published article not found.".into()))?;
     tx.commit().await?;
@@ -268,7 +276,7 @@ async fn finish_mutation(
     log(&mut tx, ctx, action, &article).await?;
     if action == "ARTICLE_PUBLISH" || action == "ARTICLE_ARCHIVE" {
         crate::services::notification_service::NotificationService::notify_article_status(
-            &mut *tx,
+            &mut tx,
             ctx.user_id,
             id,
             article.version,

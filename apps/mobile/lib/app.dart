@@ -42,23 +42,6 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
   StreamSubscription<AuthState>? _authSubscription;
   StreamSubscription<NetworkStatus>? _networkSubscription;
 
-  /// The signed-in doctor's stable identifier, resolved asynchronously from
-  /// the access token JWT once `state is SignedIn` (see
-  /// `_resolveDoctorId`/`background_sync_worker.dart`'s
-  /// `doctorIdentifierFromAccessToken` — the same derivation
-  /// `core/cache/doctor_cache_store.dart`'s private `_identitySeed` already
-  /// uses). Only ever used to namespace `NotificationCubit`'s own local
-  /// schedule-reconciliation dedup keys, never sent to the backend. Null
-  /// until resolved, which simply skips reconciliation for the first frame
-  /// or two after sign-in (`NotificationCubit`'s own documented tolerance).
-  String? _doctorId;
-
-  /// Set once by `NotificationCubit`'s own `BlocProvider.create`, so
-  /// [_resolveDoctorId] — which resolves asynchronously, after that one-shot
-  /// `create` has already run — can still deliver the id to the already-live
-  /// cubit instead of a value that would otherwise never reach it.
-  NotificationCubit? _notificationCubit;
-
   @override
   void initState() {
     super.initState();
@@ -124,7 +107,6 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
         _incidentRetryTimer?.cancel();
         if (state is SignedIn) {
           unawaited(ClientErrorReporter.current?.flushStartup());
-          unawaited(_resolveDoctorId());
           _incidentRetryTimer =
               Timer.periodic(const Duration(seconds: 30), (_) {
             if (WidgetsBinding.instance.lifecycleState ==
@@ -132,13 +114,6 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
               unawaited(ClientErrorReporter.current?.flushStartup());
             }
           });
-        } else {
-          // Signing out tears down the `MultiBlocProvider` subtree (disposing
-          // the old `NotificationCubit`); drop these too so a later sign-in
-          // can't have `_resolveDoctorId` reach into a stale, already-closed
-          // instance before the new one is constructed.
-          _doctorId = null;
-          _notificationCubit = null;
         }
       });
       _networkSubscription = connectivity!.changes.listen((status) {
@@ -151,32 +126,6 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
     } catch (error, stack) {
       unawaited(ClientErrorReporter.captureStartup(error, stack));
       _startupError = error;
-    }
-  }
-
-  /// Reads the current access token and decodes its stable subject, the same
-  /// way `background_sync_worker.dart`'s background isolate independently
-  /// does for the same purpose. A no-op (and harmless) if the token is
-  /// temporarily unavailable or unchanged; `setState` only fires when the
-  /// resolved id actually changes, so this never forces a needless rebuild
-  /// on every call.
-  Future<void> _resolveDoctorId() async {
-    final token = await api?.read('access_token');
-    final id = doctorIdentifierFromAccessToken(token);
-    if (!mounted || id == null || id == _doctorId) return;
-    _doctorId = id;
-    final cubit = _notificationCubit;
-    if (cubit != null && !cubit.isClosed) {
-      // The cubit already exists (constructed before this async resolution
-      // finished) — deliver the id directly rather than relying on a rebuild
-      // to reconstruct it, since `BlocProvider.create` only runs once.
-      cubit.doctorId = id;
-      cubit.doctorRepo ??=
-          DoctorRepository(api!, cache: cache, connectivity: connectivity!);
-    } else {
-      // No live cubit yet (e.g. resolved before the first `SignedIn` build) —
-      // a plain rebuild is enough, since `create` will read `_doctorId` fresh.
-      setState(() {});
     }
   }
 
@@ -204,14 +153,9 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
                   create: (_) => DoctorCubit(DoctorRepository(api!,
                       cache: cache, connectivity: connectivity!))),
               BlocProvider<NotificationCubit>(
-                  create: (_) => _notificationCubit = NotificationCubit(
-                        NotificationRepository(api!),
-                        doctorRepo: _doctorId == null
-                            ? null
-                            : DoctorRepository(api!,
-                                cache: cache, connectivity: connectivity!),
-                        doctorId: _doctorId,
-                      )..startPolling(interval: const Duration(minutes: 1))),
+                  create: (_) =>
+                      NotificationCubit(NotificationRepository(api!))
+                        ..startPolling(interval: const Duration(minutes: 1))),
             ], child: application(const DoctorShell()));
           }
           return application(state is SessionRestoring
@@ -237,7 +181,7 @@ class _SplashPage extends StatelessWidget {
             child: const Icon(Icons.medical_services_rounded,
                 color: DoctorTokens.primary, size: 30)),
         const SizedBox(height: 16),
-        const Text('HelloDoctor',
+        const Text('AfyaMkononi',
             style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
@@ -723,7 +667,7 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
                         'Kenya Medical Practitioners and Dentists Council · Kenya'),
                     Text('Status: ${professional.verificationLabel}'),
                     const Text(
-                        'Manual HelloDoctor registration review. Clinical access requires approval.'),
+                        'Manual AfyaMkononi registration review. Clinical access requires approval.'),
                     if (professional.reviewNote != null)
                       Text(professional.reviewNote!),
                     TextButton(

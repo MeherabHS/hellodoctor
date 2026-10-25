@@ -237,7 +237,17 @@ class CallController extends ChangeNotifier {
 
   Future<void> switchCamera() => engine.switchCamera();
 
+  bool _left = false;
+
+  /// Idempotent: a widget's `dispose()` calling this again after its own
+  /// explicit "leave and pop" action already called it (`Navigator.pop`
+  /// synchronously triggers `State.dispose()`, which has no way to know the
+  /// leave already happened) must never queue a second `DISCONNECTED`
+  /// telemetry event or re-release an already-released engine for the same
+  /// call.
   Future<void> leave() async {
+    if (_left) return;
+    _left = true;
     _tokenRenewalGuard?.cancel();
     await engine.release();
     if (_joinedAtLeastOnce) {

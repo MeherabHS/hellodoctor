@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../features/notifications/notification_repository.dart';
+import '../network/client_error_reporter.dart';
 
 /// Patient FCM adapter. A push only causes an authenticated inbox refresh;
 /// sensitive details and deep-link authorization remain server controlled.
@@ -25,9 +26,15 @@ class PushNotificationService {
     _started = true;
     try {
       await Firebase.initializeApp();
-    } catch (_) {
-      // The native Firebase files are deployment inputs. Missing them must not
-      // block authentication or in-app notifications.
+    } catch (error, stack) {
+      // The native Firebase files are deployment inputs (see
+      // docs/FCM_SETUP.md). Missing them must not block authentication or
+      // in-app notifications, but the failure must still be visible to
+      // operators rather than silently invisible forever, so it goes through
+      // the same sanitized client-diagnostics pipeline as any other
+      // unexpected client error.
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Notifications', operation: 'push_init');
     }
     try {
       final messaging = FirebaseMessaging.instance;
@@ -60,9 +67,13 @@ class PushNotificationService {
       });
       final initial = await messaging.getInitialMessage();
       if (initial != null) unawaited(onNotificationReceived());
-    } catch (_) {
+    } catch (error, stack) {
       // FCM is optional until native project configuration and APNs setup are
-      // supplied; the existing inbox remains the fallback delivery channel.
+      // supplied; the existing inbox remains the fallback delivery channel —
+      // but, as above, the failure is still captured through sanitized
+      // diagnostics instead of silently disappearing.
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Notifications', operation: 'push_init');
     }
   }
 

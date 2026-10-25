@@ -30,19 +30,6 @@ int stableNotificationId(String key) {
   return hash & 0x7FFFFFFF;
 }
 
-/// `consultation_t15:<appointment_id>` — reserved for parity with the Doctor
-/// side's T-15 reminder; note the backend's `CONSULTATION_REMINDER_15M`
-/// scheduler currently targets the doctor's `user_id` only (confirmed by
-/// direct backend source inspection — `notification_scheduler.rs`'s
-/// `run_t15_reminder_pass` inserts against `c.doctor_user_id`, never a
-/// patient id), so this key is not yet fed by any real backend event for a
-/// patient; a local, client-side-scheduled reminder (scheduled directly from
-/// the appointment's own confirmed slot time, not from a backend
-/// notification) is what actually drives it today — see
-/// `schedule_notification_reconciler.dart`.
-String t15ReminderKey(String appointmentId) =>
-    'consultation_t15:$appointmentId';
-
 /// `notification_event:<backend_notification_id>` — the dedup source for
 /// bridging a backend `/notifications` row to a local device notification.
 String remoteEventKey(String backendNotificationId) =>

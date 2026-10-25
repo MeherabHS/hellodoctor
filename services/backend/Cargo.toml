@@ -62,3 +62,6 @@ reqwest = { version = "0.12", features = ["json"] }
 tower = { version = "0.4", features = ["util"] }
 http-body-util = "0.1"
 reqwest = { version = "0.12", features = ["json", "multipart"] }
+# No-echo terminal password prompt, used only by the offline
+# examples/reset_admin_password.rs recovery tool (never shipped in the server binary).
+rpassword = "7"

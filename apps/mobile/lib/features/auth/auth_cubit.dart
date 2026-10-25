@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_client.dart';
 import '../../core/cache/doctor_cache_store.dart';
+import '../notifications/notification_repository.dart';
 
 sealed class AuthState {
   const AuthState();
@@ -249,6 +250,15 @@ class AuthCubit extends Cubit<AuthState> {
     _busy = true;
     String? notice;
     try {
+      // Best-effort: a signed-out device must stop receiving push for this
+      // account. Already reported through ClientErrorReporter inside
+      // NotificationRepository.revokeDevice on failure, so swallowed here
+      // rather than surfaced as the (unrelated) server-logout notice below.
+      try {
+        final notificationRepo = NotificationRepository(api);
+        await notificationRepo.revokeDevice(
+            deviceId: await notificationRepo.deviceId());
+      } catch (_) {}
       final refresh = await api.read('refresh_token');
       if (refresh != null) {
         await api.post('/auth/logout', data: {'refresh_token': refresh});

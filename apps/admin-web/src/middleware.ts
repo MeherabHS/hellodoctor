@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exposureHeaders, ExposureError } from './lib/exposure';
+import { hasPrototypePollution, hasTunnelingHeader, isJsonStateChangingRequest, isPerimeterBlockedPath } from './lib/sideDoorGuard';
+
+function sideDoorBlocked(status: number) {
+  return NextResponse.json({ success: false, error: 'Request rejected.' },
+    { status, headers: { 'Cache-Control': 'no-store' } });
+}
 
 // UX-level gate only — redirects an obviously-unauthenticated browser to
 // /login before it ever renders the dashboard shell. This is NOT the real
@@ -8,11 +14,15 @@ import { exposureHeaders, ExposureError } from './lib/exposure';
 // and shouldn't need to); the actual boundary is the Rust backend rejecting
 // every proxied request that lacks a valid bearer token, enforced in
 // `src/app/api/proxy/[...path]/route.ts` on every single call regardless of
-// what this middleware does or doesn't catch.
+// what this middleware does or doesn't catch. The side-door checks below
+// (verb-tunneling/proxy-rewrite headers, SSRF/debug/backup-file-shaped
+// paths, prototype-pollution-shaped JSON bodies) are a separate, narrower
+// concern — see `lib/sideDoorGuard.ts` for why each is safe to block
+// unconditionally — and run before any of that session logic.
 const SESSION_MARKER = 'hd_admin_session';
 const PUBLIC_PATHS = ['/login', '/api/login', '/api/bot-challenge'];
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   try {
     exposureHeaders(req.headers, { environment: process.env.ENVIRONMENT,
       origin: process.env.ADMIN_WEB_ORIGIN, proxySecret: process.env.WEB_PROXY_SECRET,
@@ -20,6 +30,18 @@ export function middleware(req: NextRequest) {
   } catch (error) {
     return NextResponse.json({ success: false, error: 'Secure deployment configuration or ingress required.' },
       { status: error instanceof ExposureError ? error.status : 503, headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  if (hasTunnelingHeader(req.headers)) return sideDoorBlocked(400);
+  if (isPerimeterBlockedPath(req.nextUrl.pathname)) return sideDoorBlocked(403);
+  if (isJsonStateChangingRequest(req.method, req.headers.get('content-type'))) {
+    try {
+      const body = await req.clone().text();
+      if (body && hasPrototypePollution(JSON.parse(body))) return sideDoorBlocked(403);
+    } catch {
+      // Malformed JSON is this route's own job to reject — this guard only
+      // ever blocks a *well-formed* pollution-shaped payload.
+    }
   }
 
   const { pathname } = req.nextUrl;
@@ -41,6 +63,12 @@ export function middleware(req: NextRequest) {
   const next = () => {
     const response = NextResponse.next({ request: { headers: requestHeaders } });
     response.headers.set('Content-Security-Policy', csp);
+    // Side-channel isolation: COOP prevents a cross-origin popup/opener from
+    // sharing this page's window object (Spectre-class memory leaks, opener
+    // hijacking); CORP stops a third-party page from side-loading this
+    // origin's responses as a sub-resource.
+    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+    response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
     return response;
   };
 

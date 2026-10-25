@@ -1,0 +1,10 @@
+DROP TABLE article_quiz_publications;
+DROP FUNCTION guard_article_quiz_publication();
+ALTER TABLE article_quiz_questions DROP CONSTRAINT article_quiz_answer_fk;
+DROP TABLE article_quiz_options;
+DROP TABLE article_quiz_questions;
+DROP FUNCTION guard_article_quiz_child();
+DROP FUNCTION check_article_quiz_order();
+DROP TABLE article_quiz_revisions;
+DROP FUNCTION guard_article_quiz_revision();
+DROP FUNCTION article_quiz_complete(UUID);

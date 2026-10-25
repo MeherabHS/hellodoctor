@@ -154,6 +154,30 @@ pub async fn update_own_profile(
 
     let id = ctx.patient_profile_id(&state).await?;
     let mut tx = state.begin_authed(&ctx).await?;
+    // `WELCOME_GREETING` fires on the genuine "account activation" event for
+    // a Patient: the first time this profile actually leaves the OTP-login
+    // placeholder state (`auth_service::verify_otp_and_login`'s seeded
+    // `full_name: "Patient User"`, `date_of_birth: 1995-01-01`,
+    // `gender: OTHER` — the exact triple `PatientProfileDto.isPlaceholder`
+    // already checks client-side). Computed from the row as it stands
+    // immediately before this update, compared against what it will become
+    // after applying `patient_repo::update`'s own `COALESCE(new, existing)`
+    // semantics — so this never fires for a dependent profile edit (a
+    // dependent's row was never a login placeholder to begin with) or for
+    // an already-completed profile being edited again.
+    let before = patient_repo::find_by_id(&mut *tx, id).await?;
+    let was_placeholder = before.as_ref().is_some_and(|p| {
+        p.full_name == "Patient User"
+            && p.date_of_birth == NaiveDate::from_ymd_opt(1995, 1, 1).unwrap()
+            && p.gender == Gender::Other
+    });
+    let will_still_be_placeholder = before.as_ref().is_some_and(|p| {
+        body.full_name.as_deref().unwrap_or(&p.full_name) == "Patient User"
+            && body.date_of_birth.unwrap_or(p.date_of_birth)
+                == NaiveDate::from_ymd_opt(1995, 1, 1).unwrap()
+            && body.gender.unwrap_or(p.gender) == Gender::Other
+    });
+
     let rows = patient_repo::update(
         &mut *tx,
         id,
@@ -168,10 +192,13 @@ pub async fn update_own_profile(
         Utc::now(),
     )
     .await?;
-    tx.commit().await?;
     if rows != 1 {
         return Err(AppError::NotFound("Patient profile not found.".into()));
     }
+    if was_placeholder && !will_still_be_placeholder {
+        crate::services::NotificationService::notify_welcome_greeting(&mut tx, id).await?;
+    }
+    tx.commit().await?;
     Ok(Json(ApiResponse {
         success: true,
         data: json!({"updated": true}),

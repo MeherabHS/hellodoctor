@@ -56,9 +56,16 @@ class NotificationState {
 /// mark-read/rollback shape, same Layer 1 realtime-poll-plus-local-notify
 /// bridge from `docs/DOCTOR_NOTIFICATION_DELIVERY_ARCHITECTURE.md` (there is
 /// no WebSocket/SSE client anywhere in this codebase to subscribe to
-/// instead). Deliberately does not carry the Doctor cubit's Layer 3 schedule
-/// reconciliation — that's Doctor-specific dormant infrastructure this app
-/// has no equivalent of; this cubit is scoped to the in-app inbox only.
+/// instead).
+///
+/// Per the final notification architecture decision, the backend/FCM is the
+/// sole scheduler for every server-driven push, including the T-15
+/// consultation reminder for both Doctor and Patient
+/// (`notification_scheduler.rs::run_t15_reminder_pass`) — this cubit
+/// deliberately does not run any local appointment-reminder scheduling of
+/// its own. `LocalNotificationService.showNow` below is reactive display
+/// only (an already-delivered backend event shown while the app is in the
+/// foreground), never a locally-computed future reminder.
 class NotificationCubit extends Cubit<NotificationState> {
   NotificationCubit(this.repo) : super(const NotificationState());
   final NotificationRepository repo;

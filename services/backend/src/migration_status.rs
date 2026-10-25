@@ -32,7 +32,34 @@ use std::collections::BTreeSet;
 /// content changed too). If `/healthz` ever reports `binary_latest_migration`
 /// behind the newest file on disk after a real `cargo build`, touch this
 /// comment to force re-expansion rather than assuming the migration itself
-/// is wrong. (Re-touched again for 20261118000003.)
+/// is wrong. (Re-touched again for 20261119000001.) (Re-touched again for
+/// 20261120000001.) (Re-touched again for 20261121000001.) (Re-touched again
+/// for 20261122000001.) (Re-touched again after 20261122000001's own content
+/// changed in place — template-render grants added — still before this
+/// milestone was ever reported complete, so this is an in-flight edit of an
+/// unshipped migration, not a rewrite of history.) (Re-touched again after
+/// adding the `hellodoctor_finance_worker` preferred_language grant to the
+/// same in-flight 20261122000001 file.) (Re-touched again after adding `id`
+/// to that same grant — a column referenced only in a WHERE filter still
+/// needs its own column-level GRANT, not only the columns in the SELECT
+/// list.) (Re-touched again for 20261124000001 — Milestones 4+5 engagement
+/// and Kenyan holiday notifications.) (Re-touched again for 20261124000002
+/// — HelloDoctor -> AfyaMkononi user-facing rebrand.) (Re-touched again
+/// after fixing 20261124000001's `notifications_type_check` rebuild, which
+/// had accidentally dropped Milestone 2's own additions to that constraint
+/// — `DROP CONSTRAINT` + `ADD CONSTRAINT` replaces the whole list, so the
+/// base must always be the MOST RECENT prior owner's list, never an older
+/// one.) (Re-touched again for 20261125000001/20261126000001/20261126000002
+/// — Admin Campaigns, Milestones 6B+6C.) (Re-touched again after fixing
+/// 20261126000002's down migration: it had hardcoded a restored constraint
+/// name, `campaigns_check1`, that collided with a still-present, untouched
+/// 6B constraint already auto-assigned that exact name — caught by
+/// `migrator.undo()`/`migrator.run()` round-tripping in this project's own
+/// migration-backfill regression tests, not assumed.)
+// Re-expand for Milestone 6D's additive 20261127000001 migration, including
+// the cleanup-only row-lock permission and Doctor-ID collision guard.
+// Re-expand for the additive 6E quiz-revision migration, 20261128000001.
+// Re-expand for 6F's restricted Patient quiz functions (20261129000001).
 pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 
 #[derive(Debug, Clone, PartialEq, Eq)]

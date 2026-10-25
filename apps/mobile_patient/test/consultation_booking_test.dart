@@ -62,7 +62,9 @@ void main() {
       'PENDING_PAYMENT',
       'CANCELLED',
       'REFUNDED',
-      'NO_SHOW'
+      'EXPIRED',
+      'PREMATURE_TERMINATION',
+      'DISPUTED',
     ]) {
       expect(
           AppointmentDetailDto.fromJson(

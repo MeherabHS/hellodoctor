@@ -13,7 +13,7 @@
          app is next opened manually. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application
-        android:label="hellodoctor_mobile"
+        android:label="AfyaMkononi"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
@@ -47,6 +47,18 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Without this, an FCM message delivered while the app is
+             backgrounded/terminated (shown automatically by the OS from the
+             message's `notification` block — no app code runs for that path)
+             has no notification channel on Android 8+ and the system may
+             silently drop it. Points at the same `GENERAL` channel id
+             `NotificationChannels.general` already creates on startup
+             (local_notification_service.dart) — every foreground-displayed
+             notification instead picks its own more specific channel via
+             `NotificationChannels.forType`. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="GENERAL" />
         <!-- Required by flutter_local_notifications for AlarmManager delivery
              while the Flutter process is backgrounded, and rescheduling after
              reboot or an in-place APK update. -->

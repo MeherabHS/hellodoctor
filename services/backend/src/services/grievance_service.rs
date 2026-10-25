@@ -191,6 +191,12 @@ impl GrievanceService {
             .bind(&txn.gross_amount).bind(serde_json::to_value(txn.payment_status).unwrap().as_str().unwrap())
             .execute(&mut *tx).await?;
         transaction_repo::mark_status(&mut *tx, txn.id, PaymentStatus::RefundPending).await?;
+        crate::services::NotificationService::notify_refund_approved(
+            &mut tx,
+            session.appointment_id,
+            grievance_id,
+        )
+        .await?;
 
         AuditService::log_in_tx(
             &mut *tx,
@@ -407,6 +413,22 @@ impl GrievanceService {
                 "This refund request was changed by another request; reload and retry.".into(),
             ));
         }
+
+        let appointment_id: Uuid = sqlx::query_scalar(
+            "SELECT cs.appointment_id FROM grievance_reports gr \
+               JOIN consultation_sessions cs ON cs.id = gr.consultation_id \
+              WHERE gr.id = $1",
+        )
+        .bind(existing.grievance_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        crate::services::NotificationService::notify_refund_transitioned(
+            &mut tx,
+            appointment_id,
+            refund_request_id,
+            to_status,
+        )
+        .await?;
 
         AuditService::log_in_tx(
             &mut *tx,

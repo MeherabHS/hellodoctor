@@ -1,0 +1,11 @@
+DROP TRIGGER article_category_guard ON article_categories;
+DROP FUNCTION guard_article_category();
+DROP TRIGGER admin_article_guard ON admin_articles;
+DROP FUNCTION guard_admin_article();
+DROP TRIGGER admin_article_id_guard ON admin_articles;
+DROP FUNCTION guard_admin_article_id();
+ALTER TABLE admin_articles DROP CONSTRAINT admin_articles_cover_fk;
+DROP TABLE article_media;
+DROP TABLE admin_articles;
+DROP TABLE article_categories;
+REVOKE SELECT,INSERT ON audit_events FROM hellodoctor_system_worker;

@@ -71,3 +71,62 @@ class NotificationDto {
       readAt: readAt ?? this.readAt,
       metadata: metadata);
 }
+
+/// Mirrors `GET/PUT /notifications/preferences`
+/// (`notification_handlers.rs`'s `NotificationPreferencesView`/
+/// `UpdatePreferencesRequest`). Quiet-hours times are plain "HH:MM" strings
+/// on the wire — never raw `DateTime`/locale-dependent formatting.
+class NotificationPreferencesDto {
+  const NotificationPreferencesDto({
+    required this.operationalEnabled,
+    required this.engagementEnabled,
+    required this.quietHoursEnabled,
+    required this.quietHoursStartLocal,
+    required this.quietHoursEndLocal,
+    required this.greetingNotificationsEnabled,
+    required this.religiousGreetingsEnabled,
+    required this.preferredLanguage,
+  });
+
+  final bool operationalEnabled,
+      engagementEnabled,
+      quietHoursEnabled,
+      greetingNotificationsEnabled,
+      religiousGreetingsEnabled;
+  final String quietHoursStartLocal, quietHoursEndLocal, preferredLanguage;
+
+  factory NotificationPreferencesDto.fromJson(Json j) =>
+      NotificationPreferencesDto(
+        operationalEnabled: j['operational_enabled'] == true,
+        engagementEnabled: j['engagement_enabled'] == true,
+        quietHoursEnabled: j['quiet_hours_enabled'] == true,
+        quietHoursStartLocal: _textOf(j['quiet_hours_start_local'], '22:00'),
+        quietHoursEndLocal: _textOf(j['quiet_hours_end_local'], '07:00'),
+        greetingNotificationsEnabled: j['greeting_notifications_enabled'] == true,
+        religiousGreetingsEnabled: j['religious_greetings_enabled'] == true,
+        preferredLanguage: _textOf(j['preferred_language'], 'en'),
+      );
+
+  NotificationPreferencesDto copyWith({
+    bool? operationalEnabled,
+    bool? engagementEnabled,
+    bool? quietHoursEnabled,
+    String? quietHoursStartLocal,
+    String? quietHoursEndLocal,
+    bool? greetingNotificationsEnabled,
+    bool? religiousGreetingsEnabled,
+    String? preferredLanguage,
+  }) =>
+      NotificationPreferencesDto(
+        operationalEnabled: operationalEnabled ?? this.operationalEnabled,
+        engagementEnabled: engagementEnabled ?? this.engagementEnabled,
+        quietHoursEnabled: quietHoursEnabled ?? this.quietHoursEnabled,
+        quietHoursStartLocal: quietHoursStartLocal ?? this.quietHoursStartLocal,
+        quietHoursEndLocal: quietHoursEndLocal ?? this.quietHoursEndLocal,
+        greetingNotificationsEnabled:
+            greetingNotificationsEnabled ?? this.greetingNotificationsEnabled,
+        religiousGreetingsEnabled:
+            religiousGreetingsEnabled ?? this.religiousGreetingsEnabled,
+        preferredLanguage: preferredLanguage ?? this.preferredLanguage,
+      );
+}

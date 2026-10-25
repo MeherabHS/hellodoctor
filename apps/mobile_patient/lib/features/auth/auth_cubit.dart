@@ -3,6 +3,7 @@ import '../../core/network/api_client.dart';
 import '../../core/cache/patient_cache_store.dart';
 import '../../core/validation/kenya_phone.dart';
 import '../../core/validation/otp_validation.dart';
+import '../notifications/notification_repository.dart';
 import 'auth_repository.dart';
 
 sealed class AuthState {
@@ -311,6 +312,15 @@ class AuthCubit extends Cubit<AuthState> {
     _busy = true;
     String? notice;
     try {
+      // Best-effort: a signed-out device must stop receiving push for this
+      // account. Already reported through ClientErrorReporter inside
+      // NotificationRepository.revokeDevice on failure, so swallowed here
+      // rather than surfaced as the (unrelated) server-logout notice below.
+      try {
+        final notificationRepo = NotificationRepository(api);
+        await notificationRepo.revokeDevice(
+            deviceId: await notificationRepo.deviceId());
+      } catch (_) {}
       await repository.logout();
     } catch (_) {
       notice = 'Signed out on this device. Server revocation could not be '

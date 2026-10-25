@@ -291,7 +291,7 @@ export interface AdminGrievance {
 let runtimeGeneration=0;
 const inflightReads=createInflightReads();
 export function clearAdminRuntime(){runtimeGeneration++;inflightReads.clear();}
-function request<T>(path:string,options?:RequestInit):Promise<T>{
+export function request<T>(path:string,options?:RequestInit):Promise<T>{
  return (options?.method??'GET').toUpperCase()==='GET'&&!options?.signal&&!options?.headers
   ? inflightReads.run(`${runtimeGeneration}:${path}`,()=>performRequest<T>(path,options)) : performRequest<T>(path,options);
 }
@@ -700,4 +700,98 @@ export function setPrimaryPlatformPaymentMethod(id: string) {
 }
 export function deactivatePlatformPaymentMethod(id: string) {
   return request<{ id: string; is_active: boolean }>(`/admin/platform-payment-methods/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+// Admin Campaigns (Milestones 6B + 6C) — draft/review/approval lifecycle,
+// scheduling/pause/resume/cancel, dispatch monitoring. Dispatch itself is a
+// backend scheduler pass; nothing here ever sends anything directly.
+export type CampaignAudience = "PATIENTS" | "DOCTORS" | "BOTH";
+export type CampaignStatus =
+  | "DRAFT"
+  | "PENDING_REVIEW"
+  | "APPROVED"
+  | "SCHEDULED"
+  | "SENDING"
+  | "PAUSED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export interface CampaignContent {
+  title_en: string;
+  title_sw: string;
+  body_en: string;
+  body_sw: string;
+  audience: CampaignAudience;
+}
+
+export interface Campaign extends CampaignContent {
+  id: string;
+  created_by: string;
+  status: CampaignStatus;
+  version: number;
+  content_version: number;
+  approved_content_version: number | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  scheduled_for: string | null;
+  sending_started_at: string | null;
+  paused_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+}
+
+export interface CampaignStats {
+  status: CampaignStatus;
+  audience_count: number;
+  queued: number;
+  sent_to_provider: number;
+  deferred_by_preference_or_quiet_hours: number;
+  retry_pending: number;
+  permanently_failed: number;
+  sending_started_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+}
+
+export function listCampaigns(status?: CampaignStatus) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request<Campaign[]>(`/admin/campaigns${query}`);
+}
+export function getCampaign(id: string) {
+  return request<Campaign>(`/admin/campaigns/${encodeURIComponent(id)}`);
+}
+export function getCampaignAudiencePreview(audience: CampaignAudience) {
+  return request<{ audience: CampaignAudience; eligible_count: number }>(
+    `/admin/campaigns/audience-preview?audience=${encodeURIComponent(audience)}`
+  );
+}
+export function createCampaign(creation_key: string, content: CampaignContent) {
+  return request<Campaign>("/admin/campaigns", {
+    method: "POST",
+    body: JSON.stringify({ creation_key, content }),
+  });
+}
+export function updateCampaign(id: string, version: number, content: CampaignContent) {
+  return request<Campaign>(`/admin/campaigns/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ version, content }),
+  });
+}
+function campaignTransition(id: string, action: string, version: number, extra?: Record<string, unknown>) {
+  return request<Campaign>(`/admin/campaigns/${encodeURIComponent(id)}/${action}`, {
+    method: "POST",
+    body: JSON.stringify({ version, ...extra }),
+  });
+}
+export const submitCampaign = (id: string, version: number) => campaignTransition(id, "submit", version);
+export const approveCampaign = (id: string, version: number) => campaignTransition(id, "approve", version);
+export const pauseCampaign = (id: string, version: number) => campaignTransition(id, "pause", version);
+export const resumeCampaign = (id: string, version: number) => campaignTransition(id, "resume", version);
+export const cancelCampaign = (id: string, version: number) => campaignTransition(id, "cancel", version);
+export const scheduleCampaign = (id: string, version: number, scheduled_for: string) =>
+  campaignTransition(id, "schedule", version, { scheduled_for });
+export function getCampaignStats(id: string) {
+  return request<CampaignStats>(`/admin/campaigns/${encodeURIComponent(id)}/stats`);
 }

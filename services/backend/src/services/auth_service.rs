@@ -154,7 +154,7 @@ impl AuthService {
                 let active_count = user_repo::count_active(&mut *tx).await?;
                 if active_count as u32 >= state.config.max_active_users {
                     return Err(AppError::CapacityLimitReached(
-                        "HelloDoctor is at its current controlled pilot capacity. Please try again later.".into(),
+                        "AfyaMkononi is at its current controlled pilot capacity. Please try again later.".into(),
                     ));
                 }
                 (user_repo::create_patient_user(&mut *tx, phone).await?, true)

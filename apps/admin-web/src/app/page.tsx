@@ -1,6 +1,8 @@
 ﻿'use client';
 
 import { GrievanceInvestigation } from '@/components/GrievanceInvestigation';
+import { CampaignManager } from '@/components/campaigns/CampaignManager';
+import { BlogManager } from '@/components/blogs/BlogManager';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useBackendSync, ModalitySplit } from '@/lib/useBackendSync';
@@ -59,6 +61,8 @@ type AdminPageId =
   | 'compliance'
   | 'logs'
   | 'grievances'
+  | 'campaigns'
+  | 'blogs'
   | 'settings';
 
 interface ToastNotice {
@@ -303,7 +307,7 @@ export default function AdminPortalPage() {
     },
     verification: {
       title: 'Doctor Verification',
-      breadcrumb: 'Review KMPDC professional registration details • Manual HelloDoctor review',
+      breadcrumb: 'Review KMPDC professional registration details • Manual AfyaMkononi review',
     },
     compliance: {
       title: 'Clinical e-Prescription & Q&A Audit',
@@ -316,6 +320,11 @@ export default function AdminPortalPage() {
     grievances: {
       title: 'Consultation Grievance & Injustice Adjudication',
       breadcrumb: 'Patient Rights & Clinical Accountability • Doctor Conduct & System Failure Disputes',
+    },
+    blogs: { title: 'Blog Manager', breadcrumb: 'Articles · Draft, Review & Publish' },
+    campaigns: {
+      title: 'Admin Campaign Manager',
+      breadcrumb: 'Patient & Doctor Push Notification Campaigns • Draft, Review, Schedule & Monitor',
     },
     settings: {
       title: 'Platform Payment Settings',
@@ -806,7 +815,7 @@ export default function AdminPortalPage() {
   const selectedTxObj = selectedTransactionId ? transactions.find((t) => t.txId === selectedTransactionId) : null;
 
   return (
-    <div id="adminPortalShell" className="admin-portal-shell">
+    <div id="adminPortalShell" className={`admin-portal-shell${activeAdminPage === 'blogs' ? ' cms-active' : ''}`}>
       {/* Toast Overlay */}
       <div id="adminToastContainer" className="app-toast-container" style={{ position: 'fixed', top: '70px', right: '24px', left: 'auto', width: '360px', zIndex: 9999 }}>
         {toasts.map((t) => (
@@ -837,9 +846,9 @@ export default function AdminPortalPage() {
       {/* ── Left Sidebar (Full Height, Pure White) ── */}
       <aside className="admin-sidebar">
         <div className="admin-sidebar-header">
-          <div className="admin-brand-icon">H</div>
+          <div className="admin-brand-icon">A</div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span className="admin-brand-name">HelloDoctor</span>
+            <span className="admin-brand-name">AfyaMkononi</span>
             <span style={{ fontSize: '9.5px', color: '#64748B', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>Central Admin</span>
           </div>
         </div>
@@ -939,6 +948,18 @@ export default function AdminPortalPage() {
               {pendingGrievancesCount > 0 ? `${pendingGrievancesCount} Open` : '0'}
             </span>
           </div>
+
+          <div
+            className={`admin-nav-item ${activeAdminPage === 'campaigns' ? 'active' : ''}`}
+            id="adminNav-campaigns"
+            onClick={() => setActiveAdminPage('campaigns')}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
+            <span>Campaigns</span>
+          </div>
+          <button type="button" className={`admin-nav-item ${activeAdminPage === 'blogs' ? 'active' : ''}`} id="adminNav-blogs" onClick={()=>setActiveAdminPage('blogs')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/></svg><span>Blog Manager</span>
+          </button>
 
           <div
             className={`admin-nav-item ${activeAdminPage === 'settings' ? 'active' : ''}`}
@@ -2035,6 +2056,14 @@ export default function AdminPortalPage() {
             </div>
           )}
 
+          {/* PAGE: ADMIN CAMPAIGN MANAGER */}
+          {activeAdminPage === 'blogs' && <div className="admin-page-view active" id="adminPage_blogs"><BlogManager /></div>}
+          {activeAdminPage === 'campaigns' && (
+            <div className="admin-page-view active" id="adminPage_campaigns">
+              <CampaignManager />
+            </div>
+          )}
+
           {/* PLATFORM PAYMENT SETTINGS — the platform's own merchant
               configuration, distinct from a patient's saved payment methods
               and a doctor's payout destinations: this is the platform's own
@@ -2447,7 +2476,7 @@ export default function AdminPortalPage() {
             </div>
 
             <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', color: '#64748B' }}>Professional registration Verified Credential Ledger • HelloDoctor Kenya</span>
+              <span style={{ fontSize: '11px', color: '#64748B' }}>Professional registration Verified Credential Ledger • AfyaMkononi Kenya</span>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   className="admin-btn-sec"
@@ -2569,7 +2598,7 @@ export default function AdminPortalPage() {
             </div>
 
             <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', color: '#64748B' }}>Confidential Medical Record • HelloDoctor Health Vault</span>
+              <span style={{ fontSize: '11px', color: '#64748B' }}>Confidential Medical Record • AfyaMkononi Health Vault</span>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   className="admin-btn-sec"

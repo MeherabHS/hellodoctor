@@ -74,7 +74,7 @@ class ApiException implements Exception {
       case null:
         return message.isNotEmpty
             ? message
-            : 'Unable to reach HelloDoctor. Check your connection and retry.';
+            : 'Unable to reach AfyaMkononi. Check your connection and retry.';
       default:
         return message;
     }
@@ -584,7 +584,7 @@ class ApiClient {
               'You appear to be offline. Check your connection and retry.',
             DioExceptionType.cancel => 'The request was cancelled.',
             _ =>
-              'Unable to reach HelloDoctor. Check your connection and retry.',
+              'Unable to reach AfyaMkononi. Check your connection and retry.',
           };
     final requestId = body is Map && body['meta'] is Map
         ? body['meta']['request_id']?.toString()

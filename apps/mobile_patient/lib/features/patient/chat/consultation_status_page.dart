@@ -60,8 +60,9 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
           'COMPLETED',
           'CANCELLED',
           'REFUNDED',
-          'NO_SHOW',
-          'EXPIRED'
+          'EXPIRED',
+          'PREMATURE_TERMINATION',
+          'DISPUTED',
         ]
             .contains(detail?.status ?? widget.appointment.status));
   }
@@ -184,7 +185,6 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
     final history = const [
       'CANCELLED',
       'REFUNDED',
-      'NO_SHOW',
       'EXPIRED',
       'PREMATURE_TERMINATION',
       'DISPUTED'
@@ -247,7 +247,6 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
     final ended = const [
       'CANCELLED',
       'REFUNDED',
-      'NO_SHOW',
       'EXPIRED',
       'PREMATURE_TERMINATION',
       'DISPUTED'

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hellodoctor_mobile/core/network/api_client.dart';
 import 'package:hellodoctor_mobile/core/notifications/background_sync_worker.dart';
@@ -142,35 +140,4 @@ void main() {
       expect(result, isTrue);
     });
   });
-
-  group('doctorIdentifierFromAccessToken', () {
-    test(
-        'extracts user_id/sub (the JWT subject) when no doctor_id claim '
-        'exists, matching the real backend Claims shape', () {
-      final jwt = fakeJwt({'sub': 'user-123', 'user_id': 'user-123'});
-      expect(doctorIdentifierFromAccessToken(jwt), 'user-123');
-    });
-
-    test('prefers an explicit doctor_id claim if one is ever present', () {
-      final jwt = fakeJwt(
-          {'doctor_id': 'doc-9', 'user_id': 'user-123', 'sub': 'user-123'});
-      expect(doctorIdentifierFromAccessToken(jwt), 'doc-9');
-    });
-
-    test('returns null for a malformed token rather than throwing', () {
-      expect(doctorIdentifierFromAccessToken('not-a-jwt'), isNull);
-      expect(doctorIdentifierFromAccessToken(null), isNull);
-      expect(doctorIdentifierFromAccessToken(''), isNull);
-    });
-  });
-}
-
-/// Builds a real (unsigned, test-only) JWT string: three dot-separated
-/// base64url segments, matching exactly what
-/// [doctorIdentifierFromAccessToken] decodes (`base64Url.normalize` +
-/// `base64Url.decode` + `utf8.decode` + `jsonDecode` on the middle segment).
-String fakeJwt(Map<String, dynamic> claims) {
-  String segment(Map<String, dynamic> value) =>
-      base64Url.encode(utf8.encode(jsonEncode(value)));
-  return '${segment({'alg': 'none', 'typ': 'JWT'})}.${segment(claims)}.';
 }

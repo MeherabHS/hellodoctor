@@ -7,8 +7,13 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ (API 33) requires this runtime-requestable permission
+         before any local notification can be shown; requested explicitly at
+         a sensible point in the app, not on first launch (see
+         local_notification_service.dart). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
-        android:label="HelloDoctor"
+        android:label="AfyaMkononi"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
@@ -42,6 +47,18 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Without this, an FCM message delivered while the app is
+             backgrounded/terminated (shown automatically by the OS from the
+             message's `notification` block — no app code runs for that path)
+             has no notification channel on Android 8+ and the system may
+             silently drop it. Points at the same `GENERAL` channel id
+             `NotificationChannels.general` already creates on startup
+             (local_notification_service.dart) — every foreground-displayed
+             notification instead picks its own more specific channel via
+             `NotificationChannels.forType`. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="GENERAL" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

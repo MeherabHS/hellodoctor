@@ -30,14 +30,6 @@ int stableNotificationId(String key) {
   return hash & 0x7FFFFFFF;
 }
 
-/// `docs/.../ARCHITECTURE.md`'s `daily_schedule:<doctor_id>:<yyyy-mm-dd>`.
-String dailySummaryKey(String doctorId, String nairobiDate) =>
-    'daily_schedule:$doctorId:$nairobiDate';
-
-/// `consultation_t15:<appointment_id>`.
-String t15ReminderKey(String appointmentId) =>
-    'consultation_t15:$appointmentId';
-
 /// `notification_event:<backend_notification_id>` — the dedup source for
 /// Layer 1/2 remote-event-to-local-notification bridging.
 String remoteEventKey(String backendNotificationId) =>

@@ -1,0 +1,36 @@
+'use client';
+import {useState} from 'react';
+import type {AdminArticle} from '../../lib/blogContent';
+import {emptyQuiz,editableQuiz,newQuestion,quizErrors,quizRevision,type QuizContent,type QuizDocument,type QuizRevision,type QuizLanguage} from '../../lib/quizContent';
+import {getQuiz,saveQuiz,transitionQuiz} from '../../lib/quizApi';
+import {blogErrorMessage,independentApprovalMessage} from '../../lib/blogErrors';
+import {QuestionEditor} from './QuestionEditor';
+import {QuizImport} from './QuizImport';
+export function McqBuilder({article,onPreview,onDirty}:{article:AdminArticle|null;onPreview:(c:QuizContent|null)=>void;onDirty:(d:boolean)=>void}){
+  const [open,setOpen]=useState(false),[loaded,setLoaded]=useState(false),[revision,setRevision]=useState<QuizRevision|null>(null),[published,setPublished]=useState<QuizRevision|null>(null),[content,setContent]=useState<QuizContent>(emptyQuiz),[language,setLanguage]=useState<QuizLanguage>('en'),[dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+  function apply(doc:QuizDocument){if(doc.schema_version!==1)throw new Error('Unable to load the saved question contract.');const selected=quizRevision(doc);const value=selected?editableQuiz(selected):emptyQuiz();setRevision(selected);setPublished(doc.published);setContent(value);setDirty(false);onDirty(false);onPreview(value);setLoaded(true);}
+  function change(value:QuizContent){setContent(value);setDirty(true);onDirty(true);onPreview(value);setNotice('');setError('');}
+  async function load(){if(!article)return;setBusy(true);setError('');try{apply(await getQuiz(article.id));}catch(e){setError(blogErrorMessage(e));}finally{setBusy(false);}}
+  async function save(){if(!article)return;const errors=quizErrors(content);if(errors.length){setError(errors.map(e=>`Question ${e.row}: ${e.message}`).join(' '));return;}setBusy(true);setError('');try{apply(await saveQuiz(article.id,revision,content));setNotice('Question draft saved. Published article and quiz remain unchanged.');}catch(e){setError(blogErrorMessage(e));}finally{setBusy(false);}}
+  async function act(action:string){if(!article||!revision||dirty)return;if(action==='approve'&&revision.can_approve!==true){setError(independentApprovalMessage);return;}setBusy(true);setError('');try{apply(await transitionQuiz(article.id,revision,action));setNotice(action==='publish'?'Approved quiz setting published. No notification was sent.':'Question review status updated. Publication is a separate action.');}catch(e){setError(blogErrorMessage(e));}finally{setBusy(false);}}
+  const stale=Boolean(revision&&article&&revision.article_content_version!==article.content_version);
+  const errors=quizErrors(content,content.include_quiz);
+  return <fieldset className="cms-quiz" disabled={busy||article?.status==='ARCHIVED'}><legend>Article Questions / MCQ Builder</legend><p className="cms-hint">Optional. Draft questions stay private. Only an explicitly approved and published quiz setting changes what Patients receive.</p>
+    {!article?<p>Save the article draft before adding questions. MCQs default to OFF.</p>:<button type="button" aria-expanded={open} onClick={()=>{setOpen(!open);if(!loaded)void load();}}>{open?'Collapse MCQ Builder':'Open MCQ Builder'}</button>}
+    {error&&<p role="alert" className="cms-error">{error} <button type="button" onClick={load}>Reload saved questions</button></p>}
+    {open&&loaded&&<><label className="cms-check"><input type="checkbox" checked={content.include_quiz} onChange={e=>change({...content,include_quiz:e.target.checked})}/>Include MCQs in this article</label>
+      <p>{content.include_quiz?'Included draft quiz — approval and explicit publication required.':'Draft setting: article without MCQs. Questions are preserved; an existing published quiz changes only after approval and publication.'}</p>
+      <p className="cms-hint">Current Patient quiz: {published?.include_quiz&&article?.status==='PUBLISHED'&&published.article_content_version===article.content_version?`${published.questions.length} questions`:'not included in the current published article'}. Saving questions never changes article visibility. Changes to the article body require the quiz to be saved and reviewed against the new article version.</p>
+      <div className="cms-language" role="group" aria-label="Question editor language"><button type="button" aria-pressed={language==='en'} onClick={()=>setLanguage('en')}>English questions</button><button type="button" aria-pressed={language==='sw'} onClick={()=>setLanguage('sw')}>Kiswahili questions</button></div>
+      {content.questions.map((q,i)=><QuestionEditor key={q.id} question={q} index={i} total={content.questions.length} language={language} onChange={value=>change({...content,questions:content.questions.map(old=>old.id===value.id?value:old)})} onRemove={()=>change({...content,questions:content.questions.filter(old=>old.id!==q.id)})} onMove={offset=>{const questions=[...content.questions];[questions[i],questions[i+offset]]=[questions[i+offset],questions[i]];change({...content,questions});}}/>)}
+      <div className="cms-actions"><button type="button" disabled={content.questions.length>=50} onClick={()=>change({...content,questions:[...content.questions,newQuestion()]})}>Add question</button><button type="button" className="cms-primary" onClick={save}>Save question draft</button></div>
+      <p className="cms-hint">{content.questions.length}/50 questions · {revision?.status.replaceAll('_',' ')||'Unsaved draft'} · Plain text only; HTML is displayed as text. Complete Kiswahili per question or leave all translation fields blank for English fallback.</p>
+      {content.include_quiz&&errors.length>0&&<ul className="cms-hint">{errors.map((e,i)=><li key={i}>Question {e.row||'quiz'} · {e.message}</li>)}</ul>}
+      <QuizImport key={`${revision?.id||'new'}-${revision?.version||0}`} articleId={article!.id} revision={revision} disabled={busy||dirty} onImported={doc=>{apply(doc);setNotice('Questions imported to draft. No article or quiz was published.');}}/>
+      {stale&&<p role="status">Article content changed. Save the question draft again before review.</p>}
+      {revision?.status==='PENDING_REVIEW'&&!revision.can_approve&&<p role="status">{independentApprovalMessage}</p>}
+      <div className="cms-actions">{revision?.status==='DRAFT'&&<button type="button" disabled={dirty||stale||errors.length>0} onClick={()=>act('submit')}>Submit quiz for review</button>}{revision?.status==='PENDING_REVIEW'&&<button type="button" disabled={dirty||stale||!revision.can_approve} onClick={()=>act('approve')}>Approve quiz</button>}{revision&&['PENDING_REVIEW','APPROVED'].includes(revision.status)&&<button type="button" disabled={dirty||stale} onClick={()=>act('return')}>Return quiz for revision</button>}{revision?.status==='APPROVED'&&<button type="button" disabled={dirty||stale||article?.status!=='PUBLISHED'} onClick={()=>act('publish')}>Publish approved quiz setting</button>}</div>
+      {revision?.status==='APPROVED'&&article?.status!=='PUBLISHED'&&<p>Publish the approved article first, then publish its approved quiz setting.</p>}
+    </>}{notice&&<p role="status" className="cms-notice">{notice}</p>}
+  </fieldset>;
+}

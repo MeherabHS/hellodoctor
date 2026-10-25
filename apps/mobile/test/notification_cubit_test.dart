@@ -4,8 +4,6 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState, WidgetsBinding;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hellodoctor_mobile/core/network/api_client.dart';
-import 'package:hellodoctor_mobile/features/doctor/doctor_models.dart';
-import 'package:hellodoctor_mobile/features/doctor/doctor_repository.dart';
 import 'package:hellodoctor_mobile/features/notifications/notification_cubit.dart';
 import 'package:hellodoctor_mobile/features/notifications/notification_models.dart';
 import 'package:hellodoctor_mobile/features/notifications/notification_repository.dart';
@@ -67,21 +65,6 @@ class StubNotificationRepository extends NotificationRepository {
     markAllReadCalls++;
     if (failMarkAllRead) throw const ApiException(409, 'Server error');
     return listResponse.length;
-  }
-}
-
-/// Follows the same convention as `test/doctor_cubit_test.dart`'s own
-/// `StubDoctorRepository` — extends the real repository and overrides only
-/// what's needed (`queue()`, the schedule reconciler's appointment source).
-class StubDoctorRepository extends DoctorRepository {
-  StubDoctorRepository() : super(ApiClient(dio: Dio()));
-  int queueCalls = 0;
-  List<AppointmentDto> queueResponse = const [];
-
-  @override
-  Future<List<AppointmentDto>> queue({int limit = 25, int offset = 0}) async {
-    queueCalls++;
-    return queueResponse;
   }
 }
 
@@ -305,35 +288,5 @@ void main() {
     expect(cubit.state.items.map((n) => n.id).toList(), ['a']);
     expect(cubit.state.unreadCount, 1);
     await cubit.close();
-  });
-
-  // --- Schedule reconciliation (Layer 3) hookup ---------------------------
-
-  test(
-      'schedule reconciliation is skipped (no crash, no queue() call) when doctorRepo/doctorId are not supplied — keeps the app.dart single-argument call site working',
-      () {
-    fakeAsync((async) {
-      final repo = StubNotificationRepository();
-      final cubit = NotificationCubit(repo); // no doctorRepo, no doctorId
-      cubit.load();
-      async.flushMicrotasks();
-      expect(cubit.state.items, isNotEmpty);
-      cubit.close();
-    });
-  });
-
-  test(
-      'schedule reconciliation fetches doctorRepo.queue() once both doctorRepo and doctorId are supplied',
-      () {
-    fakeAsync((async) {
-      final repo = StubNotificationRepository();
-      final doctorRepo = StubDoctorRepository();
-      final cubit =
-          NotificationCubit(repo, doctorRepo: doctorRepo, doctorId: 'doc-1');
-      cubit.load();
-      async.flushMicrotasks();
-      expect(doctorRepo.queueCalls, greaterThanOrEqualTo(1));
-      cubit.close();
-    });
   });
 }

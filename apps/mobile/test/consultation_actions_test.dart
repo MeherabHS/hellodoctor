@@ -78,7 +78,9 @@ void main() {
       'CANCELLED',
       'REFUNDED',
       'COMPLETED',
-      'NO_SHOW'
+      'EXPIRED',
+      'PREMATURE_TERMINATION',
+      'DISPUTED',
     ]) {
       expect(appointment('CHAT', status: status).canStart, isFalse);
       expect(appointment('VIDEO', status: status).canStart, isFalse);
@@ -133,5 +135,16 @@ void main() {
     expect(
         const ChatDto(id: 'shared', expiresAt: '2000-01-01T00:00:00Z').isClosed,
         isTrue);
+    for (final status in ['EXPIRED', 'PREMATURE_TERMINATION', 'DISPUTED']) {
+      expect(
+          ChatDto.fromJson({
+            'id': 'shared',
+            'appointment_status': status,
+            'is_locked': false,
+            'expires_at': '2099-01-01T00:00:00Z'
+          }).isClosed,
+          isTrue,
+          reason: '$status must be treated as closed');
+    }
   });
 }

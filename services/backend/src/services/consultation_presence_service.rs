@@ -73,6 +73,7 @@ pub async fn apply_provider_event(
     .ok_or_else(|| AppError::NotFound("Consultation channel not found.".into()))?;
 
     let session_id: Uuid = session.get("id");
+    let appointment_id: Uuid = session.get("appointment_id");
     let patient_user_id: Option<Uuid> = session.get("patient_user_id");
     let guardian_user_id: Option<Uuid> = session.get("guardian_user_id");
     let doctor_user_id: Uuid = session.get("doctor_user_id");
@@ -131,8 +132,7 @@ pub async fn apply_provider_event(
         .fetch_one(&mut *tx)
         .await?
     {
-        let appointment_id: Uuid = session.get("appointment_id");
-        sqlx::query(
+        let transitioned = sqlx::query(
             "UPDATE consultation_sessions
                 SET recovery_state='NEEDS_REVIEW',
                     status='PREMATURE_TERMINATION'::session_status_enum,
@@ -141,7 +141,23 @@ pub async fn apply_provider_event(
         )
         .bind(session_id)
         .execute(&mut *tx)
-        .await?;
+        .await?
+        .rows_affected()
+            > 0;
+        if transitioned {
+            crate::services::NotificationService::notify_consultation_interrupted(
+                &mut tx,
+                session_id,
+                appointment_id,
+            )
+            .await?;
+            crate::services::NotificationService::notify_consultation_needs_review(
+                &mut tx,
+                session_id,
+                appointment_id,
+            )
+            .await?;
+        }
         tracing::warn!(%appointment_id, "late provider join rejected after empty-room deadline");
         tx.commit().await?;
         return Ok(false);
@@ -157,6 +173,16 @@ pub async fn apply_provider_event(
     }
 
     let present = matches!(event.kind, ProviderPresenceKind::Joined);
+    // Captured from the row locked at the top of this function (before this
+    // event's own change) — the only way the room becomes fully empty is
+    // this event's own role going absent while the OTHER role was already
+    // absent too, with the session not already past 'NONE'.
+    let other_role_present: bool = if role == "PATIENT" {
+        session.get("doctor_present")
+    } else {
+        session.get("patient_present")
+    };
+    let entering_grace_period = !present && !other_role_present && recovery_state == "NONE";
     let query = if role == "PATIENT" {
         "UPDATE consultation_sessions
             SET patient_present=$2, patient_presence_sequence=$3,
@@ -179,7 +205,6 @@ pub async fn apply_provider_event(
         .execute(&mut *tx)
         .await?;
     if present {
-        let appointment_id: Uuid = session.get("appointment_id");
         sqlx::query(
             "UPDATE appointments
                 SET status='IN_CONSULTATION'::appointment_status_enum,
@@ -188,6 +213,16 @@ pub async fn apply_provider_event(
         )
         .bind(appointment_id)
         .execute(&mut *tx)
+        .await?;
+    }
+    if entering_grace_period {
+        let deadline = Utc::now() + Duration::seconds(180);
+        crate::services::NotificationService::notify_consultation_rejoin(
+            &mut tx,
+            session_id,
+            appointment_id,
+            deadline,
+        )
         .await?;
     }
     tx.commit().await?;
@@ -200,7 +235,7 @@ pub async fn apply_provider_event(
 pub async fn expire_empty_rooms(state: &AppState) -> Result<u64, AppError> {
     let ctx = AuthContext::system();
     let mut tx = state.begin_authed_as(&ctx, DbRole::SystemWorker).await?;
-    let rows = sqlx::query(
+    let rows: Vec<(Uuid, Uuid)> = sqlx::query_as(
         "WITH due AS (
             SELECT id FROM consultation_sessions
              WHERE recovery_state='GRACE_PERIOD'
@@ -213,11 +248,25 @@ pub async fn expire_empty_rooms(state: &AppState) -> Result<u64, AppError> {
                 status='PREMATURE_TERMINATION'::session_status_enum,
                 ended_at=COALESCE(cs.ended_at, clock_timestamp())
            FROM due WHERE cs.id=due.id
-         RETURNING cs.id",
+         RETURNING cs.id, cs.appointment_id",
     )
     .fetch_all(&mut *tx)
     .await?;
     let count = rows.len() as u64;
+    for (session_id, appointment_id) in &rows {
+        crate::services::NotificationService::notify_consultation_interrupted(
+            &mut tx,
+            *session_id,
+            *appointment_id,
+        )
+        .await?;
+        crate::services::NotificationService::notify_consultation_needs_review(
+            &mut tx,
+            *session_id,
+            *appointment_id,
+        )
+        .await?;
+    }
     tx.commit().await?;
     if count > 0 {
         metrics::counter!("consultations_interrupted_needs_review_total").increment(count);

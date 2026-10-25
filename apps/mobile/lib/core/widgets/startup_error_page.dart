@@ -33,7 +33,7 @@ class StartupErrorPage extends StatelessWidget {
                             const Icon(Icons.error_outline_rounded,
                                 color: DoctorTokens.danger, size: 42),
                             const SizedBox(height: 14),
-                            const Text('HelloDoctor could not start',
+                            const Text('AfyaMkononi could not start',
                                 style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.w800,

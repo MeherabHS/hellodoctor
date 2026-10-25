@@ -1,3 +1,5 @@
+pub mod admin_article_repo;
+pub mod article_quiz_repo;
 pub mod article_repo;
 use crate::auth_context::AuthContext;
 use crate::config::AppConfig;
@@ -7,6 +9,7 @@ use std::sync::Arc;
 
 pub mod appointment_repo;
 pub mod audit_repo;
+pub mod campaign_repo;
 pub mod chat_repo;
 pub mod consultation_repo;
 pub mod doctor_repo;

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-build-only override (never applied to a release build — Android
+  merges src/debug/ resources only into debug variants). Keeps the broader
+  LAN-testing allowance so a physical device on a debug build can still
+  reach a developer's machine at an arbitrary private-network address;
+  src/main/res/xml/network_security_config.xml (used by every release/
+  profile build) is scoped tightly to just the loopback/emulator-alias
+  hosts instead.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -364,6 +364,19 @@ fn protected_routes() -> Router<AppState> {
         .route("/doctor/articles/:id/archive", axum::routing::post(article_handlers::archive))
         .route("/articles", get(article_handlers::feed))
         .route("/articles/:id", get(article_handlers::detail))
+        .route("/articles/:id/quiz", get(patient_quiz_handlers::read))
+        .route("/articles/:id/quiz/check", post(patient_quiz_handlers::check).layer(axum::extract::DefaultBodyLimit::max(1024)))
+        .route("/articles/:id/cover", get(crate::services::article_media_service::cover))
+        .route("/admin/article-categories", get(admin_article_handlers::categories).post(admin_article_handlers::create_category))
+        .route("/admin/article-categories/:id", axum::routing::patch(admin_article_handlers::edit_category).delete(admin_article_handlers::delete_category))
+        .route("/admin/articles", get(admin_article_handlers::list).post(admin_article_handlers::create))
+        .route("/admin/articles/:id", get(admin_article_handlers::detail).patch(admin_article_handlers::edit))
+        .route("/admin/articles/:id/cover", get(crate::services::article_media_service::admin_cover).post(crate::services::article_media_service::upload).layer(axum::extract::DefaultBodyLimit::max(crate::services::article_media_service::MAX_COVER_UPLOAD)))
+        .route("/admin/articles/:id/:action", post(admin_article_handlers::transition))
+        .route("/admin/articles/:id/quiz", get(crate::api::v1::admin_quiz_handlers::get).patch(crate::api::v1::admin_quiz_handlers::save).layer(axum::extract::DefaultBodyLimit::max(crate::domain::article_quizzes::MAX_REQUEST_BYTES)))
+        .route("/admin/articles/:id/quiz/import-preview", post(crate::api::v1::admin_quiz_handlers::import_preview).layer(axum::extract::DefaultBodyLimit::max(crate::domain::article_quizzes::MAX_REQUEST_BYTES)))
+        .route("/admin/articles/:id/quiz/import", post(crate::api::v1::admin_quiz_handlers::import_confirm).layer(axum::extract::DefaultBodyLimit::max(crate::domain::article_quizzes::MAX_REQUEST_BYTES)))
+        .route("/admin/articles/:id/quiz/:revision/:action", post(crate::api::v1::admin_quiz_handlers::transition).layer(axum::extract::DefaultBodyLimit::max(1024)))
         // Doctors
         .route("/doctors", get(doctor_handlers::list_doctors))
         .route("/doctors/:id", get(doctor_handlers::get_doctor))
@@ -387,6 +400,7 @@ fn protected_routes() -> Router<AppState> {
         .route("/notifications/:id/read", axum::routing::post(notification_handlers::mark_read))
         .route("/notifications/devices", axum::routing::post(notification_handlers::register_device))
         .route("/notifications/devices/revoke", axum::routing::post(notification_handlers::revoke_device))
+        .route("/notifications/preferences", get(notification_handlers::get_preferences).put(notification_handlers::update_preferences))
         .route("/doctor/chats", get(doctor_handlers::list_own_chats))
         .route("/doctor/appointments/:current_appointment_id/patient-history", get(doctor_handlers::list_patient_history))
         .route("/doctor/appointments/:current_appointment_id/patient-history/:historical_consultation_id", get(doctor_handlers::get_patient_history_detail))
@@ -656,5 +670,46 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/admin/platform-payment-methods/:id",
             axum::routing::delete(admin_handlers::deactivate_platform_payment_method),
+        )
+        // Admin Campaigns (Milestone 6B — draft/review/approval only, no dispatch)
+        .route(
+            "/admin/campaigns",
+            get(campaign_handlers::list).post(campaign_handlers::create),
+        )
+        .route(
+            "/admin/campaigns/audience-preview",
+            get(campaign_handlers::audience_preview),
+        )
+        .route(
+            "/admin/campaigns/:id",
+            get(campaign_handlers::detail).patch(campaign_handlers::update),
+        )
+        .route(
+            "/admin/campaigns/:id/submit",
+            axum::routing::post(campaign_handlers::submit),
+        )
+        .route(
+            "/admin/campaigns/:id/approve",
+            axum::routing::post(campaign_handlers::approve),
+        )
+        .route(
+            "/admin/campaigns/:id/cancel",
+            axum::routing::post(campaign_handlers::cancel),
+        )
+        .route(
+            "/admin/campaigns/:id/schedule",
+            axum::routing::post(campaign_handlers::schedule),
+        )
+        .route(
+            "/admin/campaigns/:id/pause",
+            axum::routing::post(campaign_handlers::pause),
+        )
+        .route(
+            "/admin/campaigns/:id/resume",
+            axum::routing::post(campaign_handlers::resume),
+        )
+        .route(
+            "/admin/campaigns/:id/stats",
+            get(campaign_handlers::stats),
         )
 }

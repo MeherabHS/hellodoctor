@@ -2175,7 +2175,7 @@ class _PayoutBindingSheetState extends State<_PayoutBindingSheet> {
                     color: DoctorTokens.warningLight,
                     borderRadius: BorderRadius.circular(12)),
                 child: const Text(
-                    'Provider authorization is required. HelloDoctor never verifies a manually typed wallet or card number and never stores provider PINs or OTPs.',
+                    'Provider authorization is required. AfyaMkononi never verifies a manually typed wallet or card number and never stores provider PINs or OTPs.',
                     style: TextStyle(
                         fontSize: 11, color: Color(0xFF92400E), height: 1.35))),
             const SizedBox(height: 14),

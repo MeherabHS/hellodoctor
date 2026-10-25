@@ -5,10 +5,11 @@ import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import 'blogs_models.dart';
 import 'blogs_repository.dart';
+import 'article_content.dart';
+import 'article_quiz_section.dart';
 
-/// `prototype/index.html` view-13's article-detail flow, made real. Shows
-/// the full doctor-authored body and reference list — no invented "read
-/// time" or category badge (see `blogs_models.dart`'s doc comment).
+/// Existing article detail flow: Doctor plain text/references are preserved;
+/// Admin content uses safe Markdown, localized metadata and authenticated covers.
 class BlogDetailPage extends StatefulWidget {
   const BlogDetailPage(
       {super.key, required this.articleId, required this.repo});
@@ -31,6 +32,7 @@ class _BlogDetailPageState extends State<BlogDetailPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final language = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: PatientTokens.bg,
       body: SafeArea(
@@ -42,9 +44,11 @@ class _BlogDetailPageState extends State<BlogDetailPage> {
                 onPressed: () => Navigator.of(context).maybePop(),
                 icon: const Icon(Icons.arrow_back, size: 20),
               ),
-              Text(l10n.blogsTitle,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800, color: PatientTokens.text)),
+              Expanded(
+                  child: Text(l10n.blogsTitle,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: PatientTokens.text))),
             ]),
           ),
           Expanded(
@@ -66,7 +70,16 @@ class _BlogDetailPageState extends State<BlogDetailPage> {
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
                   children: [
-                    Text(article.title,
+                    if (article.hasCover)
+                      ArticleCover(
+                          articleId: article.id,
+                          mediaId: article.coverImageId!,
+                          repo: widget.repo),
+                    if (article.categoryFor(language).isNotEmpty)
+                      Text(article.categoryFor(language),
+                          style: const TextStyle(
+                              fontSize: 11, color: PatientTokens.primary)),
+                    Text(article.titleFor(language),
                         style: const TextStyle(
                             fontSize: 19,
                             fontWeight: FontWeight.w800,
@@ -85,7 +98,9 @@ class _BlogDetailPageState extends State<BlogDetailPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                            '${article.authorName} • ${article.specialty}',
+                            article.isAdmin
+                                ? article.authorName
+                                : '${article.authorName} • ${article.specialty}',
                             style: const TextStyle(
                                 fontSize: 12, color: PatientTokens.textSub)),
                       ),
@@ -95,18 +110,22 @@ class _BlogDetailPageState extends State<BlogDetailPage> {
                                 fontSize: 11, color: PatientTokens.textSub)),
                     ]),
                     const Divider(height: 28),
-                    Text(article.summary,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontStyle: FontStyle.italic,
-                            color: PatientTokens.textSub,
-                            height: 1.5)),
+                    if (!article.isAdmin)
+                      Text(article.summaryFor(language),
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontStyle: FontStyle.italic,
+                              color: PatientTokens.textSub,
+                              height: 1.5)),
                     const SizedBox(height: 14),
-                    Text(article.body,
-                        style: const TextStyle(
-                            fontSize: 13.5,
-                            color: PatientTokens.text,
-                            height: 1.6)),
+                    if (article.contentFormat == 'markdown')
+                      ArticleMarkdown(body: article.bodyFor(language))
+                    else
+                      Text(article.bodyFor(language),
+                          style: const TextStyle(
+                              fontSize: 13.5,
+                              color: PatientTokens.text,
+                              height: 1.6)),
                     if (article.referencesList.isNotEmpty) ...[
                       const SizedBox(height: 20),
                       Text(l10n.blogsReferences,
@@ -122,6 +141,16 @@ class _BlogDetailPageState extends State<BlogDetailPage> {
                                   fontSize: 11.5,
                                   color: PatientTokens.textSub)),
                         ),
+                    ],
+                    if (article.isAdmin && article.quiz != null) ...[
+                      const SizedBox(height: 24),
+                      ArticleQuizSection(
+                          key: ValueKey(article.quiz!.revisionId),
+                          articleId: article.id,
+                          publication: article.quiz!,
+                          repository: widget.repo.quizzes,
+                          onRefreshArticle: () => setState(() =>
+                              _future = widget.repo.detail(widget.articleId))),
                     ],
                   ],
                 );

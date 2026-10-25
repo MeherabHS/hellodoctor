@@ -26,7 +26,7 @@ void main() {
     await tester.pumpWidget(const HelloDoctorPatientApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('HelloDoctor could not start'), findsOneWidget);
+    expect(find.text('AfyaMkononi could not start'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     // `captureStartup` chains a best-effort 1s-timeout MethodChannel probe
