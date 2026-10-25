@@ -5,6 +5,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/doctor_widgets.dart';
 import '../auth/auth_cubit.dart';
 import '../doctor/doctor_pages.dart';
+import 'notification_settings_page.dart';
 
 /// Settings home: the nested IA described in the HelloDoctor Doctor Flutter
 /// notification/profile-parity spec — Profile, Professional Details,
@@ -40,6 +41,14 @@ class SettingsHomePage extends StatelessWidget {
               title: 'Payout',
               subtitle: 'Earnings and payout destination',
               onTap: () => _switchToTab(context, tabIndex: 4)),
+          _SettingsTile(
+              icon: Icons.notifications_outlined,
+              title: 'Notifications',
+              subtitle: 'Quiet hours and notification categories',
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const NotificationSettingsPage()))),
           _SettingsTile(
               icon: Icons.shield_outlined,
               title: 'Security',

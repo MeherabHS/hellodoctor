@@ -133,8 +133,14 @@ class ChatDto {
   bool get isClosed =>
       locked == true ||
       (DateTime.tryParse(expiresAt ?? '')?.isBefore(DateTime.now()) ?? false) ||
-      const ['CANCELLED', 'REFUNDED', 'NO_SHOW', 'PENDING_PAYMENT']
-          .contains(appointmentStatus);
+      const [
+        'CANCELLED',
+        'REFUNDED',
+        'EXPIRED',
+        'PREMATURE_TERMINATION',
+        'DISPUTED',
+        'PENDING_PAYMENT'
+      ].contains(appointmentStatus);
   String get actionLabel => isClosed
       ? 'View consultation history'
       : modality == 'CHAT' && lastMessageAt == null

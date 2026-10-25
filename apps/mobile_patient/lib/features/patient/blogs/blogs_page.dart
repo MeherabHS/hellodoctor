@@ -6,13 +6,10 @@ import '../../../l10n/app_localizations.dart';
 import 'blog_detail_page.dart';
 import 'blogs_models.dart';
 import 'blogs_repository.dart';
+import 'article_content.dart';
 
-/// `prototype/index.html` view-13 — "Health Blogs & Medical Library", made
-/// real against `GET /articles`. The prototype's "Featured Editorial" hero
-/// and per-article "5 min read"/category badges are static mockup text with
-/// no backing field on `DoctorArticle` — not reproduced here (see
-/// `blogs_models.dart`). Search is client-side substring filtering over the
-/// loaded page, since the backend's `ArticleQuery` has no search parameter.
+/// Existing Blogs tab, backed by the unified published feed. Search remains a
+/// client-side filter over the loaded page; advanced browsing is deferred.
 class BlogsPage extends StatefulWidget {
   const BlogsPage({super.key, required this.repo});
   final BlogsRepository repo;
@@ -40,12 +37,13 @@ class _BlogsPageState extends State<BlogsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final language = Localizations.localeOf(context).languageCode;
     return Scaffold(
       backgroundColor: PatientTokens.bg,
       body: SafeArea(
         child: Column(children: [
           const PatientPageHeader('Health articles',
-              'Practical guidance from verified HelloDoctor physicians'),
+              'Practical guidance from AfyaMkononi physicians and editors'),
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
             child: Container(
@@ -95,8 +93,8 @@ class _BlogsPageState extends State<BlogsPage> {
                   final articles = (snapshot.data ?? const [])
                       .where((a) =>
                           query.isEmpty ||
-                          a.title.toLowerCase().contains(query) ||
-                          a.summary.toLowerCase().contains(query))
+                          a.titleFor(language).toLowerCase().contains(query) ||
+                          a.summaryFor(language).toLowerCase().contains(query))
                       .toList();
                   if (articles.isEmpty) {
                     return ListView(children: const [
@@ -104,7 +102,7 @@ class _BlogsPageState extends State<BlogsPage> {
                           icon: Icons.article_outlined,
                           title: 'No articles yet',
                           message:
-                              'Health guides from verified HelloDoctor physicians will appear here.'),
+                              'Published health guides from AfyaMkononi physicians and editors will appear here.'),
                     ]);
                   }
                   return ListView(
@@ -115,6 +113,7 @@ class _BlogsPageState extends State<BlogsPage> {
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _ArticleTile(
                             article: article,
+                            repo: widget.repo,
                             onTap: () =>
                                 Navigator.of(context).push(MaterialPageRoute(
                               builder: (_) => BlogDetailPage(
@@ -135,25 +134,33 @@ class _BlogsPageState extends State<BlogsPage> {
 }
 
 class _ArticleTile extends StatelessWidget {
-  const _ArticleTile({required this.article, required this.onTap});
+  const _ArticleTile(
+      {required this.article, required this.onTap, required this.repo});
   final BlogArticleDto article;
+  final BlogsRepository repo;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final language = Localizations.localeOf(context).languageCode;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(PatientTokens.cardRadius),
       child: PatientCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(article.title,
+          if (article.hasCover)
+            ArticleCover(
+                articleId: article.id,
+                mediaId: article.coverImageId!,
+                repo: repo),
+          Text(article.titleFor(language),
               style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: PatientTokens.text)),
           const SizedBox(height: 4),
-          Text(article.summary,
+          Text(article.summaryFor(language),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
@@ -162,7 +169,10 @@ class _ArticleTile extends StatelessWidget {
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Expanded(
               child: Text(
-                  l10n.blogsByAuthor(article.authorName, article.specialty),
+                  article.isAdmin
+                      ? article.authorName
+                      : l10n.blogsByAuthor(
+                          article.authorName, article.specialty),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(

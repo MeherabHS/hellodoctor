@@ -38,10 +38,22 @@ use std::sync::Arc;
 use tower::ServiceExt;
 use uuid::Uuid;
 
+#[path = "cases/admin_articles.rs"]
+mod admin_articles;
+#[path = "cases/admin_campaigns.rs"]
+mod admin_campaigns;
+#[path = "cases/admin_quizzes.rs"]
+mod admin_quizzes;
 #[path = "cases/admission_capacity_bench.rs"]
 mod admission_capacity_bench;
 #[path = "cases/consultation_recovery.rs"]
 mod consultation_recovery;
+#[path = "cases/engagement_and_holiday_notifications.rs"]
+mod engagement_and_holiday_notifications;
+#[path = "cases/notification_localization_preferences.rs"]
+mod notification_localization_preferences;
+#[path = "cases/patient_quizzes.rs"]
+mod patient_quizzes;
 #[path = "cases/pool_pressure.rs"]
 mod pool_pressure;
 #[path = "cases/profile_pictures.rs"]
@@ -207,6 +219,7 @@ fn test_config() -> AppConfig {
         metrics_scrape_token: String::new(),
         allowed_origins: vec!["http://localhost:3000".into()],
         doctor_daily_summary_time_local: "07:00".into(),
+        engagement_greeting_time_local: "08:00".into(),
         azure_email_endpoint: None,
         azure_email_access_key: None,
         azure_email_sender: None,
@@ -2479,7 +2492,7 @@ async fn test_identity_patient_bootstrap_atomic_and_doctor_phone_never_becomes_p
             &serde_json::json!({
                 "phone_number": phone,
                 "otp_code": otp_code,
-                "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0"}]
+                "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0-afyamkononi"}]
             }),
         )
         .await;
@@ -2516,7 +2529,7 @@ async fn test_identity_patient_bootstrap_atomic_and_doctor_phone_never_becomes_p
         &serde_json::json!({
             "phone_number":"+254700009994",
             "otp_code":otp["data"]["debug_otp_code"],
-            "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0"}]
+            "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0-afyamkononi"}]
         }),
     )
     .await;
@@ -2601,7 +2614,7 @@ async fn test_security_patient_registration_requires_and_records_data_consent(po
         &serde_json::json!({
             "phone_number": phone,
             "otp_code": second["data"]["debug_otp_code"],
-            "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0"}]
+            "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0-afyamkononi"}]
         }),
     )
     .await;
@@ -2609,7 +2622,7 @@ async fn test_security_patient_registration_requires_and_records_data_consent(po
     let accepted_json = json_body(accepted).await;
     let user_id = accepted_json["data"]["user"]["id"].as_str().unwrap();
     let ledger_count: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM legal_acceptances WHERE user_id=$1 AND document_type='PATIENT_DATA_SHARING_CONSENT' AND document_version='1.0'",
+        "SELECT count(*) FROM legal_acceptances WHERE user_id=$1 AND document_type='PATIENT_DATA_SHARING_CONSENT' AND document_version='1.0-afyamkononi'",
     )
     .bind(Uuid::parse_str(user_id).unwrap())
     .fetch_one(&pool)
@@ -3973,31 +3986,40 @@ async fn test_grievance_number_unique_under_concurrent_submission(pool: PgPool) 
     .unwrap();
     let ctx = isolation_ctx(UserId::from(uid(PATIENT_USER_ID)), UserRole::Patient);
 
-    let mut handles = Vec::new();
-    for consultation_id in consultation_ids {
-        let state = state.clone();
-        let ctx = ctx.clone();
-        handles.push(tokio::spawn(async move {
-            hellodoctor_backend::services::GrievanceService::submit_grievance(
-                &state,
-                &ctx,
-                PatientProfileId::from(uid(PATIENT_PROFILE_ID)),
-                consultation_id,
-                GrievanceTarget::System,
-                "SERVICE_QUALITY".into(),
-                "Concurrent grievance-number regression test".into(),
-            )
-            .await
-        }));
-    }
     let mut numbers = Vec::new();
-    for h in handles {
-        let report = h
-            .await
-            .unwrap()
-            .expect("concurrent submission must not fail with a duplicate-key error");
-        numbers.push(report.grievance_number);
+    const BATCH_SIZE: usize = 4;
+    // The test role intentionally has a two-connection pool and the
+    // application fails acquisition after 250ms.  Bounded batches preserve
+    // real sequence races while ensuring every business operation can obtain
+    // a connection, so a failure still means grievance creation or numbering
+    // is broken rather than that the harness was saturated.
+    for batch in consultation_ids.chunks(BATCH_SIZE) {
+        let mut handles = Vec::with_capacity(batch.len());
+        for &consultation_id in batch {
+            let state = state.clone();
+            let ctx = ctx.clone();
+            handles.push(tokio::spawn(async move {
+                hellodoctor_backend::services::GrievanceService::submit_grievance(
+                    &state,
+                    &ctx,
+                    PatientProfileId::from(uid(PATIENT_PROFILE_ID)),
+                    consultation_id,
+                    GrievanceTarget::System,
+                    "SERVICE_QUALITY".into(),
+                    "Concurrent grievance-number regression test".into(),
+                )
+                .await
+            }));
+        }
+        for h in handles {
+            let report = h
+                .await
+                .unwrap()
+                .expect("every bounded concurrent submission must succeed");
+            numbers.push(report.grievance_number);
+        }
     }
+    assert_eq!(numbers.len(), 40);
     let distinct: std::collections::HashSet<_> = numbers.iter().collect();
     assert_eq!(
         distinct.len(),
@@ -9786,7 +9808,7 @@ async fn test_doctor_cannot_list_or_mark_read_another_doctors_notifications(pool
     let doctor2_token = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
 
     hellodoctor_backend::services::NotificationService::notify_registration_verified(
-        &state.db,
+        &mut state.db.acquire().await.unwrap(),
         UserId::from(uid(DOCTOR1_USER_ID)),
         uid(DOCTOR1_PROFILE_ID),
     )
@@ -9983,14 +10005,14 @@ async fn test_registration_verification_notifications_are_exactly_once(pool: PgP
     // authenticated session in play) so the count reflects the real table
     // contents rather than being silently filtered to zero rows.
     hellodoctor_backend::services::NotificationService::notify_registration_rejected(
-        &state.db,
+        &mut state.db.acquire().await.unwrap(),
         UserId::from(uid(DOCTOR1_USER_ID)),
         uid(DOCTOR1_PROFILE_ID),
     )
     .await
     .unwrap();
     hellodoctor_backend::services::NotificationService::notify_registration_rejected(
-        &state.db,
+        &mut state.db.acquire().await.unwrap(),
         UserId::from(uid(DOCTOR1_USER_ID)),
         uid(DOCTOR1_PROFILE_ID),
     )
@@ -10010,14 +10032,14 @@ async fn test_registration_verification_notifications_are_exactly_once(pool: PgP
     );
 
     hellodoctor_backend::services::NotificationService::notify_registration_verified(
-        &state.db,
+        &mut state.db.acquire().await.unwrap(),
         UserId::from(uid(DOCTOR1_USER_ID)),
         uid(DOCTOR1_PROFILE_ID),
     )
     .await
     .unwrap();
     hellodoctor_backend::services::NotificationService::notify_registration_verified(
-        &state.db,
+        &mut state.db.acquire().await.unwrap(),
         UserId::from(uid(DOCTOR1_USER_ID)),
         uid(DOCTOR1_PROFILE_ID),
     )
@@ -10260,8 +10282,29 @@ async fn test_t15_reminder_scheduler_fires_once_and_cancellation_suppresses_it(p
     .await
     .unwrap();
     assert_eq!(
-        count_a, 1,
-        "an eligible appointment must get exactly one T-15 reminder"
+        count_a, 2,
+        "an eligible appointment must get exactly one T-15 reminder per recipient (Doctor + Patient)"
+    );
+    let (doctor_count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type = 'CONSULTATION_REMINDER_15M' AND user_id = $2",
+    )
+    .bind(apt_a)
+    .bind(uid(DOCTOR1_USER_ID))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(doctor_count, 1, "the Doctor must get exactly one reminder");
+    let (patient_count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type = 'CONSULTATION_REMINDER_15M' AND user_id = $2",
+    )
+    .bind(apt_a)
+    .bind(uid(PATIENT_USER_ID))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        patient_count, 1,
+        "the Patient must get exactly one reminder"
     );
 
     let (count_b,): (i64,) = sqlx::query_as(
@@ -10295,8 +10338,134 @@ async fn test_t15_reminder_fires_immediately_for_near_term_booking(pool: PgPool)
     .await
     .unwrap();
     assert_eq!(
-        count, 1,
-        "a near-term booking must get an immediate reminder, not a skipped one"
+        count, 2,
+        "a near-term booking must get an immediate reminder for both Doctor and Patient, not a skipped one"
+    );
+}
+
+/// A dependent profile has no `user_id` of its own (`user_id IS NULL,
+/// guardian_patient_id IS NOT NULL` — see
+/// migrations/20261101000001_patient_profile_dependents). An appointment
+/// booked for a dependent must route the Patient-side T-15 reminder to the
+/// guardian's own account, never silently drop it.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_t15_reminder_routes_dependent_appointment_to_guardian(pool: PgPool) {
+    let (_app, pool, state) = test_app_and_state(pool).await;
+    use hellodoctor_backend::services::notification_scheduler::run_t15_reminder_pass;
+
+    let dependent_id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO patient_profiles (id, user_id, guardian_patient_id, full_name, date_of_birth, gender, created_at, updated_at) \
+         VALUES ($1, NULL, $2, 'Dependent Reminder Test', '2015-01-01', 'OTHER', NOW(), NOW())",
+    )
+    .bind(dependent_id)
+    .bind(uid(PATIENT_PROFILE_ID))
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let now = Utc::now();
+    let (_slot, apt_id) = insert_confirmed_appointment_for(
+        &pool,
+        uid(DOCTOR1_PROFILE_ID),
+        dependent_id,
+        now + chrono::Duration::minutes(10),
+    )
+    .await;
+
+    run_t15_reminder_pass(&state, now).await.unwrap();
+
+    let (guardian_count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type = 'CONSULTATION_REMINDER_15M' AND user_id = $2",
+    )
+    .bind(apt_id)
+    .bind(uid(PATIENT_USER_ID))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        guardian_count, 1,
+        "a dependent's appointment reminder must route to the guardian's own account"
+    );
+    let (total,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type = 'CONSULTATION_REMINDER_15M'",
+    )
+    .bind(apt_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        total, 2,
+        "exactly one reminder each for the Doctor and the guardian, none for the dependent (who has no account)"
+    );
+}
+
+/// The admin reschedule endpoint changes an appointment's `slot_id`
+/// (and therefore its effective start time) without creating a new
+/// appointment row. A T-15 reminder already created for the *old* time must
+/// be cancelled so it can never fire at the wrong instant; a fresh
+/// reminder for the new time is created normally on a later scheduler tick
+/// (not asserted here — that path is already covered by the other T-15
+/// tests, which don't involve a reschedule).
+#[sqlx::test(migrations = "./migrations")]
+async fn test_reschedule_cancels_stale_t15_reminder(pool: PgPool) {
+    let (app, pool, state) = test_app_and_state(pool).await;
+    use hellodoctor_backend::services::notification_scheduler::run_t15_reminder_pass;
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+
+    let now = Utc::now();
+    let (_old_slot, apt_id) =
+        insert_confirmed_appointment(&pool, now + chrono::Duration::minutes(10)).await;
+
+    // Create the stale reminder the reschedule must clean up.
+    run_t15_reminder_pass(&state, now).await.unwrap();
+    let (before,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type = 'CONSULTATION_REMINDER_15M'",
+    )
+    .bind(apt_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(before, 2, "sanity check: the stale reminder pair exists");
+
+    // An available replacement slot, far enough out (several days, not
+    // hours — seed data creates demo slots a few hours out from whenever
+    // seeding ran, which a same-day replacement slot can collide with) that
+    // it is not itself inside any T-15 window right now.
+    let new_slot_id = Uuid::new_v4();
+    doctor_repo::insert_slot(
+        &pool,
+        &ScheduleSlot {
+            id: new_slot_id,
+            doctor_id: DoctorProfileId::from(uid(DOCTOR1_PROFILE_ID)),
+            start_time: now + chrono::Duration::days(5),
+            end_time: now + chrono::Duration::days(5) + chrono::Duration::minutes(15),
+            status: SlotStatus::Available,
+            created_at: Utc::now(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let response = post(
+        &app,
+        &format!("/api/v1/admin/appointments/{apt_id}/reschedule"),
+        Some(&admin),
+        &serde_json::json!({"slot_id": new_slot_id, "reason": "Doctor emergency unavailability"}),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let (after,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type = 'CONSULTATION_REMINDER_15M'",
+    )
+    .bind(apt_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        after, 0,
+        "the stale reminder pair for the old time must be cancelled by the reschedule"
     );
 }
 
@@ -10333,7 +10502,7 @@ async fn test_daily_summary_zero_appointments_current_behavior_is_documented(poo
         1,
         "current scheduler behavior sends exactly one notification even for a zero-consultation day"
     );
-    assert_eq!(rows[0].0, "You have no consultations scheduled today.");
+    assert_eq!(rows[0].0, "You have 0 consultation(s) scheduled today.");
     assert_eq!(rows[0].1.as_ref().unwrap()["count"], 0);
 }
 
@@ -10437,7 +10606,7 @@ async fn test_daily_summary_excludes_cancelled_appointments_from_count(pool: PgP
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(body, "You have 2 consultations scheduled today.");
+    assert_eq!(body, "You have 2 consultation(s) scheduled today.");
     assert_eq!(metadata.unwrap()["count"], 2);
 }
 
@@ -10496,8 +10665,8 @@ async fn test_t15_reminder_exact_boundary_times(pool: PgPool) {
 
     assert_eq!(
         reminder_count(&pool, apt_14).await,
-        1,
-        "an appointment exactly 14 minutes out must be notified"
+        2,
+        "an appointment exactly 14 minutes out must notify both Doctor and Patient"
     );
     assert_eq!(
         reminder_count(&pool, apt_16).await,
@@ -10870,6 +11039,588 @@ async fn test_push_token_ownership_and_logout_disable(pool: PgPool) {
         !enabled_after,
         "logout must disable (not necessarily delete) the account's device registrations"
     );
+}
+
+// ============================================================================
+// Notification Milestone 1 — Essential Transactional Events
+// (BOOKING_CONFIRMED, BOOKING_RESCHEDULED, PRESCRIPTION_AVAILABLE, and the
+// REFUND_APPROVED/REFUND_PROCESSING/REFUND_COMPLETED lifecycle).
+// ============================================================================
+
+/// Positive: the real payment webhook (`book_and_confirm`'s end-to-end HTTP
+/// flow, not a direct DB status flip) must notify both the Doctor and the
+/// Patient exactly once each.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_booking_confirmed_notifies_doctor_and_patient(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+
+    let rows: Vec<(Uuid, String)> = sqlx::query_as(
+        "SELECT user_id, dedup_key FROM notifications \
+         WHERE related_entity_id = $1 AND type = 'BOOKING_CONFIRMED' ORDER BY dedup_key",
+    )
+    .bind(apt_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        rows.len(),
+        2,
+        "both Doctor and Patient must be notified exactly once"
+    );
+    assert_eq!(rows[0].0, uid(DOCTOR1_USER_ID));
+    assert!(rows[0].1.ends_with(":doctor"));
+    assert_eq!(rows[1].0, uid(PATIENT_USER_ID));
+    assert!(rows[1].1.ends_with(":patient"));
+}
+
+/// Guardian routing: a dependent has no `user_id` of its own, so the
+/// Patient-side `BOOKING_CONFIRMED` must route to the guardian's account —
+/// mirrors `test_t15_reminder_routes_dependent_appointment_to_guardian`'s
+/// same real-world requirement for a different notification type.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_booking_confirmed_routes_dependent_appointment_to_guardian(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let guardian_token = fresh_patient_token(&pool).await;
+    let dependent = json_body(
+        post(
+            &app,
+            "/api/v1/patients/me/profiles",
+            Some(&guardian_token),
+            &serde_json::json!({
+                "full_name": "Booking Confirmed Dependent", "date_of_birth": "2013-01-01",
+                "gender": "OTHER", "relationship": "Child"
+            }),
+        )
+        .await,
+    )
+    .await;
+    let dependent_id = Uuid::parse_str(dependent["data"]["id"].as_str().unwrap()).unwrap();
+    let book_json =
+        json_body(book_and_confirm_for_profile(&app, &guardian_token, dependent_id).await).await;
+    let apt_id = Uuid::parse_str(book_json["data"]["appointment_id"].as_str().unwrap()).unwrap();
+
+    let guardian_user_id: Uuid = sqlx::query_scalar(
+        "SELECT g.user_id FROM patient_profiles p \
+         JOIN patient_profiles g ON g.id = p.guardian_patient_id WHERE p.id = $1",
+    )
+    .bind(dependent_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let rows: Vec<(Uuid, String)> = sqlx::query_as(
+        "SELECT user_id, dedup_key FROM notifications \
+         WHERE related_entity_id = $1 AND type = 'BOOKING_CONFIRMED' ORDER BY dedup_key",
+    )
+    .bind(apt_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(rows.len(), 2);
+    let patient_side = rows.iter().find(|r| r.1.ends_with(":patient")).unwrap();
+    assert_eq!(
+        patient_side.0, guardian_user_id,
+        "a dependent's BOOKING_CONFIRMED must route to the guardian's own account, never be silently dropped"
+    );
+}
+
+/// Idempotency: calling the notifier twice for the same already-confirmed
+/// appointment (simulating a retried/duplicated call at the service layer)
+/// must not create duplicate rows for either recipient — the dedup key is
+/// per-appointment-per-role, not per-invocation.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_notify_booking_confirmed_is_idempotent_on_repeated_calls(pool: PgPool) {
+    let (_app, pool, state) = test_app_and_state(pool).await;
+    let now = Utc::now();
+    let (_slot, apt_id) =
+        insert_confirmed_appointment(&pool, now + chrono::Duration::days(4)).await;
+
+    let ctx = hellodoctor_backend::auth_context::AuthContext::system();
+    let mut tx = state
+        .begin_authed_as(&ctx, hellodoctor_backend::repository::DbRole::PaymentWorker)
+        .await
+        .unwrap();
+    hellodoctor_backend::services::NotificationService::notify_booking_confirmed(&mut tx, apt_id)
+        .await
+        .unwrap();
+    hellodoctor_backend::services::NotificationService::notify_booking_confirmed(&mut tx, apt_id)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+
+    let (count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type = 'BOOKING_CONFIRMED'",
+    )
+    .bind(apt_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        count, 2,
+        "repeated calls must not duplicate either recipient's notification"
+    );
+}
+
+/// Positive: a real admin reschedule must notify both the Doctor and the
+/// Patient exactly once each, keyed by the specific reschedule event.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_booking_rescheduled_notifies_both_parties(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let now = Utc::now();
+    let (_old_slot, apt_id) =
+        insert_confirmed_appointment(&pool, now + chrono::Duration::days(2)).await;
+    let new_slot_id = Uuid::new_v4();
+    doctor_repo::insert_slot(
+        &pool,
+        &ScheduleSlot {
+            id: new_slot_id,
+            doctor_id: DoctorProfileId::from(uid(DOCTOR1_PROFILE_ID)),
+            start_time: now + chrono::Duration::days(5),
+            end_time: now + chrono::Duration::days(5) + chrono::Duration::minutes(15),
+            status: SlotStatus::Available,
+            created_at: Utc::now(),
+        },
+    )
+    .await
+    .unwrap();
+
+    let response = post(
+        &app,
+        &format!("/api/v1/admin/appointments/{apt_id}/reschedule"),
+        Some(&admin),
+        &serde_json::json!({"slot_id": new_slot_id, "reason": "Doctor emergency unavailability"}),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let reschedule_id = Uuid::parse_str(
+        json_body(response).await["data"]["reschedule_id"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+
+    let rows: Vec<(Uuid, String)> = sqlx::query_as(
+        "SELECT user_id, dedup_key FROM notifications \
+         WHERE related_entity_id = $1 AND type = 'BOOKING_RESCHEDULED' ORDER BY dedup_key",
+    )
+    .bind(apt_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[0].0, uid(DOCTOR1_USER_ID));
+    assert_eq!(
+        rows[0].1,
+        format!("booking-rescheduled:{reschedule_id}:doctor")
+    );
+    assert_eq!(rows[1].0, uid(PATIENT_USER_ID));
+    assert_eq!(
+        rows[1].1,
+        format!("booking-rescheduled:{reschedule_id}:patient")
+    );
+}
+
+/// Idempotency + correctness of the per-event key: a SECOND, independent
+/// reschedule of the same appointment must get its own fresh notification
+/// pair (never suppressed as a false-positive duplicate of the first), while
+/// a direct repeat of the exact same reschedule id is still deduplicated.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_booking_rescheduled_keyed_per_event_not_per_appointment(pool: PgPool) {
+    let (_app, pool, state) = test_app_and_state(pool).await;
+    let now = Utc::now();
+    let (_slot, apt_id) =
+        insert_confirmed_appointment(&pool, now + chrono::Duration::days(6)).await;
+
+    let ctx = hellodoctor_backend::auth_context::AuthContext::system();
+    let mut tx = state
+        .begin_authed_as(&ctx, hellodoctor_backend::repository::DbRole::PaymentWorker)
+        .await
+        .unwrap();
+    let first_reschedule_id = Uuid::new_v4();
+    hellodoctor_backend::services::NotificationService::notify_booking_rescheduled(
+        &mut tx,
+        apt_id,
+        first_reschedule_id,
+    )
+    .await
+    .unwrap();
+    // A duplicate call with the SAME reschedule id must not double-insert.
+    hellodoctor_backend::services::NotificationService::notify_booking_rescheduled(
+        &mut tx,
+        apt_id,
+        first_reschedule_id,
+    )
+    .await
+    .unwrap();
+    // A genuinely different reschedule of the same appointment must still
+    // get its own pair.
+    let second_reschedule_id = Uuid::new_v4();
+    hellodoctor_backend::services::NotificationService::notify_booking_rescheduled(
+        &mut tx,
+        apt_id,
+        second_reschedule_id,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    let (count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type = 'BOOKING_RESCHEDULED'",
+    )
+    .bind(apt_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        count, 4,
+        "exactly 2 pairs (one per distinct reschedule event), the repeated call deduplicated"
+    );
+}
+
+/// `PRESCRIPTION_AVAILABLE` fires once per appointment — on the first Rx
+/// page, not again for subsequent pages of the same multi-page prescription.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_prescription_available_notifies_once_not_per_page(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let (appointment, _) = book_and_confirm(&app, &patient).await;
+    open_clinical_window(&pool, appointment).await;
+    let uri = format!("/api/v1/consultations/{appointment}/prescription");
+
+    for page in 1..=3u8 {
+        let image = image::RgbImage::from_pixel(3, 3, image::Rgb([page * 30, 20, 40]));
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(image)
+            .write_to(&mut bytes, image::ImageFormat::Png)
+            .unwrap();
+        let payload = serde_json::json!({"base64_photo":STANDARD.encode(bytes.into_inner()),"mime_type":"image/png"});
+        let response = post(&app, &uri, Some(&doctor), &payload).await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+    }
+
+    let rows: Vec<(Uuid, String)> = sqlx::query_as(
+        "SELECT user_id, dedup_key FROM notifications \
+         WHERE related_entity_id = $1 AND type = 'PRESCRIPTION_AVAILABLE'",
+    )
+    .bind(appointment)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        rows.len(),
+        1,
+        "exactly one PRESCRIPTION_AVAILABLE notification regardless of how many pages were uploaded"
+    );
+    assert_eq!(rows[0].0, uid(PATIENT_USER_ID));
+    assert_eq!(rows[0].1, format!("prescription-available:{appointment}"));
+}
+
+/// Full refund lifecycle via the real HTTP endpoints (mirrors
+/// `test_refund_request_has_a_finance_resolution_lifecycle`'s own flow):
+/// REFUND_APPROVED on adjudication, REFUND_PROCESSING on the PROCESSING
+/// transition, REFUND_COMPLETED only once a real `provider_reference`
+/// confirms the REFUNDED transition — never claiming paid on approval alone.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_refund_lifecycle_notifications(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+
+    let session = consultation_repo::find_by_appointment(&pool, apt_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let grv_json = json_body(
+        post(
+            &app,
+            "/api/v1/grievances",
+            Some(&patient_token),
+            &serde_json::json!({
+                "consultation_id": session.id,
+                "target": "DOCTOR",
+                "category": "Rushed Consultation / Ended Abruptly",
+                "claim_summary": "Milestone 1 refund-notification regression"
+            }),
+        )
+        .await,
+    )
+    .await;
+    let grv_id = Uuid::parse_str(grv_json["data"]["grievance_id"].as_str().unwrap()).unwrap();
+
+    let adj = post(
+        &app,
+        &format!("/api/v1/admin/grievances/{grv_id}/refund"),
+        Some(&admin_token),
+        &serde_json::json!({ "audit_notes": "Substantiated for notification regression." }),
+    )
+    .await;
+    assert_eq!(adj.status(), StatusCode::OK);
+
+    let approved: Vec<(Uuid, String)> = sqlx::query_as(
+        "SELECT user_id, dedup_key FROM notifications \
+         WHERE related_entity_id = $1 AND type = 'REFUND_APPROVED'",
+    )
+    .bind(grv_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        approved.len(),
+        1,
+        "exactly one REFUND_APPROVED notification"
+    );
+    assert_eq!(approved[0].0, uid(PATIENT_USER_ID));
+
+    let refund_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM financial_refund_requests WHERE grievance_id = $1")
+            .bind(grv_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    let processing = post(
+        &app,
+        &format!("/api/v1/admin/finance/refund-requests/{refund_id}/transition"),
+        Some(&admin_token),
+        &serde_json::json!({ "status": "PROCESSING" }),
+    )
+    .await;
+    assert_eq!(processing.status(), StatusCode::OK);
+    let (processing_count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type = 'REFUND_PROCESSING'",
+    )
+    .bind(refund_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(processing_count, 1);
+
+    let refunded = post(
+        &app,
+        &format!("/api/v1/admin/finance/refund-requests/{refund_id}/transition"),
+        Some(&admin_token),
+        &serde_json::json!({ "status": "REFUNDED", "provider_reference": "MPESA-NOTIF-TEST-1" }),
+    )
+    .await;
+    assert_eq!(refunded.status(), StatusCode::OK);
+    let completed: Vec<(Uuid, String)> = sqlx::query_as(
+        "SELECT user_id, dedup_key FROM notifications \
+         WHERE related_entity_id = $1 AND type = 'REFUND_COMPLETED'",
+    )
+    .bind(refund_id)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        completed.len(),
+        1,
+        "exactly one REFUND_COMPLETED, created only once a real provider_reference confirmed the REFUNDED transition"
+    );
+    assert_eq!(completed[0].0, uid(PATIENT_USER_ID));
+
+    // No notification claims payment at approval time — REFUND_COMPLETED
+    // must not have existed before the REFUNDED transition actually happened.
+    let (total_refund_notifications,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type IN ('REFUND_APPROVED','REFUND_PROCESSING','REFUND_COMPLETED')",
+    )
+    .bind(refund_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    // REFUND_APPROVED is keyed by grievance_id, not refund_request_id, so it
+    // is not counted here — this assertion is scoped to the two
+    // refund-request-keyed types actually reachable from this id.
+    assert_eq!(total_refund_notifications, 2);
+}
+
+/// Negative / scope boundary: `FAILED` and `RECONCILIATION_REQUIRED` are
+/// operational escape hatches deliberately out of this milestone's bounded
+/// scope — transitioning to either must create no notification at all.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_refund_failed_transition_emits_no_notification(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+
+    let session = consultation_repo::find_by_appointment(&pool, apt_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let grv_json = json_body(
+        post(
+            &app,
+            "/api/v1/grievances",
+            Some(&patient_token),
+            &serde_json::json!({
+                "consultation_id": session.id,
+                "target": "DOCTOR",
+                "category": "Rushed Consultation / Ended Abruptly",
+                "claim_summary": "Milestone 1 FAILED-transition regression"
+            }),
+        )
+        .await,
+    )
+    .await;
+    let grv_id = Uuid::parse_str(grv_json["data"]["grievance_id"].as_str().unwrap()).unwrap();
+    post(
+        &app,
+        &format!("/api/v1/admin/grievances/{grv_id}/refund"),
+        Some(&admin_token),
+        &serde_json::json!({ "audit_notes": "Substantiated." }),
+    )
+    .await;
+    let refund_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM financial_refund_requests WHERE grievance_id = $1")
+            .bind(grv_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+    let failed = post(
+        &app,
+        &format!("/api/v1/admin/finance/refund-requests/{refund_id}/transition"),
+        Some(&admin_token),
+        &serde_json::json!({ "status": "FAILED" }),
+    )
+    .await;
+    assert_eq!(failed.status(), StatusCode::OK);
+
+    let (count,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM notifications WHERE related_entity_id = $1 AND type IN ('REFUND_PROCESSING','REFUND_COMPLETED')",
+    )
+    .bind(refund_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        count, 0,
+        "FAILED is out of this milestone's bounded scope and must emit nothing"
+    );
+}
+
+/// `appointment_notification_recipients` (the SECURITY DEFINER function every
+/// Milestone 1 notification goes through to resolve recipients) must not be
+/// a blanket RLS bypass: (1) its `search_path` is pinned (confirmed directly
+/// against `pg_proc`, not just by reading the migration), (2) EXECUTE is
+/// restricted to exactly the three roles that call it — any other role must
+/// be refused outright, and (3) even an authorized *role* only ever sees
+/// recipients for an appointment it is an actual participant in
+/// (`consultation_participant_allowed`'s own ADMIN/owning-Patient/assigned-
+/// Doctor gate) — an unrelated Doctor or Patient gets zero rows, not another
+/// account's recipient data.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_appointment_notification_recipients_is_participant_scoped(pool: PgPool) {
+    let (_app, pool, _state) = test_app_and_state(pool).await;
+    let roles = build_role_pools(&pool).await;
+    let now = Utc::now();
+    let (_slot, apt_id) =
+        insert_confirmed_appointment(&pool, now + chrono::Duration::days(8)).await;
+
+    // (1) Fixed search_path — a SECURITY DEFINER function without this is a
+    // classic privilege-escalation vector (a caller-controlled search_path
+    // could shadow `consultation_participant_allowed` with an attacker
+    // function of the same name in a schema earlier in the path).
+    let (proconfig,): (Option<Vec<String>>,) = sqlx::query_as(
+        "SELECT proconfig FROM pg_proc WHERE proname = 'appointment_notification_recipients'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        proconfig
+            .unwrap_or_default()
+            .iter()
+            .any(|c| c == "search_path=public"),
+        "appointment_notification_recipients must pin search_path=public"
+    );
+
+    async fn call_as(
+        pool: &PgPool,
+        user_id: Uuid,
+        role: &str,
+        appointment_id: Uuid,
+    ) -> Result<Vec<(Option<Uuid>, Option<Uuid>)>, sqlx::Error> {
+        let mut tx = pool.begin().await.unwrap();
+        sqlx::query("SELECT set_config('app.current_user_id', $1, true), set_config('app.current_role', $2, true)")
+            .bind(user_id.to_string())
+            .bind(role)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+        let result = sqlx::query_as(
+            "SELECT doctor_user_id, patient_user_id FROM appointment_notification_recipients($1)",
+        )
+        .bind(appointment_id)
+        .fetch_all(&mut *tx)
+        .await;
+        tx.rollback().await.unwrap();
+        result
+    }
+
+    // (3a) Authorized: the assigned Doctor sees the real recipient pair.
+    let as_doctor = call_as(&roles.api, uid(DOCTOR1_USER_ID), "DOCTOR", apt_id)
+        .await
+        .unwrap();
+    assert_eq!(as_doctor.len(), 1);
+    assert_eq!(as_doctor[0].0, Some(uid(DOCTOR1_USER_ID)));
+    assert_eq!(as_doctor[0].1, Some(uid(PATIENT_USER_ID)));
+
+    // (3b) Authorized: the owning Patient sees the same pair.
+    let as_patient = call_as(&roles.api, uid(PATIENT_USER_ID), "PATIENT", apt_id)
+        .await
+        .unwrap();
+    assert_eq!(as_patient.len(), 1);
+
+    // (3c) Unauthorized: a real but unrelated Doctor (never assigned to this
+    // appointment) must see nothing — not an error, zero rows, matching
+    // `consultation_participant_allowed`'s own fail-closed WHERE clause.
+    let as_foreign_doctor = call_as(&roles.api, uid(DOCTOR2_USER_ID), "DOCTOR", apt_id)
+        .await
+        .unwrap();
+    assert!(
+        as_foreign_doctor.is_empty(),
+        "an unrelated Doctor must never see this appointment's recipients"
+    );
+
+    // (3d) Unauthorized: a real but unrelated Patient (never this
+    // appointment's patient) must also see nothing.
+    let foreign_patient_token = fresh_patient_token(&pool).await;
+    let foreign_patient_claims = hellodoctor_backend::crypto::verify_access_token(
+        &foreign_patient_token,
+        TEST_JWT_PUBLIC_KEY_B64,
+    )
+    .unwrap();
+    let as_foreign_patient = call_as(
+        &roles.api,
+        uid(&foreign_patient_claims.user_id),
+        "PATIENT",
+        apt_id,
+    )
+    .await
+    .unwrap();
+    assert!(
+        as_foreign_patient.is_empty(),
+        "an unrelated Patient must never see this appointment's recipients"
+    );
+
+    // (2) Restricted EXECUTE: a role never granted it at all (system/auth
+    // worker) must be refused outright — not merely filtered to zero rows,
+    // a hard permission-denied at the database layer.
+    for (role_pool, role_label) in [(&roles.system, "system"), (&roles.auth, "auth")] {
+        let err = call_as(role_pool, uid(DOCTOR1_USER_ID), "ADMIN", apt_id)
+            .await
+            .unwrap_err();
+        assert!(
+            err.to_string().to_lowercase().contains("permission denied"),
+            "hellodoctor_{role_label}_worker must not have EXECUTE on appointment_notification_recipients: {err}"
+        );
+    }
 }
 
 async fn insert_confirmed_appointment(pool: &PgPool, start_time: DateTime<Utc>) -> (Uuid, Uuid) {
@@ -11423,10 +12174,10 @@ async fn test_doctor_registration_is_pending_and_cannot_set_privileged_fields(po
         "qualifications": ["MBBS"],
         "residential_address": "Nairobi",
         "accepted_documents": [
-            {"type": "DOCTOR_TERMS", "version": "1.0"},
-            {"type": "PRIVACY_NOTICE", "version": "1.0"},
-            {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0"},
-            {"type": "TELEMEDICINE_PRACTITIONER_POLICY", "version": "1.0"}
+            {"type": "DOCTOR_TERMS", "version": "1.0-afyamkononi"},
+            {"type": "PRIVACY_NOTICE", "version": "1.0-afyamkononi"},
+            {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0-afyamkononi"},
+            {"type": "TELEMEDICINE_PRACTITIONER_POLICY", "version": "1.0-afyamkononi"}
         ]
     });
     let response = post(&app, "/api/v1/auth/doctor/register", None, &payload).await;
@@ -11782,10 +12533,10 @@ async fn test_doctor_registration_legal_consent_gate_enforces_current_required_s
         })
     };
     let required_only = serde_json::json!([
-        {"type": "DOCTOR_TERMS", "version": "1.0"},
-        {"type": "PRIVACY_NOTICE", "version": "1.0"},
-        {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0"},
-        {"type": "TELEMEDICINE_PRACTITIONER_POLICY", "version": "1.0"}
+        {"type": "DOCTOR_TERMS", "version": "1.0-afyamkononi"},
+        {"type": "PRIVACY_NOTICE", "version": "1.0-afyamkononi"},
+        {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0-afyamkononi"},
+        {"type": "TELEMEDICINE_PRACTITIONER_POLICY", "version": "1.0-afyamkononi"}
     ]);
 
     // 1. missing required agreement entirely -> rejected.
@@ -11802,9 +12553,9 @@ async fn test_doctor_registration_legal_consent_gate_enforces_current_required_s
         "9102",
         "102",
         serde_json::json!([
-            {"type": "DOCTOR_TERMS", "version": "1.0"},
-            {"type": "PRIVACY_NOTICE", "version": "1.0"},
-            {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0"}
+            {"type": "DOCTOR_TERMS", "version": "1.0-afyamkononi"},
+            {"type": "PRIVACY_NOTICE", "version": "1.0-afyamkononi"},
+            {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0-afyamkononi"}
         ]),
     );
     assert_eq!(
@@ -11828,9 +12579,9 @@ async fn test_doctor_registration_legal_consent_gate_enforces_current_required_s
         "103",
         serde_json::json!([
             {"type": "DOCTOR_TERMS", "version": "0.9"},
-            {"type": "PRIVACY_NOTICE", "version": "1.0"},
-            {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0"},
-            {"type": "TELEMEDICINE_PRACTITIONER_POLICY", "version": "1.0"}
+            {"type": "PRIVACY_NOTICE", "version": "1.0-afyamkononi"},
+            {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0-afyamkononi"},
+            {"type": "TELEMEDICINE_PRACTITIONER_POLICY", "version": "1.0-afyamkononi"}
         ]),
     );
     assert_eq!(
@@ -11866,8 +12617,9 @@ async fn test_doctor_registration_legal_consent_gate_enforces_current_required_s
     // 7 (marketing included half): optional Marketing Communications
     // included -> still succeeds, and a fifth row lands.
     let mut with_marketing_arr = required_only.as_array().unwrap().clone();
-    with_marketing_arr
-        .push(serde_json::json!({"type": "MARKETING_COMMUNICATIONS", "version": "1.0"}));
+    with_marketing_arr.push(
+        serde_json::json!({"type": "MARKETING_COMMUNICATIONS", "version": "1.0-afyamkononi"}),
+    );
     let with_marketing = base("9107", "107", serde_json::Value::Array(with_marketing_arr));
     let response = post(&app, "/api/v1/auth/doctor/register", None, &with_marketing).await;
     assert_eq!(response.status(), StatusCode::CREATED);
@@ -11949,10 +12701,10 @@ async fn test_legal_document_version_bump_preserves_history_and_flags_stale(pool
         "qualifications": ["MBBS"],
         "residential_address": "Nairobi",
         "accepted_documents": [
-            {"type": "DOCTOR_TERMS", "version": "1.0"},
-            {"type": "PRIVACY_NOTICE", "version": "1.0"},
-            {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0"},
-            {"type": "TELEMEDICINE_PRACTITIONER_POLICY", "version": "1.0"}
+            {"type": "DOCTOR_TERMS", "version": "1.0-afyamkononi"},
+            {"type": "PRIVACY_NOTICE", "version": "1.0-afyamkononi"},
+            {"type": "PROFESSIONAL_VERIFICATION_DECLARATION", "version": "1.0-afyamkononi"},
+            {"type": "TELEMEDICINE_PRACTITIONER_POLICY", "version": "1.0-afyamkononi"}
         ]
     });
     let response = post(&app, "/api/v1/auth/doctor/register", None, &payload).await;
@@ -11975,14 +12727,14 @@ async fn test_legal_document_version_bump_preserves_history_and_flags_stale(pool
 
     // Bump DOCTOR_TERMS to a new current version.
     sqlx::query(
-        "UPDATE legal_documents SET is_current=false WHERE document_type='DOCTOR_TERMS' AND version='1.0'",
+        "UPDATE legal_documents SET is_current=false WHERE document_type='DOCTOR_TERMS' AND version='1.0-afyamkononi'",
     )
     .execute(&pool)
     .await
     .unwrap();
     sqlx::query(
         "INSERT INTO legal_documents (document_type, version, title, required, is_current, body) \
-         VALUES ('DOCTOR_TERMS','1.1','HelloDoctor Doctor Terms of Service',true,true,'Updated terms text.')",
+         VALUES ('DOCTOR_TERMS','1.1','AfyaMkononi Doctor Terms of Service',true,true,'Updated terms text.')",
     )
     .execute(&pool)
     .await
@@ -12004,7 +12756,7 @@ async fn test_legal_document_version_bump_preserves_history_and_flags_stale(pool
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(kept_version, "1.0");
+    assert_eq!(kept_version, "1.0-afyamkononi");
     assert_eq!(kept_hash, original_hash);
 
     // 9. a data-level staleness query shows this doctor is behind the new

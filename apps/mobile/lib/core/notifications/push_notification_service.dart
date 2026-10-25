@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../features/notifications/notification_repository.dart';
+import '../network/client_error_reporter.dart';
 
 /// Thin FCM adapter for the Doctor app. FCM messages only trigger a refresh of
 /// the existing authenticated inbox; the payload is never used to authorize
@@ -26,9 +27,15 @@ class PushNotificationService {
     _started = true;
     try {
       await Firebase.initializeApp();
-    } catch (_) {
+    } catch (error, stack) {
       // Missing google-services/GoogleService-Info configuration is a
-      // deployment issue. Push must never block login or the app shell.
+      // deployment issue (see docs/FCM_SETUP.md) — push must never block
+      // login or the app shell, but the failure must still be visible to
+      // operators rather than silently invisible forever, so it goes through
+      // the same sanitized client-diagnostics pipeline as any other
+      // unexpected client error.
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Notifications', operation: 'push_init');
     }
 
     try {
@@ -62,9 +69,13 @@ class PushNotificationService {
       });
       final initial = await messaging.getInitialMessage();
       if (initial != null) unawaited(onNotificationReceived());
-    } catch (_) {
+    } catch (error, stack) {
       // Permissions, provider configuration and connectivity are all
-      // best-effort. The in-app inbox remains available without FCM.
+      // best-effort. The in-app inbox remains available without FCM — but,
+      // as above, the failure is still captured through sanitized
+      // diagnostics instead of silently disappearing.
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Notifications', operation: 'push_init');
     }
   }
 

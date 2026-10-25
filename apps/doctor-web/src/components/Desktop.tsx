@@ -27,7 +27,7 @@ export function Dashboard({profile,queue,onAppointments,earnings,qna,action}:{pr
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),60000);return()=>clearInterval(timer);},[]);
   const today=dayKey(new Date(now).toISOString());
   const activeQueue=queue.data.filter(a=>a.queue_actionable===true);
-  const todaysConsultations=queue.data.filter(a=>dayKey(a.start_time)===today&&!['CANCELLED','REFUNDED','NO_SHOW'].includes(a.status)).length;
+  const todaysConsultations=queue.data.filter(a=>dayKey(a.start_time)===today&&!['CANCELLED','REFUNDED','EXPIRED'].includes(a.status)).length;
   const next=activeQueue.find(a=>Date.parse(a.start_time)>=now);
   return <section id="dwPage_dashboard" className="dw-page-view active">
     <header className="dw-page-header"><div className="dw-page-title-group"><h2>Good morning, {profile.full_name}</h2><p>{profile.primary_specialty} &middot; {date(new Date(now).toISOString())}</p></div><button className="dw-btn-outline" disabled={queue.loading||wallet.loading||questions.loading} onClick={()=>{void queue.refresh();void wallet.refresh();void questions.refresh();}}>Refresh overview</button></header>

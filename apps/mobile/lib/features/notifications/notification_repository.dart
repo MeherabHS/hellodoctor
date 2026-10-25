@@ -107,14 +107,16 @@ class NotificationRepository {
 
   /// POST /notifications/devices.
   ///
-  /// HONEST CAVEAT: the backend transport is a confirmed no-op stub today —
-  /// `register_device` in `notification_handlers.rs` always answers
-  /// `push_provider: "CONFIGURATION_REQUIRED"` — and this client intentionally
-  /// has no push SDK dependency (no Firebase Cloud Messaging / APNs
-  /// integration exists in `pubspec.yaml`, by design). [pushToken] is
-  /// therefore NOT a real platform push token; pass [devicePlaceholderToken]'s
-  /// result instead. This call only records a registration row for whenever a
-  /// real push provider is wired up later.
+  /// Backed by a real FCM HTTP v1 transport (`notification_transport.rs`'s
+  /// `FcmTransport`) and a real `firebase_messaging` client
+  /// (`core/notifications/push_notification_service.dart`), which calls this
+  /// method with the device's actual FCM registration token on obtain/refresh.
+  /// `register_device` in `notification_handlers.rs` reports
+  /// `push_provider: "FCM_HTTP_V1"` once the backend's service-account
+  /// credentials are configured, or `"NOOP_DEVELOPMENT"` in an environment
+  /// where they aren't (development/test) — in that case this call still
+  /// records the registration row, just without any provider actually
+  /// delivering to it yet.
   Future<Json> registerDevice(
       {required String platform,
       required String pushToken,
@@ -154,6 +156,52 @@ class NotificationRepository {
     return 'WEB';
   }
 
+  /// GET /notifications/preferences
+  Future<NotificationPreferencesDto> getPreferences() async {
+    try {
+      final raw = _mapData(_data(await api.get('/notifications/preferences')));
+      return NotificationPreferencesDto.fromJson(raw);
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'NotificationSettings', operation: 'load');
+      rethrow;
+    }
+  }
+
+  /// PUT /notifications/preferences. `language`, when passed, must already
+  /// be 'en' or 'sw' — the backend itself validates this (see
+  /// `NotificationService::update_preferences`), this is just the matching
+  /// client-side contract.
+  Future<NotificationPreferencesDto> updatePreferences({
+    required bool operationalEnabled,
+    required bool engagementEnabled,
+    required bool quietHoursEnabled,
+    required String quietHoursStartLocal,
+    required String quietHoursEndLocal,
+    required bool greetingNotificationsEnabled,
+    required bool religiousGreetingsEnabled,
+    String? language,
+  }) async {
+    try {
+      final raw = _mapData(_data(await api.put('/notifications/preferences',
+          data: {
+            'operational_enabled': operationalEnabled,
+            'engagement_enabled': engagementEnabled,
+            'quiet_hours_enabled': quietHoursEnabled,
+            'quiet_hours_start_local': quietHoursStartLocal,
+            'quiet_hours_end_local': quietHoursEndLocal,
+            'greeting_notifications_enabled': greetingNotificationsEnabled,
+            'religious_greetings_enabled': religiousGreetingsEnabled,
+            if (language != null) 'language': language,
+          })));
+      return NotificationPreferencesDto.fromJson(raw);
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'NotificationSettings', operation: 'update');
+      rethrow;
+    }
+  }
+
   static const _deviceIdKey = 'notification_device_placeholder_id';
 
   Future<String> deviceId() async {
@@ -170,22 +218,4 @@ class NotificationRepository {
     return generated;
   }
 
-  /// A stable, locally-generated, non-cryptographic placeholder device
-  /// identifier — explicitly NOT a real push token. The backend upserts a
-  /// device row on `ON CONFLICT (user_id, push_token)` (see
-  /// `notification_repo::device_tokens::upsert`), so this value is persisted
-  /// (reusing the same secure-storage abstraction `ApiClient` uses for
-  /// session tokens) and reused across app launches rather than regenerated
-  /// each call — a fresh value every call would silently accumulate a new
-  /// device row per launch instead of refreshing `last_seen_at` on one.
-  Future<String> devicePlaceholderToken() async {
-    final existing = await _deviceIdStore.read(_deviceIdKey);
-    if (existing != null && existing.isNotEmpty) return existing;
-    final rand = Random.secure();
-    final bytes = List<int>.generate(16, (_) => rand.nextInt(256));
-    final generated =
-        'placeholder-${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join()}';
-    await _deviceIdStore.write(_deviceIdKey, generated);
-    return generated;
-  }
 }

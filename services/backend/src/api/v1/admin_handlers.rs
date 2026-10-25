@@ -352,7 +352,7 @@ pub async fn revoke_doctor_professional_registration(
         ));
     }
     crate::services::NotificationService::notify_professional_verification_revoked(
-        &mut *tx,
+        &mut tx,
         doc.user_id,
         id.into_inner(),
     )
@@ -573,7 +573,7 @@ pub async fn create_doctor(
     let active_count = crate::repository::user_repo::count_active(&state.auth_db).await?;
     if active_count as u32 >= state.config.max_active_users {
         return Err(AppError::CapacityLimitReached(
-            "HelloDoctor is at its current controlled pilot capacity. Raise MAX_ACTIVE_USERS only after an evidence-gated capacity review.".into(),
+            "AfyaMkononi is at its current controlled pilot capacity. Raise MAX_ACTIVE_USERS only after an evidence-gated capacity review.".into(),
         ));
     }
 
@@ -1531,14 +1531,20 @@ async fn review_doctor_professional_registration(
     let verified = status == ProfessionalVerificationStatus::Verified;
     if verified {
         crate::services::NotificationService::notify_registration_verified(
-            &mut *tx,
+            &mut tx,
+            doc.user_id,
+            id.into_inner(),
+        )
+        .await?;
+        crate::services::NotificationService::notify_doctor_welcome_greeting(
+            &mut tx,
             doc.user_id,
             id.into_inner(),
         )
         .await?;
     } else {
         crate::services::NotificationService::notify_registration_rejected(
-            &mut *tx,
+            &mut tx,
             doc.user_id,
             id.into_inner(),
         )
@@ -2156,6 +2162,20 @@ pub async fn resolve_consultation_recovery(
             _ => AppError::Database(error),
         }
     })?;
+    if result.1 == "RESOLVED" {
+        let resolved_appointment_id: Uuid =
+            sqlx::query_scalar("SELECT appointment_id FROM consultation_sessions WHERE id=$1")
+                .bind(session_id)
+                .fetch_one(&mut *tx)
+                .await?;
+        crate::services::NotificationService::notify_consultation_recovery_resolved(
+            &mut tx,
+            resolved_appointment_id,
+            session_id,
+            &body.outcome,
+        )
+        .await?;
+    }
     AuditService::log_in_tx(
         &mut *tx,
         AuditLogEntry::new(

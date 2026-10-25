@@ -227,7 +227,10 @@ String safeClientOperation(String value) => const {
       'mint_rtc_token',
       'call_telemetry',
       'update',
-      'response_parse'
+      'response_parse',
+      'push_init',
+      'register_device',
+      'revoke_device'
     }.contains(value)
         ? value
         : 'unhandled_async';

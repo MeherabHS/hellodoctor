@@ -50,4 +50,49 @@ void main() {
     expect(english.postConsultHeader, 'Consultation Completed');
     expect(swahili.postConsultHeader, isNot(english.postConsultHeader));
   });
+
+  test('Milestone 3 notification-settings labels are translated in both locales',
+      () {
+    final english = lookupAppLocalizations(const Locale('en'));
+    final swahili = lookupAppLocalizations(const Locale('sw'));
+    expect(english.notificationSettingsPageTitle, 'Notification settings');
+    expect(swahili.notificationSettingsPageTitle, 'Mipangilio ya arifa');
+    expect(swahili.notificationSettingsQuietHoursTitle, isNot(english.notificationSettingsQuietHoursTitle));
+  });
+
+  test('setLocale calls the bound backend-sync hook with the new language code',
+      () async {
+    final store = _MemoryStore();
+    final controller = LocaleController(store);
+    final syncedLanguages = <String>[];
+    controller.bindBackendSync((languageCode) async {
+      syncedLanguages.add(languageCode);
+    });
+
+    await controller.setLocale('sw');
+    expect(controller.locale.languageCode, 'sw');
+    expect(syncedLanguages, ['sw']);
+  });
+
+  test('setLocale never awaits or fails on a failing backend-sync hook',
+      () async {
+    final store = _MemoryStore();
+    final controller = LocaleController(store);
+    controller.bindBackendSync((_) async {
+      throw Exception('network unavailable');
+    });
+
+    // Must complete normally — a failing best-effort sync must never
+    // surface as an error from the local, synchronous language switch.
+    await controller.setLocale('sw');
+    expect(controller.locale.languageCode, 'sw');
+  });
+
+  test('setLocale is a no-op with no sync hook bound (unbound by default)',
+      () async {
+    final store = _MemoryStore();
+    final controller = LocaleController(store);
+    await controller.setLocale('sw');
+    expect(controller.locale.languageCode, 'sw');
+  });
 }

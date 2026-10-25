@@ -1,0 +1,8 @@
+-- PostgreSQL cannot drop a value from an enum type (no ALTER TYPE ... DROP
+-- VALUE exists), so 'SCHEDULED'/'SENDING'/'PAUSED'/'COMPLETED' cannot be
+-- removed from campaign_status here. This is a documented, unavoidable
+-- PostgreSQL limitation (same one already recorded in
+-- `20261107000002_doctor_verification_revocation.down.sql`), not an
+-- oversight: `20261126000002`'s down migration restores the 6B trigger,
+-- which never writes these values again, so their mere presence in the type
+-- is inert.

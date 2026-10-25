@@ -3,7 +3,9 @@ use crate::{
     auth_context::AuthContext,
     domain::models::UserRole,
     error::AppError,
-    repository::{appointment_repo, chat_repo, grievance_repo, AppState, DbRole},
+    repository::{
+        appointment_repo, chat_repo, grievance_repo, notification_repo, AppState, DbRole,
+    },
     services::consultation_trace::{self, Event},
 };
 use axum::{
@@ -358,7 +360,15 @@ pub async fn reschedule(
             .await?;
     sqlx::query("UPDATE appointments SET slot_id=$2,status='CONFIRMED',updated_at=clock_timestamp() WHERE id=$1").bind(id).bind(body.slot_id).execute(&mut *tx).await?;
     sqlx::query("UPDATE doctor_schedule_slots SET status=CASE WHEN id=$1 THEN 'AVAILABLE'::slot_status_enum ELSE 'BOOKED'::slot_status_enum END WHERE id IN($1,$2)").bind(old.0).bind(body.slot_id).execute(&mut *tx).await?;
+    // The T-15 reminder scheduler's dedup key embeds the slot's start_time,
+    // so a reschedule naturally gets a fresh reminder created at the new time
+    // on the next scheduler tick — but a reminder already created for the
+    // *old* time before this reschedule would otherwise sit untouched and
+    // still fire at the wrong instant. Cancel any such stale pending
+    // reminder for both the Doctor and the Patient/guardian recipient now.
+    notification_repo::cancel_pending_reminders_for_appointment(&mut *tx, id).await?;
     let change = Uuid::new_v4();
+    crate::services::NotificationService::notify_booking_rescheduled(&mut tx, id, change).await?;
     sqlx::query("INSERT INTO appointment_reschedules(id,appointment_id,original_slot_id,new_slot_id,original_start,new_start,actor_user_id,auth_session_id,request_id,reason,grievance_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)").bind(change).bind(id).bind(old.0).bind(body.slot_id).bind(original).bind(new_start).bind(ctx.user_id).bind(ctx.session_id).bind(&ctx.request_id).bind(reason).bind(body.grievance_id).execute(&mut *tx).await?;
     consultation_trace::record(
         &mut tx,

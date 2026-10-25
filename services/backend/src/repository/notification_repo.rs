@@ -59,12 +59,54 @@ pub async fn insert_if_new<'e, A>(
 where
     A: Acquire<'e, Database = Postgres> + Send,
 {
+    insert_if_new_with_ttl(
+        executor,
+        id,
+        user_id,
+        notification_type,
+        title,
+        body,
+        related_entity_type,
+        related_entity_id,
+        scheduled_for,
+        dedup_key,
+        metadata,
+        None,
+    )
+    .await
+}
+
+/// Same as [`insert_if_new`], but additionally sets `ttl_seconds` — for an
+/// event whose usefulness genuinely expires (e.g. a Rejoin invitation for a
+/// grace period that has already closed, or a Ready-to-join alert for a
+/// consultation window that has already ended), so a delivery delayed past
+/// that point is dropped by the provider/OS instead of misleadingly still
+/// inviting the recipient to act. `None` (every existing caller via
+/// [`insert_if_new`]) falls back to the transport's own default.
+#[allow(clippy::too_many_arguments)]
+pub async fn insert_if_new_with_ttl<'e, A>(
+    executor: A,
+    id: Uuid,
+    user_id: UserId,
+    notification_type: &str,
+    title: &str,
+    body: &str,
+    related_entity_type: Option<&str>,
+    related_entity_id: Option<Uuid>,
+    scheduled_for: Option<DateTime<Utc>>,
+    dedup_key: &str,
+    metadata: Option<serde_json::Value>,
+    ttl_seconds: Option<i32>,
+) -> Result<bool, sqlx::Error>
+where
+    A: Acquire<'e, Database = Postgres> + Send,
+{
     let mut savepoint = executor.begin().await?;
     let result = sqlx::query(
         "INSERT INTO notifications \
          (id, user_id, type, title, body, related_entity_type, related_entity_id, \
-          scheduled_for, dedup_key, metadata) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+          scheduled_for, dedup_key, metadata, ttl_seconds) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
     )
     .bind(id)
     .bind(user_id)
@@ -76,6 +118,7 @@ where
     .bind(scheduled_for)
     .bind(dedup_key)
     .bind(metadata)
+    .bind(ttl_seconds)
     .execute(&mut *savepoint)
     .await;
 
@@ -216,13 +259,25 @@ pub struct DueNotification {
     pub delivery_attempts: i32,
     pub collapse_key: Option<String>,
     pub ttl_seconds: Option<i32>,
+    pub frequency_claimed: bool,
 }
 
 /// Claims at most `limit` due rows. `scheduled_for` is nullable for events
 /// that are immediately eligible; `next_delivery_at` is the durable retry
-/// gate. A failed worker leaves rows in DUE, which the next pass can safely
-/// reclaim after the bounded claim window because all state changes are
-/// compare-and-set updates.
+/// gate, and this claim itself now also uses it as a short processing
+/// lease (`clock_timestamp() + 2 minutes`) — found necessary (not assumed)
+/// via a genuine concurrent-worker test: the claiming transaction commits
+/// immediately (releasing `FOR UPDATE`'s row lock) while the row sits in
+/// `DUE` for the whole rest of this row's processing (frequency-cap claim,
+/// provider dispatch, final status write), and `DUE` was itself one of the
+/// statuses this same query re-claims — so two genuinely concurrent
+/// `run_push_delivery_pass` calls could both claim and independently
+/// process the identical row before either finished, each separately
+/// consuming a daily frequency-cap slot and racing on which one's final
+/// status write won. The lease closes that window while preserving the
+/// original crash-recovery intent (a worker that actually dies mid-
+/// processing still leaves the row reclaimable, just after the lease
+/// expires rather than immediately).
 pub async fn claim_due_notifications<'e, E: PgExecutor<'e>>(
     executor: E,
     limit: i64,
@@ -241,12 +296,13 @@ pub async fn claim_due_notifications<'e, E: PgExecutor<'e>>(
         UPDATE notifications n \
            SET delivery_status = 'DUE', \
                delivery_attempts = n.delivery_attempts + 1, \
-               last_delivery_error = NULL \
+               last_delivery_error = NULL, \
+               next_delivery_at = clock_timestamp() + interval '2 minutes' \
           FROM due \
          WHERE n.id = due.id \
         RETURNING n.id, n.user_id, n.type, n.title, n.body, \
                   n.related_entity_type, n.related_entity_id, n.dedup_key, \
-                  n.delivery_attempts, n.collapse_key, n.ttl_seconds",
+                  n.delivery_attempts, n.collapse_key, n.ttl_seconds, n.frequency_claimed",
     )
     .bind(limit.clamp(1, 100))
     .fetch_all(executor)
@@ -305,6 +361,274 @@ pub async fn mark_delivery_permanent<'e, E: PgExecutor<'e>>(
     .execute(executor)
     .await?;
     Ok(())
+}
+
+/// Defers a quiet-hours-eligible row to the end of the recipient's quiet
+/// window, rather than failing it. Shares `mark_delivery_retry`'s
+/// re-claimable `FAILED`/`next_delivery_at` shape (deliberately — a deferred
+/// row is not a provider failure and must not be double-counted against
+/// `notification_push_retry_total`/`_permanent_failure_total`), but is kept
+/// as its own function so a deferred dispatch is distinguishable in logs.
+pub async fn mark_delivery_deferred<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    next_delivery_at: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE notifications SET delivery_status='FAILED', \
+                last_delivery_error='Deferred: recipient quiet hours in effect', \
+                next_delivery_at=$2 \
+           WHERE id=$1 AND delivery_status='DUE'",
+    )
+    .bind(id)
+    .bind(next_delivery_at)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+/// The gating facts for one notification type — `category` distinguishes
+/// SECURITY/TRANSACTIONAL/CLINICAL (never subject to preference, quiet-hours
+/// or frequency suppression — see `notification_scheduler.rs`'s delivery
+/// gate) from OPERATIONAL/ENGAGEMENT (the only two categories this applies
+/// to). Falls back to a conservative always-eligible default
+/// (`category = "TRANSACTIONAL"`) if a type was somehow never seeded into
+/// the registry, so a missing registry row can never silently suppress a
+/// real notification.
+#[derive(Debug, sqlx::FromRow)]
+pub struct NotificationTypeGate {
+    pub category: String,
+    pub quiet_hours_allowed: bool,
+    pub max_per_day: i32,
+}
+
+pub async fn notification_type_gate<'e, E: PgExecutor<'e>>(
+    executor: E,
+    notification_type: &str,
+) -> Result<NotificationTypeGate, sqlx::Error> {
+    let row: Option<NotificationTypeGate> = sqlx::query_as(
+        "SELECT category, quiet_hours_allowed, max_per_day \
+           FROM notification_type_registry WHERE notification_type = $1",
+    )
+    .bind(notification_type)
+    .fetch_optional(executor)
+    .await?;
+    Ok(row.unwrap_or(NotificationTypeGate {
+        category: "TRANSACTIONAL".to_string(),
+        quiet_hours_allowed: false,
+        max_per_day: 20,
+    }))
+}
+
+/// A user's own delivery preferences, defaulted identically to a user with
+/// no row at all (`notification_preferences` is only ever written once a
+/// user actually opens notification settings) — see
+/// `migrations/20261122000001_milestone3_localization_preferences`'s own
+/// column defaults, which this mirrors exactly for the first five fields.
+///
+/// `greeting_notifications_enabled`/`religious_greetings_enabled`
+/// (Milestone 4/5) are role-aware/strict-by-default and computed directly
+/// in `user_notification_preferences`'s own query (via `COALESCE` against
+/// the joined `users.role`) rather than here, since a plain Rust-level
+/// `unwrap_or` has no access to the user's role.
+#[derive(Debug, sqlx::FromRow)]
+pub struct NotificationPreferences {
+    pub operational_enabled: bool,
+    pub engagement_enabled: bool,
+    pub quiet_hours_enabled: bool,
+    pub quiet_hours_start_local: chrono::NaiveTime,
+    pub quiet_hours_end_local: chrono::NaiveTime,
+    pub greeting_notifications_enabled: bool,
+    pub religious_greetings_enabled: bool,
+}
+
+/// Role-aware default for a user with no `notification_preferences` row yet:
+/// Doctors (and any non-Patient role) default to greetings ON, Patients
+/// default OFF — "Patients should have greetings disabled by default" is a
+/// stricter, separate axis from the general `engagement_enabled` default
+/// (which stays on for everyone). Once a row exists, its own stored value is
+/// used verbatim regardless of role. `religious_greetings_enabled` has no
+/// role-aware branch at all — it is FALSE for every role until explicitly
+/// opted into, since inferring religious preference from role (or anything
+/// else) is exactly what this milestone's instructions forbid.
+///
+/// Reads `users.role`, so the caller's executor needs `SELECT` on that
+/// column: `hellodoctor_api` already has it (own row only, via RLS) and
+/// `hellodoctor_system_worker` has an unconditional full-row grant — the
+/// two roles that ever call this.
+pub async fn user_notification_preferences<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: UserId,
+) -> Result<NotificationPreferences, sqlx::Error> {
+    let row: Option<NotificationPreferences> = sqlx::query_as(
+        "SELECT COALESCE(np.operational_enabled, TRUE) AS operational_enabled, \
+                COALESCE(np.engagement_enabled, TRUE) AS engagement_enabled, \
+                COALESCE(np.quiet_hours_enabled, FALSE) AS quiet_hours_enabled, \
+                COALESCE(np.quiet_hours_start_local, TIME '22:00') AS quiet_hours_start_local, \
+                COALESCE(np.quiet_hours_end_local, TIME '07:00') AS quiet_hours_end_local, \
+                COALESCE(np.greeting_notifications_enabled, u.role <> 'PATIENT') AS greeting_notifications_enabled, \
+                COALESCE(np.religious_greetings_enabled, FALSE) AS religious_greetings_enabled \
+           FROM users u \
+           LEFT JOIN notification_preferences np ON np.user_id = u.id \
+          WHERE u.id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(executor)
+    .await?;
+    Ok(row.unwrap_or(NotificationPreferences {
+        operational_enabled: true,
+        engagement_enabled: true,
+        quiet_hours_enabled: false,
+        quiet_hours_start_local: chrono::NaiveTime::from_hms_opt(22, 0, 0).unwrap(),
+        quiet_hours_end_local: chrono::NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+        // Only reachable if `user_id` resolves to no `users` row at all —
+        // should never happen for a real authenticated caller, so this
+        // strictest-possible fallback (greetings off) is purely defensive.
+        greeting_notifications_enabled: false,
+        religious_greetings_enabled: false,
+    }))
+}
+
+/// Creates or replaces the caller's own preference row. Only ever called
+/// from within a `begin_authed` transaction for the owning user — the
+/// `notification_preferences_owner_insert`/`_owner_update` RLS policies
+/// require `app.current_user_id` to already equal `user_id`, and `ON
+/// CONFLICT`'s implicit `SELECT` needs that same session identity to see its
+/// own existing row (the same RLS/`ON CONFLICT` interaction
+/// `insert_if_new`'s own doc comment explains — safe here specifically
+/// because this always writes the caller's *own* row, never someone else's).
+#[allow(clippy::too_many_arguments)]
+pub async fn upsert_preferences<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: UserId,
+    operational_enabled: bool,
+    engagement_enabled: bool,
+    quiet_hours_enabled: bool,
+    quiet_hours_start_local: chrono::NaiveTime,
+    quiet_hours_end_local: chrono::NaiveTime,
+    greeting_notifications_enabled: bool,
+    religious_greetings_enabled: bool,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO notification_preferences \
+            (user_id, operational_enabled, engagement_enabled, quiet_hours_enabled, \
+             quiet_hours_start_local, quiet_hours_end_local, \
+             greeting_notifications_enabled, religious_greetings_enabled, updated_at) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, clock_timestamp()) \
+         ON CONFLICT (user_id) DO UPDATE SET \
+            operational_enabled = EXCLUDED.operational_enabled, \
+            engagement_enabled = EXCLUDED.engagement_enabled, \
+            quiet_hours_enabled = EXCLUDED.quiet_hours_enabled, \
+            quiet_hours_start_local = EXCLUDED.quiet_hours_start_local, \
+            quiet_hours_end_local = EXCLUDED.quiet_hours_end_local, \
+            greeting_notifications_enabled = EXCLUDED.greeting_notifications_enabled, \
+            religious_greetings_enabled = EXCLUDED.religious_greetings_enabled, \
+            updated_at = clock_timestamp()",
+    )
+    .bind(user_id)
+    .bind(operational_enabled)
+    .bind(engagement_enabled)
+    .bind(quiet_hours_enabled)
+    .bind(quiet_hours_start_local)
+    .bind(quiet_hours_end_local)
+    .bind(greeting_notifications_enabled)
+    .bind(religious_greetings_enabled)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+/// Atomically claims one daily send slot for `(user_id, notification_type,
+/// local_date)` against `max_per_day`, returning `true` iff the claim
+/// succeeded. Safe under any number of concurrent delivery-pass workers: the
+/// `INSERT ... ON CONFLICT DO UPDATE ... WHERE ... RETURNING` is a single
+/// statement, so Postgres's own row lock on the conflicting key serializes
+/// concurrent claims against the same user+type+day — unlike a read-then-act
+/// `SELECT COUNT(*)` check (this milestone's own Milestone 3 original
+/// design), which two truly concurrent workers could both pass before
+/// either commits. See `notifications.frequency_claimed` for how a single
+/// notification row stays idempotent across delivery retries so a retried
+/// send never claims a second slot for what is logically one notification.
+pub async fn claim_frequency_slot<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: UserId,
+    notification_type: &str,
+    local_date: chrono::NaiveDate,
+    max_per_day: i32,
+) -> Result<bool, sqlx::Error> {
+    let claimed: Option<(i32,)> = sqlx::query_as(
+        "INSERT INTO notification_frequency_counters (user_id, notification_type, local_date, sent_count) \
+         VALUES ($1, $2, $3, 1) \
+         ON CONFLICT (user_id, notification_type, local_date) DO UPDATE SET \
+            sent_count = notification_frequency_counters.sent_count + 1 \
+         WHERE notification_frequency_counters.sent_count < $4 \
+         RETURNING sent_count",
+    )
+    .bind(user_id)
+    .bind(notification_type)
+    .bind(local_date)
+    .bind(max_per_day)
+    .fetch_optional(executor)
+    .await?;
+    Ok(claimed.is_some())
+}
+
+/// Marks a notification row as having already resolved its frequency-cap
+/// claim (whether that claim succeeded or the row was suppressed) — once
+/// set, `run_push_delivery_pass` never re-evaluates the frequency gate for
+/// this exact row again, so a transient-failure retry of an already-allowed
+/// send can never claim a second daily slot for the same logical
+/// notification.
+pub async fn mark_frequency_claimed<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE notifications SET frequency_claimed = TRUE WHERE id = $1")
+        .bind(id)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+/// One row of the maintained Kenyan holiday calendar
+/// (`migrations/20261124000001_milestone4_5_engagement_and_holidays`).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct KenyanHoliday {
+    pub id: Uuid,
+    pub holiday_key: String,
+    pub is_religious: bool,
+}
+
+/// Holidays observed on this *exact* Nairobi-local date — strict equality,
+/// never `<=`, so a scheduler that was down on the real day never "catches
+/// up" and sends a holiday greeting late (this milestone's own "prevent
+/// historical events from being sent late after downtime" requirement).
+pub async fn holidays_observed_on<'e, E: PgExecutor<'e>>(
+    executor: E,
+    local_date: chrono::NaiveDate,
+) -> Result<Vec<KenyanHoliday>, sqlx::Error> {
+    sqlx::query_as::<_, KenyanHoliday>(
+        "SELECT id, holiday_key, is_religious FROM kenyan_holidays WHERE observed_date = $1",
+    )
+    .bind(local_date)
+    .fetch_all(executor)
+    .await
+}
+
+/// Looks up whether a specific `kenyan_holidays` row (by id) is
+/// religious-origin — used by the delivery gate to decide whether a claimed
+/// `HOLIDAY_GREETING` row additionally needs `religious_greetings_enabled`.
+/// `None` only if the holiday row was somehow deleted after the
+/// notification referencing it was created; treated as non-religious (the
+/// permissive case) since there is nothing left to gate against.
+pub async fn holiday_is_religious<'e, E: PgExecutor<'e>>(
+    executor: E,
+    holiday_id: Uuid,
+) -> Result<Option<bool>, sqlx::Error> {
+    sqlx::query_scalar("SELECT is_religious FROM kenyan_holidays WHERE id = $1")
+        .bind(holiday_id)
+        .fetch_optional(executor)
+        .await
 }
 
 pub mod device_tokens {

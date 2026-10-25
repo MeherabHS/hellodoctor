@@ -77,6 +77,12 @@ pub struct AppConfig {
     /// changing the delivery time is an env var, not a code change. See
     /// `notification_scheduler.rs`.
     pub doctor_daily_summary_time_local: String,
+    /// Kenya-local time of day, `HH:MM`, at which the weekly good-morning
+    /// engagement greeting (`DOCTOR_GREETING`/`PATIENT_GREETING`) and the
+    /// weekly `HEALTH_EDUCATION` nudge are generated (Milestones 4/5).
+    /// Mirrors `doctor_daily_summary_time_local`'s own config-not-code
+    /// rationale.
+    pub engagement_greeting_time_local: String,
     pub azure_email_endpoint: Option<String>,
     pub azure_email_access_key: Option<String>,
     pub azure_email_sender: Option<String>,
@@ -214,6 +220,8 @@ impl AppConfig {
             allowed_origins,
             doctor_daily_summary_time_local: env::var("DOCTOR_DAILY_SUMMARY_TIME_LOCAL")
                 .unwrap_or_else(|_| "07:00".into()),
+            engagement_greeting_time_local: env::var("ENGAGEMENT_GREETING_TIME_LOCAL")
+                .unwrap_or_else(|_| "08:00".into()),
             azure_email_endpoint: env::var("AZURE_EMAIL_ENDPOINT")
                 .ok()
                 .filter(|v| !v.trim().is_empty()),

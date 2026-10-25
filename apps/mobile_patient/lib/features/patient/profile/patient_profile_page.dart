@@ -11,6 +11,7 @@ import 'add_dependent_sheet.dart';
 import 'family_profile_chip_row.dart';
 import 'family_profiles_cubit.dart';
 import 'language_modal.dart';
+import '../../notifications/notification_settings_page.dart';
 import 'profile_cubit.dart';
 import 'profile_edit_sheet.dart';
 import 'profile_models.dart';
@@ -93,6 +94,12 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                     }),
                     onTap: () => showLanguageModal(
                         context, context.read<LocaleController>()),
+                  ),
+                  _SettingsTile(
+                    icon: Icons.notifications_outlined,
+                    title: l10n.notificationSettingsMenuTitle,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const NotificationSettingsPage())),
                   ),
                   _SettingsTile(
                     icon: Icons.payments_outlined,

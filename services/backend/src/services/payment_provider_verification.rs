@@ -59,11 +59,17 @@ async fn find_active_platform_method<'e, E: PgExecutor<'e>>(
     executor: E,
     family: &str,
 ) -> Result<Option<PlatformPaymentMethod>, AppError> {
+    // `list_platform_payment_methods` is already ordered `is_primary DESC,
+    // created_at DESC`, so the first match in that pre-sorted order is the
+    // right one to take — not `.max_by_key(|m| m.is_primary)`, which (being a
+    // boolean key) would instead return the *last* element among ties,
+    // silently preferring a non-primary/oldest row whenever a family (e.g.
+    // "MPESA" matching both MPESA_PAYBILL and MPESA_TILL) has more than one
+    // configured method.
     let methods = payment_methods_repo::list_platform_payment_methods(executor).await?;
     Ok(methods
         .into_iter()
-        .filter(|m| m.provider_code.starts_with(family))
-        .max_by_key(|m| m.is_primary))
+        .find(|m| m.provider_code.starts_with(family)))
 }
 
 pub struct VerificationOutcome {

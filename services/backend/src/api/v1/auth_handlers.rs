@@ -380,7 +380,7 @@ pub async fn doctor_register(
     let active_count = crate::repository::user_repo::count_active(&state.auth_db).await?;
     if active_count as u32 >= state.config.max_active_users {
         return Err(AppError::CapacityLimitReached(
-            "HelloDoctor is at its current controlled pilot capacity.".into(),
+            "AfyaMkononi is at its current controlled pilot capacity.".into(),
         ));
     }
 

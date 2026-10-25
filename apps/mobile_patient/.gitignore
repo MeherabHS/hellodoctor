@@ -51,3 +51,10 @@ app.*.map.json
 # regenerated automatically on every build, not hand-maintained.
 /lib/l10n/app_localizations.dart
 /lib/l10n/app_localizations_*.dart
+
+# Firebase native configuration is a per-deployment secret (real project
+# credentials), supplied only through the deployment secret process — never
+# committed. See docs/FCM_SETUP.md.
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart

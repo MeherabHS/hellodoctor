@@ -2068,3 +2068,139 @@ User-approved Schedule correction VERIFIED on build `vROyHPJLjR3IY3OKge4Ib`: rea
 ## 2026-10-07 - System telemetry verification
 
 FULL_SYSTEM_TELEMETRY_REQUIREMENT = NOT_MET. Real PostgreSQL incident service and Admin APIs verified; 11 unique focused Rust tests pass. Live Admin MFA/login/error feed/command telemetry and Prometheus metrics pass. Web browser diagnostics only log locally and create no Admin database incident; Flutter global handlers do not ingest crashes. Notification scheduler failures bypass the central incident sink. Missing measurements are replaced by Connected/24 ms defaults; Admin export is a toast, and the feed stops at 200 records. Running Admin login page returns HTTP 500 with missing compiled-module markers, so browser acceptance is blocked. No production code/mobile/backend changes or installations in this verification pass. Evidence and exact gaps: [SYSTEM_TELEMETRY_VERIFICATION.md](SYSTEM_TELEMETRY_VERIFICATION.md).
+## Backend regression gate — 2026-10-24
+
+Milestones 4–5 regression remediation is complete. The five registration failures were
+outdated test fixtures using legal-document version `1.0`; successful paths now use the
+current AfyaMkononi version `1.0-afyamkononi`, while negative stale-version tests remain.
+The 40-way grievance uniqueness test was changed to bounded batches of four so it exercises
+real concurrent sequence races within the intentional two-connection/250 ms test-harness
+limit. All 40 operations must still succeed, persist, and have distinct grievance numbers.
+The rebrand down-migration now clears rebrand current flags before restoring historical
+current documents, preserving `legal_documents_one_current`.
+
+Verification used owned disposable Postgres 16 and Redis 7 fixtures (55432/16479), then
+removed only those containers, volume, and network. Fresh migration apply and rollback/
+reapply passed. Focused affected tests passed, and the full serialized command
+`cargo test --test api_tests -- --test-threads=1` completed with **349 passed, 0 failed,
+4 ignored**. `cargo fmt --all -- --check`, Clippy with `-D warnings`, `cargo check
+--all-targets`, and `cargo test --lib` (**84 passed**) also passed. Existing Flutter baseline
+remains Doctor 267/267 and Patient 295/295 with clean analysis. Admin/Doctor Web were not
+changed by Milestones 4–5 and have no fresh regression claim here.
+
+The current worktree still contains substantial legitimate uncommitted changes. No Git
+history operation was performed. Remaining external limitation: Firebase native
+configuration and real-device FCM delivery are not verified. Recommended next action is
+the separately mandated read-only Milestone 6 Admin Web inspection; do not begin campaign
+implementation from this checkpoint.
+
+## Milestone 6D checkpoint — 2026-10-25
+
+Admin Blog/CMS implementation and automated verification completed after a fresh
+read-only inspection. See [the complete 6D report](MILESTONE_6D_REPORT.md) for exact
+files, schema/RLS, APIs, workflow, preview, media, Patient compatibility and limits.
+Separate `admin_articles` integrates into the existing Patient feed/tab; Doctor
+publishing/RLS and Campaign Management remain preserved. No MCQs were implemented.
+
+Actual verification: Rust format/Clippy/compile pass; library **87/87**; focused CMS
+integration **14/14**; full serialized integration **379 passed, 0 failed, 4 ignored**
+(383 total cases, confirmed native exit 0). Admin Web **76 tests**, typecheck and build
+pass; lint has 0 errors and 1 existing Campaign Manager warning. Patient analyze is
+clean and **308/308 tests** pass. Built Admin browser fixture: **10 checks**, zero page
+exceptions, with 1440/768/390 px layouts; separate static layout checks pass at all
+three widths. Tests used owned disposable PostgreSQL/Redis, not shared development.
+
+Final acceptance gate **PARTIAL**: real Admin BFF-to-Patient persistence/reading and
+external object storage are not verified end to end, and existing Next.js security
+advisories remain open. No shared migration, production deployment, Git staging,
+commit, reset or cleanup. Stop at Milestone 6D; do not automatically start 6E/6F.
+
+### User-requested live development startup
+
+Admin panel is running at `http://127.0.0.1:3000`; backend at
+`http://127.0.0.1:8080`. Existing development settings were retained. Normal startup
+applied the sole pending CMS migration; source/binary/local-development database now
+all equal `20261127000001`, confirmed by the canonical readiness/schema script.
+No reset or production deployment. Real login-page, redirect, unauthenticated CMS
+guard and browser-exception smoke checks passed without API mocks; backend health
+and Node connectivity passed. Both servers are left running. Object storage remains
+unconfigured, and the authenticated publication-to-Patient walkthrough is still open.
+
+### Milestone 6D stabilization — 2026-10-25
+
+Sensitive authors now see “Approval required from another Admin.” with Approve
+disabled; backend authorization is unchanged. CMS errors are readable and cover
+failure after text save cannot report upload success. Next/eslint-config-next
+16.4.3 and transitive Zod 4.6.7 remove reported critical/high audit entries;
+three moderate Tailwind/PostCSS entries remain for separate major-version review.
+Current Admin gates pass with **83 tests**, typecheck, lint (0 errors/1 existing
+Campaign warning) and production build. Rust gates and **87 library tests**, **14
+focused CMS tests**, Patient analyze/**308 tests**, **11** synthetic browser checks,
+**3** layout checks and **6** live anonymous smoke checks pass.
+
+Initial full backend run: **378 passed, 1 database-acquisition timeout, 4 ignored**.
+The failed cleanup case passes alone. An independent full serialized repeat without
+competing builds passed the 14 CMS cases, then was stopped at the user's explicit
+request. It is incomplete; do not claim a clean full-suite pass. Final gate PARTIAL.
+
+Azure is the approved provider. Cloud verification is **DEFERRED — AWAITING AZURE
+BLOB INTEGRATION**; missing legacy S3 settings are expected. No provider setup,
+storage rewrite or credential request. Existing seeded Admin sign-in returned 401
+on one attempt; no reset/extra account. Only one live Admin and no usable Patient
+runtime are available. Full live cross-app acceptance is not claimed. See
+[stabilization report](MILESTONE_6D_STABILIZATION_REPORT.md) and
+[Azure planning document](AZURE_BLOB_INTEGRATION_PLAN.md). Stop after stabilization;
+Azure implementation and 6E remain separately authorized work.
+
+### Milestone 6E — optional article MCQs — 2026-10-25
+
+User authorized 6E after the 6D stop. Focused reinspection found no quiz conflict.
+Implemented optional MCQ inclusion (default OFF), manual bilingual question/option
+authoring, ordering/deletion, CSV/JSON preview and atomic confirmed import, and a
+local interactive quiz below the existing Admin article phone preview. No separate
+dashboard or Patient authoring UI. Immutable quiz publication revisions preserve the
+live article/quiz while replacements are drafted. Review binds quiz and article
+content versions; sensitive quizzes require an independent Admin. Published Patient
+article responses expose only safe quiz inclusion/revision/count metadata, never
+answer keys. Flutter rendering/evaluation remains 6F.
+
+Additive migration `20261128000001` adds four FORCE-RLS tables with scoped FKs,
+draft-write/published-immutability guards and transactional audit. Existing Doctor
+articles, campaign delivery, notification logic and Azure adapter are preserved.
+Verified: Rust format/Clippy/compile, **91 library**, **9 MCQ**, **14 CMS**,
+**93 Admin** tests; Admin typecheck/lint/build; **3** responsive layout checks.
+Final evidence and exact files: [6E report](MILESTONE_6E_REPORT.md).
+
+The full-backend gate remains the historical **378 passed, 1 DB-acquisition timeout,
+4 ignored**, with the stopped repeat retained. No new full-suite run was started.
+The old failing cleanup case passed the current focused CMS module; complete
+regression still needs a coordinated run. Azure intentionally remains deferred.
+Admin/backend ports were not listening; no app-server availability is claimed.
+Stop after 6E; 6F and Azure infrastructure need separate authorization.
+
+### Milestone 6F — Patient article quizzes — 2026-10-25
+
+User authorized 6F. Inspected current Flutter article flow, 6E schema/publication,
+RLS/ABAC, authenticated API transport, localization, tokens/widgets and tests first.
+Added Patient-only read/check APIs via restricted projection/evaluation functions;
+no direct Patient answer-key grants. Article/quiz publication/version locks reject
+unavailable or superseded quizzes. Flutter adds an optional quiz beneath the existing
+article, local session counts, server feedback, explanations, completion/restart,
+EN/SW fallback, duplicate-submit guards and whole-article refresh for stale revisions.
+No persisted attempts, selection telemetry/audit, notifications, new navigation or
+Admin authoring changes. Azure/GitHub work remains out of scope.
+
+Completed checks: Flutter format/analyze clean and **326 tests**, including existing
+Blogs-tab → article → quiz → feedback → summary/restart; Rust format/Clippy/compile,
+**91 library**, **10 Patient quiz**, **9 Admin quiz** and **14 CMS** tests pass.
+The single owned-fixture full serialized run passed **398, failed 0, ignored 4**,
+native exit 0, in **1143.61 seconds** within the 35-minute cap. Four existing explicit
+admission benchmarks remain ignored. No overlap or automatic repeat. The historical
+378/1/4 result is preserved; its 250 ms acquisition timeout did not recur. No
+production deadlines, fixture pool settings or assertions were weakened. Automated
+6F gate GREEN; real cross-app/device acceptance remains unverified.
+Use `scratch/milestone6f-*` and [6F report](MILESTONE_6F_REPORT.md) for current evidence.
+No connected Android/iOS device or emulator source; only Windows/Edge, with no app
+runner for those targets. No application servers were started.
+Stop after 6F. GitHub preparation and Azure infrastructure require separate work;
+neither was started.

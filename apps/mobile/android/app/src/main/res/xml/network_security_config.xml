@@ -4,13 +4,28 @@
   anything the Dart layer decides. The actual security policy — whether a
   build is allowed to talk HTTP at all — is enforced once, in
   lib/core/network/api_client.dart: a release build only reaches this far
-  over HTTP for a loopback/private-network test address, or when explicitly
-  built with ENVIRONMENT=development and ALLOW_INSECURE_HTTP=true.
-  ApiClient rejects development flags in staging/production and never follows
-  API redirects. This platform permission does not authorize insecure API traffic. This file just
-  stops Android from redundantly (and silently) blocking the traffic that
-  layer already approved.
+  over HTTP for a loopback/emulator-alias address, or when explicitly built
+  with ENVIRONMENT=development and ALLOW_INSECURE_HTTP=true. ApiClient
+  rejects development flags in staging/production and never follows API
+  redirects.
+
+  Previously this file's `<base-config>` permitted cleartext to ANY domain
+  unconditionally (relying entirely on the Dart-layer check as the only
+  backstop) — a real defense-in-depth gap: a bug in that one Dart check
+  would have had no independent OS-level barrier behind it. This now scopes
+  the OS-level exception down to the same handful of loopback/emulator
+  hosts the Dart policy's own `_isLanTestHost` already names as the
+  legitimate development case, so a real public HTTP endpoint is still
+  blocked by Android itself even if the Dart check were ever wrong. A
+  physical device testing against a LAN IP (e.g. 192.168.x.x) needs a debug
+  build — see src/debug/res/xml/network_security_config.xml, which keeps the
+  broader allowance but only for a build that is never shipped.
 -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true" />
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
 </network-security-config>

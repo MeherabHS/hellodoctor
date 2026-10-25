@@ -51,7 +51,7 @@ export function date(value: string | null | undefined) { return value ? new Date
 export function time(value: string | null | undefined) { return value ? new Date(value).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' }) : '—'; }
 export function dayKey(value: string) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Nairobi', year:'numeric',month:'2-digit',day:'2-digit' }).format(new Date(value)); }
 export function statusLabel(a: Appointment, nextId?: string, now = Date.now()) {
-  if (['COMPLETED','CANCELLED','REFUNDED','NO_SHOW'].includes(a.status) || a.doctor_lifecycle === 'DONE') return a.doctor_lifecycle.replaceAll('_',' ');
+  if (['COMPLETED','CANCELLED','REFUNDED','EXPIRED','PREMATURE_TERMINATION','DISPUTED'].includes(a.status) || a.doctor_lifecycle === 'DONE') return a.doctor_lifecycle.replaceAll('_',' ');
   const minutes = Math.ceil((Date.parse(a.start_time) - now) / 60000);
   if (a.status === 'IN_CONSULTATION') return 'In consultation';
   if (minutes > 0 && minutes <= 60) return `${a.id === nextId ? 'Next · ' : ''}Starts in ${minutes} min`;

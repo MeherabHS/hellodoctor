@@ -418,6 +418,31 @@ void main() {
       expect(events.map((event) => event['event_type']), contains('DOCTOR_DISCONNECTED'));
     });
 
+    test('leave() is idempotent: calling it twice queues only one DISCONNECTED',
+        () async {
+      // Mirrors AgoraPage's real lifecycle: `_leaveAndPop()` awaits leave()
+      // then pops the Navigator, which synchronously triggers the widget's
+      // own `dispose()` — which also calls leave() again, with no way to
+      // know the first call already happened.
+      final engine = FakeAgoraEngine();
+      final events = <Map<String, dynamic>>[];
+      final controller = CallController(
+        engine: engine,
+        mintToken: () async => _token(),
+        requestPermissions: () async => true,
+        telemetrySubmit: (batch) async => events.addAll(batch),
+      );
+      await controller.start();
+      engine.simulateJoinSuccess();
+      await controller.leave();
+      await controller.leave();
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
+      expect(
+        events.where((event) => event['event_type'] == 'DOCTOR_DISCONNECTED'),
+        hasLength(1),
+      );
+    });
+
     test('an ordinary uninterrupted join never queues a false reconnect', () async {
       // Real Agora SDKs report onConnectionStateChanged(connected) as a
       // follow-up to the SDK's own onJoinChannelSuccess for the very same

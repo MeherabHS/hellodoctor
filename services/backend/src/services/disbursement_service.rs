@@ -310,7 +310,7 @@ impl DisbursementService {
             .ok_or_else(|| AppError::NotFound("Doctor profile not found.".into()))?;
 
         crate::services::NotificationService::notify_payout_paid(
-            &mut *tx,
+            &mut tx,
             doctor.user_id,
             item.id,
             &item.net_amount,

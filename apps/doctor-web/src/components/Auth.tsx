@@ -43,7 +43,7 @@ export function Auth({ onSignedIn, onBoundary }: { onSignedIn: () => void; onBou
   function change(next: 'signin' | 'register') { if (!busy) { setChallengeToken(null); setMode(next); setError(''); setDevelopmentCode(null); } }
   if (mode === 'pending') return <main className="web-auth"><div className="sheet-pill-tag">Pending verification</div><h1 className="sheet-title">Application submitted</h1><p className="sheet-desc">Clinical credentialing must approve your professional registration before consultations become available.</p><button className="sheet-btn primary" onClick={() => change('signin')}>Return to sign in</button></main>;
   return <main className="web-auth">
-    <div className="sheet-header-top"><span className="sheet-pill-tag">🩺 Doctor Access</span><span className="dw-topbar-brand">HelloDoctor</span></div>
+    <div className="sheet-header-top"><span className="sheet-pill-tag">🩺 Doctor Access</span><span className="dw-topbar-brand">AfyaMkononi</span></div>
     {mode === 'mfa' ? <>
       <h1 className="sheet-title">Verify your session</h1><p className="sheet-desc">Enter the one-time verification code sent through your configured channel.</p>
       {developmentCode && <p className="web-gap" role="status">Development backend code: <strong>{developmentCode}</strong></p>}
@@ -63,7 +63,7 @@ export function Auth({ onSignedIn, onBoundary }: { onSignedIn: () => void; onBou
         <button className="sheet-btn primary" type="submit" style={{ width: '100%' }} disabled={busy || challengeToken === null}>{busy ? 'Signing in…' : 'Doctor Secure Sign In →'}</button>
       </form> };
       if (nodeId === 'docRegisterFields') return { props: { style: { display: mode === 'register' ? 'block' : 'none' } }, children: mode !== 'register' ? null : <form onSubmit={submit}>
-        <p className="sheet-desc">Professional Registration · Kenya Medical Practitioners and Dentists Council (KMPDC) · Kenya. Applications undergo manual HelloDoctor review.</p>
+        <p className="sheet-desc">Professional Registration · Kenya Medical Practitioners and Dentists Council (KMPDC) · Kenya. Applications undergo manual AfyaMkononi review.</p>
         {fields.map(([name,label,type]) => <label key={name} htmlFor={name}>{label}<input className="auth-input" id={name} name={name} type={type} required min={type === 'number' ? 0 : undefined} max={type === 'number' ? 100 : undefined} minLength={type === 'password' ? 12 : undefined} maxLength={type === 'password' ? 128 : name === 'full_name' ? 120 : undefined} autoComplete={type === 'password' ? 'new-password' : undefined} /></label>)}
         <BotChallenge action="doctor_register" reset={challengeReset} onToken={setChallengeToken} />
         <button className="sheet-btn primary" type="submit" style={{ width: '100%' }} disabled={busy || challengeToken === null}>{busy ? 'Submitting…' : 'Submit Verification Application →'}</button>

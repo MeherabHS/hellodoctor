@@ -84,9 +84,8 @@ class NotificationChannels {
 
 /// Thin wrapper around `flutter_local_notifications` + `timezone` — the only
 /// place in the app that calls either package directly, so every other
-/// Layer 1/2/3 module (realtime bridging, background worker, schedule
-/// reconciler) depends on this single, testable seam instead of the plugin
-/// APIs directly.
+/// Layer 1/2 module (realtime bridging, background worker) depends on this
+/// single, testable seam instead of the plugin APIs directly.
 class LocalNotificationService {
   const LocalNotificationService._();
 
@@ -167,76 +166,5 @@ class LocalNotificationService {
       ),
       payload: payload,
     );
-  }
-
-  /// Schedules a future device notification — used for Layer 3's daily
-  /// summary and T-15 reminders. Deliberately uses
-  /// [AndroidScheduleMode.inexactAllowWhileIdle], not an exact alarm: the
-  /// spec itself requires treating this as best-effort ("do NOT claim an
-  /// exact execution time"; Doze/battery optimization may defer it), and an
-  /// exact alarm on Android 12+ additionally requires the special
-  /// `SCHEDULE_EXACT_ALARM`/`USE_EXACT_ALARM` access, which this
-  /// architecture deliberately avoids needing. If [whenUtc] is already in
-  /// the past, the plugin fires it immediately — acceptable for a
-  /// reconciliation pass that runs slightly late.
-  static Future<void> scheduleAt({
-    required int id,
-    required AndroidNotificationChannel channel,
-    required DateTime whenUtc,
-    required String title,
-    required String body,
-    String? payload,
-  }) async {
-    await _plugin.zonedSchedule(
-      id,
-      title,
-      body,
-      tz.TZDateTime.from(whenUtc, tz.local),
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channel.id,
-          channel.name,
-          channelDescription: channel.description,
-          importance: channel.importance,
-          priority: channel.importance == Importance.high
-              ? Priority.high
-              : Priority.defaultPriority,
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: payload,
-    );
-  }
-
-  static Future<void> cancel(int id) => _plugin.cancel(id);
-
-  /// The set of ids currently scheduled-but-not-yet-fired — the schedule
-  /// reconciler's "what already exists" input, so it can diff against the
-  /// authoritative backend schedule and cancel exactly the stale ones
-  /// (RESCHEDULED/CANCELLED/NO LONGER AUTHORIZED/COMPLETED) without ever
-  /// touching ones that are still current.
-  static Future<Set<int>> pendingIds() async {
-    final pending = await _plugin.pendingNotificationRequests();
-    return pending.map((p) => p.id).toSet();
-  }
-
-  /// Same as [pendingIds], but keyed by each request's own `payload` (the
-  /// original deterministic string key passed to [scheduleAt]) rather than
-  /// its hashed int id. A hashed id can't be reversed back into the key that
-  /// produced it, so this is what lets the reconciler find and cancel a
-  /// pending request whose *key* no longer belongs to the current
-  /// should-exist set (e.g. a stale `consultation_t15:<old-appointment-id>`
-  /// left over from a cancelled appointment) — not just ones it already
-  /// knows the id for. A request scheduled by something other than this
-  /// service (or on a plugin version where [payload] came back null) is
-  /// skipped rather than guessed at.
-  static Future<Map<int, String>> pendingByPayload() async {
-    final pending = await _plugin.pendingNotificationRequests();
-    return {
-      for (final p in pending)
-        if (p.payload != null) p.id: p.payload!,
-    };
   }
 }

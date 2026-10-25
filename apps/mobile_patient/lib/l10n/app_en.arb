@@ -1,10 +1,10 @@
 {
   "@@locale": "en",
-  "appTitle": "HelloDoctor",
+  "appTitle": "AfyaMkononi",
   "@appTitle": {
     "description": "Application title shown in the OS task switcher and app launcher."
   },
-  "loadingNetwork": "Loading HelloDoctor Health Network...",
+  "loadingNetwork": "Loading AfyaMkononi Health Network...",
   "@loadingNetwork": {
     "description": "Skeleton loading state status line (prototype view-14)."
   },
@@ -1305,7 +1305,7 @@
   "@doctorProfileTitle": {
     "description": "Patient interface: doctorProfileTitle"
   },
-  "doctorProfileSubtitle": "Verified HelloDoctor specialist",
+  "doctorProfileSubtitle": "Verified AfyaMkononi specialist",
   "@doctorProfileSubtitle": {
     "description": "Patient interface: doctorProfileSubtitle"
   },
@@ -1622,7 +1622,7 @@
     }
   },
   "authDataConsentTitle": "Patient data and health information",
-  "authDataConsentSummary": "Review the data-sharing consent required to create your HelloDoctor account.",
+  "authDataConsentSummary": "Review the data-sharing consent required to create your AfyaMkononi account.",
   "authDataConsentView": "Read the full consent",
   "authDataConsentAccept": "I have read and accept this consent",
   "authDataConsentRequired": "Read and accept the Patient data-sharing consent before continuing.",
@@ -1649,7 +1649,7 @@
   "profileVerified": "Verified clinician",
   "profileCredentials": "Credentials",
   "qnaScreenTitle": "Ask a Doctor",
-  "qnaScreenSubtitle": "Get general health guidance from verified HelloDoctor clinicians.",
+  "qnaScreenSubtitle": "Get general health guidance from verified AfyaMkononi clinicians.",
   "qnaAskAction": "Ask a health question",
   "qnaRecent": "Recent questions",
   "qnaAwaiting": "Awaiting answer",
@@ -1681,5 +1681,157 @@
         "type": "int"
       }
     }
-  }
+  },
+  "notificationSettingsMenuTitle": "Notification settings",
+  "@notificationSettingsMenuTitle": {
+    "description": "Patient profile menu item leading to notification settings."
+  },
+  "notificationSettingsMenuSubtitle": "Quiet hours and categories",
+  "@notificationSettingsMenuSubtitle": {
+    "description": "Patient profile menu subtitle for the notification settings item."
+  },
+  "notificationSettingsPageTitle": "Notification settings",
+  "@notificationSettingsPageTitle": {
+    "description": "Notification settings screen title."
+  },
+  "notificationSettingsRoutineTitle": "Routine updates",
+  "@notificationSettingsRoutineTitle": {
+    "description": "Toggle label for OPERATIONAL-category notifications."
+  },
+  "notificationSettingsRoutineSubtitle": "Booking and account status notices",
+  "@notificationSettingsRoutineSubtitle": {
+    "description": "Toggle description for OPERATIONAL-category notifications."
+  },
+  "notificationSettingsAnnouncementsTitle": "Announcements",
+  "@notificationSettingsAnnouncementsTitle": {
+    "description": "Toggle label for ENGAGEMENT-category notifications."
+  },
+  "notificationSettingsAnnouncementsSubtitle": "Optional engagement and announcement notices",
+  "@notificationSettingsAnnouncementsSubtitle": {
+    "description": "Toggle description for ENGAGEMENT-category notifications."
+  },
+  "notificationSettingsQuietHoursTitle": "Quiet hours",
+  "@notificationSettingsQuietHoursTitle": {
+    "description": "Quiet hours toggle label."
+  },
+  "notificationSettingsQuietHoursSubtitle": "Hold non-urgent notifications during this window. Consultation reminders and time-sensitive alerts are never delayed.",
+  "@notificationSettingsQuietHoursSubtitle": {
+    "description": "Quiet hours toggle description."
+  },
+  "notificationSettingsQuietHoursStart": "Starts at",
+  "@notificationSettingsQuietHoursStart": {
+    "description": "Quiet hours start-time row label."
+  },
+  "notificationSettingsQuietHoursEnd": "Ends at",
+  "@notificationSettingsQuietHoursEnd": {
+    "description": "Quiet hours end-time row label."
+  },
+  "notificationSettingsLoadError": "Unable to load notification settings.",
+  "@notificationSettingsLoadError": {
+    "description": "Error shown when notification settings fail to load."
+  },
+  "notificationSettingsSaveError": "Could not save notification settings.",
+  "@notificationSettingsSaveError": {
+    "description": "Error shown when a notification settings change fails to save."
+  },
+  "notificationSettingsGreetingsTitle": "Greetings",
+  "@notificationSettingsGreetingsTitle": {
+    "description": "Toggle label for good-morning/birthday/holiday greeting notifications."
+  },
+  "notificationSettingsGreetingsSubtitle": "Good-morning, birthday and Kenyan holiday messages",
+  "@notificationSettingsGreetingsSubtitle": {
+    "description": "Toggle description for greeting notifications."
+  },
+  "notificationSettingsReligiousTitle": "Religious holiday greetings",
+  "@notificationSettingsReligiousTitle": {
+    "description": "Toggle label for religious-origin holiday greetings (Eid, Good Friday, Easter, Christmas)."
+  },
+  "notificationSettingsReligiousSubtitle": "Eid, Good Friday, Easter and Christmas messages",
+  "@notificationSettingsReligiousSubtitle": {
+    "description": "Toggle description for religious holiday greetings."
+  },
+  "quizTitle": "Check your understanding",
+  "quizIntro": "Try this optional learning quiz after reading the article. Your progress is kept only on this screen.",
+  "quizStart": "Start quiz",
+  "quizQuestionCount": "Questions: {count}",
+  "@quizQuestionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "quizLoading": "Loading…",
+  "quizLoadError": "The quiz could not be loaded. Please retry.",
+  "quizAnswerError": "Your answer could not be checked. Please retry.",
+  "quizRetry": "Retry",
+  "quizSubmit": "Submit answer",
+  "quizNext": "Next question",
+  "quizFinish": "See summary",
+  "quizCorrect": "Correct",
+  "quizIncorrect": "Not quite",
+  "quizExplanation": "Explanation",
+  "quizComplete": "Quiz complete",
+  "quizAttempted": "Attempted: {attempted} / {total}",
+  "@quizAttempted": {
+    "placeholders": {
+      "attempted": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "quizCorrectCount": "Correct answers: {count}",
+  "@quizCorrectCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "quizIncorrectCount": "Incorrect answers: {count}",
+  "@quizIncorrectCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "quizPercentage": "Completion: {percent}%",
+  "@quizPercentage": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "quizRestart": "Restart quiz",
+  "quizPosition": "Question {current} of {total}",
+  "@quizPosition": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "quizUpdated": "The article or quiz has changed. Refresh the article to start the current quiz.",
+  "quizUnavailable": "This quiz is no longer available.",
+  "quizRefreshArticle": "Refresh article",
+  "quizCorrectAnswer": "Correct answer: {answer}",
+  "@quizCorrectAnswer": {
+    "placeholders": {
+      "answer": {
+        "type": "String"
+      }
+    }
+  },
+  "quizEnglishFallback": "English shown — Kiswahili is unavailable for this question.",
+  "quizSessionExpired": "Please sign in again to continue.",
+  "quizRateLimited": "Too many requests. Please try again shortly."
+
 }

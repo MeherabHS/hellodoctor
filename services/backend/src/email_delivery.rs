@@ -55,7 +55,7 @@ pub async fn send_email_otp(
             .unwrap_or("");
     let body = serde_json::json!({
         "senderAddress": sender,
-        "content": {"subject": "HelloDoctor verification code", "plainText": format!("Your HelloDoctor verification code is {code}. It expires in 5 minutes. If you did not request this, ignore this email.")},
+        "content": {"subject": "AfyaMkononi verification code", "plainText": format!("Your AfyaMkononi verification code is {code}. It expires in 5 minutes. If you did not request this, ignore this email.")},
         "recipients": {"to": [{"address": recipient}]}
     });
     let body_bytes = serde_json::to_vec(&body)

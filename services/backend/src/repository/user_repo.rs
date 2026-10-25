@@ -116,6 +116,27 @@ pub async fn count_active<'e, E: PgExecutor<'e>>(executor: E) -> Result<i64, sql
         .await
 }
 
+/// `hellodoctor_api` previously had no write path to `users` at all. This is
+/// the narrowest possible one: a single-column, own-row-only UPDATE grant
+/// (`migrations/20261122000001_milestone3_localization_preferences`, enforced
+/// by both the column-level GRANT and the `users_api_update_own_language`
+/// RLS policy — neither alone is sufficient under `FORCE ROW LEVEL
+/// SECURITY`). Callers must validate `language` against the allowed locale
+/// set themselves; this function trusts its caller the same way every other
+/// function in this module does.
+pub async fn set_preferred_language<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: UserId,
+    language: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE users SET preferred_language = $2 WHERE id = $1")
+        .bind(id)
+        .bind(language)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
 pub async fn insert_user<'e, E: PgExecutor<'e>>(
     executor: E,
     user: &User,

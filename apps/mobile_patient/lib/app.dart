@@ -118,6 +118,8 @@ class _AppState extends State<HelloDoctorPatientApp>
       ClientErrorReporter.current!.loadBuildMetadata();
       auth = AuthCubit(api!, cache: cache);
       locale = LocaleController(secureStore!)..load();
+      locale!.bindBackendSync(
+          (languageCode) => NotificationRepository(api!).syncLanguage(languageCode));
       _authSubscription = auth!.stream.listen((state) {
         _incidentRetryTimer?.cancel();
         if (state is SignedIn) {
@@ -200,7 +202,7 @@ class _SplashPage extends StatelessWidget {
             child: const Icon(Icons.medical_services_rounded,
                 color: PatientTokens.primary, size: 30)),
         const SizedBox(height: 16),
-        const Text('HelloDoctor',
+        const Text('AfyaMkononi',
             style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,

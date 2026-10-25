@@ -6,10 +6,10 @@ import 'notification_models.dart';
 
 /// Wraps the own-inbox notification endpoints confirmed live in
 /// `services/backend/src/api/v1/notification_handlers.rs` — identical
-/// contract to `apps/mobile`'s `NotificationRepository`, which this mirrors.
-/// No device-token registration here: the Patient app has no push SDK
-/// dependency either (same honest "no real push provider configured" state
-/// the Doctor app documents), and this pass is scoped to the in-app inbox.
+/// contract to `apps/mobile`'s `NotificationRepository`, which this mirrors,
+/// including real device-token registration/revocation backed by a real
+/// FCM HTTP v1 transport and `firebase_messaging` client (see
+/// `core/notifications/push_notification_service.dart`).
 class NotificationRepository {
   NotificationRepository(this.api, {TokenStore? deviceIdStore})
       : _deviceIdStore = deviceIdStore ?? SecureTokenStore();
@@ -133,6 +133,72 @@ class NotificationRepository {
           screen: 'Notifications', operation: 'revoke_device');
       rethrow;
     }
+  }
+
+  /// GET /notifications/preferences
+  Future<NotificationPreferencesDto> getPreferences() async {
+    try {
+      final raw = _mapData(_data(await api.get('/notifications/preferences')));
+      return NotificationPreferencesDto.fromJson(raw);
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'NotificationSettings', operation: 'load');
+      rethrow;
+    }
+  }
+
+  /// PUT /notifications/preferences. `language`, when passed, must already
+  /// be 'en' or 'sw' — the backend validates this itself (see
+  /// `NotificationService::update_preferences`), this is just the matching
+  /// client-side contract.
+  Future<NotificationPreferencesDto> updatePreferences({
+    required bool operationalEnabled,
+    required bool engagementEnabled,
+    required bool quietHoursEnabled,
+    required String quietHoursStartLocal,
+    required String quietHoursEndLocal,
+    required bool greetingNotificationsEnabled,
+    required bool religiousGreetingsEnabled,
+    String? language,
+  }) async {
+    try {
+      final raw = _mapData(_data(await api.put('/notifications/preferences',
+          data: {
+            'operational_enabled': operationalEnabled,
+            'engagement_enabled': engagementEnabled,
+            'quiet_hours_enabled': quietHoursEnabled,
+            'quiet_hours_start_local': quietHoursStartLocal,
+            'quiet_hours_end_local': quietHoursEndLocal,
+            'greeting_notifications_enabled': greetingNotificationsEnabled,
+            'religious_greetings_enabled': religiousGreetingsEnabled,
+            if (language != null) 'language': language,
+          })));
+      return NotificationPreferencesDto.fromJson(raw);
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'NotificationSettings', operation: 'update');
+      rethrow;
+    }
+  }
+
+  /// Best-effort backend sync of a language change: fetches the current
+  /// preferences first and PUTs them back with only `language` changed,
+  /// since the backend's `PUT` replaces the whole preference row — a naive
+  /// PUT of just `{language}` with hardcoded defaults for the rest would
+  /// silently reset quiet hours/category toggles the user had already set.
+  /// Called from `LocaleController.setLocale` via its best-effort sync hook.
+  Future<void> syncLanguage(String language) async {
+    final current = await getPreferences();
+    await updatePreferences(
+      operationalEnabled: current.operationalEnabled,
+      engagementEnabled: current.engagementEnabled,
+      quietHoursEnabled: current.quietHoursEnabled,
+      quietHoursStartLocal: current.quietHoursStartLocal,
+      quietHoursEndLocal: current.quietHoursEndLocal,
+      greetingNotificationsEnabled: current.greetingNotificationsEnabled,
+      religiousGreetingsEnabled: current.religiousGreetingsEnabled,
+      language: language,
+    );
   }
 
   static String currentPlatformLabel() {

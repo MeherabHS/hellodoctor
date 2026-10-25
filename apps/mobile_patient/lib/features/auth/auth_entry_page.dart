@@ -100,7 +100,7 @@ class _AuthEntryPageState extends State<AuthEntryPage> {
                                                   Icons.add_rounded,
                                                   color: Colors.white,
                                                   size: 25)),
-                                          const Text('HelloDoctor',
+                                          const Text('AfyaMkononi',
                                               style: TextStyle(
                                                   fontSize: 22,
                                                   fontWeight: FontWeight.w700,
@@ -223,7 +223,7 @@ class _AuthEntryPageState extends State<AuthEntryPage> {
                                           Text(
                                               register
                                                   ? 'Already have an account? '
-                                                  : 'New to HelloDoctor? ',
+                                                  : 'New to AfyaMkononi? ',
                                               style: const TextStyle(
                                                   color:
                                                       PatientTokens.textSub)),

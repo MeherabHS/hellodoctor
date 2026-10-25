@@ -4,6 +4,16 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Google Services (FCM) native config is a per-deployment secret, never
+// committed (see .gitignore and docs/FCM_SETUP.md) — so this plugin is
+// applied imperatively, only when the real file has actually been placed,
+// rather than from the declarative `plugins {}` block above (which would
+// fail every build in an environment that hasn't supplied it yet, including
+// this repository as checked in).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.hellodoctor_mobile"
     compileSdk = flutter.compileSdkVersion

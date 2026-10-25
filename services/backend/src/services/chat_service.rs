@@ -156,18 +156,35 @@ impl ChatService {
             .fetch_one(&mut *tx)
             .await?;
         let notice = Uuid::new_v4();
-        let body = if ctx.role == UserRole::Doctor {
-            "You have a new message from your doctor."
+        let (template_key, fallback_body) = if ctx.role == UserRole::Doctor {
+            (
+                "new_chat_message_patient",
+                "You have a new message from your doctor.",
+            )
         } else {
-            "Your patient sent you a consultation message."
+            (
+                "new_chat_message_doctor",
+                "Your patient sent you a consultation message.",
+            )
         };
+        let language =
+            crate::services::NotificationService::user_language(&mut *tx, recipient).await?;
+        let (title, body) = crate::services::NotificationService::render(
+            &mut *tx,
+            template_key,
+            &language,
+            &[],
+            "New consultation message",
+            fallback_body,
+        )
+        .await?;
         notification_repo::insert_if_new(
             &mut *tx,
             notice,
             recipient,
             "NEW_CHAT_MESSAGE",
-            "New consultation message",
-            body,
+            &title,
+            &body,
             Some("CHAT"),
             Some(conv.id),
             None,

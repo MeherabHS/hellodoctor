@@ -5,32 +5,37 @@
 /// This wakes on Android's own best-effort periodic schedule (NOT an exact
 /// alarm — see [registerBackgroundSync]), runs an authenticated sync against
 /// the backend using the app's existing session, and shows local device
-/// notifications for anything newly discovered. It also feeds the doctor's
-/// current appointment queue to Layer 3's
-/// `ScheduleNotificationReconciler.reconcile` so the pre-scheduled daily
-/// summary / T-15 reminders stay current even while the app process isn't
-/// running.
+/// notifications for anything newly discovered.
+///
+/// NOTE (notification-architecture consolidation): this worker previously
+/// also fed the doctor's current appointment queue to a local "Layer 3"
+/// schedule reconciler so a locally-scheduled `DAILY_CONSULTATION_SUMMARY`
+/// notification would stay current while the app process wasn't running.
+/// That local reconciler was removed once the backend's own
+/// `DAILY_CONSULTATION_SUMMARY` (`notification_scheduler.rs::run_daily_summary_pass`,
+/// covered by `services/backend/tests/api_tests.rs`) was confirmed as the
+/// sole, reliable source — the notification-list sync this file still
+/// performs already surfaces that backend-created row through the same
+/// dedup/display path as every other notification type below, so no
+/// separate reconciliation step is needed. The T-15 consultation reminder
+/// has always been backend/FCM-scheduled only, never locally scheduled.
 ///
 /// Deliberately split into:
-///  - pure decision logic ([computeNewNotifications],
-///    [doctorIdentifierFromAccessToken]) with zero plugin/network/storage
-///    dependency, unit-tested in `test/background_sync_worker_test.dart`;
+///  - pure decision logic ([computeNewNotifications]) with zero
+///    plugin/network/storage dependency, unit-tested in
+///    `test/background_sync_worker_test.dart`;
 ///  - a thin impure shell ([runBackgroundSyncOnce], [callbackDispatcher])
 ///    that does the actual plugin/network/storage calls and cannot be run
 ///    under `flutter test` (no real Android platform channel in that host).
 library;
 
-import 'dart:convert';
-
 import 'package:workmanager/workmanager.dart';
 
 import '../network/api_client.dart';
-import '../../features/doctor/doctor_repository.dart';
 import '../../features/notifications/notification_models.dart';
 import '../../features/notifications/notification_repository.dart';
 import 'local_notification_service.dart';
 import 'notification_ids.dart';
-import 'schedule_notification_reconciler.dart';
 
 /// Unique Android WorkManager task identifiers. [backgroundSyncUniqueName]
 /// is the "only one of these may exist" key passed to
@@ -137,47 +142,6 @@ SyncDecision computeNewNotifications({
   );
 }
 
-/// Decodes the doctor's own stable identifier from an access token JWT's
-/// payload, without any network/storage dependency (pure — takes the raw
-/// token string, returns the claim value or null).
-///
-/// HONEST CAVEAT: the backend's `Claims` struct
-/// (`services/backend/src/crypto.rs`) only carries `sub`/`user_id` (both set
-/// to the authenticated `users.id`) — there is no `doctor_profiles.id` claim,
-/// and no persisted `doctor_profiles.id` is reachable from a background
-/// isolate (it exists only in in-memory `DoctorCubit`/`ProfileDto` state
-/// built from an authenticated API call the main app isolate already made).
-/// This mirrors the exact precedent already established in
-/// `core/cache/doctor_cache_store.dart`'s private `_identitySeed` (same
-/// claim-key fallback order, same "treat a malformed token as opaque, never
-/// throw" behavior) rather than inventing a new identity derivation.
-///
-/// This is acceptable here because [ScheduleNotificationReconciler.reconcile]
-/// only ever uses `doctorId` to namespace its own local, per-doctor dedup key
-/// (`daily_schedule:<doctorId>:<date>`) — it is never sent to the backend or
-/// compared against `doctor_profiles.id` anywhere. What matters is that the
-/// same device/session consistently produces the same `doctorId` across
-/// runs, which the JWT subject does.
-String? doctorIdentifierFromAccessToken(String? jwt) {
-  if (jwt == null || jwt.isEmpty) return null;
-  final parts = jwt.split('.');
-  if (parts.length != 3) return null;
-  try {
-    final normalized = base64Url.normalize(parts[1]);
-    final payload = jsonDecode(utf8.decode(base64Url.decode(normalized)));
-    if (payload is Map) {
-      for (final key in const ['doctor_id', 'user_id', 'sub']) {
-        final id = payload[key];
-        if (id != null && id.toString().isNotEmpty) return id.toString();
-      }
-    }
-  } catch (_) {
-    // A malformed/unexpected token shape is treated as "no identifier
-    // available" rather than crashing the background isolate.
-  }
-  return null;
-}
-
 // ---------------------------------------------------------------------
 // Impure shell — the only part of this file touching the plugin, network,
 // or secure storage. Not unit-testable under `flutter test` (no platform
@@ -209,9 +173,8 @@ Future<bool> runGracefully(Future<void> Function() body) async {
 }
 
 /// Runs one background sync pass: fetches the doctor's notification inbox
-/// and appointment queue with a fresh [api], shows local notifications for
-/// anything newly discovered since [cursorStore]'s persisted cursor, and
-/// reconciles Layer 3's pre-scheduled daily-summary/T-15 reminders.
+/// with a fresh [api] and shows local notifications for anything newly
+/// discovered since [cursorStore]'s persisted cursor.
 ///
 /// Always returns `true` — see [runGracefully].
 Future<bool> runBackgroundSyncOnce({
@@ -246,25 +209,6 @@ Future<bool> runBackgroundSyncOnce({
       if (decision.nextCursor != null) {
         await cursorStore.write(
             backgroundSyncLastSeenCreatedAtKey, decision.nextCursor!);
-      }
-
-      // --- Layer 3 reconciliation ------------------------------------
-      // KNOWN LIMITATION (documented, not silent): a single-page fetch of
-      // up to 100 appointments, with no delta sync and no pagination loop.
-      // A doctor with a queue deeper than 100 entries will have reminders
-      // reconciled only for the first page returned by the backend's
-      // default ordering. Acceptable for this best-effort background pass;
-      // the foreground app's own queue screen remains the authoritative,
-      // fully paginated view.
-      final doctorId =
-          doctorIdentifierFromAccessToken(await api.read('access_token'));
-      if (doctorId != null) {
-        final appointments = await DoctorRepository(api).queue(limit: 100);
-        await ScheduleNotificationReconciler.reconcile(
-          doctorId: doctorId,
-          appointments: appointments,
-          nowUtc: DateTime.now().toUtc(),
-        );
       }
     });
 

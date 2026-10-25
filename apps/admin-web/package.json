@@ -6,15 +6,16 @@
     "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts && node --import tsx --test tests/*.test.tsx",
     "lint": "eslint ."
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "lucide-react": "^0.447.0",
-    "next": "16.4.0",
+    "next": "16.4.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
     "redis": "^4.7.1",
     "tailwind-merge": "^2.5.2"
   },
@@ -22,11 +23,14 @@
     "@types/node": "^20.16.10",
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",
+    "@types/react-test-renderer": "^18.3.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^10.12.0",
-    "eslint-config-next": "^16.4.0",
+    "eslint-config-next": "16.4.3",
     "postcss": "^8.4.47",
+    "react-test-renderer": "^18.3.1",
     "tailwindcss": "^3.4.13",
+    "tsx": "^4.20.6",
     "typescript": "^5.6.2"
   }
 }

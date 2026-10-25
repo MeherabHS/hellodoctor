@@ -488,7 +488,18 @@ impl ConsultationService {
             .fetch_one(&mut **tx)
             .await?;
         match result.as_str() {
-            "COMPLETED" => {}
+            "COMPLETED" => {
+                crate::services::NotificationService::notify_consultation_completed(
+                    tx,
+                    appointment_id,
+                )
+                .await?;
+                crate::services::NotificationService::notify_first_consultation_milestone(
+                    tx,
+                    appointment_id,
+                )
+                .await?;
+            }
             // The SQL function decides this while holding authoritative rows.
             // A stale pre-call snapshot must not repeat semantic side effects.
             "ALREADY_COMPLETED" => return Ok(()),
@@ -546,7 +557,7 @@ impl ConsultationService {
                     doctor_repo::find_by_id(&mut **tx, appointment.doctor_id).await?
                 {
                     crate::services::NotificationService::notify_earning_credited(
-                        &mut **tx,
+                        tx,
                         doctor.user_id,
                         appointment_id,
                         &txn.net_amount,

@@ -97,7 +97,7 @@ export default function AdminLoginPage() {
           <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-lg mb-3">
             HD
           </div>
-          <h1 className="text-xl font-semibold text-slate-900">HelloDoctor Admin Portal</h1>
+          <h1 className="text-xl font-semibold text-slate-900">AfyaMkononi Admin Portal</h1>
           <p className="text-sm text-slate-500 mt-1">Central Hospital &amp; Operations Command</p>
         </div>
 

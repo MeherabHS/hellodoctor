@@ -340,6 +340,21 @@ impl PrescriptionService {
             DocumentStorageService::delete(state, key).await;
             return Err(error);
         }
+        // Notify only once per appointment, the moment the first Rx page
+        // becomes available — not on every subsequent page of the same
+        // multi-page prescription (`count` is the number of pages that
+        // existed *before* this insert).
+        if count == 0 {
+            if let Err(error) = crate::services::NotificationService::notify_prescription_available(
+                &mut tx,
+                appointment_id,
+            )
+            .await
+            {
+                DocumentStorageService::delete(state, key).await;
+                return Err(error.into());
+            }
+        }
         if let Err(error) = tx.commit().await {
             DocumentStorageService::delete(state, key).await;
             return Err(error.into());

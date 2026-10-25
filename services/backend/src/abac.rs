@@ -80,6 +80,13 @@ pub enum Action {
     /// its payment provider(s). Admin-only, same shape as `SimulateLog`.
     ManagePlatformPaymentMethod,
     ExecuteDataRightsAction,
+
+    /// Admin notification campaign authoring and lifecycle (create/edit/list/
+    /// get/submit/approve/cancel) and the PII-safe audience-size preview.
+    /// Dispatch itself is a separate, not-yet-built capability — see
+    /// Milestone 6B/6C.
+    ManageCampaigns,
+    ManageArticles,
 }
 
 pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
@@ -130,7 +137,9 @@ pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
         | ResolveSystemError
         | ViewConsultationTimeline
         | ManagePlatformPaymentMethod
-        | ExecuteDataRightsAction => matches!(ctx.role, Admin),
+        | ExecuteDataRightsAction
+        | ManageCampaigns
+        | ManageArticles => matches!(ctx.role, Admin),
     };
 
     if allowed {

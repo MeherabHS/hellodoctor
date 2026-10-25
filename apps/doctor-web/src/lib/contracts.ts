@@ -16,7 +16,7 @@ export function messageSide(message: Pick<Message,'sender_id'>, authenticatedUse
 export function upcomingFirst(appointments: Appointment[]): Appointment[] {
   const serverOrdered = appointments.every(a => typeof a.queue_actionable === 'boolean');
   if (serverOrdered) return [...appointments];
-  const terminal = (a: Appointment) => ['COMPLETED', 'CANCELLED', 'REFUNDED', 'NO_SHOW', 'DONE'].includes(a.status) || a.doctor_lifecycle === 'DONE';
+  const terminal = (a: Appointment) => ['COMPLETED', 'CANCELLED', 'EXPIRED', 'PREMATURE_TERMINATION', 'DISPUTED', 'REFUNDED'].includes(a.status) || a.doctor_lifecycle === 'DONE';
   return [...appointments].sort((a, b) => Number(terminal(a)) - Number(terminal(b)) || (terminal(a) ? Date.parse(b.start_time) - Date.parse(a.start_time) : Date.parse(a.start_time) - Date.parse(b.start_time)) || a.id.localeCompare(b.id));
 }
 export function consultationAction(a: Pick<Appointment,'modality'|'status'|'chat_expires_at'|'chat_locked'> & {queue_actionable?:boolean}, now=Date.now()): 'chat'|'call'|null {
@@ -32,7 +32,7 @@ export function consultationActionLabel(a: Pick<Appointment,'modality'|'status'|
 export function chatActionLabel(c: Conversation, now=Date.now()): string {
   return chatLocked(c,now) ? 'View consultation history' : c.modality==='CHAT' && !c.last_message_at ? 'Start chat consultation' : 'Open chat';
 }
-export function chatLocked(chat: Conversation, now = Date.now()): boolean { return ['CANCELLED','REFUNDED','NO_SHOW','PENDING_PAYMENT'].includes(chat.appointment_status ?? '') || chat.is_locked || !Number.isFinite(Date.parse(chat.expires_at)) || Date.parse(chat.expires_at) <= now; }
+export function chatLocked(chat: Conversation, now = Date.now()): boolean { return ['CANCELLED','REFUNDED','EXPIRED','PREMATURE_TERMINATION','DISPUTED','PENDING_PAYMENT'].includes(chat.appointment_status ?? '') || chat.is_locked || !Number.isFinite(Date.parse(chat.expires_at)) || Date.parse(chat.expires_at) <= now; }
 export function money(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   // Format decimal strings without rounding through binary floating point.

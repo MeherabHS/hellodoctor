@@ -58,8 +58,14 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
   int generation = 0;
   StreamSubscription<FamilyProfilesState>? profileSubscription;
   bool isPast(AppointmentSummaryDto a) =>
-      const ['COMPLETED', 'CANCELLED', 'REFUNDED', 'NO_SHOW']
-          .contains(a.status) ||
+      const [
+        'COMPLETED',
+        'CANCELLED',
+        'REFUNDED',
+        'EXPIRED',
+        'PREMATURE_TERMINATION',
+        'DISPUTED',
+      ].contains(a.status) ||
       a.chatLocked == true ||
       (a.chatExpiresAt?.isBefore(DateTime.now()) ?? false);
   @override

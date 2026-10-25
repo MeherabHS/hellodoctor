@@ -1,7 +1,7 @@
 {
   "@@locale": "sw",
-  "appTitle": "HelloDoctor",
-  "loadingNetwork": "Inapakia Mtandao wa Afya wa HelloDoctor...",
+  "appTitle": "AfyaMkononi",
+  "loadingNetwork": "Inapakia Mtandao wa Afya wa AfyaMkononi...",
   "authSignInSubtitle": "Ingia kwa nambari yako ya simu",
   "authPhoneNumberLabel": "Nambari ya simu",
   "authPhoneNumberHint": "07XX XXX XXX",
@@ -280,7 +280,7 @@
   "directoryVideoFee": "Video (KES {fee})",
   "directoryChatFee": "Mazungumzo (KES {fee})",
   "doctorProfileTitle": "Wasifu wa Daktari",
-  "doctorProfileSubtitle": "Daktari bingwa wa HelloDoctor aliyethibitishwa",
+  "doctorProfileSubtitle": "Daktari bingwa wa AfyaMkononi aliyethibitishwa",
   "doctorProfileLoadError": "Imeshindikana kupakia wasifu wa daktari huyu.",
   "doctorAboutTab": "Kuhusu",
   "doctorAvailabilityTab": "Nafasi Zilizopo",
@@ -348,7 +348,7 @@
   "cacheOfflineUpdated": "Hakuna mtandao — inaonyesha data iliyohifadhiwa · Ilisasishwa mwisho {time}",
   "cacheLastUpdated": "Ilisasishwa mwisho {time}",
   "authDataConsentTitle": "Idhini ya data ya mgonjwa na taarifa za afya",
-  "authDataConsentSummary": "Soma idhini ya kushiriki data inayohitajika kuunda akaunti yako ya HelloDoctor.",
+  "authDataConsentSummary": "Soma idhini ya kushiriki data inayohitajika kuunda akaunti yako ya AfyaMkononi.",
   "authDataConsentView": "Soma idhini kamili",
   "authDataConsentAccept": "Nimesoma na ninakubali idhini hii",
   "authDataConsentRequired": "Soma na ukubali idhini ya data ya mgonjwa kabla ya kuendelea.",
@@ -375,7 +375,7 @@
   "profileVerified": "Daktari aliyethibitishwa",
   "profileCredentials": "Sifa za kitaaluma",
   "qnaScreenTitle": "Muulize daktari",
-  "qnaScreenSubtitle": "Pata mwongozo wa afya kutoka kwa madaktari wa HelloDoctor waliothibitishwa.",
+  "qnaScreenSubtitle": "Pata mwongozo wa afya kutoka kwa madaktari wa AfyaMkononi waliothibitishwa.",
   "qnaAskAction": "Uliza swali la afya",
   "qnaRecent": "Maswali ya hivi karibuni",
   "qnaAwaiting": "Linasubiri jibu",
@@ -407,5 +407,106 @@
         "type": "int"
       }
     }
-  }
+  },
+  "notificationSettingsMenuTitle": "Mipangilio ya arifa",
+  "notificationSettingsMenuSubtitle": "Muda wa utulivu na makundi",
+  "notificationSettingsPageTitle": "Mipangilio ya arifa",
+  "notificationSettingsRoutineTitle": "Masasisho ya kawaida",
+  "notificationSettingsRoutineSubtitle": "Arifa za uhifadhi na hali ya akaunti",
+  "notificationSettingsAnnouncementsTitle": "Matangazo",
+  "notificationSettingsAnnouncementsSubtitle": "Arifa za hiari za ushiriki na matangazo",
+  "notificationSettingsQuietHoursTitle": "Muda wa utulivu",
+  "notificationSettingsQuietHoursSubtitle": "Shikilia arifa zisizo za dharura wakati wa muda huu. Vikumbusho vya ushauri na arifa za haraka haviahirishwi kamwe.",
+  "notificationSettingsQuietHoursStart": "Huanza saa",
+  "notificationSettingsQuietHoursEnd": "Huisha saa",
+  "notificationSettingsLoadError": "Imeshindikana kupakia mipangilio ya arifa.",
+  "notificationSettingsSaveError": "Imeshindikana kuhifadhi mipangilio ya arifa.",
+  "notificationSettingsGreetingsTitle": "Salamu",
+  "notificationSettingsGreetingsSubtitle": "Ujumbe wa asubuhi njema, siku ya kuzaliwa na sikukuu za Kenya",
+  "notificationSettingsReligiousTitle": "Salamu za sikukuu za kidini",
+  "notificationSettingsReligiousSubtitle": "Ujumbe wa Eid, Ijumaa Kuu, Pasaka na Krismasi",
+  "quizTitle": "Jipime uelewa",
+  "quizIntro": "Jaribu maswali haya ya hiari baada ya kusoma makala. Maendeleo yako yanabaki kwenye skrini hii tu.",
+  "quizStart": "Anza maswali",
+  "quizQuestionCount": "Maswali: {count}",
+  "@quizQuestionCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "quizLoading": "Inapakia…",
+  "quizLoadError": "Maswali hayajapakiwa. Tafadhali jaribu tena.",
+  "quizAnswerError": "Jibu lako halijakaguliwa. Tafadhali jaribu tena.",
+  "quizRetry": "Jaribu tena",
+  "quizSubmit": "Wasilisha jibu",
+  "quizNext": "Swali linalofuata",
+  "quizFinish": "Ona muhtasari",
+  "quizCorrect": "Sahihi",
+  "quizIncorrect": "Si sahihi",
+  "quizExplanation": "Maelezo",
+  "quizComplete": "Maswali yamekamilika",
+  "quizAttempted": "Umejibu: {attempted} / {total}",
+  "@quizAttempted": {
+    "placeholders": {
+      "attempted": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "quizCorrectCount": "Majibu sahihi: {count}",
+  "@quizCorrectCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "quizIncorrectCount": "Majibu yasiyo sahihi: {count}",
+  "@quizIncorrectCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "quizPercentage": "Uliokamilisha: {percent}%",
+  "@quizPercentage": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "quizRestart": "Anza tena",
+  "quizPosition": "Swali {current} kati ya {total}",
+  "@quizPosition": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "quizUpdated": "Makala au maswali yamebadilika. Pakia makala upya ili kuanza maswali ya sasa.",
+  "quizUnavailable": "Maswali haya hayapatikani tena.",
+  "quizRefreshArticle": "Pakia makala upya",
+  "quizCorrectAnswer": "Jibu sahihi: {answer}",
+  "@quizCorrectAnswer": {
+    "placeholders": {
+      "answer": {
+        "type": "String"
+      }
+    }
+  },
+  "quizEnglishFallback": "Kiingereza kimeonyeshwa — tafsiri ya Kiswahili ya swali hili haipatikani.",
+  "quizSessionExpired": "Tafadhali ingia tena ili kuendelea.",
+  "quizRateLimited": "Maombi ni mengi. Tafadhali jaribu tena baada ya muda mfupi."
+
 }

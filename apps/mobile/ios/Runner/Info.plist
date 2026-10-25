@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
-	<string>HelloDoctor needs camera access for prescription capture and consultation video.</string>
+	<string>AfyaMkononi needs camera access for prescription capture and consultation video.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>HelloDoctor needs microphone access for consultation audio.</string>
+	<string>AfyaMkononi needs microphone access for consultation audio.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Hellodoctor Mobile</string>
+	<string>AfyaMkononi</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

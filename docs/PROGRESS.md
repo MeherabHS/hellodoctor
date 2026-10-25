@@ -656,3 +656,112 @@ does not exist there) — restart the dev backend and run
 `scripts/verify_backend_schema.ps1` before trusting any live check against it, per
 CLAUDE.md §4 migration discipline. The repository-wide git cleanup (94 changed/untracked
 files, several scratch/audit-evidence directories) has not been started.
+## Backend regression remediation — 2026-10-24
+
+The remaining eight Milestones 4–5 regression failures were resolved without changing
+production safeguards. Five registration fixtures were updated from the obsolete legal
+document version `1.0` to the current `1.0-afyamkononi` only in successful-registration
+paths; existing stale-version rejection coverage remains. The grievance-number test now
+runs all 40 submissions in bounded four-way batches, matching the deliberately small
+two-connection test pool while retaining successful-persistence and uniqueness assertions.
+The AfyaMkononi down-migration was corrected to clear rebrand current flags before restoring
+the prior current documents.
+
+Fresh isolated Postgres 16/Redis 7 fixtures were used on ports 55432/16479; shared
+development services on 5432/6379 were left untouched. Fresh migration application,
+rebrand rollback/reapply, the two migration regressions, the focused registration/grievance
+filters, and notification-focused filters passed. The full serialized backend suite passed
+**349 tests, 0 failed, 4 ignored**. Final Rust checks passed: `cargo fmt --all -- --check`,
+`cargo clippy --all-targets -- -D warnings`, `cargo check --all-targets`, and
+`cargo test --lib` (**84 passed**). Existing Flutter verification remains Doctor
+267/267 with clean analysis and Patient 295/295 with clean analysis; no new Flutter run was
+needed for this backend-only remediation. No Milestone 6 work began.
+
+Files changed by this remediation: `services/backend/tests/api_tests.rs`,
+`services/backend/migrations/20261124000002_rebrand_afyamkononi.down.sql`,
+`docs/PROGRESS.md`, and `docs/CHECKPOINT.md`. The worktree remains intentionally dirty and
+Git history was not modified. Native Firebase credentials/device delivery remain external
+configuration limitations. The complete backend regression gate is **GREEN**.
+
+## Milestone 6D — Admin Blog/CMS — 2026-10-25
+
+Focused read-only inspection preceded implementation. Added a separate Admin article
+schema with FORCE RLS, bilingual categories/content, exact-version approval,
+independent review for sensitive metadata, guarded publication/scheduling and audit
+events. Doctor articles and their policies/publication behavior remain intact. The
+existing Patient article endpoints now combine published Doctor and Admin content;
+the existing Flutter Blogs tab supports Editorial identity, EN/SW fallback, safe
+Markdown and authenticated covers. Admin Blog Manager adds modular authoring,
+local smartphone preview, secure covers and review/publication controls. Publishing
+does not send notifications or create campaigns. No MCQs or advanced Patient browsing
+were added. Existing Milestone 6C code and legitimate uncommitted work were preserved.
+
+Verified: Rust format, Clippy with warnings denied and compilation; **87 library
+tests**, **14 focused CMS integration tests**, full serialized backend **379 passed,
+0 failed, 4 existing benchmarks ignored** (383 total cases; native exit 0). Admin:
+**76 tests**, typecheck, production build and ESLint with 0 errors/1 existing Campaign
+Manager warning. Patient: clean analyze and **308 tests**. Installed-Edge checks:
+3 static responsive layouts and 10 interactive checks with synthetic transport,
+including local preview isolation, payloads, covers and integrated small-screen layout.
+
+Acceptance gate is **PARTIAL**, not live cross-app acceptance: the authenticated
+Admin BFF → same persisted record → running Patient app walkthrough and real external
+object-store round trip remain unverified. Existing Next.js security advisories also
+remain; the first build stopped on its advisory, and the retry passed. Shared databases
+were not reset/migrated and no deployment or Git history action occurred. Full exact
+file list, endpoints, migrations, security details and evidence:
+[Milestone 6D report](MILESTONE_6D_REPORT.md).
+
+### Milestone 6D stabilization — 2026-10-25
+
+Applied independent-approval UX and readable CMS errors without weakening backend
+review rules. Failed cover uploads retain the saved text draft and cannot show
+upload success. Patched Next/eslint-config-next to **16.4.3** and transitive Zod to
+**4.6.7**; audit now has no critical/high entries and three moderate Tailwind/PostCSS
+entries pending separate review. Admin **83 tests**, typecheck/lint/build pass;
+Rust gates/**87 library tests**, focused CMS **14**, Flutter analyze/**308 tests**,
+synthetic browser **11**, layouts **3**, live anonymous smoke **6** pass.
+Initial full backend run had **378 passed, 1 database-acquisition timeout, 4 ignored**;
+the cleanup case passes alone. The full repeat without competing builds passed the
+14 CMS cases, then was stopped at the user's request. It is incomplete; gate PARTIAL.
+
+**DEFERRED — AWAITING AZURE BLOB INTEGRATION.** Legacy storage configuration remains
+intentionally empty. No S3 workaround, Azure implementation or new infrastructure.
+Live seeded Admin sign-in returned 401; one live Admin and unavailable Patient
+runtime also prevent full same-record cross-app acceptance. No account reset or
+extra live Admin was created. Details and exact evidence:
+[stabilization report](MILESTONE_6D_STABILIZATION_REPORT.md),
+[planning-only Azure integration](AZURE_BLOB_INTEGRATION_PLAN.md).
+
+### Milestone 6E — optional Admin article MCQs — 2026-10-25
+
+Added optional inclusion, modular bilingual question authoring/reordering/deletion,
+CSV/JSON validation/preview/atomic import and local interactive quiz simulation in
+the existing article editor. Approved immutable quiz revisions are separate from
+drafts, protecting published articles and previously approved quizzes. Sensitive
+quiz review is independent and binds the exact quiz/article content versions.
+Patient article responses contain only safe publication metadata; no answer keys,
+attempts, scoring, Flutter quiz renderer or new navigation.
+
+Verification: Rust format/Clippy/compile pass; library **91**, MCQ integration **9**,
+existing CMS **14**, Admin **93** tests pass; Admin typecheck/lint/build pass
+(0 lint errors, 1 existing Campaign warning); responsive layouts **3** pass.
+No full backend rerun: preserve **378 passed, 1 timeout, 4 ignored** and the prior
+interrupted repeat. Full regression remains a coordinated future gate.
+Azure stays intentionally deferred; no dependencies, cloud configuration, production
+deployment or Git history operations. See [6E report](MILESTONE_6E_REPORT.md).
+
+### Milestone 6F — Patient interactive quizzes — 2026-10-25
+
+Implementation present: restricted Patient question-read/answer-check functions and
+APIs; optional quiz in the existing BlogDetailPage; local-only scoring and progress,
+feedback, explanations, restart, EN/SW and stale-revision refresh. No attempts or
+profiles persisted, no answer-selection analytics, no Admin rebuild or Azure work.
+Flutter format/analyze and **326 tests** pass; Rust format/Clippy/compile and **91
+library tests** pass. Focused Patient quiz **10**, Admin quiz **9**, CMS **14** pass.
+One serialized full backend run: **398 passed, 0 failed, 4 existing benchmarks
+ignored**, native exit 0, **1143.61 seconds**, within its 35-minute cap. The prior
+timeout did not recur; its evidence and unchanged deadline/pool settings remain.
+No overlap or full-suite retry. Automated gate GREEN; real device/live cross-app
+verification remains unavailable. Azure and GitHub migration were not started.
+Stop at 6F. Details: [6F report](MILESTONE_6F_REPORT.md).

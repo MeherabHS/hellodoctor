@@ -243,3 +243,195 @@ async fn test_push_delivery_pass_sent_permanent_and_retry_paths(pool: PgPool) {
         "a transient provider failure must never disable the device token"
     );
 }
+
+/// A short TTL alone would not have caught this: a `CONSULTATION_READY` row
+/// that was fine when queued but whose appointment has since actually moved
+/// to `IN_CONSULTATION` (someone already joined) must be suppressed at
+/// dispatch time, never sent, and never retried — while the in-app inbox
+/// row itself must still exist (history is retained).
+#[sqlx::test(migrations = "./migrations")]
+async fn test_push_delivery_pass_suppresses_stale_consultation_ready(pool: PgPool) {
+    let (app, pool, mut state) = test_app_and_state(pool).await;
+    let doctor_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let register = post(
+        &app,
+        "/api/v1/notifications/devices",
+        Some(&doctor_token),
+        &serde_json::json!({"platform": "android", "push_token": "ready-stale-token"}),
+    )
+    .await;
+    assert_eq!(register.status(), StatusCode::CREATED);
+
+    let (_slot, appointment_id) =
+        insert_confirmed_appointment(&pool, Utc::now() + chrono::Duration::minutes(5)).await;
+    let notification_id = Uuid::new_v4();
+    assert!(notification_repo::insert_if_new(
+        &pool,
+        notification_id,
+        UserId::from(uid(DOCTOR1_USER_ID)),
+        "CONSULTATION_READY",
+        "Consultation ready",
+        "Your consultation is ready to join.",
+        Some("APPOINTMENT"),
+        Some(appointment_id),
+        None,
+        "stale-ready-test",
+        None,
+    )
+    .await
+    .unwrap());
+
+    // The authoritative state changed after this was queued: someone already
+    // joined, exactly the race the dispatch-time recheck exists to catch.
+    sqlx::query("UPDATE appointments SET status='IN_CONSULTATION' WHERE id=$1")
+        .bind(appointment_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let mut outcomes = HashMap::new();
+    outcomes.insert(
+        "ready-stale-token".to_string(),
+        PushOutcome::SentToProvider {
+            provider_message_id: Some("should-never-be-used".into()),
+        },
+    );
+    state.notification_transport = std::sync::Arc::new(ScriptedTransport { outcomes });
+    notification_scheduler::run_push_delivery_pass(&state)
+        .await
+        .unwrap();
+
+    let (status, error): (String, Option<String>) = sqlx::query_as(
+        "SELECT delivery_status, last_delivery_error FROM notifications WHERE id = $1",
+    )
+    .bind(notification_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(status, "FAILED");
+    assert!(error.unwrap().contains("Suppressed"));
+    // The row must still exist for in-app history — it was never deleted.
+    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM notifications WHERE id=$1)")
+        .bind(notification_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(exists, "a suppressed dispatch must retain the inbox row");
+}
+
+/// Same concern for `CONSULTATION_REJOIN`: if the session has already
+/// recovered (the participant rejoined) by the time a queued push is about
+/// to go out, it must be suppressed rather than misleadingly inviting a
+/// rejoin that already happened.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_push_delivery_pass_suppresses_stale_consultation_rejoin(pool: PgPool) {
+    let (app, pool, mut state) = test_app_and_state(pool).await;
+    let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let register = post(
+        &app,
+        "/api/v1/notifications/devices",
+        Some(&patient_token),
+        &serde_json::json!({"platform": "android", "push_token": "rejoin-stale-token"}),
+    )
+    .await;
+    assert_eq!(register.status(), StatusCode::CREATED);
+
+    let (appointment_id, _) = book_and_confirm(&app, &patient_token).await;
+    let notification_id = Uuid::new_v4();
+    assert!(notification_repo::insert_if_new(
+        &pool,
+        notification_id,
+        UserId::from(uid(PATIENT_USER_ID)),
+        "CONSULTATION_REJOIN",
+        "Rejoin available",
+        "Both participants have left the consultation room. Rejoin before the grace period ends to continue, or it will be marked interrupted.",
+        Some("APPOINTMENT"),
+        Some(appointment_id),
+        None,
+        "stale-rejoin-test",
+        None,
+    )
+    .await
+    .unwrap());
+
+    // The session was never actually in GRACE_PERIOD here (recovery_state
+    // defaults to 'NONE') — simulating "already recovered by dispatch time."
+
+    let mut outcomes = HashMap::new();
+    outcomes.insert(
+        "rejoin-stale-token".to_string(),
+        PushOutcome::SentToProvider {
+            provider_message_id: Some("should-never-be-used".into()),
+        },
+    );
+    state.notification_transport = std::sync::Arc::new(ScriptedTransport { outcomes });
+    notification_scheduler::run_push_delivery_pass(&state)
+        .await
+        .unwrap();
+
+    let (status, error): (String, Option<String>) = sqlx::query_as(
+        "SELECT delivery_status, last_delivery_error FROM notifications WHERE id = $1",
+    )
+    .bind(notification_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(status, "FAILED");
+    assert!(error.unwrap().contains("Suppressed"));
+}
+
+/// Positive control: a `CONSULTATION_READY` notification whose appointment
+/// is still genuinely eligible at dispatch time must still be sent normally
+/// — the recheck must not false-positive-block the ordinary case.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_push_delivery_pass_still_sends_genuinely_eligible_ready(pool: PgPool) {
+    let (app, pool, mut state) = test_app_and_state(pool).await;
+    let doctor_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let register = post(
+        &app,
+        "/api/v1/notifications/devices",
+        Some(&doctor_token),
+        &serde_json::json!({"platform": "android", "push_token": "ready-live-token"}),
+    )
+    .await;
+    assert_eq!(register.status(), StatusCode::CREATED);
+
+    let (_slot, appointment_id) =
+        insert_confirmed_appointment(&pool, Utc::now() + chrono::Duration::minutes(5)).await;
+    let notification_id = Uuid::new_v4();
+    assert!(notification_repo::insert_if_new(
+        &pool,
+        notification_id,
+        UserId::from(uid(DOCTOR1_USER_ID)),
+        "CONSULTATION_READY",
+        "Consultation ready",
+        "Your consultation is ready to join.",
+        Some("APPOINTMENT"),
+        Some(appointment_id),
+        None,
+        "live-ready-test",
+        None,
+    )
+    .await
+    .unwrap());
+
+    let mut outcomes = HashMap::new();
+    outcomes.insert(
+        "ready-live-token".to_string(),
+        PushOutcome::SentToProvider {
+            provider_message_id: Some("projects/x/messages/live".into()),
+        },
+    );
+    state.notification_transport = std::sync::Arc::new(ScriptedTransport { outcomes });
+    notification_scheduler::run_push_delivery_pass(&state)
+        .await
+        .unwrap();
+
+    let (status,): (String,) =
+        sqlx::query_as("SELECT delivery_status FROM notifications WHERE id = $1")
+            .bind(notification_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(status, "SENT_TO_PROVIDER");
+}

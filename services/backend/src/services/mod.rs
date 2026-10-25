@@ -1,5 +1,6 @@
 pub mod agora_token_service;
 pub mod appointment_service;
+pub mod article_media_service;
 pub mod audit_service;
 pub mod auth_service;
 pub mod chat_service;

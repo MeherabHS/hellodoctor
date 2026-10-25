@@ -185,3 +185,76 @@ pub async fn revoke_device(
         data: serde_json::json!({ "status": "REVOKED", "disabled_count": disabled }),
     }))
 }
+
+/// GET /api/v1/notifications/preferences
+pub async fn get_preferences(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let prefs = NotificationService::get_preferences(&state, &ctx).await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: prefs,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePreferencesRequest {
+    pub operational_enabled: bool,
+    pub engagement_enabled: bool,
+    pub quiet_hours_enabled: bool,
+    pub quiet_hours_start_local: String,
+    pub quiet_hours_end_local: String,
+    #[serde(default)]
+    pub greeting_notifications_enabled: Option<bool>,
+    #[serde(default)]
+    pub religious_greetings_enabled: Option<bool>,
+    pub language: Option<String>,
+}
+
+/// PUT /api/v1/notifications/preferences
+pub async fn update_preferences(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Json(payload): Json<UpdatePreferencesRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let parse_time = |s: &str| {
+        chrono::NaiveTime::parse_from_str(s, "%H:%M").map_err(|_| {
+            AppError::Validation(
+                "quiet_hours_start_local/quiet_hours_end_local must be HH:MM.".into(),
+            )
+        })
+    };
+    let start = parse_time(&payload.quiet_hours_start_local)?;
+    let end = parse_time(&payload.quiet_hours_end_local)?;
+    // Keep older clients compatible with the Milestone 3 request shape. An
+    // omitted new field retains the caller's current value, including the
+    // role-aware default for greeting notifications.
+    let current = NotificationService::get_preferences(&state, &ctx).await?;
+    NotificationService::update_preferences(
+        &state,
+        &ctx,
+        crate::services::notification_service::UpdatePreferencesInput {
+            operational_enabled: payload.operational_enabled,
+            engagement_enabled: payload.engagement_enabled,
+            quiet_hours_enabled: payload.quiet_hours_enabled,
+            quiet_hours_start_local: start,
+            quiet_hours_end_local: end,
+            greeting_notifications_enabled: payload
+                .greeting_notifications_enabled
+                .unwrap_or(current.greeting_notifications_enabled),
+            religious_greetings_enabled: payload
+                .religious_greetings_enabled
+                .unwrap_or(current.religious_greetings_enabled),
+            language: payload.language,
+        },
+    )
+    .await?;
+    let prefs = NotificationService::get_preferences(&state, &ctx).await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: prefs,
+    }))
+}
