@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   reactStrictMode: true,
   // Dev-server-only (ignored in production builds): Next 16 blocks
   // cross-origin HMR/dev-resource requests by default. ADMIN_WEB_ORIGIN
