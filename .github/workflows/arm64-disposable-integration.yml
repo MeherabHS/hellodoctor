@@ -1,0 +1,126 @@
+name: Disposable Ubuntu ARM64 six-service integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_runtime_image:
+        description: Reviewed digest-pinned ARM64 backend runtime image
+        required: true
+        type: string
+      admin_web_image:
+        description: Reviewed digest-pinned ARM64 Admin Web image
+        required: true
+        type: string
+      doctor_web_image:
+        description: Reviewed digest-pinned ARM64 Doctor Web image
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arm64-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  six-service-smoke:
+    name: ARM64 disposable six-service smoke and restart
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: hellodoctor
+      POSTGRES_PASSWORD: m8-arm64-ci-password
+      BACKEND_RUNTIME_IMAGE: ${{ inputs.backend_runtime_image }}
+      ADMIN_WEB_IMAGE: ${{ inputs.admin_web_image }}
+      DOCTOR_WEB_IMAGE: ${{ inputs.doctor_web_image }}
+      BACKEND_ENV_FILE: /tmp/hellodoctor-arm64/backend.env
+      API_HOST: api.localhost
+      ADMIN_HOST: admin.localhost
+      DOCTOR_HOST: doctor.localhost
+      WEB_PROXY_SECRET: arm64-ci-proxy-secret
+      TURNSTILE_SITE_KEY: arm64-ci-site
+      TURNSTILE_SECRET_KEY: arm64-ci-secret
+      WEB_AUTH_ASSERTION_SECRET: arm64-ci-assertion-secret-012345678901234567890123
+      ACME_EMAIL: test@example.invalid
+      POSTGRES_VOLUME: arm64-ci-pgdata
+      REDIS_VOLUME: arm64-ci-redisdata
+      CADDY_DATA_VOLUME: arm64-ci-caddydata
+      CADDY_CONFIG_VOLUME: arm64-ci-caddyconfig
+      ERASURE_JOURNAL_DIR: /tmp/hellodoctor-arm64/erasure
+      PROXY_BIND_ADDRESS: 127.0.0.1
+      PROXY_HTTP_PORT: "58080"
+      PROXY_HTTPS_PORT: "58443"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Record checked-out application revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          echo "SOURCE_REVISION=$(git rev-parse HEAD)"
+      - name: Verify native runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Prepare synthetic backend environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hellodoctor-arm64/erasure
+          cat > /tmp/hellodoctor-arm64/backend.env <<'EOF'
+          ENVIRONMENT=development
+          DATABASE_URL=postgres://postgres:m8-arm64-ci-password@postgres:5432/hellodoctor
+          DEV_AUTH_OTP_ENABLED=true
+          DEV_SIMULATION_ENABLED=true
+          STORAGE_PROVIDER=disabled
+          RECOVERY_MODE=false
+          GLOBAL_IP_RATE_LIMIT_PER_MIN=100000
+          DB_POOL_MAX_CONNECTIONS_PER_ROLE=10
+          EOF
+      - name: Render disposable Compose configuration
+        run: >-
+          docker compose -f deploy/single-vm/compose.yml
+          -f deploy/single-vm/compose.local-verification.yml
+          -f deploy/single-vm/compose.arm64-ci.yml config --quiet
+      - name: Start six services with synthetic volumes
+        run: >-
+          docker compose -f deploy/single-vm/compose.yml
+          -f deploy/single-vm/compose.local-verification.yml
+          -f deploy/single-vm/compose.arm64-ci.yml up -d
+      - name: Wait for service health
+        shell: bash
+        run: |
+          set -euo pipefail
+          project='hellodoctor-arm64-ci'
+          for attempt in $(seq 1 30); do
+            health="$(docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml ps --all --format '{{.Health}}')"
+            if [ "$(printf '%s\n' "$health" | grep -c '^healthy$' || true)" -ge 6 ]; then exit 0; fi
+            sleep 10
+          done
+          docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml ps
+          exit 1
+      - name: Check architecture and basic routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          project='hellodoctor-arm64-ci'
+          docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml ps
+          curl --fail --silent --show-error -H 'Host: api.localhost' http://127.0.0.1:58080/healthz
+          curl --fail --silent --show-error -H 'Host: admin.localhost' http://127.0.0.1:58080/login >/dev/null
+          curl --fail --silent --show-error -H 'Host: doctor.localhost' http://127.0.0.1:58080/ >/dev/null
+      - name: Restart services and verify recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          project='hellodoctor-arm64-ci'
+          docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml restart postgres redis backend admin-web doctor-web proxy
+          sleep 20
+          docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml ps
+          curl --fail --silent --show-error -H 'Host: api.localhost' http://127.0.0.1:58080/healthz
+      - name: Tear down disposable project
+        if: always()
+        run: docker compose -p hellodoctor-arm64-ci -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml down -v --remove-orphans

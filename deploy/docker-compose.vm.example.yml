@@ -1,0 +1,63 @@
+# Configuration-only VM deployment example.
+# It intentionally references pre-built images; this milestone does not build,
+# transfer or deploy artifacts. Invoke with:
+#   docker compose --env-file /etc/hellodoctor/hellodoctor.env \
+#     -f deploy/docker-compose.vm.example.yml config
+#   docker compose --env-file /etc/hellodoctor/hellodoctor.env \
+#     -f deploy/docker-compose.vm.example.yml up -d
+#
+# The backend may consume the private file wholesale. Web services receive an
+# explicit allowlist only, so database/JWT/FCM/encryption secrets never enter
+# their containers or browser bundles.
+name: hellodoctor-vm-example
+
+services:
+  backend:
+    platform: linux/arm64
+    image: ${BACKEND_IMAGE:?set BACKEND_IMAGE in /etc/hellodoctor/hellodoctor.env}
+    restart: unless-stopped
+    env_file:
+      - /etc/hellodoctor/hellodoctor.env
+    environment:
+      HOST: 0.0.0.0
+      PORT: ${BACKEND_CONTAINER_PORT:-8080}
+    ports:
+      - "127.0.0.1:${BACKEND_LISTEN_PORT:-8080}:${BACKEND_CONTAINER_PORT:-8080}"
+
+  admin-web:
+    platform: linux/arm64
+    image: ${ADMIN_WEB_IMAGE:?set ADMIN_WEB_IMAGE in /etc/hellodoctor/hellodoctor.env}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      ENVIRONMENT: ${ENVIRONMENT:?set ENVIRONMENT}
+      BACKEND_URL: ${BACKEND_URL:?set BACKEND_URL}
+      ADMIN_WEB_ORIGIN: ${ADMIN_WEB_ORIGIN:?set ADMIN_WEB_ORIGIN}
+      WEB_PROXY_SECRET: ${WEB_PROXY_SECRET:?set WEB_PROXY_SECRET}
+      WEB_AUTH_ASSERTION_SECRET: ${WEB_AUTH_ASSERTION_SECRET:?set WEB_AUTH_ASSERTION_SECRET}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+      DEV_AUTH_OTP_ENABLED: "false"
+      DEV_SIMULATION_ENABLED: "false"
+      ADMIN_WEB_BUILD_NUMBER: ${ADMIN_WEB_BUILD_NUMBER:-unreported}
+    ports:
+      - "127.0.0.1:${ADMIN_WEB_LISTEN_PORT:-3000}:3000"
+
+  doctor-web:
+    platform: linux/arm64
+    image: ${DOCTOR_WEB_IMAGE:?set DOCTOR_WEB_IMAGE in /etc/hellodoctor/hellodoctor.env}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      ENVIRONMENT: ${ENVIRONMENT:?set ENVIRONMENT}
+      BACKEND_URL: ${BACKEND_URL:?set BACKEND_URL}
+      DOCTOR_WEB_ORIGIN: ${DOCTOR_WEB_ORIGIN:?set DOCTOR_WEB_ORIGIN}
+      WEB_PROXY_SECRET: ${WEB_PROXY_SECRET:?set WEB_PROXY_SECRET}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      DOCTOR_WEB_BUILD_NUMBER: ${DOCTOR_WEB_BUILD_NUMBER:-unreported}
+      DEV_AUTH_OTP_ENABLED: "false"
+      DEV_SIMULATION_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${DOCTOR_WEB_LISTEN_PORT:-3001}:3001"
