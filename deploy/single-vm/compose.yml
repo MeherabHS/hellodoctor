@@ -1,0 +1,192 @@
+# New configuration: never overlay the shared dev/Config A projects.
+# All six services share the SAME four cores; limits are not dedicated allocations.
+name: hellodoctor-vm
+x-common: &common
+  restart: unless-stopped
+  # The production target is Ubuntu 24.04 ARM64. Keep accidental x86 image
+  # pulls from being silently emulated on the host.
+  platform: linux/arm64
+  cpuset: "0-3"
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: {max-size: "10m", max-file: "3"}
+x-web: &web
+  <<: *common
+  read_only: true
+  cap_drop: [ALL]
+  tmpfs: ["/tmp:size=32m,mode=1777", "/app/.next/cache:size=32m,uid=1000,gid=1000"]
+  environment: &web-env
+    NODE_ENV: production
+    ENVIRONMENT: production
+    BACKEND_URL: http://backend:8080
+    WEB_PROXY_SECRET: ${WEB_PROXY_SECRET:?set a private ingress secret}
+    TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?set Turnstile site key}
+    TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?set private Turnstile secret}
+    DEV_AUTH_OTP_ENABLED: "false"
+    DEV_SIMULATION_ENABLED: "false"
+    NODE_OPTIONS: --max-old-space-size=256
+
+services:
+  postgres:
+    <<: *common
+    image: ${POSTGRES_IMAGE:-postgres:16-bookworm@sha256:e8a07d2c7579b038938cdba6c539e580e5001caf9ea203d397b5cc83e76bd938}
+    # Retain the verified jit=off fix; do not tune pools/timeouts here.
+    command: [postgres, -c, jit=off, -c, shared_preload_libraries=pg_stat_statements, -c, pg_stat_statements.track=all, -c, pg_stat_statements.max=200]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set database owner}
+      POSTGRES_DB: ${POSTGRES_DB:?set database name}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set private database password}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    networks: [data]
+    mem_limit: 3072m
+    memswap_limit: 3072m
+    cpu_shares: 3000
+    shm_size: 256m
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  redis:
+    <<: *common
+    image: ${REDIS_IMAGE:-redis:7-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f}
+    command: [redis-server, --appendonly, "yes"]
+    volumes: ["redisdata:/data"]
+    networks: [data]
+    mem_limit: 384m
+    memswap_limit: 384m
+    cpu_shares: 500
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  backend:
+    <<: *common
+    image: ${BACKEND_RUNTIME_IMAGE:?set backend image with healthcheck}
+    env_file: ["${BACKEND_ENV_FILE:?set absolute private backend environment path}"]
+    environment:
+      ENVIRONMENT: production
+      HOST: 0.0.0.0
+      PORT: "8080"
+      APP_DB_HOST: postgres
+      APP_DB_PORT: "5432"
+      APP_DB_NAME: ${POSTGRES_DB:?set database name}
+      REDIS_URL: redis://redis:6379
+      MAX_ACTIVE_USERS: "15000"
+      SEED_DEV_DATA: "false"
+      DEV_AUTH_OTP_ENABLED: "false"
+      DEV_SIMULATION_ENABLED: "false"
+      PUBLIC_API_BASE_URL: https://${API_HOST:?set API hostname}
+      ALLOWED_ORIGINS: https://${ADMIN_HOST:?set Admin hostname},https://${DOCTOR_HOST:?set Doctor hostname}
+      # Exact ingress/BFF socket peers, never an entire subnet.
+      TRUSTED_PROXY_IPS: 172.30.84.10,172.30.84.11,172.30.84.12
+      EXTERNAL_ERASURE_JOURNAL_PATH: /var/lib/hellodoctor/erasure/erasure.journal
+    volumes: ["${ERASURE_JOURNAL_DIR:?set pre-provisioned persistent journal directory}:/var/lib/hellodoctor/erasure"]
+    read_only: true
+    cap_drop: [ALL]
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    networks:
+      app: {ipv4_address: 172.30.84.13}
+      data: {}
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    cpu_shares: 6000
+    stop_grace_period: 30s
+    healthcheck:
+      test: [CMD-SHELL, "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /healthz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && timeout 5 grep -q \"200 OK\" <&3'"]
+      interval: 30s
+      timeout: 8s
+      start_period: 60s
+      retries: 5
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+
+  admin-web:
+    <<: *web
+    image: ${ADMIN_WEB_IMAGE:?set built Admin image digest}
+    environment:
+      <<: *web-env
+      ADMIN_WEB_ORIGIN: https://${ADMIN_HOST}
+      WEB_AUTH_ASSERTION_SECRET: ${WEB_AUTH_ASSERTION_SECRET:?set separate Admin assertion secret}
+      REDIS_URL: redis://redis:6379
+      ADMIN_WEB_BUILD_NUMBER: ${ADMIN_WEB_BUILD_NUMBER:-m8-ws4}
+    networks:
+      app: {ipv4_address: 172.30.84.11}
+      data: {}
+    mem_limit: 448m
+    memswap_limit: 448m
+    cpu_shares: 750
+    depends_on:
+      backend: {condition: service_healthy}
+
+  doctor-web:
+    <<: *web
+    image: ${DOCTOR_WEB_IMAGE:?set built Doctor image digest}
+    environment:
+      <<: *web-env
+      DOCTOR_WEB_ORIGIN: https://${DOCTOR_HOST}
+      DOCTOR_WEB_BUILD_NUMBER: ${DOCTOR_WEB_BUILD_NUMBER:-m8-ws4}
+    networks:
+      app: {ipv4_address: 172.30.84.12}
+    mem_limit: 384m
+    memswap_limit: 384m
+    cpu_shares: 750
+    depends_on:
+      backend: {condition: service_healthy}
+
+  proxy:
+    <<: *common
+    image: ${CADDY_IMAGE:-caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5}
+    environment:
+      API_HOST: ${API_HOST}
+      ADMIN_HOST: ${ADMIN_HOST}
+      DOCTOR_HOST: ${DOCTOR_HOST}
+      ACME_EMAIL: ${ACME_EMAIL:?set certificate contact}
+      WEB_PROXY_SECRET: ${WEB_PROXY_SECRET}
+    ports:
+      - "${PROXY_BIND_ADDRESS:-0.0.0.0}:${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_BIND_ADDRESS:-0.0.0.0}:${PROXY_HTTPS_PORT:-443}:443"
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddydata:/data", "caddyconfig:/config"]
+    read_only: true
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    networks:
+      app: {ipv4_address: 172.30.84.10}
+    mem_limit: 128m
+    memswap_limit: 128m
+    cpu_shares: 500
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8081/healthz]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      admin-web: {condition: service_healthy}
+      doctor-web: {condition: service_healthy}
+
+networks:
+  app:
+    ipam:
+      config: [{subnet: 172.30.84.0/24}]
+  data:
+    internal: true
+
+# Explicit existing volume names avoid accidentally mounting an empty replacement.
+# Provision NEW installations separately; never point verification at real volumes.
+volumes:
+  pgdata:
+    external: true
+    name: ${POSTGRES_VOLUME:?set approved persistent PostgreSQL volume}
+  redisdata:
+    external: true
+    name: ${REDIS_VOLUME:?set approved persistent Redis volume}
+  caddydata:
+    external: true
+    name: ${CADDY_DATA_VOLUME:?set certificate volume}
+  caddyconfig:
+    external: true
+    name: ${CADDY_CONFIG_VOLUME:?set proxy config volume}

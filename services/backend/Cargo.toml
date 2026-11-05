@@ -34,7 +34,7 @@ flate2 = "1.1"
 
 # Image Processing (Upload Security Pipeline)
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
-object_store = { version = "0.14", default-features = false, features = ["aws"] }
+object_store = { version = "0.14", default-features = false, features = ["aws", "azure"] }
 
 # Database & Migrations
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "bigdecimal", "migrate", "macros", "json"] }
@@ -49,6 +49,14 @@ metrics-exporter-prometheus = "0.15"
 # Logging & Observability
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+# Milestone 8 hold-duration investigation (2026-11-04): only needed as the
+# parameter type for sqlx's own `PoolOptions::acquire_time_level`, which lets
+# us capture its built-in "aquired_after_secs" tracing event (target
+# "sqlx::pool::acquire") into a metric via a tracing_subscriber Layer, with
+# zero call-site changes anywhere a pool is used. Already a transitive
+# dependency of sqlx at this exact version; adding it directly changes
+# nothing about what gets compiled.
+log = "0.4"
 thiserror = "1.0"
 dotenvy = "0.15"
 futures-util = "0.3"
@@ -56,12 +64,15 @@ parking_lot = "0.12"
 async-trait = "0.1"
 deadpool-redis = { version = "0.23.1", features = ["rt_tokio_1"] }
 regex = "1.10"
-reqwest = { version = "0.12", features = ["json"] }
+# Keep the direct HTTP client on Rustls so the ARM64 image does not require
+# an OpenSSL development toolchain. object_store still brings aws-lc-rs for
+# its Azure/AWS TLS paths, which is built and checked for ARM64 in CI.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [dev-dependencies]
 tower = { version = "0.4", features = ["util"] }
 http-body-util = "0.1"
-reqwest = { version = "0.12", features = ["json", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
 # No-echo terminal password prompt, used only by the offline
 # examples/reset_admin_password.rs recovery tool (never shipped in the server binary).
 rpassword = "7"

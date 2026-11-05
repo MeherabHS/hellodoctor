@@ -1,0 +1,146 @@
+name: Native Ubuntu ARM64 image compatibility
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "services/backend/**"
+      - "apps/admin-web/**"
+      - "apps/doctor-web/**"
+      - "deploy/single-vm/**"
+      - ".github/workflows/arm64-compatibility.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arm64-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-backend-arm64:
+    name: Rust tests and backend ARM64 image
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Record checked-out application revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          echo "SOURCE_REVISION=$(git rev-parse HEAD)"
+      - name: Verify runner and Docker architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(docker info --format '{{.Architecture}}')" = aarch64
+          docker buildx version
+          docker buildx inspect --bootstrap
+      - name: Compile and run Rust unit/security tests natively
+        working-directory: services/backend
+        run: cargo test --lib --locked
+      - name: Build backend image
+        run: >-
+          docker buildx build --platform linux/arm64 --load
+          --tag hellodoctor-backend:arm64-ci
+          --file services/backend/Dockerfile services/backend
+      - name: Verify backend image architecture
+        run: test "$(docker image inspect --format '{{.Architecture}}' hellodoctor-backend:arm64-ci)" = arm64
+      - name: Build production backend runtime wrapper
+        run: >-
+          docker build --platform linux/arm64
+          --build-arg BACKEND_IMAGE=hellodoctor-backend:arm64-ci
+          --tag hellodoctor-backend-runtime:arm64-ci
+          --file deploy/single-vm/backend.Dockerfile deploy/single-vm
+      - name: Verify production backend image architecture
+        run: test "$(docker image inspect --format '{{.Architecture}}' hellodoctor-backend-runtime:arm64-ci)" = arm64
+
+  admin-web-arm64:
+    name: Admin Web ARM64 image
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Record checked-out application revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          echo "SOURCE_REVISION=$(git rev-parse HEAD)"
+      - name: Verify runner and Docker architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Build Admin Web image
+        run: >-
+          docker buildx build --platform linux/arm64 --load
+          --tag hellodoctor-admin-web:arm64-ci
+          --file apps/admin-web/Dockerfile apps/admin-web
+      - name: Verify Node architecture and image architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect --format '{{.Architecture}}' hellodoctor-admin-web:arm64-ci)" = arm64
+          test "$(docker run --rm --entrypoint node hellodoctor-admin-web:arm64-ci -p 'process.arch')" = arm64
+
+  doctor-web-arm64:
+    name: Doctor Web ARM64 image
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Record checked-out application revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          echo "SOURCE_REVISION=$(git rev-parse HEAD)"
+      - name: Verify runner and Docker architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Build Doctor Web image
+        run: >-
+          docker buildx build --platform linux/arm64 --load
+          --tag hellodoctor-doctor-web:arm64-ci
+          --file apps/doctor-web/Dockerfile apps/doctor-web
+      - name: Verify Node architecture and image architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect --format '{{.Architecture}}' hellodoctor-doctor-web:arm64-ci)" = arm64
+          test "$(docker run --rm --entrypoint node hellodoctor-doctor-web:arm64-ci -p 'process.arch')" = arm64
+
+  pgbackrest-arm64:
+    name: pgBackRest ARM64 image
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Record checked-out application revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          echo "SOURCE_REVISION=$(git rev-parse HEAD)"
+      - name: Verify runner and Docker architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Build pgBackRest image
+        run: >-
+          docker buildx build --platform linux/arm64 --load
+          --tag hellodoctor-postgres-pgbackrest:arm64-ci
+          --file deploy/single-vm/backup/pgbackrest.Dockerfile deploy/single-vm/backup
+      - name: Verify package architecture and pgBackRest
+        run: >-
+          docker run --rm --entrypoint sh hellodoctor-postgres-pgbackrest:arm64-ci
+          -c 'test "$(dpkg --print-architecture)" = arm64; pgbackrest version'
