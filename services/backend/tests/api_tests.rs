@@ -5859,6 +5859,12 @@ async fn test_identity_concurrent_http_requests_no_cross_user_pool_bleed(pool: P
                 );
             }
         }
+        // Keep the 4-request concurrency shape while allowing the normal lane's
+        // 100-token burst budget to replenish between batches. Admission shedding
+        // remains covered by the dedicated capacity tests.
+        if batch_start + BATCH_SIZE < 128 {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
     }
     assert_eq!(
         total_items, 128,
@@ -13669,6 +13675,10 @@ async fn test_security_idempotency_upload_rechecks_ownership_and_clinical_window
     .execute(&pool)
     .await
     .unwrap();
+    // This is the ninth upload-lane request in the fixture. Let the
+    // eight-token burst budget replenish before asserting the clinical-window
+    // rejection; upload shedding is tested separately.
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     assert_eq!(
         post_idem(&app, &uri, Some(&doctor), &payload, &key)
             .await
