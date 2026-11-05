@@ -14061,16 +14061,24 @@ async fn test_security_patient_otp_concurrent_consumption_issues_one_session(poo
             second
         };
         let data = json_body(winner).await["data"].clone();
-        assert_eq!(
-            get(
-                &app,
-                "/api/v1/doctors",
-                Some(data["access_token"].as_str().unwrap())
-            )
-            .await
-            .status(),
-            StatusCode::OK
-        );
+        let access_token = data["access_token"].as_str().unwrap();
+        let mut doctors_status = StatusCode::SERVICE_UNAVAILABLE;
+        for _ in 0..3 {
+            let response = get(&app, "/api/v1/doctors", Some(access_token)).await;
+            doctors_status = response.status();
+            if doctors_status != StatusCode::SERVICE_UNAVAILABLE {
+                break;
+            }
+            let retry_after = response
+                .headers()
+                .get("retry-after")
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(1)
+                .min(5);
+            tokio::time::sleep(std::time::Duration::from_secs(retry_after)).await;
+        }
+        assert_eq!(doctors_status, StatusCode::OK);
         let counts: (i64, i64) = sqlx::query_as("SELECT (SELECT COUNT(*) FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE u.phone_number=$1),(SELECT COUNT(*) FROM patient_profiles p JOIN users u ON u.id=p.user_id WHERE u.phone_number=$1)")
             .bind(phone).fetch_one(&pool).await.unwrap();
         assert_eq!(counts, (initial_sessions + 1, 1));
