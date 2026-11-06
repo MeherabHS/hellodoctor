@@ -1,0 +1,42 @@
+# DRAFT - disposable ARM64 CI only. Never used by compose.yml (production)
+# or compose.local-verification.yml (plain-HTTP local runs).
+#
+# Exercises *real* TLS termination and Secure-cookie behavior in CI without
+# any public DNS or ACME dependency, using Caddy's built-in internal CA
+# (`tls internal`): Caddy mints a locally-trusted leaf cert for each listed
+# hostname, signed by a CA cert it also writes to the `caddydata` volume.
+# The test job trusts that CA for its curl calls (see the integration
+# workflow's "Trust Caddy's internal CA" step) rather than using -k, so the
+# check is a real certificate-chain validation, not merely "TLS negotiated."
+{
+    admin off
+}
+
+https://api.localhost {
+    tls internal
+    log {
+        output stdout
+        format filter {
+            wrap json
+            fields {
+                request>headers>Authorization delete
+                request>headers>Cookie delete
+            }
+        }
+    }
+    reverse_proxy backend:8080
+}
+
+https://admin.localhost {
+    tls internal
+    reverse_proxy admin-web:3000
+}
+
+https://doctor.localhost {
+    tls internal
+    reverse_proxy doctor-web:3000
+}
+
+http://:8081 {
+    respond /healthz 200
+}
