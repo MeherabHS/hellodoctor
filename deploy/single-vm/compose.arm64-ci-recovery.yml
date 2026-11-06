@@ -1,0 +1,87 @@
+# DRAFT - disposable ARM64 recovery-test overlay only. Never applied to
+# compose.yml (production) or the six-service smoke workflow.
+#
+# IMPORTANT FINDING from this review: archive_mode/archive_command are not
+# set anywhere in the repository today (confirmed by grep across deploy/ and
+# docs/ on origin/test/ubuntu-arm64-validation) - compose.yml's postgres
+# `command:` only sets `jit=off` and pg_stat_statements. Without
+# archive_mode=on and an archive_command pointed at pgbackrest, WAL-based
+# PITR cannot work in ANY environment, not just CI. This overlay wires it for
+# the disposable recovery test; the same two settings still need adding to
+# the real deploy/single-vm/compose.yml postgres `command:` (or an
+# operator-supplied postgresql.conf) before pgBackRest/PITR can function on
+# the actual VM. Flagging this is part of this plan's deliverable, not a
+# change made to compose.yml here.
+name: hellodoctor-arm64-ci-recovery
+
+services:
+  postgres:
+    # pgbackrest.Dockerfile is itself a postgres:16-bookworm image with
+    # pgbackrest/cron/python3/curl layered on, with postgres-entrypoint.sh as
+    # its Postgres-mode entrypoint (writes pgbackrest.conf, then execs the
+    # stock docker-entrypoint.sh). Using it as POSTGRES_IMAGE colocates the
+    # pgbackrest client + conf inside the same container WAL archiving needs
+    # to shell out from.
+    image: ${POSTGRES_BACKUP_IMAGE:?set the reviewed ARM64 pgbackrest/postgres image}
+    entrypoint: ["/usr/local/bin/postgres-entrypoint.sh"]
+    command:
+      - postgres
+      - -c
+      - archive_mode=on
+      - -c
+      - archive_command=pgbackrest --stanza=${PGBACKREST_STANZA:-hellodoctor} archive-push %p
+      - -c
+      - wal_level=replica
+    environment:
+      PGBACKREST_STANZA: ${PGBACKREST_STANZA:-hellodoctor}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest/repo1
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:?set a disposable synthetic cipher passphrase, never a real one}
+    volumes:
+      - pgbackrest-repo:/var/lib/pgbackrest/repo1
+
+  # Sidecar: stanza-create + check on start, then cron for scheduled backups.
+  # Shares the same repo volume and cipher passphrase as postgres above so it
+  # reads/writes the identical encrypted repository.
+  pgbackrest-sidecar:
+    image: ${POSTGRES_BACKUP_IMAGE:?set the reviewed ARM64 pgbackrest/postgres image}
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGDATABASE: ${POSTGRES_DB:-hellodoctor}
+      PGBACKREST_STANZA: ${PGBACKREST_STANZA:-hellodoctor}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest/repo1
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:?set a disposable synthetic cipher passphrase, never a real one}
+      BACKUP_RUN_ON_START: "false"
+    volumes:
+      - pgbackrest-repo:/var/lib/pgbackrest/repo1
+    networks: [data]
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  # Restore target: same image, empty data volume, entrypoint overridden so
+  # it does NOT auto-start postgres - the workflow runs `pgbackrest restore`
+  # into this container's empty PGDATA first, then starts postgres on top of
+  # the restored files.
+  postgres-restore-target:
+    image: ${POSTGRES_BACKUP_IMAGE:?set the reviewed ARM64 pgbackrest/postgres image}
+    entrypoint: ["sleep", "infinity"]
+    environment:
+      PGBACKREST_STANZA: ${PGBACKREST_STANZA:-hellodoctor}
+      PGBACKREST_REPO1_PATH: /var/lib/pgbackrest/repo1
+      PGBACKREST_REPO1_CIPHER_TYPE: aes-256-cbc
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:?set a disposable synthetic cipher passphrase, never a real one}
+    volumes:
+      - pgbackrest-repo:/var/lib/pgbackrest/repo1:ro
+      - restore-target-pgdata:/var/lib/postgresql/data
+    networks: [data]
+
+networks:
+  data:
+    internal: false
+
+volumes:
+  pgbackrest-repo: {external: false, name: hellodoctor-arm64-ci-recovery-pgbackrest-repo}
+  restore-target-pgdata: {external: false, name: hellodoctor-arm64-ci-recovery-restore-pgdata}

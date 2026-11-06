@@ -1,0 +1,315 @@
+name: Disposable ARM64 pgBackRest backup and PITR recovery
+
+# DRAFT - prepared for review only, not wired to any automatic trigger.
+# Separate from arm64-disposable-integration.yml per the brief's Phase 4:
+# this exercises backup/WAL/restore in isolation against a throwaway
+# database and a throwaway, locally-generated cipher passphrase - no
+# production data, no Azure credentials (repo1-type defaults to posix, a
+# local disposable volume, never repo1-type=azure).
+#
+# Review fix applied: every negative test below now captures the target
+# command's exit code OUTSIDE of any pipe (docker compose run ... > file 2>&1;
+# rc=$?), with `set +o pipefail` around that one command. The previous draft
+# piped the command directly into `tee | grep`, so under `pipefail` the
+# pipeline's reported status could reflect the *grep* exit code rather than
+# the pgbackrest command's - a true "rejected the wrong key" case could still
+# register as a pipeline failure (wrong reason) or, more importantly, a
+# silently-ignored failure could still show the grep match and falsely PASS.
+# Both negative tests now assert on the captured rc AND the log text,
+# separately, so neither signal alone can produce a false PASS or FAIL.
+#
+# Review fix applied: restore now actually starts PostgreSQL on the restored
+# data directory, waits for it to leave recovery, and queries
+# recovery_probe directly - PASS is never granted on the restore command's
+# exit code alone.
+
+on:
+  workflow_dispatch:
+    inputs:
+      postgres_backup_image:
+        description: Reviewed digest-pinned ARM64 postgres+pgbackrest image
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arm64-recovery-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backup-and-restore:
+    name: pgBackRest stanza, encrypted backup, WAL/PITR restore
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    # Review fix applied: postgres_backup_image is a private GHCR package;
+    # `contents: read` alone cannot authenticate the pull below.
+    permissions:
+      contents: read
+      packages: read
+    env:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: hellodoctor
+      POSTGRES_PASSWORD: m8-arm64-recovery-password
+      POSTGRES_BACKUP_IMAGE: ${{ inputs.postgres_backup_image }}
+      PGBACKREST_STANZA: hellodoctor
+      # Synthetic, generated fresh per run, never reused, never a real secret.
+      PGBACKREST_REPO1_CIPHER_PASS: ${{ github.run_id }}-${{ github.run_attempt }}-synthetic-ci-only-passphrase
+      DC: >-
+        docker compose -p hellodoctor-arm64-ci-recovery
+        -f deploy/single-vm/compose.yml
+        -f deploy/single-vm/compose.local-verification.yml
+        -f deploy/single-vm/compose.arm64-ci.yml
+        -f deploy/single-vm/compose.arm64-ci-recovery.yml
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify native runner
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Install psql probe client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Log in to GHCR to pull the private digest-pinned image
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Verify the input image is digest-pinned and architecture-correct
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$POSTGRES_BACKUP_IMAGE" in
+            *@sha256:*) ;;
+            *) echo "::error::$POSTGRES_BACKUP_IMAGE is not digest-pinned"; exit 1 ;;
+          esac
+          docker pull "$POSTGRES_BACKUP_IMAGE"
+          arch="$(docker image inspect --format '{{.Architecture}}' "$POSTGRES_BACKUP_IMAGE")"
+          test "$arch" = arm64 || { echo "::error::$POSTGRES_BACKUP_IMAGE reports architecture '$arch', expected arm64"; exit 1; }
+          echo "PASS: $POSTGRES_BACKUP_IMAGE is digest-pinned and arm64"
+      - name: Start postgres (with WAL archiving) and the pgbackrest sidecar
+        run: $DC up -d postgres pgbackrest-sidecar
+      - name: Wait for postgres health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 30); do
+            PGPASSWORD="$POSTGRES_PASSWORD" pg_isready -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" && break
+            sleep 5
+          done
+      - name: Verify stanza creation and pgbackrest check explicitly
+        shell: bash
+        # postgres-entrypoint.sh/backup-entrypoint.sh already run stanza-create
+        # and check on startup; re-running `check` here is deliberately
+        # idempotent (pgbackrest check is safe to re-run) and makes the
+        # assertion explicit and independently timestamped rather than
+        # inferred from startup logs.
+        run: |
+          set -euo pipefail
+          $DC exec -T pgbackrest-sidecar runuser -u postgres -- \
+            pgbackrest --stanza="$PGBACKREST_STANZA" check
+          echo "PASS: pgbackrest check succeeded for stanza $PGBACKREST_STANZA"
+      - name: Seed pre-recovery-point marker data
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -v ON_ERROR_STOP=1 \
+            -c "CREATE TABLE recovery_probe (id INT PRIMARY KEY, note TEXT);" \
+            -c "INSERT INTO recovery_probe VALUES (1, 'pre-backup-marker');"
+      - name: Take an encrypted full backup
+        shell: bash
+        run: |
+          set -euo pipefail
+          $DC exec -T pgbackrest-sidecar runuser -u postgres -- \
+            pgbackrest --stanza="$PGBACKREST_STANZA" --type=full backup
+          $DC exec -T pgbackrest-sidecar runuser -u postgres -- \
+            pgbackrest --stanza="$PGBACKREST_STANZA" info
+      - name: Record WAL-archive count before generating new WAL activity
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -t -A -v ON_ERROR_STOP=1 \
+            -c "SELECT archived_count FROM pg_stat_archiver;")"
+          echo "WAL_ARCHIVED_BEFORE=${before}" >> "$GITHUB_ENV"
+      - name: Generate WAL activity and a named restore point
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -v ON_ERROR_STOP=1 \
+            -c "INSERT INTO recovery_probe VALUES (2, 'pre-restore-point-marker');" \
+            -c "SELECT pg_create_restore_point('arm64_ci_recovery_probe');" \
+            -c "SELECT pg_switch_wal();"
+      - name: Seed post-recovery-point marker data (must NOT survive restore-to-point)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -v ON_ERROR_STOP=1 \
+            -c "INSERT INTO recovery_probe VALUES (3, 'post-restore-point-marker');" \
+            -c "SELECT pg_switch_wal();"
+      - name: Verify WAL archive-push actually advanced (not just configured)
+        shell: bash
+        run: |
+          set -euo pipefail
+          sleep 5
+          after="$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -t -A -v ON_ERROR_STOP=1 \
+            -c "SELECT archived_count FROM pg_stat_archiver;")"
+          test "$after" -gt "$WAL_ARCHIVED_BEFORE" || {
+            echo "::error::pg_stat_archiver.archived_count did not increase ($WAL_ARCHIVED_BEFORE -> $after) - archive_command is not actually succeeding, even if archive_mode=on is set"
+            exit 1
+          }
+          echo "PASS: WAL archiving is actively advancing ($WAL_ARCHIVED_BEFORE -> $after)"
+
+      - name: Negative test - wrong cipher key is rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +o pipefail
+          $DC run --rm --no-deps \
+            -e PGBACKREST_STANZA="$PGBACKREST_STANZA" \
+            -e PGBACKREST_REPO1_PATH=/var/lib/pgbackrest/repo1 \
+            -e PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc \
+            -e PGBACKREST_REPO1_CIPHER_PASS=deliberately-wrong-passphrase \
+            postgres-restore-target sh -c '
+              cat > /etc/pgbackrest/pgbackrest.conf <<EOF
+          [global]
+          repo1-path=${PGBACKREST_REPO1_PATH}
+          repo1-cipher-type=${PGBACKREST_REPO1_CIPHER_TYPE}
+          repo1-cipher-pass=${PGBACKREST_REPO1_CIPHER_PASS}
+          [${PGBACKREST_STANZA}]
+          pg1-path=/var/lib/postgresql/data
+          EOF
+              pgbackrest --stanza="$PGBACKREST_STANZA" info' > /tmp/wrong-key.log 2>&1
+          rc=$?
+          set -o pipefail
+          cat /tmp/wrong-key.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::wrong cipher key did not produce a nonzero exit (rc=0) - pgbackrest accepted an invalid key"
+            exit 1
+          fi
+          grep -qi "cipher\|unable to\|error" /tmp/wrong-key.log || {
+            echo "::error::command failed (rc=$rc) but not with the expected cipher-mismatch error text"; exit 1; }
+          echo "PASS: wrong cipher key was rejected (rc=$rc) with the expected error text"
+
+      - name: Negative test - unavailable repository is reported, not silently ignored
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +o pipefail
+          $DC run --rm --no-deps \
+            -e PGBACKREST_STANZA="$PGBACKREST_STANZA" \
+            -e PGBACKREST_REPO1_PATH=/var/lib/pgbackrest/repo1-does-not-exist \
+            -e PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc \
+            -e PGBACKREST_REPO1_CIPHER_PASS="$PGBACKREST_REPO1_CIPHER_PASS" \
+            postgres-restore-target sh -c '
+              cat > /etc/pgbackrest/pgbackrest.conf <<EOF
+          [global]
+          repo1-path=${PGBACKREST_REPO1_PATH}
+          repo1-cipher-type=${PGBACKREST_REPO1_CIPHER_TYPE}
+          repo1-cipher-pass=${PGBACKREST_REPO1_CIPHER_PASS}
+          [${PGBACKREST_STANZA}]
+          pg1-path=/var/lib/postgresql/data
+          EOF
+              pgbackrest --stanza="$PGBACKREST_STANZA" info' > /tmp/missing-repo.log 2>&1
+          rc=$?
+          set -o pipefail
+          cat /tmp/missing-repo.log
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::unavailable repository did not produce a nonzero exit (rc=0)"
+            exit 1
+          fi
+          grep -qi "error\|unable to\|does not exist\|missing\|path does not exist" /tmp/missing-repo.log || {
+            echo "::error::command failed (rc=$rc) but not with an unavailable-repository error"; exit 1; }
+          echo "PASS: unavailable repository path was reported as an error (rc=$rc)"
+
+      - name: Restore into the fresh target, to the named restore point (PITR)
+        shell: bash
+        run: |
+          set -euo pipefail
+          recovery_started="$(date -u +%s)"
+          $DC run --rm --no-deps \
+            -e PGBACKREST_STANZA="$PGBACKREST_STANZA" \
+            -e PGBACKREST_REPO1_PATH=/var/lib/pgbackrest/repo1 \
+            -e PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc \
+            -e PGBACKREST_REPO1_CIPHER_PASS="$PGBACKREST_REPO1_CIPHER_PASS" \
+            postgres-restore-target sh -c '
+              cat > /etc/pgbackrest/pgbackrest.conf <<EOF
+          [global]
+          repo1-path=${PGBACKREST_REPO1_PATH}
+          repo1-cipher-type=${PGBACKREST_REPO1_CIPHER_TYPE}
+          repo1-cipher-pass=${PGBACKREST_REPO1_CIPHER_PASS}
+          [${PGBACKREST_STANZA}]
+          pg1-path=/var/lib/postgresql/data
+          EOF
+              chown -R postgres:postgres /var/lib/postgresql/data
+              runuser -u postgres -- pgbackrest --stanza="$PGBACKREST_STANZA" \
+                --type=name --target=arm64_ci_recovery_probe --target-action=promote \
+                restore'
+          echo "RECOVERY_STARTED_EPOCH=${recovery_started}" >> "$GITHUB_ENV"
+
+      - name: Start the restored PostgreSQL and wait for it to leave recovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_cid="$($DC ps -q postgres-restore-target)"
+          docker exec -d "$target_cid" runuser -u postgres -- \
+            pg_ctl -D /var/lib/postgresql/data -l /tmp/restored-postgres.log -w -t 120 start
+          for attempt in $(seq 1 60); do
+            if docker exec "$target_cid" runuser -u postgres -- psql -d "$POSTGRES_DB" -tAc "SELECT pg_is_in_recovery();" 2>/dev/null | grep -qx f; then
+              break
+            fi
+            sleep 2
+          done
+          in_recovery="$(docker exec "$target_cid" runuser -u postgres -- psql -d "$POSTGRES_DB" -tAc "SELECT pg_is_in_recovery();")"
+          if [ "$in_recovery" != "f" ]; then
+            echo "::error::restored PostgreSQL did not leave recovery mode within the wait budget (pg_is_in_recovery()=$in_recovery)"
+            docker exec "$target_cid" cat /tmp/restored-postgres.log || true
+            exit 1
+          fi
+          recovery_finished="$(date -u +%s)"
+          echo "RECOVERY_TIME_SECONDS=$((recovery_finished - RECOVERY_STARTED_EPOCH))" >> "$GITHUB_STEP_SUMMARY"
+          echo "RESTORE_TARGET_CID=${target_cid}" >> "$GITHUB_ENV"
+
+      - name: Assert pre-recovery-point data is present and post-recovery-point data is absent
+        shell: bash
+        # This is the actual PASS/FAIL gate for PITR correctness. Nothing
+        # above (a clean restore exit code, or Postgres merely starting) is
+        # sufficient on its own - only these two row-level assertions prove
+        # the restore landed at the intended point in time.
+        run: |
+          set -euo pipefail
+          row1="$(docker exec "$RESTORE_TARGET_CID" runuser -u postgres -- psql -d "$POSTGRES_DB" -tAc "SELECT note FROM recovery_probe WHERE id = 1;")"
+          row2="$(docker exec "$RESTORE_TARGET_CID" runuser -u postgres -- psql -d "$POSTGRES_DB" -tAc "SELECT note FROM recovery_probe WHERE id = 2;")"
+          row3_count="$(docker exec "$RESTORE_TARGET_CID" runuser -u postgres -- psql -d "$POSTGRES_DB" -tAc "SELECT count(*) FROM recovery_probe WHERE id = 3;")"
+          test "$row1" = "pre-backup-marker" || { echo "::error::pre-backup marker (id=1) missing or wrong after restore: '$row1'"; exit 1; }
+          test "$row2" = "pre-restore-point-marker" || { echo "::error::pre-restore-point marker (id=2) missing after restore: '$row2'"; exit 1; }
+          test "$row3_count" = "0" || { echo "::error::post-restore-point marker (id=3) survived the restore-to-point (count=$row3_count) - PITR landed past the intended point"; exit 1; }
+          echo "PASS: restore landed exactly at the named restore point - pre-point rows present, post-point row absent"
+
+      - name: Capture backup-staleness evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          $DC exec -T pgbackrest-sidecar runuser -u postgres -- \
+            pgbackrest --stanza="$PGBACKREST_STANZA" info --output=json > /tmp/pgbackrest-info.json
+          cat /tmp/pgbackrest-info.json
+          python3 -c "
+          import json
+          info = json.load(open('/tmp/pgbackrest-info.json'))[0]
+          backups = info.get('backup', [])
+          assert backups, 'no backups recorded'
+          latest = backups[-1]
+          print('latest backup type:', latest.get('type'))
+          print('latest backup timestamp (stop):', latest.get('timestamp', {}).get('stop'))
+          "
+
+      - name: Tear down disposable recovery project
+        if: always()
+        run: $DC down -v --remove-orphans
+      - name: Verify no disposable recovery volumes were left behind
+        if: always()
+        shell: bash
+        run: |
+          leftover="$(docker volume ls --filter name=hellodoctor-arm64-ci-recovery -q)"
+          test -z "$leftover" || { echo "::error::leftover volumes after teardown: $leftover"; docker volume rm $leftover || true; exit 1; }
+          echo "PASS: no leftover hellodoctor-arm64-ci-recovery-* volumes"
