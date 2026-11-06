@@ -1,0 +1,47 @@
+# Scoped to this build context (apps/doctor-web). Docker resolves
+# .dockerignore relative to the build context directory passed to
+# `docker build`/`buildx build`, NOT the repository root - the root
+# .dockerignore and services/backend/.dockerignore do not apply here. Added
+# 2026-11-06 after a GHCR-publish pre-dispatch review found this build
+# context had no .dockerignore at all, unlike the backend's.
+.git
+**/.git
+
+# Secrets - never a build input. Real .env files are not currently tracked in
+# this directory (only .env.local.example, a template), but this excludes
+# them unconditionally regardless of what exists locally at build time.
+.env
+.env.*
+**/.env
+**/.env.*
+*_token.txt
+**/*_token.txt
+*_tokens.json
+**/*_tokens.json
+*.jwt
+**/*.jwt
+*.pem
+*.key
+*.der
+**/*.pem
+**/*.key
+**/*.der
+
+# Dependencies and build artifacts - reinstalled/rebuilt inside the image;
+# never a useful or safe build input from the host.
+node_modules
+**/node_modules
+.next
+**/.next
+/out
+/build
+coverage
+.vercel
+
+# Local tooling noise.
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
