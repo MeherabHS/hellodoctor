@@ -63,7 +63,7 @@ jobs:
         -f deploy/single-vm/compose.arm64-ci.yml
         -f deploy/single-vm/compose.arm64-ci-recovery.yml
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - name: Verify native runner
         run: |
           set -euo pipefail
