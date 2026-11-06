@@ -1,0 +1,403 @@
+name: ARM64 GHCR digest publish (manual, approval-gated)
+
+# DRAFT - prepared for review only. Never attach `pull_request` or
+# `pull_request_target` triggers to this workflow: it is the only workflow in
+# the repository that holds `packages: write`, and PR-triggered runs must
+# never carry a credential that can push to the registry (see
+# docs/ARM64_GHCR_PUBLICATION_HANDOFF.md).
+#
+# PREREQUISITES - this workflow cannot be dispatched until these exist. Do
+# not treat "the workflow file is present" as "the workflow is runnable":
+#   1. A GitHub Environment named `arm64-ghcr-publish` must exist (Settings ->
+#      Environments) with "Required reviewers" configured, and "Prevent
+#      self-review" set to match intent. `environment: arm64-ghcr-publish`
+#      below is a REFERENCE, not a creation of that environment or its
+#      protection rules - GitHub's GITHUB_TOKEN permission model has no
+#      `environments` scope at all (confirmed against the full 17-key
+#      `permissions:` list in the workflow-syntax reference), so this
+#      workflow cannot verify its own approval-gate configuration from
+#      inside a run. A human must confirm, before the first dispatch, via
+#      `gh api repos/<owner>/<repo>/environments/arm64-ghcr-publish --jq
+#      '.protection_rules'` (needs a PAT/gh auth with repo admin read, not
+#      the in-run GITHUB_TOKEN) or the Settings UI, that required reviewers
+#      are actually configured - referencing the environment name alone
+#      creates no protection by itself.
+#   2. CORRECTED (previous draft was wrong here): GitHub's own docs state
+#      plainly that "To trigger the workflow_dispatch event, your workflow
+#      must be in the default branch" - and this is a standing condition,
+#      not a one-time bootstrap step. While this file exists only on
+#      test/ubuntu-arm64-validation and not on the repository's default
+#      branch, it CANNOT be dispatched at all, via UI, `gh workflow run`, or
+#      the REST API, against any ref, including that same branch.
+#      Proposed safe path (requires separate approval, not performed by this
+#      session): open a SECOND, minimal PR against the default branch that
+#      adds ONLY these three `.github/workflows/*.yml` files (this one,
+#      arm64-disposable-integration.yml, arm64-disposable-recovery.yml) -
+#      no application code, no compose files, no Dockerfiles. All three
+#      declare `workflow_dispatch:` with no other trigger, so merging them
+#      causes zero automatic executions; they only become visible/
+#      dispatchable in the Actions UI. This satisfies "do not merge the
+#      application PR merely to enable manual dispatch" literally, since the
+#      ARM64 application/infra changes stay on PR #1, unmerged, exactly as
+#      they are now. The compose/Dockerfile/script files these workflows
+#      reference do not need to be on the default branch - once dispatch is
+#      possible, `actions/checkout` within the run can still check out
+#      test/ubuntu-arm64-validation (or any ref) to get them.
+#   3. `verify-revision` below requires that the five required ARM64/backend
+#      CI checks already report `success` for the exact requested SHA, and
+#      that this SHA is (or was) an actual PR head commit, not a stale or
+#      synthetic commit - it queries the Checks API and the
+#      commits/{sha}/pulls API itself rather than trusting the caller's
+#      claim that "CI is green."
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_revision:
+        description: Full 40-character lowercase git SHA already green on arm64-compatibility.yml
+        required: true
+        type: string
+      publish_backend:
+        description: Publish hellodoctor-backend
+        type: boolean
+        default: true
+      publish_admin_web:
+        description: Publish hellodoctor-admin-web
+        type: boolean
+        default: true
+      publish_doctor_web:
+        description: Publish hellodoctor-doctor-web
+        type: boolean
+        default: true
+      publish_pgbackrest:
+        description: Publish hellodoctor-postgres-pgbackrest (only when the recovery job is ready to consume it)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arm64-ghcr-publish
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Gate job: validates the input shape and that the requested revision is
+  # actually the one CI passed, before any job with packages:write starts.
+  # Runs on a plain runner (no ARM64 needed for API calls) to keep the
+  # expensive native runners reserved for the four build jobs.
+  # ---------------------------------------------------------------------
+  verify-revision:
+    name: Validate requested revision and required CI checks
+    runs-on: ubuntu-latest
+    # `checks` is the correct and sufficient scope for the check-runs lookup
+    # below - confirmed against GitHub's own permissions reference ("Work
+    # with check runs and check suites"), which also confirms `actions` is a
+    # different, unrelated scope (workflow-run operations like cancelling),
+    # not needed here. `pull-requests: read` is added for the new
+    # commits/{sha}/pulls lookup that ties this SHA to an actual PR head.
+    permissions:
+      contents: read
+      checks: read
+      pull-requests: read
+    outputs:
+      owner_lc: ${{ steps.owner.outputs.lc }}
+    steps:
+      - name: Validate source_revision is an exact 40-character lowercase hex SHA
+        env:
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          set -euo pipefail
+          case "$SOURCE_REVISION" in
+            [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f])
+              ;;
+            *)
+              echo "::error::source_revision must be exactly 40 lowercase hex characters, got '${SOURCE_REVISION}' (length ${#SOURCE_REVISION})"
+              exit 1
+              ;;
+          esac
+      - name: Compute lowercase GHCR owner (GHCR requires lowercase image paths)
+        id: owner
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "lc=$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+      - name: Verify the required CI checks passed for this exact revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        run: |
+          set -euo pipefail
+          required_checks='[
+            "Rust tests and backend ARM64 image",
+            "Admin Web ARM64 image",
+            "Doctor Web ARM64 image",
+            "pgBackRest ARM64 image",
+            "Apply migrations to a fresh Postgres and run the backend test suite"
+          ]'
+          # NOTE: single `gh api` call, not paginated - fine while this repo
+          # has under ~100 check runs per commit (confirmed 7 today); add
+          # --paginate if that ever changes.
+          gh api "repos/${REPO}/commits/${SOURCE_REVISION}/check-runs" > /tmp/check-runs.json
+          python3 - "$required_checks" <<'PYEOF'
+          import json, sys
+          required = json.loads(sys.argv[1])
+          data = json.load(open('/tmp/check-runs.json'))
+          runs = {r['name']: r.get('conclusion') for r in data.get('check_runs', [])}
+          missing = [n for n in required if n not in runs]
+          failed = [n for n in required if runs.get(n) != 'success']
+          if missing:
+              print(f"::error::required check(s) not found for this revision: {missing}")
+              sys.exit(1)
+          if failed:
+              print(f"::error::required check(s) did not succeed for this revision: {[(n, runs[n]) for n in failed]}")
+              sys.exit(1)
+          print("All required checks succeeded for the requested revision.")
+          PYEOF
+      - name: Verify the SHA belongs to an actual tracked PR head (not a stale/orphaned commit)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SOURCE_REVISION: ${{ inputs.source_revision }}
+        # Checks are recorded against a PR's real head SHA (confirmed
+        # empirically earlier this session: querying check-runs by the PR
+        # head SHA 97194dff... returned the correct 7 results, even though
+        # the pull_request-triggered jobs internally built the GitHub
+        # synthetic merge commit) - so the check above is already querying
+        # the right commit as long as the caller supplies the real branch
+        # HEAD SHA. This step adds an independent cross-check: confirm the
+        # requested SHA is CURRENTLY the head of a listed pull request,
+        # catching the case where it used to be the PR head before a
+        # force-push and its check-run records are now stale/orphaned.
+        run: |
+          set -euo pipefail
+          prs="$(gh api "repos/${REPO}/commits/${SOURCE_REVISION}/pulls" --jq '.')"
+          count="$(echo "$prs" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")"
+          if [ "$count" -eq 0 ]; then
+            echo "::error::${SOURCE_REVISION} is not associated with any pull request - refusing to publish an untracked commit"
+            exit 1
+          fi
+          current_head_match="$(echo "$prs" | python3 -c "
+          import json, sys
+          prs = json.load(sys.stdin)
+          print(any(pr['head']['sha'] == '${SOURCE_REVISION}' for pr in prs))
+          ")"
+          if [ "$current_head_match" != "True" ]; then
+            echo "::error::${SOURCE_REVISION} was once a PR head but is no longer the CURRENT head of any associated PR (likely superseded by a force-push) - its check-run results may be stale. Re-request publication with the PR's current head SHA."
+            exit 1
+          fi
+          echo "PASS: ${SOURCE_REVISION} is the current head of a tracked pull request."
+
+  publish-backend:
+    name: Build and push hellodoctor-backend
+    needs: verify-revision
+    if: ${{ inputs.publish_backend }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    environment: arm64-ghcr-publish
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+      OWNER_LC: ${{ needs.verify-revision.outputs.owner_lc }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.source_revision }}
+      - name: Fail closed unless checkout landed on the exact requested revision
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$SOURCE_REVISION" || { echo "::error::checked out $actual, expected $SOURCE_REVISION"; exit 1; }
+      - name: Verify native ARM64 runner
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = aarch64
+          test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Log in to GHCR with the scoped workflow token
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      # NOTE (flag for implementation review): the second build's
+      # --build-arg BACKEND_IMAGE requires the default buildx builder to use
+      # the `docker` driver (not `docker-container`) so it can see the first,
+      # --load'ed image. Verify `docker buildx inspect` driver on the actual
+      # runner image before relying on this exact two-step sequence
+      # unmodified; if the default builder uses docker-container, switch to
+      # building both stages in one `docker build` invocation (no buildx)
+      # instead, since classic `docker build` shares the local image store.
+      - name: Build builder-stage image (services/backend/Dockerfile)
+        run: |
+          set -euo pipefail
+          docker buildx build --platform linux/arm64 --load \
+            --tag "hellodoctor-backend:arm64-${SOURCE_REVISION}" \
+            --file services/backend/Dockerfile services/backend
+      - name: Build and push runtime image (deploy/single-vm/backend.Dockerfile) by digest
+        run: |
+          set -euo pipefail
+          tag="ghcr.io/${OWNER_LC}/hellodoctor-backend:arm64-${SOURCE_REVISION}"
+          docker buildx build --platform linux/arm64 \
+            --build-arg BACKEND_IMAGE="hellodoctor-backend:arm64-${SOURCE_REVISION}" \
+            --tag "$tag" --push \
+            --metadata-file /tmp/backend-metadata.json \
+            --file deploy/single-vm/backend.Dockerfile deploy/single-vm
+          digest="$(python3 -c "import json; print(json.load(open('/tmp/backend-metadata.json'))['containerimage.digest'])")"
+          ref="ghcr.io/${OWNER_LC}/hellodoctor-backend@${digest}"
+          echo "BACKEND_RUNTIME_IMAGE=${ref}" >> "$GITHUB_STEP_SUMMARY"
+          echo "BACKEND_RUNTIME_IMAGE=${ref}" >> "$GITHUB_ENV"
+      - name: Verify package visibility is private
+        run: |
+          set -euo pipefail
+          visibility="$(gh api "/users/${OWNER_LC}/packages/container/hellodoctor-backend" --jq '.visibility' 2>&1)" || {
+            echo "::warning::could not read package visibility via /users/ endpoint - if ${OWNER_LC} is an organization, use /orgs/${OWNER_LC}/packages/container/hellodoctor-backend instead and verify manually: $visibility"
+            exit 0
+          }
+          test "$visibility" = "private" || { echo "::error::hellodoctor-backend package visibility is '$visibility', expected 'private'"; exit 1; }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify the pushed digest actually pulls
+        run: docker buildx imagetools inspect "$BACKEND_RUNTIME_IMAGE"
+
+  publish-admin-web:
+    name: Build and push hellodoctor-admin-web
+    needs: verify-revision
+    if: ${{ inputs.publish_admin_web }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    environment: arm64-ghcr-publish
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+      OWNER_LC: ${{ needs.verify-revision.outputs.owner_lc }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.source_revision }}
+      - name: Fail closed unless checkout landed on the exact requested revision
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+      - name: Verify native ARM64 runner
+        run: test "$(uname -m)" = aarch64 && test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Log in to GHCR with the scoped workflow token
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push by digest
+        run: |
+          set -euo pipefail
+          tag="ghcr.io/${OWNER_LC}/hellodoctor-admin-web:arm64-${SOURCE_REVISION}"
+          docker buildx build --platform linux/arm64 \
+            --tag "$tag" --push \
+            --metadata-file /tmp/metadata.json \
+            --file apps/admin-web/Dockerfile apps/admin-web
+          digest="$(python3 -c "import json; print(json.load(open('/tmp/metadata.json'))['containerimage.digest'])")"
+          ref="ghcr.io/${OWNER_LC}/hellodoctor-admin-web@${digest}"
+          echo "ADMIN_WEB_IMAGE=${ref}" >> "$GITHUB_STEP_SUMMARY"
+          echo "ADMIN_WEB_IMAGE=${ref}" >> "$GITHUB_ENV"
+      - name: Verify package visibility is private
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          visibility="$(gh api "/users/${OWNER_LC}/packages/container/hellodoctor-admin-web" --jq '.visibility' 2>&1)" || {
+            echo "::warning::could not read visibility via /users/ endpoint - verify manually if ${OWNER_LC} is an organization: $visibility"; exit 0; }
+          test "$visibility" = "private" || { echo "::error::visibility is '$visibility', expected 'private'"; exit 1; }
+      - name: Verify the pushed digest actually pulls
+        run: docker buildx imagetools inspect "$ADMIN_WEB_IMAGE"
+
+  publish-doctor-web:
+    name: Build and push hellodoctor-doctor-web
+    needs: verify-revision
+    if: ${{ inputs.publish_doctor_web }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    environment: arm64-ghcr-publish
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+      OWNER_LC: ${{ needs.verify-revision.outputs.owner_lc }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.source_revision }}
+      - name: Fail closed unless checkout landed on the exact requested revision
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+      - name: Verify native ARM64 runner
+        run: test "$(uname -m)" = aarch64 && test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Log in to GHCR with the scoped workflow token
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push by digest
+        run: |
+          set -euo pipefail
+          tag="ghcr.io/${OWNER_LC}/hellodoctor-doctor-web:arm64-${SOURCE_REVISION}"
+          docker buildx build --platform linux/arm64 \
+            --tag "$tag" --push \
+            --metadata-file /tmp/metadata.json \
+            --file apps/doctor-web/Dockerfile apps/doctor-web
+          digest="$(python3 -c "import json; print(json.load(open('/tmp/metadata.json'))['containerimage.digest'])")"
+          ref="ghcr.io/${OWNER_LC}/hellodoctor-doctor-web@${digest}"
+          echo "DOCTOR_WEB_IMAGE=${ref}" >> "$GITHUB_STEP_SUMMARY"
+          echo "DOCTOR_WEB_IMAGE=${ref}" >> "$GITHUB_ENV"
+      - name: Verify package visibility is private
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          visibility="$(gh api "/users/${OWNER_LC}/packages/container/hellodoctor-doctor-web" --jq '.visibility' 2>&1)" || {
+            echo "::warning::could not read visibility via /users/ endpoint - verify manually if ${OWNER_LC} is an organization: $visibility"; exit 0; }
+          test "$visibility" = "private" || { echo "::error::visibility is '$visibility', expected 'private'"; exit 1; }
+      - name: Verify the pushed digest actually pulls
+        run: docker buildx imagetools inspect "$DOCTOR_WEB_IMAGE"
+
+  publish-pgbackrest:
+    name: Build and push hellodoctor-postgres-pgbackrest
+    needs: verify-revision
+    if: ${{ inputs.publish_pgbackrest }}
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    environment: arm64-ghcr-publish
+    permissions:
+      contents: read
+      packages: write
+    env:
+      SOURCE_REVISION: ${{ inputs.source_revision }}
+      OWNER_LC: ${{ needs.verify-revision.outputs.owner_lc }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.source_revision }}
+      - name: Fail closed unless checkout landed on the exact requested revision
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_REVISION"
+      - name: Verify native ARM64 runner
+        run: test "$(uname -m)" = aarch64 && test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Log in to GHCR with the scoped workflow token
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push by digest
+        run: |
+          set -euo pipefail
+          tag="ghcr.io/${OWNER_LC}/hellodoctor-postgres-pgbackrest:arm64-${SOURCE_REVISION}"
+          docker buildx build --platform linux/arm64 \
+            --tag "$tag" --push \
+            --metadata-file /tmp/metadata.json \
+            --file deploy/single-vm/backup/pgbackrest.Dockerfile deploy/single-vm/backup
+          digest="$(python3 -c "import json; print(json.load(open('/tmp/metadata.json'))['containerimage.digest'])")"
+          ref="ghcr.io/${OWNER_LC}/hellodoctor-postgres-pgbackrest@${digest}"
+          echo "POSTGRES_BACKUP_IMAGE=${ref}" >> "$GITHUB_STEP_SUMMARY"
+          echo "POSTGRES_BACKUP_IMAGE=${ref}" >> "$GITHUB_ENV"
+      - name: Verify package visibility is private
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          visibility="$(gh api "/users/${OWNER_LC}/packages/container/hellodoctor-postgres-pgbackrest" --jq '.visibility' 2>&1)" || {
+            echo "::warning::could not read visibility via /users/ endpoint - verify manually if ${OWNER_LC} is an organization: $visibility"; exit 0; }
+          test "$visibility" = "private" || { echo "::error::visibility is '$visibility', expected 'private'"; exit 1; }
+      - name: Verify the pushed digest actually pulls
+        run: docker buildx imagetools inspect "$POSTGRES_BACKUP_IMAGE"
