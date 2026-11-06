@@ -1,0 +1,33 @@
+# Disposable ARM64 CI overlay. Use with compose.yml and compose.local-verification.yml.
+# It deliberately changes only image selection, loopback bindings, and CPU
+# affinity. Production limits, security options, networks, and application
+# behavior remain inherited from the approved Compose files.
+name: hellodoctor-arm64-ci
+
+services:
+  postgres:
+    cpuset: "0-1"
+    ports: ["127.0.0.1:55432:5432"]
+
+  redis:
+    cpuset: "0-1"
+    ports: ["127.0.0.1:56379:6379"]
+
+  backend:
+    cpuset: "0-1"
+    image: ${BACKEND_RUNTIME_IMAGE:?set the ARM64 backend image}
+    ports: ["127.0.0.1:58280:8080"]
+
+  admin-web:
+    cpuset: "0-1"
+    image: ${ADMIN_WEB_IMAGE:?set the ARM64 Admin Web image}
+
+  doctor-web:
+    cpuset: "0-1"
+    image: ${DOCTOR_WEB_IMAGE:?set the ARM64 Doctor Web image}
+
+  proxy:
+    cpuset: "0-1"
+    ports:
+      - "127.0.0.1:58080:80"
+      - "127.0.0.1:58443:443"

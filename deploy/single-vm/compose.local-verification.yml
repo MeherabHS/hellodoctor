@@ -1,0 +1,122 @@
+# Disposable local override. It never uses production external volumes or TLS.
+name: hellodoctor-m8-final-local
+
+services:
+  postgres:
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["m8-final-local-pgdata:/var/lib/postgresql/data"]
+    # M8 six-service 60-minute acceptance run: deliberately NOT overriding
+    # mem_limit here. The smaller limits this file used for the earlier,
+    # cheap page-load-only verification (768m/128m) caused a real, measured
+    # 21% true-system-error rate under 2,000 concurrent sessions (admission
+    # "dependency_pressure" rejections once Postgres/Redis came under real
+    # load) -- nowhere near the approved single-VM topology's actual
+    # envelope. Leaving these unset inherits compose.yml's base limits
+    # (postgres 3072m, redis 384m), which is what "use the existing approved
+    # single-VM topology" requires for a real sustained-load acceptance run.
+  redis:
+    ports: ["127.0.0.1:56379:6379"]
+    volumes: ["m8-final-local-redisdata:/data"]
+  backend:
+    image: ${BACKEND_RUNTIME_IMAGE:-hellodoctor-backend:m8-final-local}
+    ports: ["127.0.0.1:58280:8080"]
+    volumes: ["m8-final-local-journal:/var/lib/hellodoctor/erasure"]
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgres://postgres:m8-local-password@postgres:5432/hellodoctor
+      APP_DB_HOST: postgres
+      APP_DB_PORT: "5432"
+      APP_DB_NAME: hellodoctor
+      REDIS_URL: redis://redis:6379
+      SEED_DEV_DATA: "true"
+      DEV_AUTH_OTP_ENABLED: "true"
+      DEV_SIMULATION_ENABLED: "true"
+      PUBLIC_API_BASE_URL: http://api.localhost
+      ALLOWED_ORIGINS: http://admin.localhost,http://doctor.localhost
+      TRUSTED_PROXY_IPS: ""
+      STORAGE_PROVIDER: disabled
+      RECOVERY_MODE: "false"
+      EXTERNAL_ERASURE_JOURNAL_PATH: ""
+      # Single-origin load generator (examples/capacity_test.rs) sends every
+      # simulated session's traffic from the one real IP of the benchmark
+      # host; same override already used by docker-compose.configA.yml /
+      # docker-compose.capacity.yml for the accepted 3-service baseline.
+      GLOBAL_IP_RATE_LIMIT_PER_MIN: "100000"
+      # Milestone 8 Step 3 (docs/MILESTONE_8_SIX_SERVICE_PERFORMANCE_REMEDIATION.md):
+      # diagnostic override for THIS stack only. An explicit `environment:`
+      # value here wins over services/backend/.env's env_file default (10)
+      # without touching that shared secrets file, which other unrelated
+      # running stacks also read. Raised from the measured dependency_pressure
+      # evidence (53,470 rejections, concentrated in the Normal lane at the
+      # old pool=10/role => pool_capacity=50 ceiling).
+      DB_POOL_MAX_CONNECTIONS_PER_ROLE: "10"
+    healthcheck:
+      test: [CMD-SHELL, "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /healthz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && timeout 5 grep -q \"200 OK\" <&3'"]
+      interval: 10s
+      timeout: 8s
+      start_period: 90s
+      retries: 12
+  admin-web:
+    image: hellodoctor-admin-ws4:local
+    ports: []
+    environment:
+      ENVIRONMENT: development
+      ADMIN_WEB_ORIGIN: http://admin.localhost
+      BACKEND_URL: http://backend:8080
+      WEB_PROXY_SECRET: ""
+      WEB_AUTH_ASSERTION_SECRET: synthetic-local-assertion-secret-012345678901234567890123
+      TURNSTILE_SITE_KEY: ""
+      TURNSTILE_SECRET_KEY: ""
+      DEV_AUTH_OTP_ENABLED: "true"
+      DEV_SIMULATION_ENABLED: "true"
+      REDIS_URL: redis://redis:6379
+    healthcheck:
+      test: [CMD-SHELL, "node -e \"require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      start_period: 45s
+      retries: 8
+  doctor-web:
+    image: hellodoctor-doctor-ws4:local
+    ports: []
+    environment:
+      ENVIRONMENT: development
+      DOCTOR_WEB_ORIGIN: http://doctor.localhost
+      BACKEND_URL: http://backend:8080
+      WEB_PROXY_SECRET: ""
+      TURNSTILE_SITE_KEY: ""
+      TURNSTILE_SECRET_KEY: ""
+      DEV_AUTH_OTP_ENABLED: "true"
+      DEV_SIMULATION_ENABLED: "true"
+    healthcheck:
+      test: [CMD-SHELL, "node -e \"require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      start_period: 45s
+      retries: 8
+  proxy:
+    volumes: ["./Caddyfile.local-verification:/etc/caddy/Caddyfile:ro", "m8-final-local-caddydata:/data", "m8-final-local-caddyconfig:/config"]
+    environment:
+      API_HOST: api.localhost
+      ADMIN_HOST: admin.localhost
+      DOCTOR_HOST: doctor.localhost
+      ACME_EMAIL: test@example.invalid
+      WEB_PROXY_SECRET: ""
+
+networks:
+  # Local-only override: the base compose marks `data` internal:true (no
+  # production ingress needed there). This file already publishes postgres's
+  # and redis's ports to the host for the benchmark harness, which requires
+  # the opposite — on Docker Desktop/WSL2, a container whose only network is
+  # internal:true never gets its published ports' host listener actually
+  # bound (confirmed: `docker inspect` reports the binding, but nothing
+  # listens on the Windows side). Never applies to the real compose.yml.
+  data:
+    internal: false
+
+volumes:
+  m8-final-local-pgdata: {external: false, name: m8-final-local-pgdata}
+  m8-final-local-redisdata: {external: false, name: m8-final-local-redisdata}
+  m8-final-local-caddydata: {external: false, name: m8-final-local-caddydata}
+  m8-final-local-caddyconfig: {external: false, name: m8-final-local-caddyconfig}
+  m8-final-local-journal: {external: false, name: m8-final-local-journal}
