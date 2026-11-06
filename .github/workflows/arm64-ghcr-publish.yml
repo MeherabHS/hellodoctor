@@ -203,7 +203,7 @@ jobs:
       SOURCE_REVISION: ${{ inputs.source_revision }}
       OWNER_LC: ${{ needs.verify-revision.outputs.owner_lc }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ inputs.source_revision }}
       - name: Fail closed unless checkout landed on the exact requested revision
@@ -272,7 +272,7 @@ jobs:
       SOURCE_REVISION: ${{ inputs.source_revision }}
       OWNER_LC: ${{ needs.verify-revision.outputs.owner_lc }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ inputs.source_revision }}
       - name: Fail closed unless checkout landed on the exact requested revision
@@ -320,7 +320,7 @@ jobs:
       SOURCE_REVISION: ${{ inputs.source_revision }}
       OWNER_LC: ${{ needs.verify-revision.outputs.owner_lc }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ inputs.source_revision }}
       - name: Fail closed unless checkout landed on the exact requested revision
@@ -368,7 +368,7 @@ jobs:
       SOURCE_REVISION: ${{ inputs.source_revision }}
       OWNER_LC: ${{ needs.verify-revision.outputs.owner_lc }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ inputs.source_revision }}
       - name: Fail closed unless checkout landed on the exact requested revision
