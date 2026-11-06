@@ -1,0 +1,17 @@
+# DRAFT - optional fourth overlay, applied on top of compose.yml +
+# compose.local-verification.yml + compose.arm64-ci.yml, only for the
+# HTTPS/secure-cookie verification steps. Swaps the proxy's Caddyfile for the
+# `tls internal`-enabled one; everything else (service images, cpuset,
+# postgres/redis loopback ports) is untouched.
+name: hellodoctor-arm64-ci
+
+services:
+  proxy:
+    volumes:
+      - ./Caddyfile.arm64-ci-tls:/etc/caddy/Caddyfile:ro
+      - caddydata-tls:/data
+      - caddyconfig-tls:/config
+
+volumes:
+  caddydata-tls: {external: false, name: hellodoctor-arm64-ci-caddydata-tls}
+  caddyconfig-tls: {external: false, name: hellodoctor-arm64-ci-caddyconfig-tls}
