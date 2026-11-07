@@ -4,6 +4,9 @@ from verify_trusted_revision import evaluate
 
 MERGE_COMMIT = "b9d72deab79fe868b5d9af561bda341a2f2a8af6"
 OLDER_MAIN_COMMIT = "e3488e54d23ca520f35e49c9f98b8a9290a5a15f"
+OLDER_APPLICATION_COMMIT_PREDATING_VERIFIER_SCRIPTS = (
+    "b9d72deab79fe868b5d9af561bda341a2f2a8af6"
+)
 STALE_PR_HEAD = "f801f7b3a1b09e33a1cbcd1f0b23d30cff4af398"
 SUPERSEDING_FORCE_PUSH_SHA = "deadbeef00112233445566778899aabbccddeef"
 CURRENT_OPEN_PR_HEAD = "1111111111111111111111111111111111aaaa"
@@ -41,6 +44,24 @@ class VerifyTrustedRevisionTests(unittest.TestCase):
         branch."""
         ok, reason = evaluate(
             compare_status="behind", prs=[], source_revision=OLDER_MAIN_COMMIT
+        )
+        self.assertTrue(ok, reason)
+
+    def test_older_application_commit_predating_the_verifier_scripts_still_eligible(self):
+        """Publication failure #4's exact scenario: the requested
+        application source_revision is an older, fully-merged commit whose
+        own tree predates PR #8 (the PR that introduced
+        verify_required_checks.py/verify_trusted_revision.py). This
+        function must evaluate trust from the SAME ancestry/PR-head logic
+        regardless of what files exist in that commit's own tree - the
+        verifier scripts are loaded from the workflow's own (newer,
+        trusted) revision by the calling workflow step, never from
+        source_revision's tree, so an older commit's missing scripts are
+        irrelevant to this function and must not affect its eligibility."""
+        ok, reason = evaluate(
+            compare_status="behind",
+            prs=[],
+            source_revision=OLDER_APPLICATION_COMMIT_PREDATING_VERIFIER_SCRIPTS,
         )
         self.assertTrue(ok, reason)
 

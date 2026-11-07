@@ -104,6 +104,20 @@ jobs:
     outputs:
       owner_lc: ${{ steps.owner.outputs.lc }}
     steps:
+      # FIX (publication failure #4): this job calls
+      # .github/scripts/verify_required_checks.py and
+      # verify_trusted_revision.py, but previously had NO checkout step at
+      # all - $GITHUB_WORKSPACE was simply empty, so those scripts could
+      # never be found regardless of which source_revision was requested.
+      # Deliberately NO `with: ref:` override here, unlike every
+      # publish-* job below: this checkout must always load the verifier
+      # scripts from the revision the workflow itself is running from (the
+      # trusted, already-reviewed workflow file's own ref), never from the
+      # untrusted, caller-supplied `source_revision` - which may be an
+      # older application commit that predates these scripts entirely, or
+      # worse, could let a crafted source_revision substitute its own
+      # verification logic for the real one. Requirement #4 of this fix.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - name: Validate source_revision is an exact 40-character lowercase hex SHA
         env:
           SOURCE_REVISION: ${{ inputs.source_revision }}
