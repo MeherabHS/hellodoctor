@@ -1515,6 +1515,15 @@ async fn review_doctor_professional_registration(
     let doc = doctor_repo::find_by_id(&mut *tx, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Doctor profile not found.".into()))?;
+    // `DoctorProfile` carries no email column; only `users` does. Read
+    // while the transaction is open (cheap, no network I/O) so the value is
+    // ready for the post-commit, fire-and-forget email send below.
+    // `find_email_by_id`, never `find_by_id` — this transaction runs under
+    // the ordinary Admin/Api role, which has no column grant on
+    // `password_hash` at all; `find_by_id` selects it unconditionally and
+    // fails the whole query with "permission denied for table users".
+    let doctor_email =
+        crate::repository::user_repo::find_email_by_id(&mut *tx, doc.user_id).await?;
     if !doctor_repo::review_professional_registration(
         &mut *tx,
         id,
@@ -1559,7 +1568,52 @@ async fn review_doctor_professional_registration(
             .with_before(serde_json::json!({"professional_verification_status": doc.professional_verification_status}))
             .with_after(serde_json::json!({"professional_verification_status": status})),
     ).await?;
+
+    // Phase 1B: atomic creation of the email intent alongside the business
+    // event, on this same transaction — see
+    // `email_outbox_repo::enqueue_transactional`'s doc comment. Content is
+    // rendered later, at dispatch time, from the doctor_profiles row just
+    // updated above.
+    let review_outbox_id = if let Some(email) = doctor_email.as_deref() {
+        let (email_type, dedup_key) = if verified {
+            (
+                "DOCTOR_APPROVED",
+                format!("doctor-approved:{}", id.into_inner()),
+            )
+        } else {
+            (
+                "DOCTOR_REJECTED",
+                format!("doctor-rejected:{}", id.into_inner()),
+            )
+        };
+        let outbox_id = Uuid::new_v4();
+        crate::repository::email_outbox_repo::enqueue_transactional(
+            &mut *tx,
+            outbox_id,
+            email_type,
+            email,
+            &dedup_key,
+            "DOCTOR_PROFILE",
+            id.into_inner(),
+            crate::repository::email_outbox_repo::transactional_email_expiry(),
+        )
+        .await?;
+        Some(outbox_id)
+    } else {
+        None
+    };
     tx.commit().await?;
+
+    // Fire-and-forget, after commit (never awaited — must not delay this
+    // already-committed response). The durable fallback is the periodic
+    // scheduler pass.
+    if let Some(outbox_id) = review_outbox_id {
+        let state = state.clone();
+        tokio::spawn(async move {
+            crate::services::email_dispatch_worker::dispatch_now(&state, outbox_id).await;
+        });
+    }
+
     Ok(Json(ApiResponse {
         success: true,
         data: serde_json::json!({"doctor_id": id, "professional_verification_status": status, "is_verified": verified, "status": status}),

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 536 280" width="536" height="280" role="img" aria-label="Celebratory illustration marking professional approval">
+  <rect width="536" height="280" fill="#DDF5EE"/>
+  <circle cx="90" cy="220" r="70" fill="#F3A58E" opacity="0.3"/>
+  <circle cx="470" cy="60" r="56" fill="#EAE7FA" opacity="0.8"/>
+  <!-- confetti accents -->
+  <circle cx="150" cy="60" r="7" fill="#F3A58E"/>
+  <rect x="380" y="200" width="12" height="12" rx="3" fill="#087F8C"/>
+  <circle cx="420" cy="150" r="6" fill="#164E59"/>
+  <rect x="120" y="150" width="10" height="10" rx="2" fill="#EAE7FA"/>
+  <!-- badge -->
+  <circle cx="268" cy="140" r="64" fill="#164E59"/>
+  <circle cx="268" cy="140" r="48" fill="#087F8C"/>
+  <path d="M248 140 l14 14 l28 -30" stroke="#FFFFFF" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

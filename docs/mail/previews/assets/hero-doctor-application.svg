@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 536 280" width="536" height="280" role="img" aria-label="Illustration representing a received professional application">
+  <rect width="536" height="280" fill="#EAE7FA"/>
+  <circle cx="460" cy="50" r="60" fill="#DDF5EE" opacity="0.8"/>
+  <circle cx="60" cy="230" r="80" fill="#087F8C" opacity="0.12"/>
+  <!-- clipboard -->
+  <rect x="213" y="70" width="110" height="146" rx="14" fill="#164E59"/>
+  <rect x="227" y="86" width="82" height="118" rx="6" fill="#FFFFFF"/>
+  <rect x="246" y="62" width="44" height="18" rx="9" fill="#F3A58E"/>
+  <rect x="240" y="104" width="54" height="8" rx="4" fill="#DDF5EE"/>
+  <rect x="240" y="122" width="54" height="8" rx="4" fill="#DDF5EE"/>
+  <rect x="240" y="140" width="34" height="8" rx="4" fill="#DDF5EE"/>
+  <!-- status checkmark badge -->
+  <circle cx="300" cy="178" r="22" fill="#087F8C"/>
+  <path d="M290 178 l7 7 l14 -16" stroke="#FFFFFF" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

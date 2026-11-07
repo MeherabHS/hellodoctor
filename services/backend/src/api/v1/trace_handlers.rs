@@ -4,7 +4,8 @@ use crate::{
     domain::models::UserRole,
     error::AppError,
     repository::{
-        appointment_repo, chat_repo, grievance_repo, notification_repo, AppState, DbRole,
+        appointment_repo, chat_repo, email_outbox_repo, grievance_repo, notification_repo,
+        AppState, DbRole,
     },
     services::consultation_trace::{self, Event},
 };
@@ -385,7 +386,65 @@ pub async fn reschedule(
         id,
     )
     .await?;
+
+    // Phase 1B: atomic creation of the email intent alongside the business
+    // event, on this same (payment-worker) transaction — see
+    // `email_outbox_repo::enqueue_transactional`'s doc comment. A second
+    // reschedule before the first one's email ever sent must not leave both
+    // queued: `supersede_pending` marks any still-pending
+    // CONFIRMED/RESCHEDULED row for this same appointment stale first, in
+    // the same transaction as the new row's own insert.
+    let recipient_email: Option<String> = sqlx::query_scalar::<_, Option<String>>(
+        "SELECT COALESCE(pu.email, gu.email) \
+           FROM appointments a \
+           JOIN patient_profiles p ON p.id = a.patient_id \
+           LEFT JOIN patient_profiles g ON g.id = p.guardian_patient_id \
+           LEFT JOIN users pu ON pu.id = p.user_id \
+           LEFT JOIN users gu ON gu.id = g.user_id \
+          WHERE a.id = $1",
+    )
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await?;
+    let rescheduled_outbox_id =
+        if let Some(recipient_email) = recipient_email.filter(|e| !e.is_empty()) {
+            let outbox_id = Uuid::new_v4();
+            let dedup_key = format!("consultation-rescheduled:{change}");
+            email_outbox_repo::supersede_pending(
+                &mut *tx,
+                &["CONSULTATION_CONFIRMED", "CONSULTATION_RESCHEDULED"],
+                "APPOINTMENT",
+                id,
+                &dedup_key,
+            )
+            .await?;
+            email_outbox_repo::enqueue_transactional(
+                &mut *tx,
+                outbox_id,
+                "CONSULTATION_RESCHEDULED",
+                &recipient_email,
+                &dedup_key,
+                "APPOINTMENT_RESCHEDULE",
+                change,
+                email_outbox_repo::transactional_email_expiry(),
+            )
+            .await?;
+            Some(outbox_id)
+        } else {
+            None
+        };
     tx.commit().await?;
+
+    // Fire-and-forget, after commit (never awaited — must not delay this
+    // already-committed response). The durable fallback is the periodic
+    // scheduler pass.
+    if let Some(outbox_id) = rescheduled_outbox_id {
+        let state = state.clone();
+        tokio::spawn(async move {
+            crate::services::email_dispatch_worker::dispatch_now(&state, outbox_id).await;
+        });
+    }
+
     Ok(Json(
         json!({"success":true,"data":{"appointment_id":id,"reschedule_id":change,"start_time":new_start}}),
     ))
