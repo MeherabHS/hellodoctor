@@ -18,8 +18,12 @@
 # the script's own exit code is non-zero if any check failed, for scheduler.log.
 set -Eeuo pipefail
 stanza="${PGBACKREST_STANZA:-hellodoctor}"
-max_age="${BACKUP_STALE_MINUTES:-120}"
+# Kept in sync with backup-entrypoint.sh's default — see that script's comment
+# for why 30 (not the original 120) is the floor consistent with the
+# documented ~15-minute RPO.
+max_age="${BACKUP_STALE_MINUTES:-30}"
 alert="${PGBACKREST_ALERT_SCRIPT:-/usr/local/bin/alert-notify.sh}"
+repo_type="${PGBACKREST_REPO1_TYPE:-posix}"
 repo_path="${PGBACKREST_REPO1_PATH:-/var/lib/pgbackrest/repo1}"
 log_dir="${PGBACKREST_LOG_DIR:-/var/log/pgbackrest}"
 growth_state="$log_dir/repo-size.last"
@@ -70,14 +74,33 @@ then
 fi
 
 # --- 3. Excessive repository disk/WAL growth since the previous tick -------
-current_size_kb=$(du -sk "$repo_path" 2>/dev/null | cut -f1)
+# `du` on $repo_path only measures a local POSIX filesystem; for repo_type=
+# azure that path isn't where the data lives at all, so `du` would silently
+# report ~0 forever and this check would never fire — the audit's "monitor
+# does not measure a remote Azure repository" finding. For azure, use the
+# cumulative repository size pgBackRest itself reports for the latest backup
+# (info[].backup[-1].info.repository.size) instead of a local disk reading.
+if [ "$repo_type" = azure ]; then
+  current_size_kb=$(printf '%s' "$info" | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    b = d[0].get("backup", []) if d else []
+    size = b[-1].get("info", {}).get("repository", {}).get("size", 0) if b else 0
+    print(int(size) // 1024)
+except Exception:
+    print(0)
+' 2>/dev/null || echo 0)
+else
+  current_size_kb=$(du -sk "$repo_path" 2>/dev/null | cut -f1)
+fi
 current_size_kb=${current_size_kb:-0}
 if [ -f "$growth_state" ]; then
   previous_size_kb=$(cat "$growth_state" 2>/dev/null || echo "$current_size_kb")
   case "$previous_size_kb" in ''|*[!0-9]*) previous_size_kb=$current_size_kb ;; esac
   growth_mb=$(( (current_size_kb - previous_size_kb) / 1024 ))
   if [ "$growth_mb" -gt "$max_growth_mb" ]; then
-    detail="Backup repository at ${repo_path} grew by ${growth_mb}MB since the previous monitor tick (threshold ${max_growth_mb}MB) — possible WAL/backup accumulation fault or retention misconfiguration."
+    detail="Backup repository (${repo_type}) grew by ${growth_mb}MB since the previous monitor tick (threshold ${max_growth_mb}MB) — possible WAL/backup accumulation fault or retention misconfiguration."
     "$alert" warning BACKUP_REPO_EXCESSIVE_GROWTH "$detail" \
       || echo "backup-monitor: alert-notify dispatch failed for BACKUP_REPO_EXCESSIVE_GROWTH" >&2
   fi

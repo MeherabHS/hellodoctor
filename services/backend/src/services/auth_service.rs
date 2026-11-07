@@ -6,8 +6,8 @@ use crate::domain::validation;
 use crate::error::AppError;
 use crate::ip_jail;
 use crate::repository::{
-    doctor_repo, legal_repo, notification_repo, otp_repo, patient_auth_repo, patient_repo,
-    session_repo, user_repo, AppState,
+    doctor_repo, email_outbox_repo, legal_repo, notification_repo, otp_repo, patient_auth_repo,
+    patient_repo, session_repo, user_repo, AppState,
 };
 use chrono::{Datelike, Duration, Utc};
 use rand::RngCore;
@@ -21,8 +21,6 @@ const MFA_CHALLENGE_TTL_SECONDS: i64 = 300;
 
 #[path = "auth_abuse.rs"]
 pub mod abuse;
-#[path = "admin_totp.rs"]
-pub mod admin_totp;
 #[path = "device_proof.rs"]
 pub mod device_proof;
 
@@ -363,6 +361,7 @@ impl AuthService {
         } else {
             None
         };
+        let expires_at = Utc::now() + Duration::seconds(MFA_CHALLENGE_TTL_SECONDS);
         patient_auth_repo::insert(
             &state.auth_db,
             &token,
@@ -372,12 +371,46 @@ impl AuthService {
             existing_id,
             if register { "REGISTER" } else { "LOGIN" },
             &crypto::hash_code(&code),
-            Utc::now() + Duration::seconds(MFA_CHALLENGE_TTL_SECONDS),
+            expires_at,
             profile,
         )
         .await?;
-        if let Err(error) =
-            crate::email_delivery::send_email_otp(&state.config, &email, &code).await
+        let first_name = if register {
+            profile
+                .map(|p| p.full_name.as_str())
+                .and_then(|n| n.split_whitespace().next())
+                .unwrap_or_default()
+                .to_string()
+        } else {
+            match existing_id {
+                Some(uid) => patient_repo::find_by_user_id(&state.db, uid)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|p| p.full_name)
+                    .unwrap_or_default()
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or_default()
+                    .to_string(),
+                None => String::new(),
+            }
+        };
+        let rendered = crate::services::email_templates::render_patient_login_otp(
+            &first_name,
+            &code,
+            MFA_CHALLENGE_TTL_SECONDS / 60,
+            &state.email_assets,
+        );
+        if let Err(error) = crate::email_delivery::send_rendered_otp_email_tracked(
+            state,
+            &email,
+            &rendered,
+            crate::email_delivery::OtpEmailKind::Patient,
+            &token,
+            expires_at,
+        )
+        .await
         {
             patient_auth_repo::delete(&state.auth_db, &token).await?;
             return Err(error);
@@ -490,6 +523,7 @@ impl AuthService {
         }
         sqlx::query("SELECT set_config('app.current_user_id',$1,true),set_config('app.current_role','PATIENT',true),set_config('app.current_doctor_id','',true),set_config('app.current_session_id','',true),set_config('app.current_request_id','',true)").bind(user.id.to_string()).execute(&mut *tx).await?;
         sqlx::query("SELECT set_config('app.current_patient_id',COALESCE((SELECT id::text FROM patient_profiles WHERE user_id=$1),''),true)").bind(user.id).execute(&mut *tx).await?;
+        let mut new_patient_full_name: Option<String> = None;
         if !patient_repo::exists_for_user_id(&mut *tx, user.id).await? {
             let details: patient_auth_repo::PatientRegistrationProfile =
                 serde_json::from_value(challenge.registration_profile.ok_or_else(|| {
@@ -514,6 +548,7 @@ impl AuthService {
                 created_at: now,
                 updated_at: now,
             };
+            new_patient_full_name = Some(profile.full_name.clone());
             patient_repo::insert(&mut *tx, &profile).await?;
         }
         if new_patient {
@@ -540,7 +575,46 @@ impl AuthService {
                 .await?;
             }
         }
+
+        // Phase 1B: atomic creation of the email intent alongside the
+        // business event, on this same transaction — only sent when a real
+        // name was actually captured at registration (this function is the
+        // email+password path, where it always is for a genuinely new
+        // account); never guessed or defaulted. Content is rendered later,
+        // at dispatch time, by `services::email_dispatch_worker` — see
+        // `email_outbox_repo::enqueue_transactional`'s own doc comment.
+        let welcome_outbox_id = if new_patient && new_patient_full_name.is_some() {
+            let id = Uuid::new_v4();
+            let dedup_key = format!("patient-welcome:{}", user.id);
+            email_outbox_repo::enqueue_transactional(
+                &mut *tx,
+                id,
+                "PATIENT_WELCOME",
+                &challenge.email,
+                &dedup_key,
+                "USER",
+                user.id.into_inner(),
+                email_outbox_repo::transactional_email_expiry(),
+            )
+            .await?;
+            Some(id)
+        } else {
+            None
+        };
         tx.commit().await?;
+
+        // Fire-and-forget, after commit (never awaited — must not delay this
+        // already-committed registration's response): a best-effort
+        // immediate send attempt. The durable fallback is the periodic
+        // scheduler pass, which will pick this row up regardless even if
+        // the process restarts before this spawned task ever runs.
+        if let Some(outbox_id) = welcome_outbox_id {
+            let state = state.clone();
+            tokio::spawn(async move {
+                crate::services::email_dispatch_worker::dispatch_now(&state, outbox_id).await;
+            });
+        }
+
         Self::issue_login_response_with_device(state, &user, device_key).await
     }
 
@@ -608,7 +682,31 @@ impl AuthService {
         )
         .await?;
 
-        if let Err(error) = crate::email_delivery::send_email_otp(&state.config, email, &code).await
+        let first_name = doctor_repo::find_by_user_id(&state.db, user.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|d| d.full_name)
+            .unwrap_or_default()
+            .split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        let rendered = crate::services::email_templates::render_doctor_login_otp(
+            &first_name,
+            &code,
+            MFA_CHALLENGE_TTL_SECONDS / 60,
+            &state.email_assets,
+        );
+        if let Err(error) = crate::email_delivery::send_rendered_otp_email_tracked(
+            state,
+            email,
+            &rendered,
+            crate::email_delivery::OtpEmailKind::Doctor,
+            &token,
+            expires_at,
+        )
+        .await
         {
             session_repo::delete_pending_challenge(&state.auth_db, &token).await?;
             return Err(error);
@@ -725,9 +823,14 @@ impl AuthService {
         Self::issue_login_response_with_device(state, &user, device_key).await
     }
 
-    /// Admin password verification issues an emailed OTP challenge. Completing
-    /// it additionally requires the enrolled authenticator TOTP in deployed
-    /// environments; email possession alone never completes Admin MFA.
+    /// Admin password verification issues an emailed OTP challenge, exactly
+    /// like `doctor_login_step1`. Admin previously also required an
+    /// enrolled authenticator TOTP as a mandatory second factor on top of
+    /// this OTP; that was removed (no self-service enrollment endpoint ever
+    /// existed, so it could only ever be provisioned out-of-band, and it
+    /// duplicated protection the OTP challenge/attempt-count/ip_jail stack
+    /// already provides) so Admin, Doctor, and Patient now share one MFA
+    /// shape.
     pub async fn admin_login_step1(
         state: &AppState,
         email: &str,
@@ -785,8 +888,26 @@ impl AuthService {
             expires_at,
         )
         .await?;
-        if let Err(error) =
-            crate::email_delivery::send_email_otp(&state.config, &recipient, &code).await
+        // Admin has no profile table to source a display name from (no
+        // self-service enrollment, per this function's own doc comment
+        // above); `render_admin_login_otp`'s `fallback_name` renders an
+        // empty name as "there", matching the same fallback already used
+        // for password-reset/password-changed emails.
+        let rendered = crate::services::email_templates::render_admin_login_otp(
+            "",
+            &code,
+            MFA_CHALLENGE_TTL_SECONDS / 60,
+            &state.email_assets,
+        );
+        if let Err(error) = crate::email_delivery::send_rendered_otp_email_tracked(
+            state,
+            &recipient,
+            &rendered,
+            crate::email_delivery::OtpEmailKind::Admin,
+            &token,
+            expires_at,
+        )
+        .await
         {
             session_repo::delete_pending_challenge(&state.auth_db, &token).await?;
             return Err(error);
@@ -799,24 +920,15 @@ impl AuthService {
     }
 
     /// Admin login step 2: verify the emailed code for the pending challenge
-    /// session. Mirrors `doctor_verify_otp`'s brute-force protection exactly
+    /// session. Identical in shape to `doctor_verify_otp_with_device`
     /// (per-challenge `attempt_count`/`max_attempts` under a row lock, plus
-    /// the same account-level jail `admin_login_step1`'s caller uses).
+    /// the same account-level jail `admin_login_step1`'s caller uses) —
+    /// Admin no longer has a second, TOTP-based factor on top of this.
     pub async fn admin_verify_otp(
         state: &AppState,
         ip: &str,
         session_token: &str,
         otp_code: &str,
-    ) -> Result<LoginResponseDto, AppError> {
-        Self::admin_verify_otp_with_totp(state, ip, session_token, otp_code, None).await
-    }
-
-    pub async fn admin_verify_otp_with_totp(
-        state: &AppState,
-        ip: &str,
-        session_token: &str,
-        otp_code: &str,
-        totp_code: Option<&str>,
     ) -> Result<LoginResponseDto, AppError> {
         if ip_jail::is_ip_jailed(&state.redis, ip).await? {
             return Err(AppError::Forbidden(
@@ -883,14 +995,6 @@ impl AuthService {
             ));
         }
 
-        if let Err(error) = admin_totp::verify(state, &mut tx, user.id, totp_code).await {
-            if matches!(error, AppError::Unauthorized(_)) {
-                session_repo::increment_challenge_attempts(&mut tx, session_token).await?;
-                tx.commit().await?;
-                ip_jail::record_failure(&state.redis, ip, &account_key).await?;
-            }
-            return Err(error);
-        }
         session_repo::delete_pending_challenge(&mut *tx, session_token).await?;
         tx.commit().await?;
         ip_jail::record_success(&state.redis, &account_key).await?;

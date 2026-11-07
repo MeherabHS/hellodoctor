@@ -124,6 +124,42 @@ pub async fn count_active<'e, E: PgExecutor<'e>>(executor: E) -> Result<i64, sql
 /// SECURITY`). Callers must validate `language` against the allowed locale
 /// set themselves; this function trusts its caller the same way every other
 /// function in this module does.
+/// Only `hellodoctor_auth_worker` has `UPDATE` on `users` (see
+/// `anonymize_and_deactivate`'s doc comment) — callers must use
+/// `DbRole::AuthWorker`, never the default `Api` pool.
+pub async fn update_password_hash<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: UserId,
+    new_password_hash: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1")
+        .bind(id)
+        .bind(new_password_hash)
+        .execute(executor)
+        .await?;
+    Ok(())
+}
+
+/// Minimal, `hellodoctor_api`-safe counterpart to `find_by_id`: selects only
+/// `email`, never `password_hash` — `hellodoctor_api`'s column-scoped GRANT
+/// (migrations/20261026000001_canonical_user_isolation) does not include
+/// `password_hash` at all, so a caller running under the ordinary `Api`
+/// role (e.g. an admin reviewing a doctor's registration, which needs the
+/// doctor's email to notify them of the decision) must use this, never
+/// `find_by_id`, or the query fails with "permission denied for table
+/// users" regardless of RLS — a column-privilege error, not a row-security
+/// one, so it is silent about which column is the actual problem until you
+/// already know to look here.
+pub async fn find_email_by_id<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: UserId,
+) -> Result<Option<String>, sqlx::Error> {
+    sqlx::query_scalar("SELECT email FROM users WHERE id = $1 AND deleted_at IS NULL")
+        .bind(id)
+        .fetch_optional(executor)
+        .await
+}
+
 pub async fn set_preferred_language<'e, E: PgExecutor<'e>>(
     executor: E,
     id: UserId,
