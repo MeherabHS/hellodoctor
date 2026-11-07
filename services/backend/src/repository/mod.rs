@@ -2,7 +2,7 @@ pub mod admin_article_repo;
 pub mod article_quiz_repo;
 pub mod article_repo;
 use crate::auth_context::AuthContext;
-use crate::config::AppConfig;
+use crate::config::{AppConfig, StorageProvider};
 use crate::error::AppError;
 use sqlx::{PgPool, Postgres, Transaction};
 use std::sync::Arc;
@@ -13,11 +13,13 @@ pub mod campaign_repo;
 pub mod chat_repo;
 pub mod consultation_repo;
 pub mod doctor_repo;
+pub mod email_outbox_repo;
 pub mod grievance_repo;
 pub mod idempotency_repo;
 pub mod legal_repo;
 pub mod notification_repo;
 pub mod otp_repo;
+pub mod password_reset_repo;
 pub mod patient_auth_repo;
 pub mod patient_repo;
 pub mod payment_event_repo;
@@ -39,8 +41,8 @@ pub mod wallet_repo;
 pub enum DbRole {
     /// Ordinary reads and patient/doctor-authored content writes.
     Api,
-    /// auth_sessions / mfa_credentials / OTP / login bootstrap, including the
-    /// one patient self-registration insert at the end of first-time OTP verify.
+    /// auth_sessions / OTP / login bootstrap, including the one patient
+    /// self-registration insert at the end of first-time OTP verify.
     AuthWorker,
     /// Booking + payment-state transitions (appointments, slots, transactions).
     PaymentWorker,
@@ -60,14 +62,100 @@ pub struct AppState {
     pub finance_db: PgPool,
     pub redis: deadpool_redis::Pool,
     pub config: Arc<AppConfig>,
+    /// Clinical/private storage handle. The selected container is fixed by
+    /// server configuration and is never supplied by a client.
     pub object_storage: Option<Arc<dyn object_store::ObjectStore>>,
+    /// Separate article-media handle. Azure deployments use a distinct
+    /// private container so article media can never address clinical blobs.
+    pub article_media_storage: Option<Arc<dyn object_store::ObjectStore>>,
     pub admission: Arc<crate::admission::Admission>,
     pub web_auth: Arc<crate::api::middleware::web_auth::WebAuthGate>,
     pub notification_transport:
         Arc<dyn crate::services::notification_transport::NotificationTransport>,
+    pub email_transport: Arc<dyn crate::services::email_transport::EmailTransport>,
+    /// Phase 2: shared presentation config for every transactional email
+    /// template — constructed once from `AppConfig` so call sites never
+    /// hand-roll a placeholder URL. `EmailAssets::none()`/`EmailLinks::none()`
+    /// (no hero images, no CTA buttons) is what every environment gets
+    /// until these env vars are deliberately set.
+    pub email_assets: crate::services::email_templates::EmailAssets,
+    pub email_links: crate::services::email_templates::EmailLinks,
 }
 
 impl AppState {
+    fn build_storage(
+        config: &AppConfig,
+        container: &str,
+    ) -> Option<Arc<dyn object_store::ObjectStore>> {
+        let client_options = object_store::ClientOptions::new()
+            .with_allow_http(config.is_development_or_test())
+            .with_timeout(std::time::Duration::from_secs(6));
+        match config.storage_provider {
+            StorageProvider::Disabled => None,
+            StorageProvider::LegacyS3 => Some(Arc::new(
+                object_store::aws::AmazonS3Builder::new()
+                    .with_bucket_name(container)
+                    .with_region("us-east-1")
+                    .with_endpoint(&config.storage_endpoint)
+                    .with_access_key_id(&config.storage_access_key)
+                    .with_secret_access_key(&config.storage_secret_key)
+                    .with_allow_http(config.is_development_or_test())
+                    .with_client_options(client_options)
+                    .build()
+                    .unwrap_or_else(|_| {
+                        panic!("Invalid private legacy object-storage configuration")
+                    }),
+            ) as Arc<dyn object_store::ObjectStore>),
+            StorageProvider::Azure => {
+                let account = config
+                    .azure_storage_account_name
+                    .as_deref()
+                    .expect("FATAL: Azure storage account configuration is missing");
+                let mut builder = object_store::azure::MicrosoftAzureBuilder::new()
+                    .with_account(account)
+                    .with_container_name(container)
+                    .with_allow_http(config.is_development_or_test())
+                    .with_client_options(client_options);
+                if let Some(endpoint) = config.azure_storage_endpoint.as_deref() {
+                    builder = builder.with_endpoint(endpoint.to_owned());
+                }
+                match config
+                    .azure_storage_auth_mode
+                    .trim()
+                    .to_ascii_lowercase()
+                    .as_str()
+                {
+                    "managed_identity" => {
+                        builder = builder.with_credential_type("managed_identity");
+                        if let Some(client_id) = config.azure_storage_client_id.as_deref() {
+                            builder = builder.with_client_id(client_id);
+                        }
+                    }
+                    "account_key" => {
+                        builder = builder.with_credential_type("access_key").with_access_key(
+                            config
+                                .azure_storage_account_key
+                                .as_deref()
+                                .expect("FATAL: Azure account key configuration is missing"),
+                        );
+                    }
+                    "azurite" => {
+                        builder = builder.with_use_emulator(true);
+                        if let Some(account_key) = config.azure_storage_account_key.as_deref() {
+                            builder = builder.with_access_key(account_key);
+                        }
+                    }
+                    _ => panic!("FATAL: invalid Azure storage authentication mode"),
+                }
+                Some(Arc::new(
+                    builder.build().unwrap_or_else(|_| {
+                        panic!("Invalid private Azure Blob Storage configuration")
+                    }),
+                ) as Arc<dyn object_store::ObjectStore>)
+            }
+        }
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         db: PgPool,
@@ -78,31 +166,18 @@ impl AppState {
         redis: deadpool_redis::Pool,
         config: Arc<AppConfig>,
     ) -> Self {
-        // Local development does not install or start a storage service.
-        // With no configured external store, document operations fail explicitly.
-        let storage_configured = !config.storage_endpoint.is_empty()
-            && !config.storage_access_key.is_empty()
-            && !config.storage_secret_key.is_empty()
-            && !config.storage_encryption_key_b64.is_empty();
-        let object_storage: Option<Arc<dyn object_store::ObjectStore>> =
-            storage_configured.then(|| {
-                Arc::new(
-                    object_store::aws::AmazonS3Builder::new()
-                        .with_bucket_name(&config.storage_bucket)
-                        .with_region("us-east-1")
-                        .with_endpoint(&config.storage_endpoint)
-                        .with_access_key_id(&config.storage_access_key)
-                        .with_secret_access_key(&config.storage_secret_key)
-                        .with_allow_http(config.environment == "development")
-                        .with_client_options(
-                            object_store::ClientOptions::new()
-                                .with_allow_http(config.environment == "development")
-                                .with_timeout(std::time::Duration::from_secs(6)),
-                        )
-                        .build()
-                        .expect("Invalid private object-storage configuration"),
-                ) as Arc<dyn object_store::ObjectStore>
-            });
+        let object_storage = Self::build_storage(config.as_ref(), &config.storage_bucket);
+        let article_media_storage = match config.storage_provider {
+            StorageProvider::Azure => Self::build_storage(
+                config.as_ref(),
+                config
+                    .azure_storage_article_container
+                    .as_deref()
+                    .expect("FATAL: Azure article-media container configuration is missing"),
+            ),
+            StorageProvider::LegacyS3 => object_storage.clone(),
+            StorageProvider::Disabled => None,
+        };
         // Five independent per-role pools (see `DbRole`) each hold
         // `db_pool_max_connections_per_role` connections, so the combined
         // real DB capacity behind admission is five times that value, not
@@ -117,11 +192,49 @@ impl AppState {
         ));
         let notification_transport: Arc<
             dyn crate::services::notification_transport::NotificationTransport,
-        > = match crate::services::notification_transport::FcmTransport::from_config(&config) {
-            Ok(Some(transport)) => Arc::new(transport),
-            Ok(None) => Arc::new(crate::services::notification_transport::NoopTransport),
-            Err(error) => panic!("FATAL: invalid FCM configuration: {error}"),
+        > = if config.recovery_mode {
+            // A restored system must not send recovered outbox rows while an
+            // operator is reconciling provider state. This is deliberately
+            // enforced at construction time, rather than relying on an
+            // operator to remember a second feature flag.
+            Arc::new(crate::services::notification_transport::NoopTransport)
+        } else {
+            match crate::services::notification_transport::FcmTransport::from_config(&config) {
+                Ok(Some(transport)) => Arc::new(transport),
+                Ok(None) => Arc::new(crate::services::notification_transport::NoopTransport),
+                Err(error) => panic!("FATAL: invalid FCM configuration: {error}"),
+            }
         };
+        let email_transport: Arc<dyn crate::services::email_transport::EmailTransport> =
+            if config.recovery_mode {
+                // Same safety posture as `notification_transport` above: a
+                // restored system must not send email while an operator is
+                // reconciling provider state. In practice this is moot for
+                // ordinary login OTP email specifically, since RECOVERY_MODE
+                // already disables ordinary authentication entirely
+                // (see docs/RECOVERY_SECURITY_MODEL.md) — kept for
+                // consistency and so any future, non-auth email trigger
+                // inherits the same guarantee automatically.
+                Arc::new(crate::services::email_transport::NoopEmailTransport)
+            } else {
+                match crate::services::email_transport::AcsEmailTransport::from_config(&config) {
+                    Ok(Some(transport)) => Arc::new(transport),
+                    Ok(None) => Arc::new(crate::services::email_transport::NoopEmailTransport),
+                    Err(error) => panic!(
+                        "FATAL: invalid Azure Communication Services Email configuration: {error}"
+                    ),
+                }
+            };
+        let email_assets = match config.email_asset_base_url.as_deref() {
+            Some(base_url) => {
+                crate::services::email_templates::EmailAssets::with_base_url(base_url)
+            }
+            None => crate::services::email_templates::EmailAssets::none(),
+        };
+        let email_links = crate::services::email_templates::EmailLinks::new(
+            config.email_patient_app_url.as_deref(),
+            config.email_doctor_portal_url.as_deref(),
+        );
         Self {
             db,
             auth_db,
@@ -131,9 +244,13 @@ impl AppState {
             redis,
             config,
             object_storage,
+            article_media_storage,
             admission,
             web_auth,
             notification_transport,
+            email_assets,
+            email_links,
+            email_transport,
         }
     }
 
@@ -206,5 +323,56 @@ impl AppState {
         ctx: &AuthContext,
     ) -> Result<Transaction<'_, Postgres>, AppError> {
         self.begin_authed_as(ctx, DbRole::Api).await
+    }
+}
+
+#[cfg(test)]
+mod storage_tests {
+    use object_store::{path::Path, ObjectStore, PutMode, PutOptions};
+
+    #[test]
+    fn azure_builder_supports_explicit_account_key_and_managed_identity_modes() {
+        let account_key = "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==";
+        object_store::azure::MicrosoftAzureBuilder::new()
+            .with_account("hellodoctor")
+            .with_container_name("clinical-private")
+            .with_credential_type("access_key")
+            .with_access_key(account_key)
+            .build()
+            .expect("account-key Azure builder should validate without network access");
+        object_store::azure::MicrosoftAzureBuilder::new()
+            .with_account("hellodoctor")
+            .with_container_name("article-media")
+            .with_credential_type("managed_identity")
+            .build()
+            .expect("managed-identity Azure builder should validate without network access");
+    }
+
+    #[tokio::test]
+    async fn create_only_contract_rejects_overwrite() {
+        let store = object_store::memory::InMemory::new();
+        store
+            .put_opts(
+                &Path::from("clinical/test.bin"),
+                vec![1_u8].into(),
+                PutOptions {
+                    mode: PutMode::Create,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        let error = store
+            .put_opts(
+                &Path::from("clinical/test.bin"),
+                vec![2_u8].into(),
+                PutOptions {
+                    mode: PutMode::Create,
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect_err("create-only writes must reject an existing object");
+        assert!(matches!(error, object_store::Error::AlreadyExists { .. }));
     }
 }
