@@ -99,6 +99,22 @@ pub fn start(state: AppState) {
             if let Err(e) = run_push_delivery_pass(&state).await {
                 tracing::error!(error = ?e, "notification scheduler: FCM delivery pass failed");
             }
+            // Phase 0 email integration: reconciliation only, never a
+            // resend — see `email_delivery::run_email_outbox_expiry_sweep`'s
+            // doc comment for why OTP email delivery is never retried from
+            // here.
+            if let Err(e) = crate::email_delivery::run_email_outbox_expiry_sweep(&state).await {
+                tracing::error!(error = ?e, "notification scheduler: email outbox expiry sweep failed");
+            }
+            // Phase 1B: durable fallback for transactional email — anything
+            // the post-commit `email_dispatch_worker::dispatch_now` fast
+            // path missed (process restart, transient failure now past its
+            // backoff, a stale lease recovered from a crashed attempt).
+            if let Err(e) =
+                super::email_dispatch_worker::run_transactional_email_dispatch_pass(&state).await
+            {
+                tracing::error!(error = ?e, "notification scheduler: transactional email dispatch pass failed");
+            }
         }
     });
 }

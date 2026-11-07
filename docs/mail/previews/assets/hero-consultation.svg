@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 536 280" width="536" height="280" role="img" aria-label="Calendar illustration representing a scheduled consultation">
+  <rect width="536" height="280" fill="#DDF5EE"/>
+  <circle cx="450" cy="220" r="70" fill="#EAE7FA" opacity="0.7"/>
+  <circle cx="70" cy="50" r="46" fill="#087F8C" opacity="0.15"/>
+  <!-- calendar card -->
+  <rect x="193" y="70" width="150" height="140" rx="16" fill="#FFFFFF"/>
+  <rect x="193" y="70" width="150" height="36" rx="16" fill="#164E59"/>
+  <rect x="193" y="92" width="150" height="14" fill="#164E59"/>
+  <rect x="216" y="56" width="10" height="28" rx="5" fill="#164E59"/>
+  <rect x="310" y="56" width="10" height="28" rx="5" fill="#164E59"/>
+  <circle cx="230" cy="140" r="10" fill="#DDF5EE"/>
+  <circle cx="268" cy="140" r="10" fill="#F3A58E"/>
+  <circle cx="306" cy="140" r="10" fill="#DDF5EE"/>
+  <circle cx="230" cy="174" r="10" fill="#DDF5EE"/>
+  <circle cx="268" cy="174" r="10" fill="#DDF5EE"/>
+  <circle cx="306" cy="174" r="10" fill="#DDF5EE"/>
+</svg>

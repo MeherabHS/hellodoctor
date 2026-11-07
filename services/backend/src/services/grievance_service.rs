@@ -370,6 +370,7 @@ impl GrievanceService {
         to_status: &str,
         provider_reference: Option<String>,
     ) -> Result<FinancialRefundRequest, AppError> {
+        crate::abac::authorize(ctx, crate::abac::Action::InitiateDisbursement)?;
         const ALLOWED: [&str; 4] = [
             "PROCESSING",
             "REFUNDED",
@@ -392,6 +393,13 @@ impl GrievanceService {
         }
 
         let mut tx = state.begin_authed_as(ctx, DbRole::FinanceWorker).await?;
+        let created_at: chrono::DateTime<Utc> = sqlx::query_scalar("SELECT t.created_at FROM transactions t JOIN financial_refund_requests f ON f.transaction_id=t.id WHERE f.id=$1")
+            .bind(refund_request_id).fetch_optional(&mut *tx).await?
+            .ok_or_else(||AppError::NotFound("Refund request not found.".into()))?;
+        sqlx::query("SELECT pg_advisory_xact_lock(61012,EXTRACT(YEAR FROM $1::timestamptz)::integer*100+EXTRACT(MONTH FROM $1::timestamptz)::integer)")
+            .bind(created_at).execute(&mut *tx).await?;
+        sqlx::query("SELECT t.id FROM transactions t JOIN financial_refund_requests f ON f.transaction_id=t.id WHERE f.id=$1 FOR UPDATE OF t,f")
+            .bind(refund_request_id).fetch_one(&mut *tx).await?;
         let existing = grievance_repo::find_refund_request(&mut *tx, refund_request_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Refund request not found.".into()))?;
@@ -412,6 +420,18 @@ impl GrievanceService {
             return Err(AppError::Conflict(
                 "This refund request was changed by another request; reload and retry.".into(),
             ));
+        }
+
+        if to_status == "REFUNDED" {
+            let payment = sqlx::query("UPDATE transactions SET payment_status='REFUNDED_TO_PATIENT',reconciliation_required=false WHERE id=$1 AND payment_status='REFUND_PENDING'")
+                .bind(existing.transaction_id).execute(&mut *tx).await?.rows_affected();
+            let grievance = sqlx::query("UPDATE grievance_reports SET status='REFUNDED' WHERE id=$1 AND status='REFUND_APPROVED'")
+                .bind(existing.grievance_id).execute(&mut *tx).await?.rows_affected();
+            if payment != 1 || grievance != 1 {
+                return Err(AppError::Conflict(
+                    "Refund records require reconciliation before completion.".into(),
+                ));
+            }
         }
 
         let appointment_id: Uuid = sqlx::query_scalar(
@@ -448,7 +468,59 @@ impl GrievanceService {
         let updated = grievance_repo::find_refund_request(&mut *tx, refund_request_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Refund request not found.".into()))?;
+
+        // Phase 1B: atomic creation of the email intent alongside the
+        // business event, on this same (finance-worker) transaction — see
+        // `email_outbox_repo::enqueue_transactional`'s doc comment. Only on
+        // actual completion, never on PROCESSING/FAILED/
+        // RECONCILIATION_REQUIRED. Content is rendered later, at dispatch
+        // time, from the `financial_refund_requests`/`transactions` rows
+        // just updated above.
+        let refund_outbox_id = if to_status == "REFUNDED" {
+            let recipient_email: Option<String> = sqlx::query_scalar::<_, Option<String>>(
+                "SELECT COALESCE(pu.email, gu.email) \
+                   FROM appointments a \
+                   JOIN patient_profiles p ON p.id = a.patient_id \
+                   LEFT JOIN patient_profiles g ON g.id = p.guardian_patient_id \
+                   LEFT JOIN users pu ON pu.id = p.user_id \
+                   LEFT JOIN users gu ON gu.id = g.user_id \
+                  WHERE a.id = $1",
+            )
+            .bind(appointment_id)
+            .fetch_one(&mut *tx)
+            .await?;
+            if let Some(recipient_email) = recipient_email.filter(|e| !e.is_empty()) {
+                let outbox_id = Uuid::new_v4();
+                crate::repository::email_outbox_repo::enqueue_transactional(
+                    &mut *tx,
+                    outbox_id,
+                    "REFUND_PROCESSED",
+                    &recipient_email,
+                    &format!("refund-processed:{refund_request_id}"),
+                    "REFUND_REQUEST",
+                    refund_request_id,
+                    crate::repository::email_outbox_repo::transactional_email_expiry(),
+                )
+                .await?;
+                Some(outbox_id)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
         tx.commit().await?;
+
+        // Fire-and-forget, after commit (never awaited — must not delay this
+        // already-committed response). The durable fallback is the periodic
+        // scheduler pass.
+        if let Some(outbox_id) = refund_outbox_id {
+            let state = state.clone();
+            tokio::spawn(async move {
+                crate::services::email_dispatch_worker::dispatch_now(&state, outbox_id).await;
+            });
+        }
+
         Ok(updated)
     }
 }

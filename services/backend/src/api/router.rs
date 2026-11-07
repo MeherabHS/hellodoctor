@@ -341,6 +341,18 @@ fn public_routes() -> Router<AppState> {
         )
         .route("/auth/logout", axum::routing::post(auth_handlers::logout))
         .route(
+            "/auth/password-reset/request",
+            axum::routing::post(auth_handlers::request_password_reset),
+        )
+        .route(
+            "/auth/password-reset/verify-otp",
+            axum::routing::post(auth_handlers::verify_password_reset_otp),
+        )
+        .route(
+            "/auth/password-reset/complete",
+            axum::routing::post(auth_handlers::complete_password_reset),
+        )
+        .route(
             "/webhooks/payment/:provider",
             axum::routing::post(webhook_handlers::handle_payment_webhook),
         )
@@ -356,6 +368,10 @@ fn public_routes() -> Router<AppState> {
 /// each handler via `abac::authorize` and `AuthContext`.
 fn protected_routes() -> Router<AppState> {
     Router::new()
+        .route(
+            "/auth/change-password",
+            axum::routing::post(auth_handlers::change_password),
+        )
         .route("/client-errors", axum::routing::post(client_error_handlers::submit_client_error)
             .layer(axum::extract::DefaultBodyLimit::max(16 * 1024)))
         .route("/doctor/articles", get(article_handlers::list_own).post(article_handlers::create))

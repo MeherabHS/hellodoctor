@@ -1,0 +1,39 @@
+-- Milestone 8 Phase 6 efficiency investigation (2026-11-02).
+--
+-- Profiled via pg_stat_statements under real traffic from the six-service
+-- benchmark (hellodoctor-m8-final-local, disposable, never the shared dev
+-- database): consultation_repo::list_monitoring() -- the query behind
+-- GET /api/v1/admin/command/telemetry (admin_handlers.rs) -- was the single
+-- highest cumulative-cost SQL statement observed (27.04% of all query time
+-- in the sampled window), ahead of Doctor Chats/Appointments combined.
+-- `EXPLAIN (ANALYZE, BUFFERS)` against the real hellodoctor_api role
+-- confirmed a full Seq Scan + Sort over consultation_sessions (86,344 rows
+-- in this benchmark's dataset, zero existing index on status or
+-- recovery_state) on every single call, 76ms per call measured standalone,
+-- 101.77ms mean under concurrent load (2,941 calls, ~300 cumulative seconds)
+-- in the real benchmark run. This dataset's status distribution (73,842
+-- INITIALIZED / 85.5%, 12,368 COMPLETED, 134 PREMATURE_TERMINATION) is itself
+-- a synthetic-seeding artifact -- real production traffic should have far
+-- fewer long-lived INITIALIZED/ACTIVE rows at any moment, making this index
+-- substantially more selective there than in this specific benchmark
+-- dataset. Separately confirmed the real Admin-Web client only polls this
+-- endpoint every 30 seconds while the Command Center page is open
+-- (apps/admin-web/src/lib/useBackendSync.ts) -- the high call volume
+-- observed in the benchmark is a synthetic-workload artifact
+-- (capacity_test.rs fires this from 4% of all simulated patient-session
+-- action rolls, decoupled from realistic admin headcount), not a
+-- reflection of real production call frequency. The query is still
+-- genuinely wasteful (an uncapped full-table scan) independent of exactly
+-- how often it is called, and worth fixing on its own merits.
+--
+-- Fix: a partial expression index matching list_monitoring()'s exact
+-- WHERE/ORDER BY, so the planner can satisfy the whole query -- filter,
+-- order, and LIMIT -- from a single Index Scan with no separate Sort step.
+-- Pure read-path accelerant: no query result, RLS/ABAC semantics, or
+-- write-path authorization changes. Following this project's established
+-- precedent (20261202000005_t15_reminder_scan_indexes,
+-- 20261204000002_chat_conversations_doctor_index) of a plain,
+-- non-CONCURRENTLY `CREATE INDEX` for a modest-sized table.
+CREATE INDEX idx_consultation_sessions_monitoring
+ON consultation_sessions ((recovery_state = 'NEEDS_REVIEW'), COALESCE(ended_at, started_at, created_at))
+WHERE status IN ('ACTIVE', 'INITIALIZED', 'PREMATURE_TERMINATION') OR recovery_state = 'NEEDS_REVIEW';

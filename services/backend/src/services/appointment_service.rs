@@ -4,8 +4,8 @@ use crate::domain::ids::{DoctorProfileId, PatientProfileId};
 use crate::domain::models::*;
 use crate::error::AppError;
 use crate::repository::{
-    appointment_repo, chat_repo, consultation_repo, doctor_repo, payment_event_repo,
-    payment_methods_repo, transaction_repo, AppState, DbRole,
+    appointment_repo, chat_repo, consultation_repo, doctor_repo, email_outbox_repo,
+    payment_event_repo, payment_methods_repo, transaction_repo, AppState, DbRole,
 };
 use bigdecimal::BigDecimal;
 use chrono::Utc;
@@ -169,7 +169,14 @@ impl AppointmentService {
 
         let payment_session_id = Uuid::new_v4();
         let txn_id = Uuid::new_v4();
-        let txn_num = format!("TXN-{}", txn_id.to_string()[0..8].to_uppercase());
+        // Milestone 8 sustained-reliability finding: truncating to the
+        // first 8 hex chars (32 bits) made a real collision on
+        // transactions_transaction_number_key observable at ~9.4k
+        // transactions in a single benchmark session, surfacing as an
+        // unhandled 500 instead of a graceful outcome. The full UUID (122
+        // random bits) makes a collision cryptographically negligible;
+        // VARCHAR(50) has ample room for "TXN-" + 36 chars.
+        let txn_num = format!("TXN-{}", txn_id.to_string().to_uppercase());
 
         let transaction = Transaction {
             id: txn_id,
@@ -182,6 +189,7 @@ impl AppointmentService {
             platform_fee_amount: platform_fee,
             net_amount: net_doctor_amount,
             payment_status: PaymentStatus::Initiated,
+            reconciliation_required: false,
             created_at: Utc::now(),
             settled_at: None,
             currency: "KES".into(),
@@ -288,6 +296,11 @@ impl AppointmentService {
                 .await?
                 .ok_or_else(|| AppError::NotFound("Transaction session not found.".into()))?;
 
+        // Same period-first lock order as accounting close. Provider facts are
+        // still recorded after a close, but explicitly flagged for reconciliation.
+        sqlx::query("SELECT pg_advisory_xact_lock(61012,EXTRACT(YEAR FROM $1::timestamptz)::integer*100+EXTRACT(MONTH FROM $1::timestamptz)::integer)")
+            .bind(initial_txn.created_at).execute(&mut *payment_tx).await?;
+
         // Completion/expiry take the appointment lock before changing payment
         // state. Use the same order and re-read after waiting for the lock.
         sqlx::query("SELECT id FROM appointments WHERE id=$1 FOR UPDATE")
@@ -345,6 +358,7 @@ impl AppointmentService {
         } else {
             false
         };
+        let mut newly_confirmed = false;
         let apt = if !confirmed_now {
             appointment_repo::find_by_id(&mut *payment_tx, txn.appointment_id)
                 .await?
@@ -379,6 +393,13 @@ impl AppointmentService {
                 )
                 .await?;
             } else {
+                sqlx::query("UPDATE transactions SET reconciliation_required=true WHERE id=$1")
+                    .bind(txn.id)
+                    .execute(&mut *payment_tx)
+                    .await?;
+                crate::services::AuditService::log_in_tx(&mut *payment_tx,
+                    crate::services::AuditLogEntry::new(None,ctx.role,"LATE_PAYMENT_RECONCILIATION_REQUIRED","TRANSACTION",Some(txn.id),"SUCCESS")
+                        .with_after(serde_json::json!({"payment_status":"PAYMENT_HELD","reconciliation_required":true}))).await?;
                 consultation_trace::record(
                     &mut payment_tx,
                     txn.appointment_id,
@@ -392,10 +413,74 @@ impl AppointmentService {
             }
             if confirmed {
                 apt.status = AppointmentStatus::Confirmed;
+                newly_confirmed = true;
             }
             apt
         };
+
+        // Phase 1B: atomic creation of both email intents alongside the
+        // business event, on this same (payment-worker) transaction — see
+        // `email_outbox_repo::enqueue_transactional`'s doc comment. Content
+        // is rendered later, at dispatch time; a patient with no email on
+        // file (e.g. phone/SMS-registered) simply gets no row enqueued for
+        // either, same as the old inline check this replaces.
+        let mut confirmation_outbox_ids: Vec<Uuid> = Vec::new();
+        if newly_confirmed {
+            let recipient_email: Option<String> = sqlx::query_scalar::<_, Option<String>>(
+                "SELECT COALESCE(pu.email, gu.email) \
+                   FROM appointments a \
+                   JOIN patient_profiles p ON p.id = a.patient_id \
+                   LEFT JOIN patient_profiles g ON g.id = p.guardian_patient_id \
+                   LEFT JOIN users pu ON pu.id = p.user_id \
+                   LEFT JOIN users gu ON gu.id = g.user_id \
+                  WHERE a.id = $1",
+            )
+            .bind(apt.id)
+            .fetch_one(&mut *payment_tx)
+            .await?;
+            if let Some(recipient_email) = recipient_email.filter(|e| !e.is_empty()) {
+                let confirmed_id = Uuid::new_v4();
+                email_outbox_repo::enqueue_transactional(
+                    &mut *payment_tx,
+                    confirmed_id,
+                    "CONSULTATION_CONFIRMED",
+                    &recipient_email,
+                    &format!("consultation-confirmed:{}", apt.id),
+                    "APPOINTMENT",
+                    apt.id,
+                    email_outbox_repo::transactional_email_expiry(),
+                )
+                .await?;
+                confirmation_outbox_ids.push(confirmed_id);
+
+                let payment_id = Uuid::new_v4();
+                email_outbox_repo::enqueue_transactional(
+                    &mut *payment_tx,
+                    payment_id,
+                    "PAYMENT_CONFIRMED",
+                    &recipient_email,
+                    &format!("payment-confirmed:{}", txn.id),
+                    "TRANSACTION",
+                    txn.id,
+                    email_outbox_repo::transactional_email_expiry(),
+                )
+                .await?;
+                confirmation_outbox_ids.push(payment_id);
+            }
+        }
         payment_tx.commit().await?;
+
+        // Fire-and-forget, after commit (never awaited — must not delay this
+        // already-committed booking/payment response). The durable fallback
+        // is the periodic scheduler pass.
+        if !confirmation_outbox_ids.is_empty() {
+            let state = state.clone();
+            tokio::spawn(async move {
+                for outbox_id in confirmation_outbox_ids {
+                    crate::services::email_dispatch_worker::dispatch_now(&state, outbox_id).await;
+                }
+            });
+        }
 
         // Funds captured after a reservation expired require reconciliation.
         // Do not create a consultation for an expired/cancelled obligation.
@@ -489,4 +574,67 @@ impl AppointmentService {
 
         Ok(apt)
     }
+
+    /// Phase 2 email support only — names/dates for a confirmed consultation,
+    /// something `NotificationService`'s existing recipient-resolution SQL
+    /// deliberately never carries (it only needs user ids for push routing).
+    /// Reads on the system-worker pool, outside any transaction, strictly
+    /// after the triggering payment transaction has already committed.
+    /// Returns `None` only if the appointment/slot/profiles can't be found
+    /// at all (should not happen for an appointment that was just
+    /// confirmed) — never an error for "patient has no email," which is
+    /// instead reflected by an empty `recipient_email` the caller checks.
+    pub async fn consultation_email_details(
+        state: &AppState,
+        appointment_id: Uuid,
+    ) -> Result<Option<ConsultationEmailDetails>, AppError> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            patient_name: String,
+            recipient_email: Option<String>,
+            doctor_name: String,
+            start_time: chrono::DateTime<Utc>,
+            appointment_number: String,
+        }
+        let row: Option<Row> = sqlx::query_as(
+            "SELECT p.full_name AS patient_name, \
+                    COALESCE(pu.email, gu.email) AS recipient_email, \
+                    d.full_name AS doctor_name, \
+                    s.start_time AS start_time, \
+                    a.appointment_number AS appointment_number \
+               FROM appointments a \
+               JOIN doctor_schedule_slots s ON s.id = a.slot_id \
+               JOIN doctor_profiles d ON d.id = a.doctor_id \
+               JOIN patient_profiles p ON p.id = a.patient_id \
+               LEFT JOIN patient_profiles g ON g.id = p.guardian_patient_id \
+               LEFT JOIN users pu ON pu.id = p.user_id \
+               LEFT JOIN users gu ON gu.id = g.user_id \
+              WHERE a.id = $1",
+        )
+        .bind(appointment_id)
+        .fetch_optional(&state.system_db)
+        .await?;
+        Ok(row.map(|row| {
+            let local = row
+                .start_time
+                .with_timezone(&crate::services::notification_service::nairobi_offset());
+            ConsultationEmailDetails {
+                patient_name: row.patient_name,
+                recipient_email: row.recipient_email.unwrap_or_default(),
+                doctor_name: row.doctor_name,
+                appointment_number: row.appointment_number,
+                date_label: local.format("%A, %d %B %Y").to_string(),
+                time_label: local.format("%-I:%M %p").to_string(),
+            }
+        }))
+    }
+}
+
+pub struct ConsultationEmailDetails {
+    pub patient_name: String,
+    pub recipient_email: String,
+    pub doctor_name: String,
+    pub appointment_number: String,
+    pub date_label: String,
+    pub time_label: String,
 }
