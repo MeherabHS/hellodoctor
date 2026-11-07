@@ -609,6 +609,9 @@ pub struct Transaction {
     pub platform_fee_amount: BigDecimal, // Strictly 20%
     pub net_amount: BigDecimal,          // Strictly 80%
     pub payment_status: PaymentStatus,
+    /// Captured funds without a valid booking require reviewed reconciliation.
+    #[serde(default)]
+    pub reconciliation_required: bool,
     pub created_at: DateTime<Utc>,
     pub settled_at: Option<DateTime<Utc>>,
     pub currency: String,
@@ -798,6 +801,23 @@ pub struct PendingMfaChallenge {
     pub created_at: DateTime<Utc>,
     pub attempt_count: i16,
     pub max_attempts: i16,
+}
+
+/// Phase 2: Secure Email OTP Password Recovery. State is derived rather than
+/// stored (see migrations/20261207000001_password_reset's doc comment):
+/// `authorization_hash.is_none()` means still awaiting OTP verification,
+/// `Some` means verified and awaiting the final `complete_reset` call.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct PasswordResetRequest {
+    pub token: String,
+    pub user_id: UserId,
+    pub code_hash: String,
+    pub attempt_count: i16,
+    pub max_attempts: i16,
+    pub otp_expires_at: DateTime<Utc>,
+    pub authorization_hash: Option<String>,
+    pub authorization_expires_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

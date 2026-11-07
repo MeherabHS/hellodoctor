@@ -1,0 +1,48 @@
+-- Milestone 8.0 critical-query audit (2026-10-31): notification_scheduler's
+-- T-15 appointment-reminder pass (services/notification_scheduler.rs's
+-- run_t15_reminder_pass, invoked on every scheduler tick) joins
+-- `appointments` (status IN ('CONFIRMED','WAITING')) to
+-- `doctor_schedule_slots` (a 15-minute start_time window) with NO filter
+-- narrower than that on either side available via an existing index:
+-- `idx_appointments_doctor`/`idx_appointments_patient` both require a
+-- doctor_id/patient_id this cross-doctor reminder scan does not have, and
+-- `idx_slots_doctor_date` is doctor-scoped, not useful for "which slot,
+-- across every doctor, starts in the next 15 minutes."
+--
+-- Verified live via EXPLAIN (ANALYZE, BUFFERS) against real Configuration-A
+-- data (62,400 slots, 25,098 appointments) before this migration was
+-- written: the live plan did a Seq Scan on BOTH tables (1,064 buffers,
+-- 7.6ms) -- `doctor_schedule_slots` dominant (731 of 1,064 buffers) despite
+-- the 15-minute window being highly selective (row estimate: 5), because
+-- nothing indexed `start_time` globally. Adding a plain index on
+-- `doctor_schedule_slots(start_time)` alone let the planner use it for the
+-- time window (1,064 -> 335 buffers, 7.6ms -> 1.5ms) but left the now-
+-- dominant `Seq Scan on appointments` (333 buffers) in place, since nothing
+-- indexed `appointments.slot_id` for the resulting small-side-driven nested
+-- loop. Adding both together: 1,064 -> 2 buffers, 7.6ms -> 0.18ms (~530x) --
+-- the entire plan becomes index-driven end to end.
+--
+-- `appointments.slot_id` was also flagged as an unindexed foreign key in a
+-- broader audit pass; this migration implements it specifically because a
+-- real, measured query benefits from it, not reflexively because it is an
+-- FK (per the audit's own instruction not to index every FK automatically).
+--
+-- Locking/availability assessed, not assumed: both tables are modest in
+-- this deployment (25,098 / 62,400 rows; `CREATE INDEX` on each completed
+-- in well under a second against live Configuration-A data during this same
+-- investigation) -- a plain (non-CONCURRENTLY) index build's brief
+-- write-blocking SHARE lock is negligible at this scale, and this project
+-- has no existing precedent for non-transactional (CONCURRENTLY) migrations
+-- (sqlx wraps each migration file in a transaction, which CONCURRENTLY
+-- cannot run inside). If either table grows to genuine production scale
+-- (low millions of rows or more) before this ships, these two statements
+-- should be re-issued by hand with CREATE INDEX CONCURRENTLY outside a
+-- migration transaction instead of relying on this file to repeat that
+-- build.
+--
+-- Neither index changes query results, RLS/ABAC semantics, or write-path
+-- authorization in any way -- both are pure read-path accelerants with no
+-- WHERE clause narrowing which rows they cover, so no existing query's
+-- correctness is affected, only (for some) its plan.
+CREATE INDEX idx_slots_start_time ON doctor_schedule_slots(start_time);
+CREATE INDEX idx_appointments_slot_id ON appointments(slot_id);

@@ -29,15 +29,16 @@ jobs:
   migrate-and-test:
     name: Apply migrations to a fresh Postgres and run the backend test suite
     runs-on: ubuntu-latest
+    timeout-minutes: 50
 
     services:
       postgres:
-        # Matches services/backend/docker-compose.yml exactly, so this job
-        # exercises the same version/credentials shape local dev does.
+        # Ephemeral job-owned PostgreSQL, containing synthetic fixtures only.
+        # Its one-run password is derived at runtime; no deployment credentials.
         image: postgres:16
         env:
           POSTGRES_USER: hellodoctor
-          POSTGRES_PASSWORD: hellodoctor_dev_password
+          POSTGRES_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
           POSTGRES_DB: hellodoctor
         ports:
           - 5432:5432
@@ -70,7 +71,7 @@ jobs:
       # is not a real backend runtime config, just what the test harness
       # needs. See tests/api_tests.rs's own `test_config()` doc comments for
       # why nothing else from .env.example is required here.
-      DATABASE_URL: postgres://hellodoctor:hellodoctor_dev_password@localhost:5432/hellodoctor
+      DATABASE_URL: postgres://hellodoctor:${{ github.run_id }}-${{ github.run_attempt }}@127.0.0.1:5432/hellodoctor
       # Required by tests/api_tests.rs's `test_redis_url()`/`reset_owned_redis`:
       # Redis-backed tests refuse to run against anything that isn't an
       # explicitly owned, non-default-port fixture (see the comment on the
@@ -78,7 +79,7 @@ jobs:
       # "final-remediation-" — `reset_owned_redis`'s own hardcoded prefix
       # check — and is written as this fixture's ownership marker below
       # before any test runs.
-      TEST_REDIS_URL: redis://127.0.0.1:16380/0
+      TEST_REDIS_URL: redis://127.0.0.1:16380/14
       TEST_REDIS_FIXTURE_ID: final-remediation-ci
 
     steps:
@@ -86,8 +87,20 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master @ 2026-10-17
         with:
-          toolchain: stable
-          components: clippy
+          toolchain: 1.99.0
+          components: clippy,rustfmt
+
+      - name: Generate ephemeral test capability-role passwords
+        shell: bash
+        run: |
+          for key in DB_API_ROLE_PASSWORD DB_AUTH_WORKER_PASSWORD DB_PAYMENT_WORKER_PASSWORD DB_SYSTEM_WORKER_PASSWORD DB_FINANCE_WORKER_PASSWORD; do
+            value="$(openssl rand -hex 24)"
+            echo "::add-mask::$value"
+            echo "$key=$value" >> "$GITHUB_ENV"
+          done
+          key="$(openssl rand -base64 32)"
+          echo "::add-mask::$key"
+          echo "TOTP_ENCRYPTION_KEY_B64=$key" >> "$GITHUB_ENV"
 
       - name: cargo fmt --check
         working-directory: services/backend
@@ -102,6 +115,10 @@ jobs:
         # could land without CI ever noticing.
         working-directory: services/backend
         run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: cargo check --all-targets
+        working-directory: services/backend
+        run: cargo check --all-targets --locked
 
       - name: cargo test --lib (unit tests, no database)
         # --locked: fails closed if this resolves a dependency graph that
@@ -118,7 +135,7 @@ jobs:
         # in this job).
         run: |
           sudo apt-get update -y && sudo apt-get install -y redis-tools
-          redis-cli -h 127.0.0.1 -p 16380 SET hd:test-fixture:owner "final-remediation-ci"
+          redis-cli -h 127.0.0.1 -p 16380 -n 14 SET hd:test-fixture:owner "final-remediation-ci"
 
       - name: cargo test --test api_tests (every migration applied fresh, real HTTP against it)
         working-directory: services/backend
@@ -126,4 +143,4 @@ jobs:
         # tests/api_tests.rs: the five capability roles are cluster-wide
         # Postgres objects, so parallel test threads race on shared
         # pg_authid catalog rows across the one Postgres service container.
-        run: cargo test --test api_tests --locked -- --test-threads=1
+        run: timeout 40m cargo test --test api_tests --locked -- --test-threads=1

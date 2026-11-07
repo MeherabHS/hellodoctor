@@ -46,7 +46,6 @@ async fn every_capability_role_is_denied_direct_economic_journal_mutation(pool: 
     assert!(forced);
 }
 
-const SYNTHETIC_TOTP_SECRET: &str = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
 const SYNTHETIC_OTP: &str = "123456";
 const SYNTHETIC_WEB_AUTH_ASSERTION_SECRET: &str =
     "test-web-auth-assertion-secret-dev-only-not-real";
@@ -77,16 +76,6 @@ impl Drop for EnvVarOverride {
     }
 }
 
-fn synthetic_totp(step: i64) -> String {
-    let mut mac = Hmac::<Sha256>::new_from_slice(b"12345678901234567890").unwrap();
-    mac.update(&(step as u64).to_be_bytes());
-    let digest = mac.finalize().into_bytes();
-    let offset = usize::from(digest[31] & 15);
-    let truncated =
-        u32::from_be_bytes(digest[offset..offset + 4].try_into().unwrap()) & 0x7fff_ffff;
-    format!("{:06}", truncated % 1_000_000)
-}
-
 async fn strict_admin_state(pool: PgPool) -> (PgPool, AppState) {
     let (_, pool, mut state) = test_app_and_state(pool).await;
     let mut config = (*state.config).clone();
@@ -94,20 +83,6 @@ async fn strict_admin_state(pool: PgPool) -> (PgPool, AppState) {
     config.dev_auth_otp_enabled = false;
     state.config = Arc::new(config);
     (pool, state)
-}
-
-async fn enroll_synthetic_totp(pool: &PgPool, state: &AppState, algorithm: &str) {
-    sqlx::query("DELETE FROM mfa_credentials WHERE user_id=$1")
-        .bind(uid(ADMIN_USER_ID))
-        .execute(pool)
-        .await
-        .unwrap();
-    let encrypted =
-        crypto::encrypt_secret(SYNTHETIC_TOTP_SECRET, &state.config.totp_encryption_key_b64)
-            .unwrap();
-    sqlx::query("INSERT INTO mfa_credentials(id,user_id,method,totp_secret_encrypted,is_enabled,totp_algorithm) VALUES($1,$2,'TOTP',$3,true,$4)")
-        .bind(Uuid::new_v4()).bind(uid(ADMIN_USER_ID)).bind(encrypted).bind(algorithm)
-        .execute(pool).await.unwrap();
 }
 
 async fn admin_challenge(pool: &PgPool) -> String {
@@ -132,154 +107,22 @@ async fn admin_session_count(pool: &PgPool) -> i64 {
         .unwrap()
 }
 
+/// Admin's own single-challenge OTP verification (wrong code, expired
+/// challenge, attempt-count exhaustion, account/IP jail) is the exact same
+/// code path `doctor_verify_otp_with_device` runs and is already covered by
+/// that shared logic's own tests — nothing admin-specific remains to test
+/// here now that the TOTP second factor (and the `mfa_credentials` row-lock
+/// it serialized concurrent attempts through) is gone. `admin_challenge`,
+/// `admin_session_count`, and `strict_admin_state` are kept for reuse by
+/// `admin_web_hmac_http_exact_body_and_real_redis_nonce_replay` below.
 #[sqlx::test(migrations = "./migrations")]
-async fn admin_totp_mandatory_algorithm_window_and_account_fail_closed(pool: PgPool) {
+async fn admin_otp_verification_issues_exactly_one_session(pool: PgPool) {
     let (pool, state) = strict_admin_state(pool).await;
-    enroll_synthetic_totp(&pool, &state, "SHA256").await;
     let before = admin_session_count(&pool).await;
-    let now = Utc::now().timestamp() / 30;
-    // TOTP is mandatory even in the approved test environment when dev OTP is
-    // disabled. Every rejected factor must leave session issuance unchanged.
-    for submitted in [
-        None,
-        Some("abcdef".to_owned()),
-        Some(synthetic_totp(now - 3)),
-        Some(synthetic_totp(now + 3)),
-    ] {
-        reset_owned_redis(&state.redis).await;
-        let challenge = admin_challenge(&pool).await;
-        assert!(matches!(
-            AuthService::admin_verify_otp_with_totp(
-                &state,
-                "192.0.2.10",
-                &challenge,
-                SYNTHETIC_OTP,
-                submitted.as_deref()
-            )
-            .await,
-            Err(AppError::Unauthorized(_))
-        ));
-        assert_eq!(admin_session_count(&pool).await, before);
-        let used: Option<i64> =
-            sqlx::query_scalar("SELECT last_totp_step FROM mfa_credentials WHERE user_id=$1")
-                .bind(uid(ADMIN_USER_ID))
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(
-            used, None,
-            "invalid factors must not consume a valid TOTP step"
-        );
-    }
-    for condition in ["wrong-email-otp", "SHA1", "unenrolled", "disabled"] {
-        reset_owned_redis(&state.redis).await;
-        enroll_synthetic_totp(
-            &pool,
-            &state,
-            if condition == "SHA1" {
-                "SHA1"
-            } else {
-                "SHA256"
-            },
-        )
-        .await;
-        if condition == "unenrolled" {
-            sqlx::query("UPDATE mfa_credentials SET is_enabled=false WHERE user_id=$1")
-                .bind(uid(ADMIN_USER_ID))
-                .execute(&pool)
-                .await
-                .unwrap();
-        }
-        if condition == "disabled" {
-            sqlx::query("UPDATE users SET is_active=false WHERE id=$1")
-                .bind(uid(ADMIN_USER_ID))
-                .execute(&pool)
-                .await
-                .unwrap();
-        }
-        let challenge = admin_challenge(&pool).await;
-        let code = synthetic_totp(Utc::now().timestamp() / 30);
-        let otp = if condition == "wrong-email-otp" {
-            "654321"
-        } else {
-            SYNTHETIC_OTP
-        };
-        assert!(
-            matches!(
-                AuthService::admin_verify_otp_with_totp(
-                    &state,
-                    "192.0.2.11",
-                    &challenge,
-                    otp,
-                    Some(&code)
-                )
-                .await,
-                Err(AppError::Unauthorized(_))
-            ),
-            "condition {condition} must fail closed"
-        );
-        assert_eq!(admin_session_count(&pool).await, before);
-    }
-}
-
-#[sqlx::test(migrations = "./migrations")]
-async fn admin_totp_concurrent_step_issues_one_session_and_replay_is_denied(pool: PgPool) {
-    let (pool, state) = strict_admin_state(pool).await;
-    enroll_synthetic_totp(&pool, &state, "SHA256").await;
-    let before = admin_session_count(&pool).await;
-    let step = Utc::now().timestamp() / 30;
-    let code = synthetic_totp(step);
-    let a = admin_challenge(&pool).await;
-    let b = admin_challenge(&pool).await;
-    let (first, second) = tokio::join!(
-        AuthService::admin_verify_otp_with_totp(
-            &state,
-            "192.0.2.20",
-            &a,
-            SYNTHETIC_OTP,
-            Some(&code)
-        ),
-        AuthService::admin_verify_otp_with_totp(
-            &state,
-            "192.0.2.21",
-            &b,
-            SYNTHETIC_OTP,
-            Some(&code)
-        )
-    );
-    assert_eq!(usize::from(first.is_ok()) + usize::from(second.is_ok()), 1);
-    assert!(
-        matches!(first, Err(AppError::Unauthorized(_)))
-            || matches!(second, Err(AppError::Unauthorized(_)))
-    );
-    assert_eq!(admin_session_count(&pool).await, before + 1);
-    let accepted: Option<i64> =
-        sqlx::query_scalar("SELECT last_totp_step FROM mfa_credentials WHERE user_id=$1")
-            .bind(uid(ADMIN_USER_ID))
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(accepted, Some(step));
-    let challenges: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM pending_mfa_challenges WHERE token IN ($1,$2)")
-            .bind(&a)
-            .bind(&b)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(challenges, 1, "only the winning challenge is consumed");
-    let replay = admin_challenge(&pool).await;
-    assert!(matches!(
-        AuthService::admin_verify_otp_with_totp(
-            &state,
-            "192.0.2.22",
-            &replay,
-            SYNTHETIC_OTP,
-            Some(&code)
-        )
-        .await,
-        Err(AppError::Unauthorized(_))
-    ));
+    let challenge = admin_challenge(&pool).await;
+    AuthService::admin_verify_otp(&state, "192.0.2.20", &challenge, SYNTHETIC_OTP)
+        .await
+        .expect("a correct, unexpired, unconsumed challenge must verify");
     assert_eq!(admin_session_count(&pool).await, before + 1);
 }
 
