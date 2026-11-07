@@ -127,67 +127,55 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SOURCE_REVISION: ${{ inputs.source_revision }}
+        # Logic extracted to .github/scripts/verify_required_checks.py
+        # (unchanged in behavior) so it has its own unit tests —
+        # see .github/scripts/test_verify_required_checks.py.
+        # NOTE: single `gh api` call, not paginated - fine while this repo
+        # has under ~100 check runs per commit (confirmed 7 today); add
+        # --paginate if that ever changes.
         run: |
           set -euo pipefail
-          required_checks='[
-            "Rust tests and backend ARM64 image",
-            "Admin Web ARM64 image",
-            "Doctor Web ARM64 image",
-            "pgBackRest ARM64 image",
-            "Apply migrations to a fresh Postgres and run the backend test suite"
-          ]'
-          # NOTE: single `gh api` call, not paginated - fine while this repo
-          # has under ~100 check runs per commit (confirmed 7 today); add
-          # --paginate if that ever changes.
-          gh api "repos/${REPO}/commits/${SOURCE_REVISION}/check-runs" > /tmp/check-runs.json
-          python3 - "$required_checks" <<'PYEOF'
-          import json, sys
-          required = json.loads(sys.argv[1])
-          data = json.load(open('/tmp/check-runs.json'))
-          runs = {r['name']: r.get('conclusion') for r in data.get('check_runs', [])}
-          missing = [n for n in required if n not in runs]
-          failed = [n for n in required if runs.get(n) != 'success']
-          if missing:
-              print(f"::error::required check(s) not found for this revision: {missing}")
-              sys.exit(1)
-          if failed:
-              print(f"::error::required check(s) did not succeed for this revision: {[(n, runs[n]) for n in failed]}")
-              sys.exit(1)
-          print("All required checks succeeded for the requested revision.")
-          PYEOF
-      - name: Verify the SHA belongs to an actual tracked PR head (not a stale/orphaned commit)
+          gh api "repos/${REPO}/commits/${SOURCE_REVISION}/check-runs" \
+            | python3 "${GITHUB_WORKSPACE}/.github/scripts/verify_required_checks.py"
+      - name: Verify the revision is trusted (merged into the default branch, or a current PR head)
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SOURCE_REVISION: ${{ inputs.source_revision }}
-        # Checks are recorded against a PR's real head SHA (confirmed
-        # empirically earlier this session: querying check-runs by the PR
-        # head SHA 97194dff... returned the correct 7 results, even though
-        # the pull_request-triggered jobs internally built the GitHub
-        # synthetic merge commit) - so the check above is already querying
-        # the right commit as long as the caller supplies the real branch
-        # HEAD SHA. This step adds an independent cross-check: confirm the
-        # requested SHA is CURRENTLY the head of a listed pull request,
-        # catching the case where it used to be the PR head before a
-        # force-push and its check-run records are now stale/orphaned.
+        # FIX (previously a false-rejection bug): the old version of this
+        # step accepted a revision ONLY if it was still the CURRENT head of
+        # an associated pull request. That can never be true for an
+        # already-merged PR's own merge commit — GitHub's
+        # commits/{sha}/pulls endpoint keeps the PR "associated" with the
+        # merge commit forever, but `pr.head.sha` always stays pinned to
+        # the PR branch's last real commit, never the merge commit itself
+        # (which only ever exists on the base branch). The old check
+        # therefore rejected every legitimate, already-merged commit with
+        # the exact same message meant for a genuinely stale, force-pushed-
+        # away PR head, conflating two different things.
+        #
+        # Now accepted if EITHER:
+        #   (a) the revision is an ancestor of, or equal to, the
+        #       repository's default branch tip (covers "is the current
+        #       tip, including a brand-new merge commit" and "is an older,
+        #       already-merged commit still reachable from it"), OR
+        #   (b) it is currently the head of a tracked, still-open pull
+        #       request (the original, still-correct pre-merge case).
+        # Rejected otherwise - which still correctly catches a commit that
+        # was once a PR head but was superseded by a force-push and never
+        # merged (reachable from neither the default branch nor any open
+        # PR), and any arbitrary/unrelated SHA.
+        # See .github/scripts/verify_trusted_revision.py for the full
+        # rationale and .github/scripts/test_verify_trusted_revision.py for
+        # its regression tests (merged PR commit, older main commit, stale
+        # force-pushed-away PR head, current open PR head).
         run: |
           set -euo pipefail
-          prs="$(gh api "repos/${REPO}/commits/${SOURCE_REVISION}/pulls" --jq '.')"
-          count="$(echo "$prs" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))")"
-          if [ "$count" -eq 0 ]; then
-            echo "::error::${SOURCE_REVISION} is not associated with any pull request - refusing to publish an untracked commit"
-            exit 1
-          fi
-          current_head_match="$(echo "$prs" | python3 -c "
-          import json, sys
-          prs = json.load(sys.stdin)
-          print(any(pr['head']['sha'] == '${SOURCE_REVISION}' for pr in prs))
-          ")"
-          if [ "$current_head_match" != "True" ]; then
-            echo "::error::${SOURCE_REVISION} was once a PR head but is no longer the CURRENT head of any associated PR (likely superseded by a force-push) - its check-run results may be stale. Re-request publication with the PR's current head SHA."
-            exit 1
-          fi
-          echo "PASS: ${SOURCE_REVISION} is the current head of a tracked pull request."
+          default_branch="$(gh api "repos/${REPO}" --jq '.default_branch')"
+          COMPARE_STATUS="$(gh api "repos/${REPO}/compare/${default_branch}...${SOURCE_REVISION}" --jq '.status' 2>/dev/null || true)"
+          export COMPARE_STATUS
+          gh api "repos/${REPO}/commits/${SOURCE_REVISION}/pulls" \
+            | python3 "${GITHUB_WORKSPACE}/.github/scripts/verify_trusted_revision.py"
 
   publish-backend:
     name: Build and push hellodoctor-backend
