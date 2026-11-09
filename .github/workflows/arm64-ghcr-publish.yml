@@ -141,8 +141,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SOURCE_REVISION: ${{ inputs.source_revision }}
+          # Component-aware (added): which checks are required now depends
+          # on which publish_* component(s) this dispatch actually selected
+          # - see .github/scripts/verify_required_checks.py's module doc
+          # for why (a Doctor-Web-only dispatch must never be required to
+          # have a backend migration check that could never exist for a
+          # revision that doesn't touch services/backend/**).
+          PUBLISH_BACKEND: ${{ inputs.publish_backend }}
+          PUBLISH_ADMIN_WEB: ${{ inputs.publish_admin_web }}
+          PUBLISH_DOCTOR_WEB: ${{ inputs.publish_doctor_web }}
+          PUBLISH_PGBACKREST: ${{ inputs.publish_pgbackrest }}
         # Logic extracted to .github/scripts/verify_required_checks.py
-        # (unchanged in behavior) so it has its own unit tests —
+        # (component-matrix logic added; evaluate()'s own behavior is
+        # unchanged) so it has its own unit tests —
         # see .github/scripts/test_verify_required_checks.py.
         # NOTE: single `gh api` call, not paginated - fine while this repo
         # has under ~100 check runs per commit (confirmed 7 today); add
