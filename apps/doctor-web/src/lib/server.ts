@@ -5,6 +5,7 @@ import { safeBackendPath, allowedProxyQuery } from './contracts';
 import { safeIncident, sanitizedStack } from './client-incidents';
 import { sanitize } from './sanitize';
 import { verifyChallenge, readAuthBody, AuthBodyError } from './turnstile';
+import { validateAcceptedDocumentsShape } from './legalConsent';
 import packageInfo from '../../package.json';
 import { readFileSync } from 'node:fs';
 
@@ -68,6 +69,20 @@ async function forwardingHeaders() {
 async function upstream(path: string, method = 'GET', body?: string, token?: string, key?: string) {
   return fetch(`${backend()}/api/v1/${path}`, { method, body, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout((path.endsWith('prescription') || path.endsWith('attachments')) ? 60000 : 15000), headers: { ...(await forwardingHeaders()), 'Content-Type': 'application/json', 'X-Request-Id':(await headers()).get('X-Request-Id')||crypto.randomUUID(),'X-Client-Type':'DOCTOR_WEB','X-Client-Build':packageInfo.version, ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(key ? { 'Idempotency-Key': key } : {}) } });
 }
+/// GET-only, unauthenticated by design: a prospective Doctor reads the
+/// current legal documents before any session exists at all (the same
+/// backend endpoint, GET /api/v1/legal/documents, that the backend's own
+/// doctor_register handler already treats as the pre-session source of
+/// truth for required document type/version pairs). No user input is
+/// accepted here, so there is nothing to validate or forward -- this is a
+/// pure passthrough of the backend's public registry response.
+export async function handleLegalDocuments() {
+  try {
+    return responseFor(await upstream('legal/documents', 'GET'));
+  } catch {
+    return failure(503, 'BACKEND_UNAVAILABLE', 'Unable to reach the service. Please retry.');
+  }
+}
 export async function handleDiagnostics(req: NextRequest) {
   if (!sameOrigin(req)) return failure(403, 'CSRF_REJECTED', 'Request origin is not permitted.');
   try {
@@ -97,7 +112,26 @@ export async function handleDiagnostics(req: NextRequest) {
 async function responseFor(res: Response) {
   const raw = await res.text();
   let data;
-  try { data = JSON.parse(raw); } catch { return failure(res.ok ? 502 : res.status, `HTTP_${res.status}`, res.status === 409 ? 'This operation conflicts with an existing submission. Refresh and retry.' : 'The service returned an unexpected response.'); }
+  try { data = JSON.parse(raw); } catch {
+    const status = res.ok ? 502 : res.status;
+    const requestId = crypto.randomUUID();
+    // Server-side diagnostic only: status, content-type and body length
+    // correlate this with backend/proxy logs without ever recording the raw
+    // body (which, for a non-JSON upstream rejection, can itself be an
+    // unredacted stack trace or field-level detail) or any request content
+    // (password, OTP, cookie, token, PII never touch this log line).
+    console.error('[doctor-web] non-JSON upstream response', {
+      requestId, status,
+      contentType: res.headers.get('content-type'),
+      bodyLength: raw.length,
+    });
+    const message = status === 409
+      ? 'This operation conflicts with an existing submission. Refresh and retry.'
+      : status >= 500
+        ? 'The service is temporarily unavailable. Please try again shortly.'
+        : `Your request could not be processed. Please check the form and try again, or contact support with reference ${requestId} if this continues.`;
+    return failure(status, `HTTP_${res.status}`, message, requestId);
+  }
   if (!res.ok) {
     const status = res.status;
     return failure(status, data.error?.code ?? `HTTP_${status}`, status >= 500 ? (status === 503 ? (String(data.error?.message).includes('STORAGE_UNAVAILABLE') ? 'STORAGE_UNAVAILABLE' : 'Service temporarily unavailable. Please retry.') : 'Unable to complete this request. Use the reference ID when contacting support.') : data.error?.message ?? 'Request could not be completed.', data.meta?.request_id);
@@ -171,8 +205,11 @@ export async function handleAuth(req: NextRequest, action: string) {
       delete body.turnstile_token;
     }
     if (action === 'register') {
-      const allowed = ['full_name','license_number','phone_number','email','password','primary_specialty','experience_years','current_hospital','qualifications','residential_address'];
+      const allowed = ['full_name','license_number','phone_number','email','password','primary_specialty','experience_years','current_hospital','qualifications','residential_address','accepted_documents'];
       if (Object.keys(body).some(key => !allowed.includes(key))) return failure(422, 'VALIDATION_FAILED', 'Registration contains unsupported fields.');
+      if (!validateAcceptedDocumentsShape(body.accepted_documents)) {
+        return failure(422, 'VALIDATION_FAILED', 'Every current required legal document must be accepted.');
+      }
       return responseFor(await upstream('auth/doctor/register', 'POST', JSON.stringify(body)));
     }
     if (action === 'login') {
