@@ -5,7 +5,9 @@ import { webAuthAssertion } from '@/lib/web-assertion';
 
 // Step 1 verifies the browser challenge before forwarding password credentials.
 // The backend emails a short-lived OTP challenge and issues no session here.
-// Step 2 requires that challenge, email OTP and deployed authenticator MFA.
+// Step 2 requires that challenge plus the emailed OTP — Admin, Doctor and
+// Patient share this same single-factor-OTP MFA shape; there is no
+// authenticator-app factor.
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
   try {
@@ -51,8 +53,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: message }, { status: backendRes.status });
   }
 
-  const { session_token, debug_otp_code, requires_totp } = payload.data;
-  return NextResponse.json({ success: true, data: { session_token, requires_totp,
+  const { session_token, debug_otp_code } = payload.data;
+  return NextResponse.json({ success: true, data: { session_token,
     debug_otp_code: process.env.ENVIRONMENT === 'development' && process.env.DEV_AUTH_OTP_ENABLED === 'true' ? debug_otp_code : undefined } },
     { headers: { 'Cache-Control': 'private, no-store' } });
 }
