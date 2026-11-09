@@ -35,7 +35,13 @@ RUN mkdir -p src && \
 
 COPY src ./src
 COPY migrations ./migrations
-RUN touch src/main.rs src/lib.rs && cargo build --release --bin hellodoctor-backend
+# `admin_bootstrap` (src/bin/admin_bootstrap.rs) is the operator-only, offline
+# first-Admin bootstrap tool — built alongside the server binary so it ships
+# in the same image, but it is never this image's CMD/ENTRYPOINT and opens no
+# port; it is only ever invoked by an operator overriding the container's
+# command (`docker compose run --rm --no-deps -it backend /app/admin_bootstrap`).
+RUN touch src/main.rs src/lib.rs && \
+    cargo build --release --bin hellodoctor-backend --bin admin_bootstrap
 
 FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3 AS runtime
 RUN apt-get update && \
@@ -46,6 +52,9 @@ RUN apt-get update && \
         --no-create-home --shell /usr/sbin/nologin hellodoctor
 WORKDIR /app
 COPY --from=builder --chown=hellodoctor:hellodoctor /app/target/release/hellodoctor-backend ./hellodoctor-backend
+# Present at /app/admin_bootstrap — not referenced by CMD/ENTRYPOINT below, so
+# it is inert until an operator explicitly invokes it via `docker compose run`.
+COPY --from=builder --chown=hellodoctor:hellodoctor /app/target/release/admin_bootstrap ./admin_bootstrap
 COPY --chown=hellodoctor:hellodoctor migrations ./migrations
 USER hellodoctor:hellodoctor
 EXPOSE 8080

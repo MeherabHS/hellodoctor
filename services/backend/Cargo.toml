@@ -68,11 +68,13 @@ regex = "1.10"
 # an OpenSSL development toolchain. object_store still brings aws-lc-rs for
 # its Azure/AWS TLS paths, which is built and checked for ARM64 in CI.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# No-echo terminal password prompt. Used by the `admin_bootstrap` binary
+# (src/bin/admin_bootstrap.rs), which is shipped in the production image —
+# a real (non-dev) dependency, unlike the dev-only examples/reset_admin_password.rs
+# below, which still gets this same crate via [dev-dependencies].
+rpassword = "7"
 
 [dev-dependencies]
 tower = { version = "0.4", features = ["util"] }
 http-body-util = "0.1"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }
-# No-echo terminal password prompt, used only by the offline
-# examples/reset_admin_password.rs recovery tool (never shipped in the server binary).
-rpassword = "7"

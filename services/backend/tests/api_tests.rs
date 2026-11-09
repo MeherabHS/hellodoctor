@@ -40,6 +40,8 @@ use uuid::Uuid;
 
 #[path = "cases/admin_articles.rs"]
 mod admin_articles;
+#[path = "cases/admin_bootstrap.rs"]
+mod admin_bootstrap;
 #[path = "cases/admin_campaigns.rs"]
 mod admin_campaigns;
 #[path = "cases/admin_quizzes.rs"]
