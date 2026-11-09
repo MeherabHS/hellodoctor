@@ -121,6 +121,7 @@ export function Auth({ onSignedIn, onBoundary }: { onSignedIn: () => void; onBou
         {fields.map(([name,label,type]) => <label key={name} htmlFor={name}>{label}<input className="auth-input" id={name} name={name} type={type} required min={type === 'number' ? 0 : undefined} max={type === 'number' ? 100 : undefined} minLength={type === 'password' ? 12 : undefined} maxLength={type === 'password' ? 128 : name === 'full_name' ? 120 : undefined} autoComplete={type === 'password' ? 'new-password' : undefined} /></label>)}
         <div className="web-gap">
           <p className="sheet-desc">Before submitting, review and accept the following requirements.</p>
+          {!!legalDocs?.length && <p className="sheet-desc" role="status">{legalDocs.filter(doc => acceptedTypes[doc.document_type]).length}/{legalDocs.length} accepted</p>}
           {legalDocsError && <p role="alert">{legalDocsError} <button type="button" onClick={() => setLegalDocsRetry(value => value + 1)}>Retry</button></p>}
           {!legalDocsError && legalDocsLoading && <p className="sheet-desc" role="status">Loading required documents…</p>}
           {legalDocs?.map(doc => <div key={doc.document_type} style={{ display: 'flex', alignItems: 'center', gap: '0.5em' }}>
