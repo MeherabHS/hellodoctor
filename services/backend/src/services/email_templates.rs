@@ -295,7 +295,7 @@ fn footer_html(footer: &Footer<'_>) -> String {
 <div style=\"font-weight:bold;font-size:14px;\">AfyaMkononi</div>\
 <div style=\"margin:4px 0 10px;\">Your Health. Your Space. Your Way.</div>\
 <div style=\"line-height:1.6;\">Operated by Global Health Initiatives (GHI)<br />Technology Partner: Research and Management Consultants Ltd. (RMCL)</div>\
-<div style=\"margin-top:10px;\">{label} <a href=\"mailto:support@hellodoctor.asia\" style=\"color:{vibrant};text-decoration:underline;\">support@hellodoctor.asia</a></div>\
+<div style=\"margin-top:10px;\">{label} <a href=\"mailto:support@afyamkononi.app\" style=\"color:{vibrant};text-decoration:underline;\">support@afyamkononi.app</a></div>\
 {disclaimer}\
 </td></tr>",
         lavender = palette::LAVENDER,
@@ -307,7 +307,7 @@ fn footer_html(footer: &Footer<'_>) -> String {
 
 fn footer_text(footer: &Footer<'_>) -> String {
     let mut out = format!(
-        "--\nAfyaMkononi\nYour Health. Your Space. Your Way.\n\nOperated by Global Health Initiatives (GHI)\nTechnology Partner: Research and Management Consultants Ltd. (RMCL)\n\n{} support@hellodoctor.asia",
+        "--\nAfyaMkononi\nYour Health. Your Space. Your Way.\n\nOperated by Global Health Initiatives (GHI)\nTechnology Partner: Research and Management Consultants Ltd. (RMCL)\n\n{} support@afyamkononi.app",
         footer.contact_label
     );
     if footer.transactional_disclaimer {
@@ -618,7 +618,7 @@ Warm regards,\nAfyaMkononi Clinical Coordination Team\n\n{footer}",
 /// Content: `AFYAMKONONI_EMAIL_CONTENT_V1.md` §4. No CTA, and — matching
 /// the approved copy exactly — no extra footer contact line beyond the
 /// shared structure, since the body itself already directs the reader to
-/// support@hellodoctor.asia. Deliberately never states a rejection reason
+/// support@afyamkononi.app. Deliberately never states a rejection reason
 /// (consistent with keeping review detail inside the authenticated
 /// Doctor Portal/app, never in email).
 pub fn render_doctor_rejected(doctor_name: &str, assets: &EmailAssets) -> RenderedEmail {
@@ -634,7 +634,7 @@ pub fn render_doctor_rejected(doctor_name: &str, assets: &EmailAssets) -> Render
 <p style=\"margin:0 0 16px;\">Our professional verification process helps us maintain the standards of quality, patient safety, confidentiality and trust expected across the AfyaMkononi healthcare network.</p>\
 <p style=\"margin:0 0 16px;\">We understand this may not be the outcome you hoped for.</p>\
 <p style=\"margin:0 0 16px;\">If you have questions about the decision or would like information about possible next steps, our team is available to assist.</p>\
-<p style=\"margin:0 0 16px;\">Please contact <strong>support@hellodoctor.asia</strong> for further guidance.</p>\
+<p style=\"margin:0 0 16px;\">Please contact <strong>support@afyamkononi.app</strong> for further guidance.</p>\
 <p style=\"margin:0 0 16px;\">Thank you again for your interest in AfyaMkononi and our commitment to respectful, stigma-free healthcare.</p>\
 <p style=\"margin:0;\">Sincerely,<br /><strong>AfyaMkononi Clinical Coordination Team</strong></p>",
         teal = palette::DEEP_TEAL,
@@ -652,7 +652,7 @@ After reviewing the information provided, we are unable to approve your applicat
 Our professional verification process helps us maintain the standards of quality, patient safety, confidentiality and trust expected across the AfyaMkononi healthcare network.\n\n\
 We understand this may not be the outcome you hoped for.\n\n\
 If you have questions about the decision or would like information about possible next steps, our team is available to assist.\n\n\
-Please contact support@hellodoctor.asia for further guidance.\n\n\
+Please contact support@afyamkononi.app for further guidance.\n\n\
 Thank you again for your interest in AfyaMkononi and our commitment to respectful, stigma-free healthcare.\n\n\
 Sincerely,\nAfyaMkononi Clinical Coordination Team\n\n\
 --\nAfyaMkononi\nYour Health. Your Space. Your Way.\n\nOperated by Global Health Initiatives (GHI)\nTechnology Partner: Research and Management Consultants Ltd. (RMCL)",
@@ -1433,7 +1433,7 @@ pub fn render_admin_login_otp(
     let body_html = format!(
         "<h1 style=\"margin:0 0 16px;font-size:20px;color:{teal};\">Administrator Access Verification</h1>\
 <p style=\"margin:0 0 16px;\">Hello {name_html},</p>\
-<p style=\"margin:0 0 16px;\">A verification code has been requested for your HelloDoctor.Asia administrator account.</p>\
+<p style=\"margin:0 0 16px;\">A verification code has been requested for your AfyaMkononi administrator account.</p>\
 <p style=\"margin:0 0 4px;font-weight:bold;\">Verification code</p>\
 {code_block}\
 <p style=\"margin:0 0 16px;text-align:center;\"><strong>Expires in {expiry_minutes} minutes.</strong></p>\
@@ -1447,14 +1447,14 @@ pub fn render_admin_login_otp(
 </ul>\
 <p style=\"margin:0 0 16px;\"><strong>If you did not initiate this request</strong>, do not use the code. Report the activity through your authorized security-support channel.</p>\
 <p style=\"margin:0 0 16px;\">Administrator access protects sensitive operational and healthcare information. Please maintain the required authentication and confidentiality practices.</p>\
-<p style=\"margin:0;\">Regards,<br /><strong>HelloDoctor.Asia Security Team</strong></p>",
+<p style=\"margin:0;\">Regards,<br /><strong>AfyaMkononi Security Team</strong></p>",
         teal = palette::DEEP_TEAL,
         code_block = verification_code_block_html(verification_code),
     );
     let text_body = format!(
         "Administrator Access Verification\n\n\
 Hello {name},\n\n\
-A verification code has been requested for your HelloDoctor.Asia administrator account.\n\n\
+A verification code has been requested for your AfyaMkononi administrator account.\n\n\
 Verification code:\n{code_block}\n\
 Expires in {expiry_minutes} minutes.\n\n\
 This code is intended only for the authentication request you initiated.\n\n\
@@ -1465,7 +1465,7 @@ For security:\n\
 - Never provide verification codes to technical support personnel.\n\n\
 If you did not initiate this request, do not use the code. Report the activity through your authorized security-support channel.\n\n\
 Administrator access protects sensitive operational and healthcare information. Please maintain the required authentication and confidentiality practices.\n\n\
-Regards,\nHelloDoctor.Asia Security Team\n\n{footer}",
+Regards,\nAfyaMkononi Security Team\n\n{footer}",
         code_block = verification_code_block_text(verification_code),
         footer = footer_text(&Footer {
             contact_label: "Security support:",
@@ -1937,6 +1937,125 @@ mod tests {
         ];
         for html in bodies {
             assert!(!html.to_lowercase().contains("circle technology"));
+        }
+    }
+
+    /// AfyaMkononi is the only customer-facing brand. Covers every one of
+    /// the 14 implemented templates (not a sample) so a regression in any
+    /// single one — like the Admin login-OTP email's former "HelloDoctor.Asia
+    /// administrator account" / "HelloDoctor.Asia Security Team" — is always
+    /// caught here, not just in the specific template it happened to appear
+    /// in last time.
+    ///
+    /// Deliberately does NOT use the shared `links()` test helper above:
+    /// that helper's `https://app.hellodoctor.asia` / `https://doctor.
+    /// hellodoctor.asia` values are pre-existing internal test fixtures only
+    /// (production has no hardcoded fallback at all — `AppConfig`'s
+    /// `email_patient_app_url`/`email_doctor_portal_url` are `None` unless
+    /// the `EMAIL_PATIENT_APP_URL`/`EMAIL_DOCTOR_PORTAL_URL` env vars are
+    /// set, which in production carry the real afyamkononi.app URLs), and
+    /// renaming that pervasively-used shared helper is out of scope for this
+    /// fix. Using a neutral placeholder domain here instead keeps this test
+    /// checking real rendered branding text, not an unrelated test fixture.
+    #[test]
+    fn no_rendered_email_ever_mentions_hellodoctor_branding() {
+        let links = EmailLinks::new(
+            Some("https://app.example.test"),
+            Some("https://doctor.example.test"),
+        );
+        let consultation = ConsultationConfirmedParams {
+            first_name: "Amani",
+            consultation_id: "C-1001",
+            appointment_date: "12 Nov 2026",
+            appointment_time: "14:00",
+            timezone: "EAT",
+            doctor_name: "Njoroge",
+        };
+        let rescheduled = ConsultationRescheduledParams {
+            first_name: "Amani",
+            consultation_id: "C-1001",
+            new_appointment_date: "13 Nov 2026",
+            new_appointment_time: "15:00",
+            timezone: "EAT",
+            doctor_name: "Njoroge",
+        };
+        let cancelled = ConsultationCancelledParams {
+            first_name: "Amani",
+            consultation_id: "C-1001",
+            appointment_date: "12 Nov 2026",
+            appointment_time: "14:00",
+            timezone: "EAT",
+        };
+        let payment = PaymentConfirmedParams {
+            first_name: "Amani",
+            transaction_id: "T-1",
+            consultation_id: "C-1001",
+            currency: "KES",
+            amount_paid: "1500",
+            payment_date: "12 Nov 2026",
+        };
+        let refund = RefundProcessedParams {
+            first_name: "Amani",
+            refund_reference: "R-1",
+            transaction_id: "T-1",
+            consultation_id: "C-1001",
+            currency: "KES",
+            refund_amount: "1500",
+            refund_date: "12 Nov 2026",
+        };
+        let rendered = [
+            render_patient_welcome("Amani", &ASSETS_LOCAL(), &links),
+            render_doctor_application_received("Njoroge", &ASSETS_LOCAL()),
+            render_doctor_approved("Njoroge", &ASSETS_LOCAL(), &links),
+            render_doctor_rejected("Njoroge", &ASSETS_LOCAL()),
+            render_consultation_confirmed(&consultation, &ASSETS_LOCAL(), &links),
+            render_consultation_rescheduled(&rescheduled, &ASSETS_LOCAL(), &links),
+            render_consultation_cancelled(&cancelled, &ASSETS_LOCAL(), &links),
+            render_payment_confirmed(&payment, &ASSETS_LOCAL(), &links),
+            render_refund_processed(&refund, &ASSETS_LOCAL(), &links),
+            render_password_changed("Amani", &ASSETS_LOCAL()),
+            render_password_reset_otp("Amani", "482913", 5, &ASSETS_LOCAL()),
+            render_patient_login_otp("Amani", "482913", 5, &ASSETS_LOCAL()),
+            render_doctor_login_otp("Njoroge", "482913", 5, &ASSETS_LOCAL()),
+            render_admin_login_otp("Wanjiru", "482913", 5, &ASSETS_LOCAL()),
+        ];
+        for r in rendered {
+            for body in [r.html_body.as_str(), r.text_body.as_str()] {
+                let lower = body.to_lowercase();
+                assert!(
+                    !lower.contains("hellodoctor"),
+                    "found HelloDoctor branding: {body}"
+                );
+                assert!(
+                    !lower.contains("hello doctor"),
+                    "found HelloDoctor branding: {body}"
+                );
+            }
+        }
+    }
+
+    /// Every template that names a contact address must use the AfyaMkononi
+    /// support domain, never hellodoctor.asia (the shared footer, and the
+    /// two templates — Admin login OTP and Doctor rejection — that mention
+    /// support outside the shared footer structure).
+    #[test]
+    fn every_template_support_contact_uses_the_afyamkononi_domain() {
+        let bodies = [
+            render_patient_welcome("Amani", &ASSETS_LOCAL(), &links()),
+            render_doctor_rejected("Njoroge", &ASSETS_LOCAL()),
+            render_password_changed("Amani", &ASSETS_LOCAL()),
+            render_admin_login_otp("Wanjiru", "482913", 5, &ASSETS_LOCAL()),
+        ];
+        for r in bodies {
+            for body in [r.html_body.as_str(), r.text_body.as_str()] {
+                if body.contains("support@") || body.contains("Security support") {
+                    assert!(
+                        body.contains("support@afyamkononi.app"),
+                        "expected the AfyaMkononi support address: {body}"
+                    );
+                }
+                assert!(!body.contains("@hellodoctor.asia"));
+            }
         }
     }
 

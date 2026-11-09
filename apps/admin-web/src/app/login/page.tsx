@@ -6,15 +6,15 @@ import { useRouter } from 'next/navigation';
 import { BotChallenge } from '@/components/BotChallenge';
 
 // Deployed Admin login requires a browser challenge and password, followed by
-// emailed OTP plus the enrolled authenticator code. Tokens stay in the BFF.
+// an emailed one-time verification code. Admin, Doctor and Patient share this
+// same single-factor-OTP MFA shape; there is no authenticator-app factor.
+// Tokens stay in the BFF.
 export default function AdminLoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<'credentials' | 'code'>('credentials');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otpCode, setOtpCode] = useState('');
-  const [totpCode, setTotpCode] = useState('');
-  const [requiresTotp, setRequiresTotp] = useState(true);
   const [sessionToken, setSessionToken] = useState('');
   const [debugCode, setDebugCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -42,8 +42,6 @@ export default function AdminLoginPage() {
       setSessionToken(json.data.session_token);
       setDebugCode(json.data.debug_otp_code ?? null);
       setOtpCode('');
-      setTotpCode('');
-      setRequiresTotp(json.data.requires_totp !== false);
       setStep('code');
       setSubmitting(false);
     } catch {
@@ -64,7 +62,7 @@ export default function AdminLoginPage() {
       const res = await fetch('/api/login/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_token: sessionToken, otp_code: otpCode, ...(totpCode ? { totp_code: totpCode } : {}) }),
+        body: JSON.stringify({ session_token: sessionToken, otp_code: otpCode }),
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
@@ -85,7 +83,6 @@ export default function AdminLoginPage() {
     setStep('credentials');
     setError(null);
     setOtpCode('');
-    setTotpCode('');
     setSessionToken('');
     setDebugCode(null);
   }
@@ -155,7 +152,7 @@ export default function AdminLoginPage() {
 
             <div>
               <p className="text-sm text-slate-700">
-                We emailed a verification code to <span className="font-medium">{email}</span>. Enter it below to finish signing in.
+                We emailed a verification code to <span className="font-medium">{email}</span>.
               </p>
               {debugCode && (
                 <p className="mt-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2">
@@ -184,13 +181,6 @@ export default function AdminLoginPage() {
               />
             </div>
 
-            {requiresTotp && <div>
-              <label htmlFor="totp" className="block text-sm font-medium text-slate-700 mb-1">Authenticator code</label>
-              <input id="totp" type="text" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required
-                autoComplete="off" value={totpCode} onChange={event => setTotpCode(event.target.value.replace(/\D/g, ''))}
-                placeholder="6-digit authenticator code"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-            </div>}
             <button
               type="submit"
               disabled={submitting}
