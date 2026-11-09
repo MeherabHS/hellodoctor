@@ -40,8 +40,8 @@ fn main() {
     // Fictional, offline-safe sample data only — no real identifiers.
     let assets = EmailAssets::with_base_url("assets");
     let links = EmailLinks::new(
-        Some("https://app.hellodoctor.asia"),
-        Some("https://doctor.hellodoctor.asia"),
+        Some("https://app.afyamkononi.app"),
+        Some("https://doctor.afyamkononi.app"),
     );
 
     let consultation_confirmed_params = ConsultationConfirmedParams {
