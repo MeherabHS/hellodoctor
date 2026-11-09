@@ -32,6 +32,31 @@ class DoctorRegistrationDraft {
   final String address;
 }
 
+/// The exact document_type values a Doctor registration applies to.
+/// GET /legal/documents is a single shared, role-agnostic registry (no
+/// audience filter exists server-side), so it also returns Patient-only
+/// document types that must never reach a Doctor registration screen.
+/// An explicit allow-list, not a Patient-type exclude-list, so a future new
+/// Patient-only document type is excluded by default rather than requiring
+/// this file to be remembered and updated -- mirrors
+/// apps/doctor-web/src/lib/legalConsent.ts::DOCTOR_APPLICABLE_DOCUMENT_TYPES.
+/// Previously only excluded 'PATIENT_DATA_SHARING_CONSENT' by name, silently
+/// still showing the other three Patient-only types
+/// (PATIENT_TERMS/PATIENT_PRIVACY_NOTICE/PATIENT_DATA_RIGHTS) on this screen.
+const _doctorApplicableDocumentTypes = {
+  'DOCTOR_TERMS',
+  'PRIVACY_NOTICE',
+  'PROFESSIONAL_VERIFICATION_DECLARATION',
+  'TELEMEDICINE_PRACTITIONER_POLICY',
+  'MARKETING_COMMUNICATIONS',
+};
+
+/// Extracted as a top-level, Flutter-independent pure function so it is
+/// directly unit-testable without driving this page's API client/widget
+/// tree -- see test/legal_consent_filter_test.dart.
+bool isDoctorApplicableDocumentType(String documentType) =>
+    _doctorApplicableDocumentTypes.contains(documentType);
+
 class _LegalDocument {
   _LegalDocument({
     required this.type,
@@ -83,7 +108,7 @@ class _LegalConsentState extends State<LegalConsentPage> {
               ))
           .toList();
       documents.removeWhere(
-          (document) => document.type == 'PATIENT_DATA_SHARING_CONSENT');
+          (document) => !isDoctorApplicableDocumentType(document.type));
       if (mounted) setState(() => _documents = documents);
     } on ApiException catch (e) {
       if (mounted) setState(() => _loadError = e.userMessage);
