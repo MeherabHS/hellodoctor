@@ -9,7 +9,9 @@ name: TEMPORARY golden regen (Doctor) -- diagnostic only, to be deleted
 # again once its job is done.
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [fix/doctor-ci-golden-drift]
+    paths: ['.github/workflows/_tmp-golden-regen.yml']
 
 permissions:
   contents: read
