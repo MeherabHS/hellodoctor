@@ -1,0 +1,60 @@
+name: TEMPORARY golden regen (Doctor) -- diagnostic only, to be deleted
+
+# One-off diagnostic workflow: regenerates the Doctor app's golden images for
+# notification_center_page_test.dart and qna_rendering_test.dart on the exact
+# ubuntu-latest + Flutter 3.47.6 environment the real CI uses, so any
+# replacement goldens are never captured on a developer's local OS. Uploads
+# the regenerated PNGs as an artifact for manual inspection before they are
+# committed -- this workflow never commits anything itself, and is deleted
+# again once its job is done.
+
+on:
+  push:
+    branches: [fix/doctor-ci-golden-drift]
+    paths: ['.github/workflows/_tmp-golden-regen.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  regen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.47.6"
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      - name: Regenerate goldens for the two affected test files only
+        run: |
+          flutter test --update-goldens \
+            test/notification_center_page_test.dart \
+            test/qna_rendering_test.dart
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: regenerated-doctor-goldens
+          path: |
+            test/goldens/notifications-loading.png
+            test/goldens/notifications-empty.png
+            test/goldens/notifications-error.png
+            test/goldens/notifications-populated.png
+            test/goldens/qna-editor-keyboard.png
+            test/goldens/qna-unanswered.png
+            test/goldens/qna-long-question.png
+            test/goldens/qna-answered.png
+            test/goldens/qna-loading.png
+            test/goldens/qna-empty.png
+            test/goldens/qna-error.png
+            test/goldens/qna-offline-cache.png
+          retention-days: 3
+          if-no-files-found: warn
