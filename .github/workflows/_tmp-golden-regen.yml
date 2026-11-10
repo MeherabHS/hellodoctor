@@ -41,20 +41,23 @@ jobs:
             test/qna_rendering_test.dart
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        # NOTE: upload-artifact's `path` is resolved relative to
+        # GITHUB_WORKSPACE (repo root), NOT this job's `defaults.run.
+        # working-directory` -- that default only applies to `run:` steps.
         with:
           name: regenerated-doctor-goldens
           path: |
-            test/goldens/notifications-loading.png
-            test/goldens/notifications-empty.png
-            test/goldens/notifications-error.png
-            test/goldens/notifications-populated.png
-            test/goldens/qna-editor-keyboard.png
-            test/goldens/qna-unanswered.png
-            test/goldens/qna-long-question.png
-            test/goldens/qna-answered.png
-            test/goldens/qna-loading.png
-            test/goldens/qna-empty.png
-            test/goldens/qna-error.png
-            test/goldens/qna-offline-cache.png
+            apps/mobile/test/goldens/notifications-loading.png
+            apps/mobile/test/goldens/notifications-empty.png
+            apps/mobile/test/goldens/notifications-error.png
+            apps/mobile/test/goldens/notifications-populated.png
+            apps/mobile/test/goldens/qna-editor-keyboard.png
+            apps/mobile/test/goldens/qna-unanswered.png
+            apps/mobile/test/goldens/qna-long-question.png
+            apps/mobile/test/goldens/qna-answered.png
+            apps/mobile/test/goldens/qna-loading.png
+            apps/mobile/test/goldens/qna-empty.png
+            apps/mobile/test/goldens/qna-error.png
+            apps/mobile/test/goldens/qna-offline-cache.png
           retention-days: 3
-          if-no-files-found: warn
+          if-no-files-found: error
