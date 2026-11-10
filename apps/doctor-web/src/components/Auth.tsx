@@ -4,7 +4,7 @@ import { errorText, request } from '../lib/client';
 import { Prototype, id, hasClass } from './Prototype';
 import { State } from './Common';
 import { BotChallenge } from './BotChallenge';
-import { allRequiredDocumentsAccepted } from '../lib/legalConsent';
+import { allRequiredDocumentsAccepted, filterDoctorApplicableDocuments } from '../lib/legalConsent';
 
 const fields = [
   ['full_name','Full legal name','text'], ['license_number','KMPDC registration number','text'],
@@ -37,14 +37,35 @@ export function Auth({ onSignedIn, onBoundary }: { onSignedIn: () => void; onBou
     if (openDocType) dialogRef.current?.showModal();
     else dialogRef.current?.close();
   }, [openDocType]);
+  const [legalDocsLoading, setLegalDocsLoading] = useState(false);
+  const [legalDocsRetry, setLegalDocsRetry] = useState(0);
   useEffect(() => {
     if (mode !== 'register' || legalDocs !== null) return;
     let cancelled = false;
-    request<{ success: boolean; data: LegalDocument[] }>('/api/auth/legal-documents')
-      .then(response => { if (!cancelled) setLegalDocs(response.data); })
-      .catch(() => { if (!cancelled) setLegalDocsError('Unable to load the required legal documents. Please reload and try again.'); });
+    setLegalDocsLoading(true);
+    setLegalDocsError('');
+    // `request<T>` already unwraps the backend's {success,data} envelope and
+    // resolves with `data` itself (see lib/client.ts::performRequest) -- this
+    // previously typed the resolved value as the FULL envelope and then read
+    // `.data` on it again, so `setLegalDocs` was actually called with
+    // `undefined` (an array has no `.data` property) on every successful
+    // fetch. `undefined`, like the initial `null`, is falsy, so the "Loading
+    // required documents…" message below never stopped rendering, and
+    // because `undefined !== null`, this effect's own re-fetch guard above
+    // also never ran again -- a silent, permanently-stuck loading state that
+    // never surfaced as an error, exactly as observed in production.
+    //
+    // GET /legal/documents is a single shared, role-agnostic registry (no
+    // audience filter exists server-side -- see legal_repo.rs::list_current),
+    // so its response also includes Patient-only document types that must
+    // never reach a Doctor registration form; filtered here via the explicit
+    // Doctor allow-list in lib/legalConsent.ts.
+    request<LegalDocument[]>('/api/auth/legal-documents')
+      .then(documents => { if (!cancelled) setLegalDocs(filterDoctorApplicableDocuments(documents)); })
+      .catch(() => { if (!cancelled) setLegalDocsError('Unable to load the required legal documents.'); })
+      .finally(() => { if (!cancelled) setLegalDocsLoading(false); });
     return () => { cancelled = true; };
-  }, [mode, legalDocs]);
+  }, [mode, legalDocs, legalDocsRetry]);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || ((mode === 'signin' || mode === 'register') && challengeToken === null)) return;
@@ -100,8 +121,9 @@ export function Auth({ onSignedIn, onBoundary }: { onSignedIn: () => void; onBou
         {fields.map(([name,label,type]) => <label key={name} htmlFor={name}>{label}<input className="auth-input" id={name} name={name} type={type} required min={type === 'number' ? 0 : undefined} max={type === 'number' ? 100 : undefined} minLength={type === 'password' ? 12 : undefined} maxLength={type === 'password' ? 128 : name === 'full_name' ? 120 : undefined} autoComplete={type === 'password' ? 'new-password' : undefined} /></label>)}
         <div className="web-gap">
           <p className="sheet-desc">Before submitting, review and accept the following requirements.</p>
-          {legalDocsError && <p role="alert">{legalDocsError}</p>}
-          {!legalDocsError && !legalDocs && <p className="sheet-desc">Loading required documents…</p>}
+          {!!legalDocs?.length && <p className="sheet-desc" role="status">{legalDocs.filter(doc => acceptedTypes[doc.document_type]).length}/{legalDocs.length} accepted</p>}
+          {legalDocsError && <p role="alert">{legalDocsError} <button type="button" onClick={() => setLegalDocsRetry(value => value + 1)}>Retry</button></p>}
+          {!legalDocsError && legalDocsLoading && <p className="sheet-desc" role="status">Loading required documents…</p>}
           {legalDocs?.map(doc => <div key={doc.document_type} style={{ display: 'flex', alignItems: 'center', gap: '0.5em' }}>
             <input
               type="checkbox"
