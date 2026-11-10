@@ -8,14 +8,13 @@ name: Mobile internal-test APK build (manual, approval-gated)
 #
 # Secrets this workflow reads (none of which this workflow ever prints,
 # commits, or derives a value from in log output):
-#   - ANDROID_INTERNAL_TEST_KEYSTORE_BASE64 (required): base64 of a
-#     dedicated internal-testing .jks keystore -- NEVER a production/Play
-#     Store signing key. See apps/*/android/app/build.gradle.kts's
-#     internalTestKeystoreProperties block, which falls back to the Flutter
-#     debug keystore (same as every local `flutter run --release`) when this
-#     secret is absent, so a first run without it still produces a build --
-#     just one signed with the publicly-known debug key, not suitable for
-#     distribution outside this one build environment.
+#   - ANDROID_INTERNAL_TEST_KEYSTORE_BASE64 (required, build fails closed if
+#     absent): base64 of a dedicated internal-testing .jks keystore -- NEVER
+#     a production/Play Store signing key. apps/*/android/app/build.gradle.kts's
+#     internalTestKeystoreProperties block itself falls back to the Flutter
+#     debug keystore when no properties file is supplied (so a bare local
+#     `flutter run --release` still works), but THIS workflow deliberately
+#     never relies on that fallback -- see the "fail closed" step below.
 #   - ANDROID_INTERNAL_TEST_KEYSTORE_PASSWORD (required alongside the above)
 #   - ANDROID_INTERNAL_TEST_KEY_ALIAS (required alongside the above)
 #   - GOOGLE_SERVICES_JSON_DOCTOR (optional): base64 of
@@ -110,9 +109,16 @@ jobs:
           KEY_ALIAS: ${{ secrets.ANDROID_INTERNAL_TEST_KEY_ALIAS }}
         run: |
           set -euo pipefail
-          if [ -z "${KEYSTORE_B64}" ]; then
-            echo "::warning::ANDROID_INTERNAL_TEST_KEYSTORE_BASE64 is not set -- falling back to the Flutter debug keystore (same as 'flutter run --release'). This APK will NOT be suitable for distribution outside this build environment."
-            exit 0
+          # Fail closed: an internal-test-signed APK was explicitly requested,
+          # so a missing keystore must stop the build rather than silently
+          # fall back to the publicly-known Flutter debug key (which the
+          # build.gradle.kts signingConfig would otherwise do for any OTHER
+          # caller, e.g. a bare local `flutter run --release` -- that
+          # fallback stays in place for that case, but this workflow must
+          # never rely on it).
+          if [ -z "${KEYSTORE_B64}" ] || [ -z "${KEYSTORE_PASSWORD}" ] || [ -z "${KEY_ALIAS}" ]; then
+            echo "::error::ANDROID_INTERNAL_TEST_KEYSTORE_BASE64/_PASSWORD/_KEY_ALIAS must all be set -- refusing to produce a debug-signed build for an internal-test APK request."
+            exit 1
           fi
           echo "${KEYSTORE_B64}" | base64 -d > internal-test.jks
           cat > internal-test-keystore.properties <<EOF
@@ -136,8 +142,14 @@ jobs:
 
       - name: Build release APK (production backend, no development bypasses)
         working-directory: apps/${{ matrix.app }}
+        # ARM64-only, split-per-abi: this is for initial physical-device E2E
+        # testing, where every target phone is arm64-v8a, not for a
+        # universal/multi-ABI distribution -- --target-platform android-arm64
+        # also skips building the unused armeabi-v7a/x86_64 native slices
+        # entirely, rather than just discarding them after the fact.
         run: |
-          flutter build apk --release \
+          flutter build apk --release --split-per-abi \
+            --target-platform android-arm64 \
             --dart-define=API_BASE_URL=https://api.hellodoctor.asia/api/v1 \
             --dart-define=ENVIRONMENT=production
 
@@ -146,7 +158,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/dist"
-          cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/${{ matrix.output_name }}"
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "$GITHUB_WORKSPACE/dist/${{ matrix.output_name }}"
           cd "$GITHUB_WORKSPACE/dist"
           BUILD_TOOLS="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
           "$BUILD_TOOLS/apksigner" verify --print-certs "${{ matrix.output_name }}" | tee signing-info.txt
