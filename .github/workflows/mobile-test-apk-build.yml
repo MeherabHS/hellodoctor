@@ -17,21 +17,31 @@ name: Mobile internal-test APK build (manual, approval-gated)
 #     never relies on that fallback -- see the "fail closed" step below.
 #   - ANDROID_INTERNAL_TEST_KEYSTORE_PASSWORD (required alongside the above)
 #   - ANDROID_INTERNAL_TEST_KEY_ALIAS (required alongside the above)
-#   - GOOGLE_SERVICES_JSON_DOCTOR (optional): base64 of
-#     apps/mobile/android/app/google-services.json, the real Firebase
-#     Android client config for the afyamkononi-ec314 project's
-#     com.example.hellodoctor_mobile app registration. Written to disk only
-#     if this secret is non-empty; the Gradle Google Services plugin is
-#     applied conditionally on the file's presence either way (see that
-#     build.gradle.kts), so the build still succeeds without it -- just
-#     without push notifications working on the resulting APK.
-#   - GOOGLE_SERVICES_JSON_PATIENT (optional): same, for
-#     apps/mobile_patient's com.hellodoctor.patient Firebase app
-#     registration.
+#   - GOOGLE_SERVICES_JSON_DOCTOR (required for any build that selects the
+#     Doctor app): base64 of apps/mobile/android/app/google-services.json,
+#     the real Firebase Android client config for the afyamkononi-ec314
+#     project's com.example.hellodoctor_mobile app registration. These
+#     builds exist specifically for real-device FCM end-to-end testing, so a
+#     missing Firebase config now fails the build closed rather than quietly
+#     producing a push-notification-dead APK.
+#   - GOOGLE_SERVICES_JSON_PATIENT (required for any build that selects the
+#     Patient app): same, for apps/mobile_patient's com.hellodoctor.patient
+#     Firebase app registration.
 # This workflow never reads, needs, or accepts any Firebase *server-side*
 # service-account credential (FCM_PROJECT_ID/FCM_CLIENT_EMAIL/
 # FCM_PRIVATE_KEY_B64) -- those stay exactly where they already are, on the
 # Azure backend, and are never copied here.
+#
+# Matrix construction: workflow_dispatch's `build_patient`/`build_doctor`
+# booleans are NOT usable as a job-level `if: matrix.app == ...` condition --
+# the `matrix` context only exists inside the job that declares
+# `strategy.matrix`, not at that job's own `if:` (which evaluates before the
+# matrix is expanded). The `prepare` job below instead computes the actual
+# list of apps to build as JSON from the two inputs, and `build` consumes it
+# via `fromJSON(needs.prepare.outputs.matrix)` -- the documented way to build
+# a dynamic matrix from upstream job output. Selecting neither app yields an
+# empty `include` list and `has_apps=false`, so `build` is skipped entirely
+# rather than running with a degenerate matrix.
 
 on:
   workflow_dispatch:
@@ -52,24 +62,65 @@ concurrency:
   group: mobile-test-apk-build
   cancel-in-progress: false
 
+env:
+  # Public certificate identity of the dedicated internal-testing keystore --
+  # NOT a secret. A certificate's SHA-256 fingerprint is meant to be shared
+  # (it's the same kind of value apps publish to restrict API keys by
+  # signing cert), and it is already implicitly disclosed by this same
+  # workflow's own `apksigner verify --print-certs` artifact. Recording the
+  # expected value here lets the build verify it actually re-signed with
+  # THIS known key, not merely that *some* valid signature exists -- rotate
+  # this value (via a reviewed PR) if the internal-test keystore is ever
+  # reissued.
+  EXPECTED_INTERNAL_TEST_CERT_SHA256: "84:AE:C1:7D:CD:AB:33:B1:DC:F4:D7:21:A5:48:C3:F6:AE:41:A4:36:C0:A9:8A:08:99:88:6A:F5:FF:AB:53:A7"
+
 jobs:
+  prepare:
+    name: Determine which apps to build
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      has_apps: ${{ steps.set-matrix.outputs.has_apps }}
+    steps:
+      - name: Build the app matrix from workflow_dispatch inputs
+        id: set-matrix
+        env:
+          BUILD_PATIENT: ${{ inputs.build_patient }}
+          BUILD_DOCTOR: ${{ inputs.build_doctor }}
+        run: |
+          set -euo pipefail
+          entries=()
+          if [ "${BUILD_PATIENT}" = "true" ]; then
+            entries+=('{"app":"mobile_patient","label":"Patient","google_services_secret":"GOOGLE_SERVICES_JSON_PATIENT","output_name":"afyamkononi-patient-test.apk"}')
+          fi
+          if [ "${BUILD_DOCTOR}" = "true" ]; then
+            entries+=('{"app":"mobile","label":"Doctor","google_services_secret":"GOOGLE_SERVICES_JSON_DOCTOR","output_name":"afyamkononi-doctor-test.apk"}')
+          fi
+
+          if [ "${#entries[@]}" -eq 0 ]; then
+            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+            echo "has_apps=false" >> "$GITHUB_OUTPUT"
+          else
+            joined=$(IFS=,; echo "${entries[*]}")
+            echo "matrix={\"include\":[${joined}]}" >> "$GITHUB_OUTPUT"
+            echo "has_apps=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report selection
+        run: |
+          echo "Patient selected: ${{ inputs.build_patient }}"
+          echo "Doctor selected: ${{ inputs.build_doctor }}"
+          echo "Computed matrix: ${{ steps.set-matrix.outputs.matrix }}"
+
   build:
     name: Build ${{ matrix.label }} internal-test APK
-    if: ${{ (matrix.app == 'mobile_patient' && inputs.build_patient) || (matrix.app == 'mobile' && inputs.build_doctor) }}
+    needs: prepare
+    if: needs.prepare.outputs.has_apps == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - app: mobile_patient
-            label: Patient
-            google_services_secret: GOOGLE_SERVICES_JSON_PATIENT
-            output_name: afyamkononi-patient-test.apk
-          - app: mobile
-            label: Doctor
-            google_services_secret: GOOGLE_SERVICES_JSON_DOCTOR
-            output_name: afyamkononi-doctor-test.apk
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
 
@@ -88,18 +139,18 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Decode Firebase Android client config (optional -- skipped if the secret is not set)
+      - name: Decode Firebase Android client config (required -- these builds are for real FCM E2E testing)
         working-directory: apps/${{ matrix.app }}/android/app
         env:
           GOOGLE_SERVICES_JSON_B64: ${{ secrets[matrix.google_services_secret] }}
         run: |
           set -euo pipefail
-          if [ -n "${GOOGLE_SERVICES_JSON_B64}" ]; then
-            echo "${GOOGLE_SERVICES_JSON_B64}" | base64 -d > google-services.json
-            echo "Firebase client config present for this build."
-          else
-            echo "::warning::${{ matrix.google_services_secret }} is not set -- building without Firebase/FCM. Push notifications will not work on this APK."
+          if [ -z "${GOOGLE_SERVICES_JSON_B64}" ]; then
+            echo "::error::${{ matrix.google_services_secret }} is not set -- refusing to produce an internal-test APK without real Firebase configuration, since these builds exist specifically to verify FCM push delivery end-to-end."
+            exit 1
           fi
+          echo "${GOOGLE_SERVICES_JSON_B64}" | base64 -d > google-services.json
+          echo "Firebase client config present for this build."
 
       - name: Decode internal-testing release keystore (required for a real, installable signature)
         working-directory: apps/${{ matrix.app }}/android/app
@@ -164,6 +215,22 @@ jobs:
           "$BUILD_TOOLS/apksigner" verify --print-certs "${{ matrix.output_name }}" | tee signing-info.txt
           "$BUILD_TOOLS/aapt2" dump badging "${{ matrix.output_name }}" | head -5 | tee -a signing-info.txt
           sha256sum "${{ matrix.output_name }}" | tee "${{ matrix.output_name }}.sha256"
+
+      - name: Verify signing certificate identity (not just that a valid signature exists)
+        working-directory: ${{ github.workspace }}/dist
+        run: |
+          set -euo pipefail
+          actual=$(grep -i "SHA-256 digest" signing-info.txt | head -1 | grep -oE '[0-9a-fA-F:]{32,}' | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          expected=$(echo "${EXPECTED_INTERNAL_TEST_CERT_SHA256}" | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          if [ -z "${actual}" ]; then
+            echo "::error::Could not extract a SHA-256 certificate digest from apksigner's output -- refusing to trust an unverified signature."
+            exit 1
+          fi
+          if [ "${actual}" != "${expected}" ]; then
+            echo "::error::${{ matrix.label }} APK is signed by an unexpected certificate -- it was not signed with the known internal-test key. This can mean the ANDROID_INTERNAL_TEST_KEYSTORE_BASE64 secret was rotated without updating EXPECTED_INTERNAL_TEST_CERT_SHA256, or a wrong/unexpected keystore was used."
+            exit 1
+          fi
+          echo "Signing certificate identity verified against the expected internal-test key."
 
       - name: Clean up decoded keystore/Firebase config before upload (never bundled as an artifact)
         if: always()
