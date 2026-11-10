@@ -26,6 +26,30 @@ export function validateAcceptedDocumentsShape(value: unknown): AcceptedDocument
   return value as AcceptedDocumentSubmission[];
 }
 
+/// The exact document_type values a Doctor registration applies to --
+/// DOCTOR_TERMS/PRIVACY_NOTICE/PROFESSIONAL_VERIFICATION_DECLARATION/
+/// TELEMEDICINE_PRACTITIONER_POLICY (mandatory) plus MARKETING_COMMUNICATIONS
+/// (optional, shared with Patient). GET /legal/documents is a single shared,
+/// role-agnostic registry (confirmed in services/backend/src/repository/
+/// legal_repo.rs::list_current -- no audience filter exists server-side), so
+/// it also returns four Patient-only document types
+/// (PATIENT_DATA_SHARING_CONSENT/PATIENT_TERMS/PATIENT_PRIVACY_NOTICE/
+/// PATIENT_DATA_RIGHTS) that must never reach a Doctor registration form.
+/// An explicit allow-list, not a Patient-type exclude-list, so a future new
+/// Patient-only document type is excluded by default rather than requiring
+/// this file to be remembered and updated.
+const DOCTOR_APPLICABLE_DOCUMENT_TYPES = new Set([
+  'DOCTOR_TERMS',
+  'PRIVACY_NOTICE',
+  'PROFESSIONAL_VERIFICATION_DECLARATION',
+  'TELEMEDICINE_PRACTITIONER_POLICY',
+  'MARKETING_COMMUNICATIONS',
+]);
+
+export function filterDoctorApplicableDocuments<T extends { document_type: string }>(documents: T[]): T[] {
+  return documents.filter(doc => DOCTOR_APPLICABLE_DOCUMENT_TYPES.has(doc.document_type));
+}
+
 export type LegalDocumentRequirement = { document_type: string; required: boolean };
 
 /// True only if every document the backend currently marks required has a

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateAcceptedDocumentsShape, allRequiredDocumentsAccepted } from '../src/lib/legalConsent.ts';
+import { validateAcceptedDocumentsShape, allRequiredDocumentsAccepted, filterDoctorApplicableDocuments } from '../src/lib/legalConsent.ts';
 
 // ---------- validateAcceptedDocumentsShape (BFF forwarding/validation) ----------
 
@@ -84,4 +84,58 @@ test('the optional document never blocks submission by itself', () => {
 
 test('an empty document list trivially passes -- the real gate is the backend requiring a non-empty submission', () => {
   assert.equal(allRequiredDocumentsAccepted([], {}), true);
+});
+
+// ---------- filterDoctorApplicableDocuments (Doctor-only document filter) ----------
+// GET /legal/documents is a single shared, role-agnostic registry (no
+// audience filter server-side); this is the production response shape
+// actually observed (9 total records: 4 mandatory Doctor + 1 shared optional
+// + 4 Patient-only) that must be reduced to exactly the 5 Doctor-applicable
+// ones before reaching a Doctor registration form.
+
+const nineDocumentProductionResponse = [
+  { document_type: 'DOCTOR_TERMS', version: '1.0', title: 'Doctor Terms', required: true },
+  { document_type: 'PRIVACY_NOTICE', version: '1.0', title: 'Privacy Notice', required: true },
+  { document_type: 'PROFESSIONAL_VERIFICATION_DECLARATION', version: '1.0', title: 'Professional Verification Declaration', required: true },
+  { document_type: 'TELEMEDICINE_PRACTITIONER_POLICY', version: '1.0', title: 'Telemedicine Practitioner Policy', required: true },
+  { document_type: 'MARKETING_COMMUNICATIONS', version: '1.0', title: 'Marketing Communications', required: false },
+  { document_type: 'PATIENT_DATA_SHARING_CONSENT', version: '1.0', title: 'Patient Data Sharing Consent', required: true },
+  { document_type: 'PATIENT_TERMS', version: '1.0', title: 'Patient Terms', required: true },
+  { document_type: 'PATIENT_PRIVACY_NOTICE', version: '1.0', title: 'Patient Privacy Notice', required: true },
+  { document_type: 'PATIENT_DATA_RIGHTS', version: '1.0', title: 'Patient Data Rights', required: true },
+];
+
+test('all 4 mandatory Doctor documents are retained from the real 9-document production response', () => {
+  const result = filterDoctorApplicableDocuments(nineDocumentProductionResponse);
+  for (const type of ['DOCTOR_TERMS', 'PRIVACY_NOTICE', 'PROFESSIONAL_VERIFICATION_DECLARATION', 'TELEMEDICINE_PRACTITIONER_POLICY']) {
+    assert.ok(result.some(doc => doc.document_type === type), `expected ${type} to be retained`);
+  }
+});
+
+test('the optional MARKETING_COMMUNICATIONS document is retained, not excluded', () => {
+  const result = filterDoctorApplicableDocuments(nineDocumentProductionResponse);
+  assert.ok(result.some(doc => doc.document_type === 'MARKETING_COMMUNICATIONS'));
+});
+
+test('all 4 Patient-only documents are excluded, not just PATIENT_DATA_SHARING_CONSENT', () => {
+  const result = filterDoctorApplicableDocuments(nineDocumentProductionResponse);
+  for (const type of ['PATIENT_DATA_SHARING_CONSENT', 'PATIENT_TERMS', 'PATIENT_PRIVACY_NOTICE', 'PATIENT_DATA_RIGHTS']) {
+    assert.ok(!result.some(doc => doc.document_type === type), `expected ${type} to be excluded`);
+  }
+});
+
+test('the real 9-document production response reduces to exactly 5 Doctor-applicable documents', () => {
+  assert.equal(filterDoctorApplicableDocuments(nineDocumentProductionResponse).length, 5);
+});
+
+test('an unrecognized future document type is excluded by default (allow-list, not exclude-list)', () => {
+  const result = filterDoctorApplicableDocuments([
+    ...nineDocumentProductionResponse,
+    { document_type: 'SOME_NEW_PATIENT_FEATURE_CONSENT', version: '1.0', title: 'New', required: true },
+  ]);
+  assert.ok(!result.some(doc => doc.document_type === 'SOME_NEW_PATIENT_FEATURE_CONSENT'));
+});
+
+test('an empty response filters to an empty list without throwing', () => {
+  assert.deepEqual(filterDoctorApplicableDocuments([]), []);
 });
