@@ -1,0 +1,168 @@
+name: Mobile internal-test APK build (manual, approval-gated)
+
+# Builds installable, release-mode Patient and Doctor Android APKs for
+# controlled real-device testing against the existing production backend
+# (https://api.hellodoctor.asia) -- never for Google Play publication. Never
+# auto-triggered: dispatched manually only, so it never runs with secrets on
+# untrusted code via push/PR.
+#
+# Secrets this workflow reads (none of which this workflow ever prints,
+# commits, or derives a value from in log output):
+#   - ANDROID_INTERNAL_TEST_KEYSTORE_BASE64 (required): base64 of a
+#     dedicated internal-testing .jks keystore -- NEVER a production/Play
+#     Store signing key. See apps/*/android/app/build.gradle.kts's
+#     internalTestKeystoreProperties block, which falls back to the Flutter
+#     debug keystore (same as every local `flutter run --release`) when this
+#     secret is absent, so a first run without it still produces a build --
+#     just one signed with the publicly-known debug key, not suitable for
+#     distribution outside this one build environment.
+#   - ANDROID_INTERNAL_TEST_KEYSTORE_PASSWORD (required alongside the above)
+#   - ANDROID_INTERNAL_TEST_KEY_ALIAS (required alongside the above)
+#   - GOOGLE_SERVICES_JSON_DOCTOR (optional): base64 of
+#     apps/mobile/android/app/google-services.json, the real Firebase
+#     Android client config for the afyamkononi-ec314 project's
+#     com.example.hellodoctor_mobile app registration. Written to disk only
+#     if this secret is non-empty; the Gradle Google Services plugin is
+#     applied conditionally on the file's presence either way (see that
+#     build.gradle.kts), so the build still succeeds without it -- just
+#     without push notifications working on the resulting APK.
+#   - GOOGLE_SERVICES_JSON_PATIENT (optional): same, for
+#     apps/mobile_patient's com.hellodoctor.patient Firebase app
+#     registration.
+# This workflow never reads, needs, or accepts any Firebase *server-side*
+# service-account credential (FCM_PROJECT_ID/FCM_CLIENT_EMAIL/
+# FCM_PRIVATE_KEY_B64) -- those stay exactly where they already are, on the
+# Azure backend, and are never copied here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_patient:
+        description: Build the Patient APK
+        type: boolean
+        default: true
+      build_doctor:
+        description: Build the Doctor APK
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-test-apk-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }} internal-test APK
+    if: ${{ (matrix.app == 'mobile_patient' && inputs.build_patient) || (matrix.app == 'mobile' && inputs.build_doctor) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: mobile_patient
+            label: Patient
+            google_services_secret: GOOGLE_SERVICES_JSON_PATIENT
+            output_name: afyamkononi-patient-test.apk
+          - app: mobile
+            label: Doctor
+            google_services_secret: GOOGLE_SERVICES_JSON_DOCTOR
+            output_name: afyamkononi-doctor-test.apk
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - name: Record checked-out application revision
+        id: rev
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: "3.47.6"
+          channel: stable
+          cache: true
+
+      - name: Decode Firebase Android client config (optional -- skipped if the secret is not set)
+        working-directory: apps/${{ matrix.app }}/android/app
+        env:
+          GOOGLE_SERVICES_JSON_B64: ${{ secrets[matrix.google_services_secret] }}
+        run: |
+          set -euo pipefail
+          if [ -n "${GOOGLE_SERVICES_JSON_B64}" ]; then
+            echo "${GOOGLE_SERVICES_JSON_B64}" | base64 -d > google-services.json
+            echo "Firebase client config present for this build."
+          else
+            echo "::warning::${{ matrix.google_services_secret }} is not set -- building without Firebase/FCM. Push notifications will not work on this APK."
+          fi
+
+      - name: Decode internal-testing release keystore (required for a real, installable signature)
+        working-directory: apps/${{ matrix.app }}/android/app
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_INTERNAL_TEST_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_INTERNAL_TEST_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_INTERNAL_TEST_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_B64}" ]; then
+            echo "::warning::ANDROID_INTERNAL_TEST_KEYSTORE_BASE64 is not set -- falling back to the Flutter debug keystore (same as 'flutter run --release'). This APK will NOT be suitable for distribution outside this build environment."
+            exit 0
+          fi
+          echo "${KEYSTORE_B64}" | base64 -d > internal-test.jks
+          cat > internal-test-keystore.properties <<EOF
+          storeFile=internal-test.jks
+          storePassword=${KEYSTORE_PASSWORD}
+          keyAlias=${KEY_ALIAS}
+          keyPassword=${KEYSTORE_PASSWORD}
+          EOF
+
+      - name: flutter pub get
+        working-directory: apps/${{ matrix.app }}
+        run: flutter pub get
+
+      - name: flutter analyze
+        working-directory: apps/${{ matrix.app }}
+        run: flutter analyze
+
+      - name: flutter test
+        working-directory: apps/${{ matrix.app }}
+        run: flutter test
+
+      - name: Build release APK (production backend, no development bypasses)
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          flutter build apk --release \
+            --dart-define=API_BASE_URL=https://api.hellodoctor.asia/api/v1 \
+            --dart-define=ENVIRONMENT=production
+
+      - name: Rename, verify signature, and checksum
+        working-directory: apps/${{ matrix.app }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/dist/${{ matrix.output_name }}"
+          cd "$GITHUB_WORKSPACE/dist"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$BUILD_TOOLS/apksigner" verify --print-certs "${{ matrix.output_name }}" | tee signing-info.txt
+          "$BUILD_TOOLS/aapt2" dump badging "${{ matrix.output_name }}" | head -5 | tee -a signing-info.txt
+          sha256sum "${{ matrix.output_name }}" | tee "${{ matrix.output_name }}.sha256"
+
+      - name: Clean up decoded keystore/Firebase config before upload (never bundled as an artifact)
+        if: always()
+        working-directory: apps/${{ matrix.app }}/android/app
+        run: rm -f internal-test.jks internal-test-keystore.properties google-services.json
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.label }}-test-apk-${{ steps.rev.outputs.sha }}
+          path: |
+            dist/${{ matrix.output_name }}
+            dist/${{ matrix.output_name }}.sha256
+            dist/signing-info.txt
+          retention-days: 14
