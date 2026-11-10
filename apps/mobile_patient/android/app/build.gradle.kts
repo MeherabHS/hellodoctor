@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -12,6 +14,19 @@ plugins {
 // this repository as checked in).
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+}
+
+// Internal-testing-only release signing, same "conditional on a real file
+// being present" pattern as google-services.json above: this repository has
+// no production/Play Store signing key at all today (release builds fall
+// back to the debug keystore, see below), so this is a dedicated,
+// never-committed keystore supplied only through CI secrets for installable
+// test builds -- explicitly not a production signing key, and never
+// generated or overwritten by this build script itself.
+val internalTestKeystoreProperties = Properties()
+val internalTestKeystorePropertiesFile = file("internal-test-keystore.properties")
+if (internalTestKeystorePropertiesFile.exists()) {
+    internalTestKeystorePropertiesFile.inputStream().use { stream -> internalTestKeystoreProperties.load(stream) }
 }
 
 android {
@@ -42,11 +57,28 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (internalTestKeystorePropertiesFile.exists()) {
+            create("internalTesting") {
+                storeFile = file(internalTestKeystoreProperties.getProperty("storeFile"))
+                storePassword = internalTestKeystoreProperties.getProperty("storePassword")
+                keyAlias = internalTestKeystoreProperties.getProperty("keyAlias")
+                keyPassword = internalTestKeystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            // Replace with a real signing config before any real distribution.
-            signingConfig = signingConfigs.getByName("debug")
+            // Falls back to the debug keystore exactly as before when no
+            // internal-test keystore has been supplied (e.g. a local
+            // `flutter run --release`), so this is a strictly additive,
+            // zero-behavior-change-by-default signing path. Replace with a
+            // real Play Store signing config before any real distribution.
+            signingConfig = if (internalTestKeystorePropertiesFile.exists())
+                signingConfigs.getByName("internalTesting")
+            else
+                signingConfigs.getByName("debug")
             // Shrink/minify the release build to help keep the per-device download
             // under the project's ~20MB size budget. flutter_local_notifications and
             // workmanager both rely on reflection for Android BroadcastReceiver/Worker
