@@ -181,6 +181,10 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                               style: const TextStyle(
                                   fontWeight: FontWeight.w800,
                                   color: PatientTokens.text)),
+                          const SizedBox(height: 2),
+                          Text(l10n.bookingTimesEat,
+                              style: const TextStyle(
+                                  fontSize: 11, color: PatientTokens.textSub)),
                           const SizedBox(height: 8),
                           _SlotGrid(state: state, cubit: _cubit),
                         ],
@@ -515,7 +519,7 @@ class _SlotGrid extends StatelessWidget {
   String _format(DateTime t) {
     final hour12 = t.hour % 12 == 0 ? 12 : t.hour % 12;
     final suffix = t.hour >= 12 ? 'PM' : 'AM';
-    return '${hour12.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')} $suffix EAT';
+    return '${hour12.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')} $suffix';
   }
 }
 

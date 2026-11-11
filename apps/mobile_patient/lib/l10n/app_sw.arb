@@ -49,6 +49,7 @@
   "bookingChatTitle": "Panga Mazungumzo ya Saa 24",
   "bookingNoSlots": "Daktari huyu hana nafasi za kupanga kwa sasa.",
   "bookingSelectDate": "Chagua Tarehe",
+  "bookingTimesEat": "Saa zinaonyeshwa kwa EAT (UTC+3)",
   "bookingAvailableSlots": "Nafasi Zilizopo",
   "bookingReasonLabel": "Sababu ya Mashauriano (si lazima)",
   "bookingReasonHint": "mfano: Homa na koo kuuma kwa siku 3…",

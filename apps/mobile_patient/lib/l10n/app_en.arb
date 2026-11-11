@@ -224,6 +224,10 @@
   "@bookingSelectDate": {
     "description": "Booking screen date-picker section header."
   },
+  "bookingTimesEat": "Times shown in EAT (UTC+3)",
+  "@bookingTimesEat": {
+    "description": "Patient interface: bookingTimesEat"
+  },
   "bookingAvailableSlots": "Available Slots",
   "@bookingAvailableSlots": {
     "description": "Booking screen slot-grid section header."
