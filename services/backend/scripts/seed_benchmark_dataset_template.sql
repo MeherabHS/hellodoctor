@@ -122,7 +122,10 @@ SELECT gen_random_uuid(), user_id,
        now()
 FROM p;
 
--- Admins, spread across the five admin roles (fixed at 10, per spec)
+-- Admins (fixed at :num_admins, per spec). Since 20261106000002_single_admin,
+-- 'ADMIN' is the only role a human admin account may hold — the legacy names
+-- this migration consolidated are now rejected outright at INSERT by the
+-- `canonical_admin_assignment` trigger.
 WITH a AS (
     SELECT gs AS seq, gen_random_uuid() AS user_id
     FROM generate_series(1, :num_admins) AS gs
@@ -132,7 +135,7 @@ SELECT user_id,
        '+25474' || lpad(seq::text, 7, '0'),
        'admin' || seq || '@capacity-test.local',
        '$argon2id$v=19$m=19456,t=2,p=1$ZGVtb3NhbHQ$ZGVtb2hhc2g',
-       (ARRAY['PLATFORM_ADMIN','CLINICAL_ADMIN','FINANCE_ADMIN','SUPPORT','COMPLIANCE','SECURITY_ADMIN']::user_role_enum[])[1 + (seq % 6)],
+       'ADMIN'::user_role_enum,
        'en', TRUE, TRUE,
        now() - 150 * interval '1 day',
        now()
@@ -299,6 +302,10 @@ INSERT INTO chat_conversations (id, appointment_id, patient_id, doctor_id, expir
 SELECT conv_id, appointment_id, patient_id, doctor_id, start_time + interval '24 hours', TRUE, start_time
 FROM tmp_conv;
 
+-- See scripts/seed_capacity_dataset.sql for why chat_mutation_wall_clock
+-- must be disabled around this one bulk INSERT (deliberately historical,
+-- already-expired conversations) and re-enabled immediately after.
+ALTER TABLE chat_messages DISABLE TRIGGER chat_mutation_wall_clock;
 INSERT INTO chat_messages (id, conversation_id, sender_id, content, is_read, sent_at)
 SELECT gen_random_uuid(), tc.conv_id,
        CASE WHEN m.i % 2 = 0 THEN pu.id ELSE du.id END,
@@ -311,6 +318,7 @@ JOIN users pu ON pu.id = pp.user_id
 JOIN doctor_profiles dp ON dp.id = tc.doctor_id
 JOIN users du ON du.id = dp.user_id
 CROSS JOIN generate_series(0, 2 + (tc.rn % 6)) AS m(i);
+ALTER TABLE chat_messages ENABLE TRIGGER chat_mutation_wall_clock;
 
 -- ============================================================================
 -- 6. Grievances — ~2% of non-cancelled appointments.

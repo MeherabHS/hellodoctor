@@ -168,7 +168,7 @@
   "@blogsTitle": {
     "description": "Blogs feed and article-detail screen header title."
   },
-  "blogsSubtitle": "Doctor-verified health guides & wellness",
+  "blogsSubtitle": "Practical guidance from AfyaMkononi physicians and editors",
   "@blogsSubtitle": {
     "description": "Blogs feed screen header subtitle."
   },
@@ -244,6 +244,14 @@
         "type": "String"
       }
     }
+  },
+  "bookingConfirmNoPayment": "Confirm Booking →",
+  "@bookingConfirmNoPayment": {
+    "description": "Booking screen submit button when the backend's effective policy says payment is not required."
+  },
+  "bookingNoPaymentRequiredNotice": "No payment required for this consultation.",
+  "@bookingNoPaymentRequiredNotice": {
+    "description": "Shown in place of the fee/payment-method section when payment is not required."
   },
   "bookingForLabel": "Booking for",
   "@bookingForLabel": {
@@ -1375,6 +1383,10 @@
       }
     }
   },
+  "doctorBookingUnavailable": "This doctor hasn't set up consultation booking yet.",
+  "@doctorBookingUnavailable": {
+    "description": "Patient interface: doctorBookingUnavailable"
+  },
   "doctorVideoBooking": "Video Slot (KES {fee})",
   "@doctorVideoBooking": {
     "description": "Patient interface: doctorVideoBooking",
@@ -1832,6 +1844,33 @@
   },
   "quizEnglishFallback": "English shown — Kiswahili is unavailable for this question.",
   "quizSessionExpired": "Please sign in again to continue.",
-  "quizRateLimited": "Too many requests. Please try again shortly."
-
+  "quizRateLimited": "Too many requests. Please try again shortly.",
+  "blogsHeading": "Health articles",
+  "blogsEmptyTitle": "No articles yet",
+  "blogsEmptyMessage": "Published health guides from AfyaMkononi physicians and editors will appear here.",
+  "blogsSearchEmptyTitle": "No matching articles",
+  "blogsSearchEmptyMessage": "Try another search or refresh the articles.",
+  "blogsLoadMore": "Load more",
+  "blogsLoadingMore": "Loading more articles?",
+  "blogsPageError": "More articles could not be loaded. Please retry.",
+  "blogsEnd": "You have reached the end.",
+  "blogsEditorial": "AfyaMkononi Editorial",
+  "notificationsLoadOlder": "Load earlier notifications",
+  "notificationsLoadingOlder": "Loading earlier notifications?",
+  "notificationDestinationError": "This destination is unavailable. Your notifications are still available here.",
+  "appointmentTitle": "Appointment",
+  "appointmentReference": "Booking reference",
+  "refreshButton": "Refresh",
+  "doctorLabel": "Doctor",
+  "patientLabel": "Patient",
+  "appointmentStatusPendingPayment": "Payment pending",
+  "appointmentStatusConfirmed": "Confirmed",
+  "appointmentStatusWaiting": "Waiting",
+  "appointmentStatusInConsultation": "In consultation",
+  "appointmentStatusCompleted": "Completed",
+  "appointmentStatusCancelled": "Cancelled",
+  "appointmentStatusExpired": "Expired",
+  "appointmentStatusRefunded": "Refunded",
+  "appointmentStatusDisputed": "Under review",
+  "appointmentStatusPrematureTermination": "Interrupted"
 }

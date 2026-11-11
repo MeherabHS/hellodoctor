@@ -5,10 +5,12 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {act,create,type ReactTestRenderer} from 'react-test-renderer';
 import {SafeMarkdown} from '../src/components/blogs/SafeMarkdown';
 import {ArticlePreview} from '../src/components/blogs/ArticlePreview';
-import {ArticleEditor} from '../src/components/blogs/ArticleEditor';
+import {ArticleEditor as Editor} from '../src/components/blogs/ArticleEditor';
+import {NavigationGuard} from '../src/components/navigation/NavigationGuard';
 import {blankArticle,type AdminArticle} from '../src/lib/blogContent';
 const content={...blankArticle(),title_en:'Health guide',body_en:'## A heading\n\nA **strong** paragraph.\n\n- First\n- Second\n\n> Quoted\n\n[Read more](https://example.org)',category_id:'c'};
 const category={id:'c',name_en:'Health',name_sw:'Afya',sensitive:true};
+function ArticleEditor(props:React.ComponentProps<typeof Editor>){return <NavigationGuard><Editor {...props}/></NavigationGuard>;}
 const article:AdminArticle={...content,id:'e0f20dc7-61b7-432e-805c-ded77ab2ee78',author_id:'author',author_name:'Editorial',status:'DRAFT',version:1,content_version:1,approved_version:null,approved_by:null,approved_at:null,requires_independent_review:true,can_approve:false,approval_block_reason:null,cover_image_id:null,created_at:'2026-10-25T10:00:00Z',updated_at:'2026-10-25T10:00:00Z',published_at:null,scheduled_for:null};
 test('Markdown renders supported formatting and disables HTML, scripts and embedded media',()=>{
   const html=renderToStaticMarkup(<SafeMarkdown body={`${content.body_en}\n\n<script>alert(1)</script>\n\n<img src=x onerror=alert(1)>\n\n![track](https://tracking.example/x)\n\n[bad](javascript:alert(1))`}/>);

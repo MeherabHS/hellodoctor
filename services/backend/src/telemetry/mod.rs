@@ -2,7 +2,56 @@ use axum::{extract::MatchedPath, http::Request, middleware::Next, response::Into
 use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use std::sync::{Once, OnceLock};
 use std::time::Instant;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
+
+/// Milestone 8 hold-duration investigation (2026-11-04): captures sqlx's own
+/// built-in "acquired connection" tracing event (`target:
+/// "sqlx::pool::acquire"`, enabled per-pool via `acquire_time_level` in
+/// `main.rs::connect_role`) into a metric, with zero changes to any query or
+/// handler call site anywhere in the codebase -- sqlx already emits this
+/// event internally on every successful `Pool::acquire()`. KNOWN LIMITATION:
+/// sqlx's event carries no pool/role identifier, so this is a process-wide
+/// aggregate across all five capability-role pools combined, not broken down
+/// by role -- a true per-role breakdown would need either upstream sqlx
+/// support or wrapping every query call site individually, which is far
+/// outside "narrowly scoped." Treat `sqlx_pool_acquire_wait_seconds` as "how
+/// long did *some* connection acquisition take, pool unspecified" alongside
+/// the already-per-role `db_pool_size`/`db_pool_idle` gauges, not as a
+/// per-role timing series on its own.
+struct SqlxAcquireMetricsLayer;
+
+impl<S: tracing::Subscriber> Layer<S> for SqlxAcquireMetricsLayer {
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        if event.metadata().target() != "sqlx::pool::acquire" {
+            return;
+        }
+        struct SecsVisitor(Option<f64>);
+        impl tracing::field::Visit for SecsVisitor {
+            fn record_f64(&mut self, field: &tracing::field::Field, value: f64) {
+                // sqlx's own field name, including its "aquired" spelling --
+                // must match exactly, this is sqlx-core 0.8.6's literal name.
+                if field.name() == "aquired_after_secs" {
+                    self.0 = Some(value);
+                }
+            }
+            fn record_debug(
+                &mut self,
+                _field: &tracing::field::Field,
+                _value: &dyn std::fmt::Debug,
+            ) {
+            }
+        }
+        let mut visitor = SecsVisitor(None);
+        event.record(&mut visitor);
+        if let Some(secs) = visitor.0 {
+            metrics::histogram!("sqlx_pool_acquire_wait_seconds").record(secs);
+        }
+    }
+}
 
 static METRICS_HANDLE: OnceLock<PrometheusHandle> = OnceLock::new();
 
@@ -62,13 +111,22 @@ pub fn init_tracing() {
         // `...=debug,tower_http=debug...` fallback). Local development sets
         // its own verbose value explicitly via `.env`/`.env.example`'s
         // documented `RUST_LOG=debug`, rather than relying on this fallback.
+        // The sqlx-acquire metrics layer gets its OWN, independent filter
+        // (below) rather than sharing this EnvFilter -- giving it the shared
+        // filter would also make `fmt::layer()` print a log line for every
+        // single connection acquisition under load, real I/O overhead this
+        // diagnostic-only addition must not introduce. Un-gated here, that
+        // layer only ever acts on its one specific event target regardless.
+        let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| "hellodoctor_backend=info,tower_http=warn,axum=warn".into());
         tracing_subscriber::registry()
+            .with(tracing_subscriber::fmt::layer().with_filter(env_filter))
             .with(
-                tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                    "hellodoctor_backend=info,tower_http=warn,axum=warn".into()
-                }),
+                SqlxAcquireMetricsLayer.with_filter(
+                    tracing_subscriber::filter::Targets::new()
+                        .with_target("sqlx::pool::acquire", tracing::Level::TRACE),
+                ),
             )
-            .with(tracing_subscriber::fmt::layer())
             .init();
     });
 }

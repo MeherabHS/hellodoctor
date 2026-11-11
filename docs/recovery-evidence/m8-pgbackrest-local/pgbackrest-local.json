@@ -1,0 +1,17 @@
+{
+    "status":  "GREEN",
+    "image":  "hellodoctor-pgbackrest:m8-local",
+    "checks":  {
+                   "full_backup":  "GREEN: full backup completed before the named recovery boundary",
+                   "wal_archive":  "GREEN: WAL archive check completed after later WAL generation",
+                   "encryption":  "GREEN: AES-256-CBC repository configured; cipher passphrase was not logged",
+                   "retention":  "GREEN: retention-full=1 and retention-diff=1 configured",
+                   "restore_debug":  "recovery=f; markers=before-boundary; codes=0/0",
+                   "restore":  "GREEN: fresh restored PostgreSQL accepted SQL, promoted, retained before-boundary and excluded after-boundary",
+                   "wrong_key":  "GREEN: wrong cipher key rejected",
+                   "repository_failure":  "GREEN: read-only repository caused check failure",
+                   "scheduler":  "GREEN: shortened cron cycle completed differential backup and monitor stanza check",
+                   "lock":  "GREEN: backup-runner uses flock to prevent overlapping executions"
+               },
+    "cleanup":  "attempted"
+}

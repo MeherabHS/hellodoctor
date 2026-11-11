@@ -36,6 +36,10 @@ out/
 *_token.txt
 *_tokens.json
 *.jwt
+services/backend/scripts/.bench_secrets.env
+services/backend/scripts/.bench_env_base.env
+services/backend/scripts/.bench_env_ctrl_a.env
+services/backend/scripts/.bench_env_ctrl_b.env
 
 # Local signing/credential files are never deployment build inputs.
 *.pem
@@ -58,3 +62,11 @@ grievances_out.json
 # releases/*.md test-session notes) tracked, but never the signed binaries
 # themselves.
 releases/*.apk
+
+# Python bytecode (ops/ DR tooling) — generated, never a source of truth.
+__pycache__/
+*.pyc
+
+# Stray local benchmark env artifact (not matched by the exact-name rules
+# above because of a trailing `!` in the on-disk filename).
+services/backend/scripts/.bench_env_base.env!

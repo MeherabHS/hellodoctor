@@ -11,7 +11,8 @@ import 'create_new_password_page.dart';
 /// holds privately, and this screen moves on to
 /// [CreateNewPasswordPage] — it never sees or displays that value itself.
 class ResetOtpVerifyPage extends StatefulWidget {
-  const ResetOtpVerifyPage({super.key, required this.auth, required this.challenge});
+  const ResetOtpVerifyPage(
+      {super.key, required this.auth, required this.challenge});
   final AuthCubit auth;
   final PasswordResetOtpSent challenge;
   @override
@@ -59,7 +60,8 @@ class _ResetOtpVerifyPageState extends State<ResetOtpVerifyPage> {
                 navigated = true;
                 Navigator.of(context)
                     .push(MaterialPageRoute(
-                        builder: (_) => CreateNewPasswordPage(auth: widget.auth)))
+                        builder: (_) =>
+                            CreateNewPasswordPage(auth: widget.auth)))
                     .then((_) => navigated = false);
               }
             },
@@ -100,7 +102,8 @@ class _ResetOtpVerifyPageState extends State<ResetOtpVerifyPage> {
                         child: FilledButton(
                             onPressed: busy
                                 ? null
-                                : () => widget.auth.verifyPasswordResetOtp(code.text),
+                                : () => widget.auth
+                                    .verifyPasswordResetOtp(code.text),
                             child: busy
                                 ? const SizedBox(
                                     width: 19,

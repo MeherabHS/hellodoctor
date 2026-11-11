@@ -17,6 +17,8 @@ class StubDoctorRepository extends DoctorRepository {
   bool offlineFlag = false;
   CachedDoctorSnapshot? cachedSnapshotValue;
   Completer<List<AppointmentDto>>? queueResponse;
+  bool bookingPolicyPaymentRequired = true;
+  bool failBookingPolicy = false;
   @override
   bool get isOffline => offlineFlag;
   @override
@@ -58,6 +60,14 @@ class StubDoctorRepository extends DoctorRepository {
       verificationStatus: verificationStatus,
       qualifications: [],
       userId: 'u1');
+  @override
+  Future<BookingPolicyDto> bookingPolicy() async {
+    if (failBookingPolicy) {
+      throw const ApiException(null, 'Unable to load booking policy.');
+    }
+    return BookingPolicyDto(paymentRequired: bookingPolicyPaymentRequired);
+  }
+
   @override
   Future<Json> duty() async => {'is_on_duty': dutyValue};
   @override
@@ -185,5 +195,40 @@ void main() {
     expect(cubit.state.offline, isTrue);
     expect(cubit.state.error, contains('Internet connection'));
     await cubit.close();
+  });
+
+  group('loadBookingPolicy (FINANCIAL_MODULE_MODE)', () {
+    test('defaults to paymentRequired before any load', () async {
+      final cubit = DoctorCubit(StubDoctorRepository());
+      expect(cubit.state.paymentRequired, isTrue);
+      await cubit.close();
+    });
+
+    test('a deferred server response hides financial actions', () async {
+      final repo = StubDoctorRepository()..bookingPolicyPaymentRequired = false;
+      final cubit = DoctorCubit(repo);
+      await cubit.loadBookingPolicy();
+      expect(cubit.state.paymentRequired, isFalse);
+      await cubit.close();
+    });
+
+    test('an enabled server response keeps financial actions visible',
+        () async {
+      final repo = StubDoctorRepository()..bookingPolicyPaymentRequired = true;
+      final cubit = DoctorCubit(repo);
+      await cubit.loadBookingPolicy();
+      expect(cubit.state.paymentRequired, isTrue);
+      await cubit.close();
+    });
+
+    test('a failed fetch never surfaces an error and keeps the safe default',
+        () async {
+      final repo = StubDoctorRepository()..failBookingPolicy = true;
+      final cubit = DoctorCubit(repo);
+      await cubit.loadBookingPolicy();
+      expect(cubit.state.paymentRequired, isTrue);
+      expect(cubit.state.error, isNull);
+      await cubit.close();
+    });
   });
 }

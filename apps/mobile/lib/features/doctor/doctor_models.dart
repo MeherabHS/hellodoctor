@@ -4,6 +4,16 @@ String textOf(dynamic value, [String fallback = '']) =>
     value == null ? fallback : value.toString();
 String? optionalText(dynamic value) => value?.toString();
 
+/// Server-authoritative `FINANCIAL_MODULE_MODE`. A doctor client must never
+/// decide this independently — see `GET /config/booking-policy`.
+class BookingPolicyDto {
+  const BookingPolicyDto({required this.paymentRequired});
+  final bool paymentRequired;
+
+  factory BookingPolicyDto.fromJson(Json j) =>
+      BookingPolicyDto(paymentRequired: j['payment_required'] != false);
+}
+
 class AppointmentDto {
   const AppointmentDto(
       {required this.id,

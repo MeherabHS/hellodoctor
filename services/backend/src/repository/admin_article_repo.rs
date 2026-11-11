@@ -36,3 +36,36 @@ pub async fn published<'e, E: PgExecutor<'e>>(
         .fetch_optional(db)
         .await
 }
+
+#[derive(sqlx::FromRow)]
+pub struct PublishedFeedRow {
+    pub article: Value,
+    pub sort_at: chrono::DateTime<chrono::Utc>,
+    pub id: Uuid,
+}
+
+/// Search only the existing RLS-filtered published projection. Cursor ordering
+/// exactly matches the legacy feed (timestamp DESC, UUID ASC); offset clients
+/// retain their existing contract. Bound parameters implement literal substring
+/// search, including '%'/'_', with whole-article English fallback for SW.
+pub async fn published_page<'e, E: PgExecutor<'e>>(
+    db: E,
+    limit: i64,
+    offset: i64,
+    search: &str,
+    language: &str,
+    before_time: Option<chrono::DateTime<chrono::Utc>>,
+    before_id: Option<Uuid>,
+) -> Result<Vec<PublishedFeedRow>, sqlx::Error> {
+    sqlx::query_as(&format!(
+        "SELECT article,sort_at,id FROM ({FEED}) f \
+         WHERE ($5::timestamptz IS NULL OR sort_at<$5 OR sort_at=$5 AND id>$6) \
+           AND ($3='' OR strpos(lower(CASE \
+             WHEN $4='sw' AND article->>'article_type'='ADMIN' \
+               AND btrim(COALESCE(article->>'title_sw',''))<>'' \
+               AND btrim(COALESCE(article->>'body_sw',''))<>'' \
+             THEN concat_ws(' ',article->>'title_sw',article->>'body_sw') \
+             ELSE concat_ws(' ',article->>'title',article->>'summary',article->>'body') END),lower($3))>0) \
+         ORDER BY sort_at DESC,id LIMIT $1 OFFSET $2"
+    )).bind(limit).bind(offset).bind(search).bind(language).bind(before_time).bind(before_id).fetch_all(db).await
+}

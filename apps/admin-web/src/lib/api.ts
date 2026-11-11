@@ -123,7 +123,9 @@ export interface AdminTransaction {
     | "SETTLED_TO_DOCTOR"
     | "DISBURSED"
     | "REFUNDED_TO_PATIENT"
+    | "REFUND_PENDING"
     | "FAILED";
+  reconciliation_required?: boolean;
   created_at: string;
   settled_at: string | null;
 }
@@ -386,6 +388,14 @@ export async function getFinanceSummary(month?: string): Promise<FinanceSummary>
   return request<FinanceSummary>(`/admin/finance/summary${query}`);
 }
 
+// Server-authoritative `FINANCIAL_MODULE_MODE` (`GET /config/booking-policy`).
+// The Admin Web client must never decide this independently — see
+// `services/backend/src/api/v1/config_handlers.rs`.
+export interface BookingPolicy { payment_required: boolean }
+export async function getBookingPolicy(): Promise<BookingPolicy> {
+  return request<BookingPolicy>('/config/booking-policy');
+}
+
 export async function getPayoutRouting(month?: string): Promise<any[]> {
   const query = month ? `?month=${encodeURIComponent(month)}` : '';
   return request<any[]>(`/admin/finance/payout-routing${query}`);
@@ -478,7 +488,8 @@ export async function getPatientDossier(id: string): Promise<PatientDossier> {
 }
 
 export interface DataRightsOutcome {
-  outcome: "HARD_DELETED" | "ANONYMIZED";
+  outcome: "HARD_DELETED" | "ANONYMIZED" | "PENDING";
+  job_id?: string;
 }
 
 export async function executePatientDataRights(id: string, reason: string): Promise<DataRightsOutcome> {

@@ -1,0 +1,7 @@
+﻿
+admission_accepted_total{class="health"} 7
+admission_accepted_total{class="normal"} 1
+admission_inflight{class="health"} 1
+admission_inflight{class="normal"} 0
+
+

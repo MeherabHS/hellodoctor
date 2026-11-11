@@ -1,0 +1,29 @@
+﻿
+admission_rejected_total{class="consultation",reason="dependency_pressure"} 877
+admission_rejected_total{class="payment",reason="account_budget"} 1
+admission_rejected_total{class="payment",reason="lane_concurrency"} 1015
+admission_rejected_total{class="normal",reason="lane_concurrency"} 12087
+admission_rejected_total{class="expensive",reason="lane_concurrency"} 4563
+admission_rejected_total{class="expensive",reason="dependency_pressure"} 154
+admission_rejected_total{class="payment",reason="limiter_unavailable"} 1
+admission_rejected_total{class="normal",reason="dependency_pressure"} 6060
+admission_rejected_total{class="payment",reason="dependency_pressure"} 18
+admission_rejected_total{class="webhook",reason="limiter_unavailable"} 1
+admission_rejected_total{class="webhook",reason="lane_concurrency"} 2861
+admission_rejected_total{class="consultation",reason="limiter_unavailable"} 2
+admission_rejected_total{class="consultation",reason="lane_concurrency"} 1751
+admission_rejected_total{class="normal",reason="limiter_unavailable"} 24
+admission_accepted_total{class="expensive"} 11364
+admission_accepted_total{class="health"} 438
+admission_accepted_total{class="payment"} 26124
+admission_accepted_total{class="webhook"} 18979
+admission_accepted_total{class="consultation"} 33506
+admission_accepted_total{class="normal"} 257105
+admission_inflight{class="webhook"} 0
+admission_inflight{class="consultation"} 0
+admission_inflight{class="health"} 1
+admission_inflight{class="payment"} 0
+admission_inflight{class="expensive"} 0
+admission_inflight{class="normal"} 0
+
+

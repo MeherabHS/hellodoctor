@@ -141,6 +141,13 @@ class QuizBlogs extends BlogsRepository {
   Future<List<BlogArticleDto>> feed({int? limit, int? offset}) async =>
       [await detail(id(1))];
   @override
+  Future<BlogPage> discover(
+          {String search = '',
+          String language = 'en',
+          BlogCursor? cursor,
+          int limit = 20}) async =>
+      BlogPage([await detail(id(1))], null);
+  @override
   Future<BlogArticleDto> detail(String articleId) async {
     loads++;
     return BlogArticleDto.fromJson({

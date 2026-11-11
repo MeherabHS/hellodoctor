@@ -37,7 +37,9 @@ class _ClinicalImageViewerState extends State<ClinicalImageViewer> {
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                     const Text('Unable to open this image.'),
                     TextButton(
-                        onPressed: () => setState(() => _image = widget.load()),
+                        onPressed: () => setState(() {
+                              _image = widget.load();
+                            }),
                         child: const Text('Retry'))
                   ]));
                 }

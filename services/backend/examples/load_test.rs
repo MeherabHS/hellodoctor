@@ -152,7 +152,7 @@ async fn main() {
     let admin_user_id = Uuid::parse_str(hellodoctor_backend::seed::ADMIN_USER_ID).unwrap();
     let admin_token = hellodoctor_backend::crypto::create_access_token(
         admin_user_id,
-        "PLATFORM_ADMIN",
+        "ADMIN",
         admin_user_id,
         &jwt_private_key,
     )

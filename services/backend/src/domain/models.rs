@@ -330,6 +330,20 @@ pub enum Modality {
     Chat,
 }
 
+/// Recorded once, at booking time, from the `FinancialModuleMode` in effect
+/// *then* — never re-derived later, so flipping the server-wide mode can
+/// never retroactively change what an existing appointment owes or doesn't.
+/// `Required` is the default for every historically-existing row (see
+/// migration 20261204000002). `NotRequired` is set only when
+/// `AppointmentService::book_appointment` runs in `FinancialModuleMode::Deferred`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(type_name = "payment_policy_enum", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum PaymentPolicy {
+    Required,
+    NotRequired,
+}
+
 /// Stored as plain TEXT + CHECK constraint in Postgres (not a native enum type),
 /// so DB rows carry it as `Option<String>` and convert through this type at the edges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -372,6 +386,7 @@ pub struct Appointment {
     pub modality: Modality,
     pub status: AppointmentStatus,
     pub consultation_fee: BigDecimal,
+    pub payment_policy: PaymentPolicy,
     pub clinical_outcome: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,

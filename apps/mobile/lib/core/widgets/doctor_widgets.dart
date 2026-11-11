@@ -1,5 +1,7 @@
+import '../l10n/doctor_locale.dart';
 import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
+import '../utils/time_format.dart';
 
 class DoctorCard extends StatelessWidget {
   const DoctorCard(
@@ -109,7 +111,8 @@ class ErrorPanel extends StatelessWidget {
             const SizedBox(height: 8),
             Text(message, textAlign: TextAlign.center),
             if (onRetry != null)
-              TextButton(onPressed: onRetry, child: const Text('Retry'))
+              TextButton(
+                  onPressed: onRetry, child: Text(doctorL10n(c).retryButton))
           ])));
 }
 
@@ -129,7 +132,9 @@ class InlineError extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(child: Text(message)),
           if (onRetry != null)
-            TextButton(onPressed: onRetry, child: const Text('Retry')),
+            TextButton(
+                onPressed: onRetry,
+                child: Text(doctorL10n(context).retryButton)),
         ]),
       );
 }
@@ -146,9 +151,7 @@ class CacheStatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final updated = lastUpdated?.toLocal();
-    final time = updated == null
-        ? null
-        : '${updated.hour.toString().padLeft(2, '0')}:${updated.minute.toString().padLeft(2, '0')}';
+    final time = updated == null ? null : formatTime12h(updated);
     return Column(children: [
       if (refreshing) const LinearProgressIndicator(minHeight: 2),
       if (offline)
@@ -161,8 +164,8 @@ class CacheStatusBar extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
                 child: Text(time == null
-                    ? 'Offline — showing saved data'
-                    : 'Offline — showing saved data · Last updated $time')),
+                    ? doctorL10n(context).cacheOffline
+                    : doctorL10n(context).cacheOfflineUpdated(time))),
           ]),
         )
       else if (time != null)
@@ -170,7 +173,7 @@ class CacheStatusBar extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 6, 18, 2),
-                child: Text('Last updated $time',
+                child: Text(doctorL10n(context).cacheLastUpdated(time),
                     style: const TextStyle(
                         fontSize: 11, color: DoctorTokens.textSub)))),
     ]);

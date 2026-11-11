@@ -19,6 +19,34 @@ impl StorageProvider {
     }
 }
 
+/// Formal production product decision (not a development bypass): whether
+/// appointment booking requires a real payment transaction before a
+/// consultation may proceed clinically. `Enabled` is the default and
+/// preserves every existing payment/earnings/settlement requirement
+/// unchanged, including this backend's current real-world behavior of
+/// refusing to book at all outside `development` (no payment gateway is
+/// actually integrated yet — see `AppointmentService::book_appointment`).
+/// `Deferred` is an explicit operator opt-in that lets booking skip payment
+/// entirely for a production launch, while every existing financial code
+/// path (wallet, settlement, payouts, refunds) remains fully intact and
+/// untouched for later re-enablement — see docs/PROGRESS.md for the
+/// accompanying design note.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FinancialModuleMode {
+    Deferred,
+    Enabled,
+}
+
+impl FinancialModuleMode {
+    fn parse(value: &str) -> Result<Self, &'static str> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "enabled" => Ok(Self::Enabled),
+            "deferred" => Ok(Self::Deferred),
+            _ => Err("FINANCIAL_MODULE_MODE must be enabled or deferred."),
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct AppConfig {
     pub port: u16,
@@ -130,6 +158,11 @@ pub struct AppConfig {
     /// of its own.
     pub azure_storage_account_key_risk_acknowledged: bool,
     pub public_api_base_url: String,
+    /// See `FinancialModuleMode`. Defaults to `Enabled` (today's exact
+    /// behavior) unless `FINANCIAL_MODULE_MODE=deferred` is explicitly set —
+    /// never silently defaulted to deferred, since that would silently stop
+    /// collecting payment.
+    pub financial_module_mode: FinancialModuleMode,
     pub environment: String,
     pub seed_dev_data: bool,
     pub dev_auth_otp_enabled: bool,
@@ -340,6 +373,7 @@ impl std::fmt::Debug for AppConfig {
                 &self.azure_storage_account_key_risk_acknowledged,
             )
             .field("public_api_base_url", &self.public_api_base_url)
+            .field("financial_module_mode", &self.financial_module_mode)
             .field("environment", &self.environment)
             .field("seed_dev_data", &self.seed_dev_data)
             .field("dev_auth_otp_enabled", &self.dev_auth_otp_enabled)
@@ -429,6 +463,16 @@ impl AppConfig {
 
         let storage_provider = StorageProvider::parse(
             &env::var("STORAGE_PROVIDER").unwrap_or_else(|_| "disabled".into()),
+        )
+        .unwrap_or_else(|error| panic!("FATAL: {error}"));
+
+        // Defaults to "enabled" (today's existing behavior, unchanged) —
+        // only an explicit FINANCIAL_MODULE_MODE=deferred unlocks the new
+        // payment-optional booking path. An invalid value fails closed at
+        // startup, same as STORAGE_PROVIDER above, never silently falling
+        // back to either mode.
+        let financial_module_mode = FinancialModuleMode::parse(
+            &env::var("FINANCIAL_MODULE_MODE").unwrap_or_else(|_| "enabled".into()),
         )
         .unwrap_or_else(|error| panic!("FATAL: {error}"));
 
@@ -610,6 +654,7 @@ impl AppConfig {
                     require("PUBLIC_API_BASE_URL")
                 }
             }),
+            financial_module_mode,
             environment,
             seed_dev_data,
             dev_auth_otp_enabled: boolean("DEV_AUTH_OTP_ENABLED"),
@@ -686,6 +731,10 @@ impl AppConfig {
 
     pub fn requires_https(&self) -> bool {
         matches!(self.environment.as_str(), "staging" | "production")
+    }
+
+    pub fn financial_module_deferred(&self) -> bool {
+        matches!(self.financial_module_mode, FinancialModuleMode::Deferred)
     }
 
     /// Remediation E1: decoded erasure-journal secrets, when configured.
@@ -1238,7 +1287,7 @@ fn validate_storage_configuration(config: &AppConfig) -> Result<(), &'static str
 mod startup_mode_tests {
     use super::{
         valid_recovery_operator_digest, valid_storage_name, validate_password_reset_policy,
-        validate_startup_mode, StorageProvider,
+        validate_startup_mode, FinancialModuleMode, StorageProvider,
     };
 
     #[test]
@@ -1323,6 +1372,24 @@ mod startup_mode_tests {
     }
 
     #[test]
+    fn financial_module_mode_selection_is_explicit() {
+        assert_eq!(
+            FinancialModuleMode::parse("enabled"),
+            Ok(FinancialModuleMode::Enabled)
+        );
+        assert_eq!(
+            FinancialModuleMode::parse("deferred"),
+            Ok(FinancialModuleMode::Deferred)
+        );
+        assert_eq!(
+            FinancialModuleMode::parse("ENABLED"),
+            Ok(FinancialModuleMode::Enabled)
+        );
+        assert!(FinancialModuleMode::parse("off").is_err());
+        assert!(FinancialModuleMode::parse("").is_err());
+    }
+
+    #[test]
     fn azure_names_follow_storage_service_constraints() {
         assert!(valid_storage_name("hellodoctor", 24));
         assert!(valid_storage_name("article-media", 63));
@@ -1348,7 +1415,7 @@ mod startup_mode_tests {
 pub(crate) mod remediation_e3_tests {
     use super::{
         validate_azure_email_configuration, validate_storage_configuration, AppConfig,
-        StorageProvider, STANDARD,
+        FinancialModuleMode, StorageProvider, STANDARD,
     };
     use base64::Engine as _;
 
@@ -1403,6 +1470,7 @@ pub(crate) mod remediation_e3_tests {
             azure_storage_use_emulator: false,
             azure_storage_account_key_risk_acknowledged: true,
             public_api_base_url: "https://api.example.invalid".into(),
+            financial_module_mode: FinancialModuleMode::Enabled,
             environment: "production".into(),
             seed_dev_data: false,
             dev_auth_otp_enabled: false,

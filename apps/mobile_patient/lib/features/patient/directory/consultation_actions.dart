@@ -3,6 +3,8 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/l10n/patient_labels.dart';
 import '../../../l10n/app_localizations.dart';
 import 'directory_models.dart';
+import 'directory_repository.dart';
+import 'doctor_photo_avatar.dart';
 
 /// Paid CHAT uses the existing slot picker and payment flow, never instant chat.
 Future<void> showConsultationChoices(BuildContext context,
@@ -113,9 +115,11 @@ class PatientDoctorCard extends StatelessWidget {
   const PatientDoctorCard(
       {super.key,
       required this.doctor,
+      required this.repo,
       required this.onProfile,
       required this.onBook});
   final PublicDoctorDto doctor;
+  final DirectoryRepository repo;
   final VoidCallback onProfile;
   final ValueChanged<String> onBook;
   @override
@@ -129,13 +133,7 @@ class PatientDoctorCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(PatientTokens.cardRadius)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          CircleAvatar(
-              radius: 24,
-              backgroundColor: PatientTokens.surfaceSubtle,
-              child: Text(doctor.initials,
-                  style: const TextStyle(
-                      color: PatientTokens.primaryDark,
-                      fontWeight: FontWeight.w700))),
+          DoctorPhotoAvatar.forDoctor(doctor: doctor, repo: repo, radius: 24),
           const SizedBox(width: 12),
           Expanded(
               child: Column(

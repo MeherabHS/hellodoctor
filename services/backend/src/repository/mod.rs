@@ -197,11 +197,24 @@ impl AppState {
             // operator is reconciling provider state. This is deliberately
             // enforced at construction time, rather than relying on an
             // operator to remember a second feature flag.
+            tracing::warn!("FCM push transport: Noop (RECOVERY_MODE) — every notification row will be created but never pushed, by design, until recovery ends.");
             Arc::new(crate::services::notification_transport::NoopTransport)
         } else {
             match crate::services::notification_transport::FcmTransport::from_config(&config) {
-                Ok(Some(transport)) => Arc::new(transport),
-                Ok(None) => Arc::new(crate::services::notification_transport::NoopTransport),
+                Ok(Some(transport)) => {
+                    tracing::info!("FCM push transport: configured — notifications will be pushed to device tokens.");
+                    Arc::new(transport)
+                }
+                Ok(None) => {
+                    // Never logs the credential values themselves, only that
+                    // they're absent — this silent fallback (an in-app
+                    // notification row is still created; the push to the
+                    // device is simply never attempted) was previously
+                    // invisible in production logs, indistinguishable from a
+                    // real delivery failure further down the pipeline.
+                    tracing::warn!("FCM push transport: Noop — FCM_PROJECT_ID/FCM_CLIENT_EMAIL/FCM_PRIVATE_KEY_B64 are not all set, so no push notification will ever reach a device even though in-app notification rows are created normally.");
+                    Arc::new(crate::services::notification_transport::NoopTransport)
+                }
                 Err(error) => panic!("FATAL: invalid FCM configuration: {error}"),
             }
         };

@@ -22,3 +22,17 @@ node_modules
 **/*.pem
 **/*.key
 **/*.der
+
+# Deployment contexts must not carry local state, reports or database data.
+scratch
+**/scratch
+**/*.dump
+**/*.backup
+**/*-backup.sql
+**/postgres-data
+**/redis-data
+**/uploads
+**/documents
+**/logs
+*.log
+grievances_out.json

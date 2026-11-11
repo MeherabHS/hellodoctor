@@ -30,8 +30,14 @@ class DoctorState {
     this.photoSaving = false,
     this.photoBytes,
     this.photoError,
+    this.paymentRequired = true,
   });
   final bool loading, refreshing, offline, duty, dutyUpdating;
+
+  /// Server-authoritative `FINANCIAL_MODULE_MODE`. Defaults to `true` (the
+  /// safe default — never hide real financial actions before the server
+  /// has confirmed the module is deferred). See [DoctorCubit.loadBookingPolicy].
+  final bool paymentRequired;
   final bool hasMoreChats, loadingMoreChats;
   final String? error;
   final DateTime? lastUpdatedAt;
@@ -66,6 +72,7 @@ class DoctorState {
     bool? photoSaving,
     Object? photoBytes = _unset,
     Object? photoError = _unset,
+    bool? paymentRequired,
   }) {
     return DoctorState(
       loading: loading ?? this.loading,
@@ -89,8 +96,10 @@ class DoctorState {
       photoBytes: identical(photoBytes, _unset)
           ? this.photoBytes
           : photoBytes as Uint8List?,
-      photoError:
-          identical(photoError, _unset) ? this.photoError : photoError as String?,
+      photoError: identical(photoError, _unset)
+          ? this.photoError
+          : photoError as String?,
+      paymentRequired: paymentRequired ?? this.paymentRequired,
     );
   }
 }
@@ -420,6 +429,21 @@ class DoctorCubit extends Cubit<DoctorState> {
           photoSaving: false,
           photoError: _message(e, 'Unable to remove your photo.')));
       return false;
+    }
+  }
+
+  /// Fetches the server-authoritative `FINANCIAL_MODULE_MODE` so the Wallet
+  /// tab can hide inactive financial actions during a deferred launch. Never
+  /// surfaces an error — a transient failure here must not block or disrupt
+  /// the rest of the Doctor shell, and the safe default (`paymentRequired:
+  /// true`, set in [DoctorState]'s constructor) is left untouched on failure.
+  Future<void> loadBookingPolicy() async {
+    try {
+      final policy = await repo.bookingPolicy();
+      if (isClosed) return;
+      emit(state.copyWith(paymentRequired: policy.paymentRequired));
+    } catch (_) {
+      // Keep the current/default value — never block or error the shell.
     }
   }
 

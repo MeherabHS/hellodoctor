@@ -12,10 +12,8 @@ void main() {
       home: Builder(
         builder: (context) => Scaffold(
           body: ElevatedButton(
-            onPressed: () => guard.push(
-                context,
-                (_) => Scaffold(
-                    body: Text('call screen ${++buildCount}'))),
+            onPressed: () => guard.push(context,
+                (_) => Scaffold(body: Text('call screen ${++buildCount}'))),
             child: const Text('Join'),
           ),
         ),
@@ -44,7 +42,7 @@ void main() {
             onPressed: () => guard.push(
                 context,
                 (context) => Scaffold(
-                    body: Column(children: [
+                        body: Column(children: [
                       Text('call screen ${++buildCount}'),
                       ElevatedButton(
                           onPressed: () => Navigator.pop(context),

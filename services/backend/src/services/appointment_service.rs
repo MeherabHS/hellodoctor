@@ -16,10 +16,16 @@ pub struct AppointmentBookingResult {
     pub appointment_id: Uuid,
     pub appointment_number: String,
     pub status: AppointmentStatus,
-    pub payment_session_id: Uuid,
-    pub payment_redirect_url: String,
+    pub payment_policy: PaymentPolicy,
+    /// `None` for a `FinancialModuleMode::Deferred` booking — no checkout
+    /// session or transaction was ever created, so there is nothing to
+    /// redirect the patient to pay.
+    pub payment_session_id: Option<Uuid>,
+    pub payment_redirect_url: Option<String>,
     pub amount: BigDecimal,
-    pub hold_expires_at: chrono::DateTime<Utc>,
+    /// `None` for a deferred booking: it is `CONFIRMED` immediately, so
+    /// there is no payment reservation deadline to report.
+    pub hold_expires_at: Option<chrono::DateTime<Utc>>,
     pub server_time: chrono::DateTime<Utc>,
 }
 
@@ -39,13 +45,31 @@ impl AppointmentService {
         doctor_id: DoctorProfileId,
         slot_id: Uuid,
         modality: Modality,
-        gateway: Gateway,
+        gateway: Option<Gateway>,
         chief_complaint: Option<String>,
         payment_method_id: Option<Uuid>,
     ) -> Result<AppointmentBookingResult, AppError> {
-        if state.config.environment != "development" {
+        let deferred = state.config.financial_module_deferred();
+        if !deferred && state.config.environment != "development" {
             return Err(AppError::Conflict("Payment collection is not configured. No checkout or confirmed payment was created.".into()));
         }
+        let Some(gateway) = gateway else {
+            if deferred {
+                return Self::book_appointment_deferred(
+                    state,
+                    ctx,
+                    patient_id,
+                    doctor_id,
+                    slot_id,
+                    modality,
+                    chief_complaint,
+                )
+                .await;
+            }
+            return Err(AppError::Validation(
+                "Either gateway or payment_method_id is required.".into(),
+            ));
+        };
         let doctor = doctor_repo::find_public(&state.db, doctor_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Doctor profile not found.".into()))?;
@@ -128,6 +152,7 @@ impl AppointmentService {
             modality,
             status: AppointmentStatus::PendingPayment,
             consultation_fee: fee.clone(),
+            payment_policy: PaymentPolicy::Required,
             clinical_outcome: None,
             completed_at: None,
             created_at: Utc::now(),
@@ -242,10 +267,151 @@ impl AppointmentService {
             appointment_id: apt_id,
             appointment_number: apt_num,
             status: AppointmentStatus::PendingPayment,
-            payment_session_id,
-            payment_redirect_url,
+            payment_policy: PaymentPolicy::Required,
+            payment_session_id: Some(payment_session_id),
+            payment_redirect_url: Some(payment_redirect_url),
             amount: fee,
-            hold_expires_at,
+            hold_expires_at: Some(hold_expires_at),
+            server_time,
+        })
+    }
+
+    /// `FinancialModuleMode::Deferred` counterpart to the payment path above:
+    /// same ownership/verification/concurrency/slot-lock discipline, zero
+    /// `transactions` row, appointment is `CONFIRMED` immediately (never
+    /// `PENDING_PAYMENT`). Never invents a paid status or a fabricated
+    /// transaction — there simply isn't one.
+    async fn book_appointment_deferred(
+        state: &AppState,
+        ctx: &AuthContext,
+        patient_id: PatientProfileId,
+        doctor_id: DoctorProfileId,
+        slot_id: Uuid,
+        modality: Modality,
+        chief_complaint: Option<String>,
+    ) -> Result<AppointmentBookingResult, AppError> {
+        let doctor = doctor_repo::find_public(&state.db, doctor_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Doctor profile not found.".into()))?;
+        if doctor.professional_verification_status != ProfessionalVerificationStatus::Verified {
+            return Err(AppError::Forbidden(
+                "This Doctor is awaiting professional verification.".into(),
+            ));
+        }
+
+        let mut tx = state.begin_authed_as(ctx, DbRole::PaymentWorker).await?;
+
+        // Same INV-BOOK-02 patient-concurrency serialization as the paid
+        // path, taken first, before any row lock.
+        sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
+            .bind(format!("patient-booking:{}", uuid::Uuid::from(patient_id)))
+            .execute(&mut *tx)
+            .await?;
+
+        // No payment hold ever exists for a deferred booking, so there is
+        // nothing of this patient's or this slot's to reclaim here — unlike
+        // the paid path, this is not a race condition to guard against.
+        let locked = doctor_repo::try_lock_slot(&mut tx, slot_id, doctor_id).await?;
+        if !locked {
+            return Err(AppError::Conflict(
+                "Selected time slot is already locked or booked, or does not belong to the specified doctor.".into(),
+            ));
+        }
+
+        let fee = match modality {
+            Modality::Video => doctor.consultation_fee_video.clone(),
+            Modality::Chat => doctor.consultation_fee_chat.clone(),
+        };
+        // Deliberately no `fee <= 0` rejection here: whether this modality
+        // is "offered" is still decided by the doctor's configured fee
+        // (unchanged, existing signal — see `consultationAction`/`supportsVideo`
+        // across every client), but a deferred booking never charges that
+        // fee regardless of its value, so a doctor who simply hasn't bothered
+        // pricing a modality while payments are off must not be blocked from
+        // offering it. Operationally, a Doctor should still configure a
+        // nonzero fee for every modality they offer in deferred mode, purely
+        // so existing availability checks keep recognizing it.
+        if fee < 0 {
+            return Err(AppError::Conflict(
+                "This consultation modality is not offered by the Doctor.".into(),
+            ));
+        }
+
+        let apt_id = Uuid::new_v4();
+        let apt_num = format!(
+            "APT-{}-{}",
+            Utc::now().format("%Y%m%d"),
+            apt_id.to_string()[0..8].to_uppercase()
+        );
+
+        let appointment = Appointment {
+            id: apt_id,
+            appointment_number: apt_num.clone(),
+            patient_id,
+            doctor_id,
+            slot_id,
+            modality,
+            status: AppointmentStatus::Confirmed,
+            consultation_fee: fee.clone(),
+            payment_policy: PaymentPolicy::NotRequired,
+            clinical_outcome: None,
+            completed_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let server_time =
+            appointment_repo::insert_confirmed_no_payment(&mut *tx, &appointment).await?;
+
+        appointment_repo::insert_clinical_intake(
+            &mut *tx,
+            &AppointmentClinicalIntake {
+                appointment_id: apt_id,
+                patient_id,
+                chief_complaint,
+                clinical_notes: None,
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            },
+        )
+        .await?;
+
+        doctor_repo::set_slot_status(&mut *tx, slot_id, SlotStatus::Booked).await?;
+
+        consultation_trace::record(
+            &mut tx,
+            apt_id,
+            None,
+            Event::accepted("APPOINTMENT_CREATED", Some(("APPOINTMENT", apt_id))),
+        )
+        .await?;
+        consultation_trace::record(
+            &mut tx,
+            apt_id,
+            None,
+            Event::accepted(
+                "BOOKING_CONFIRMED_NO_PAYMENT_REQUIRED",
+                Some(("APPOINTMENT", apt_id)),
+            ),
+        )
+        .await?;
+
+        // Fired from inside this same CONFIRMED-creating transaction —
+        // equally authoritative as the payment webhook's own call to this
+        // function, never a speculative/optimistic client-side state, since
+        // this booking never passes through PENDING_PAYMENT at all.
+        crate::services::NotificationService::notify_booking_confirmed(&mut tx, apt_id).await?;
+
+        tx.commit().await?;
+
+        Ok(AppointmentBookingResult {
+            appointment_id: apt_id,
+            appointment_number: apt_num,
+            status: AppointmentStatus::Confirmed,
+            payment_policy: PaymentPolicy::NotRequired,
+            payment_session_id: None,
+            payment_redirect_url: None,
+            amount: fee,
+            hold_expires_at: None,
             server_time,
         })
     }

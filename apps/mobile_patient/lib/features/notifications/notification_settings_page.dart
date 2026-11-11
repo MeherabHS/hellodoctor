@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/l10n/locale_controller.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/utils/time_format.dart';
 import '../../core/widgets/patient_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import 'notification_cubit.dart';
@@ -41,7 +42,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       _hasError = false;
     });
     try {
-      final prefs = await context.read<NotificationCubit>().repo.getPreferences();
+      final prefs =
+          await context.read<NotificationCubit>().repo.getPreferences();
       if (!mounted) return;
       setState(() {
         _prefs = prefs;
@@ -85,14 +87,26 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         _saving = false;
       });
       final l10n = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(l10n.notificationSettingsSaveError)));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.notificationSettingsSaveError)));
     }
   }
 
+  /// Quiet-hours times are stored/sent as `HH:mm` (24h, the backend
+  /// contract) — this only changes how that stored value is *displayed*.
+  String _displayTime(String hhmm) {
+    final parts = hhmm.split(':');
+    final hour = int.tryParse(parts.isNotEmpty ? parts[0] : '');
+    final minute = int.tryParse(parts.length > 1 ? parts[1] : '');
+    if (hour == null || minute == null) return hhmm;
+    return formatTime12h(DateTime(2000, 1, 1, hour, minute));
+  }
+
   Future<void> _pickTime(
-      {required bool isStart, required NotificationPreferencesDto current}) async {
-    final raw = isStart ? current.quietHoursStartLocal : current.quietHoursEndLocal;
+      {required bool isStart,
+      required NotificationPreferencesDto current}) async {
+    final raw =
+        isStart ? current.quietHoursStartLocal : current.quietHoursEndLocal;
     final parts = raw.split(':');
     final initial = TimeOfDay(
         hour: int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 22,
@@ -125,48 +139,55 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         PatientCard(
                             child: SwitchListTile(
                                 contentPadding: EdgeInsets.zero,
-                                title: Text(l10n.notificationSettingsRoutineTitle,
+                                title: Text(
+                                    l10n.notificationSettingsRoutineTitle,
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: PatientTokens.text)),
                                 subtitle: Text(
                                     l10n.notificationSettingsRoutineSubtitle,
                                     style: const TextStyle(
-                                        fontSize: 12, color: PatientTokens.textSub)),
+                                        fontSize: 12,
+                                        color: PatientTokens.textSub)),
                                 value: prefs.operationalEnabled,
                                 onChanged: _saving
                                     ? null
-                                    : (value) => _save(
-                                        prefs.copyWith(operationalEnabled: value)))),
+                                    : (value) => _save(prefs.copyWith(
+                                        operationalEnabled: value)))),
                         const SizedBox(height: 10),
                         PatientCard(
                             child: SwitchListTile(
                                 contentPadding: EdgeInsets.zero,
-                                title: Text(l10n.notificationSettingsAnnouncementsTitle,
+                                title: Text(
+                                    l10n.notificationSettingsAnnouncementsTitle,
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: PatientTokens.text)),
                                 subtitle: Text(
-                                    l10n.notificationSettingsAnnouncementsSubtitle,
+                                    l10n
+                                        .notificationSettingsAnnouncementsSubtitle,
                                     style: const TextStyle(
-                                        fontSize: 12, color: PatientTokens.textSub)),
+                                        fontSize: 12,
+                                        color: PatientTokens.textSub)),
                                 value: prefs.engagementEnabled,
                                 onChanged: _saving
                                     ? null
-                                    : (value) => _save(
-                                        prefs.copyWith(engagementEnabled: value)))),
+                                    : (value) => _save(prefs.copyWith(
+                                        engagementEnabled: value)))),
                         const SizedBox(height: 10),
                         PatientCard(
                             child: SwitchListTile(
                                 contentPadding: EdgeInsets.zero,
-                                title: Text(l10n.notificationSettingsGreetingsTitle,
+                                title: Text(
+                                    l10n.notificationSettingsGreetingsTitle,
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: PatientTokens.text)),
                                 subtitle: Text(
                                     l10n.notificationSettingsGreetingsSubtitle,
                                     style: const TextStyle(
-                                        fontSize: 12, color: PatientTokens.textSub)),
+                                        fontSize: 12,
+                                        color: PatientTokens.textSub)),
                                 value: prefs.greetingNotificationsEnabled,
                                 onChanged: _saving
                                     ? null
@@ -177,14 +198,17 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                           PatientCard(
                               child: SwitchListTile(
                                   contentPadding: EdgeInsets.zero,
-                                  title: Text(l10n.notificationSettingsReligiousTitle,
+                                  title: Text(
+                                      l10n.notificationSettingsReligiousTitle,
                                       style: const TextStyle(
                                           fontWeight: FontWeight.w700,
                                           color: PatientTokens.text)),
                                   subtitle: Text(
-                                      l10n.notificationSettingsReligiousSubtitle,
+                                      l10n
+                                          .notificationSettingsReligiousSubtitle,
                                       style: const TextStyle(
-                                          fontSize: 12, color: PatientTokens.textSub)),
+                                          fontSize: 12,
+                                          color: PatientTokens.textSub)),
                                   value: prefs.religiousGreetingsEnabled,
                                   onChanged: _saving
                                       ? null
@@ -196,40 +220,48 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                             child: Column(children: [
                           SwitchListTile(
                               contentPadding: EdgeInsets.zero,
-                              title: Text(l10n.notificationSettingsQuietHoursTitle,
+                              title: Text(
+                                  l10n.notificationSettingsQuietHoursTitle,
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                       color: PatientTokens.text)),
                               subtitle: Text(
                                   l10n.notificationSettingsQuietHoursSubtitle,
                                   style: const TextStyle(
-                                      fontSize: 12, color: PatientTokens.textSub)),
+                                      fontSize: 12,
+                                      color: PatientTokens.textSub)),
                               value: prefs.quietHoursEnabled,
                               onChanged: _saving
                                   ? null
-                                  : (value) =>
-                                      _save(prefs.copyWith(quietHoursEnabled: value))),
+                                  : (value) => _save(prefs.copyWith(
+                                      quietHoursEnabled: value))),
                           if (prefs.quietHoursEnabled) ...[
                             ListTile(
                                 contentPadding: EdgeInsets.zero,
-                                title: Text(l10n.notificationSettingsQuietHoursStart),
-                                trailing: Text(prefs.quietHoursStartLocal,
+                                title: Text(
+                                    l10n.notificationSettingsQuietHoursStart),
+                                trailing: Text(
+                                    _displayTime(prefs.quietHoursStartLocal),
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: PatientTokens.text)),
                                 onTap: _saving
                                     ? null
-                                    : () => _pickTime(isStart: true, current: prefs)),
+                                    : () => _pickTime(
+                                        isStart: true, current: prefs)),
                             ListTile(
                                 contentPadding: EdgeInsets.zero,
-                                title: Text(l10n.notificationSettingsQuietHoursEnd),
-                                trailing: Text(prefs.quietHoursEndLocal,
+                                title: Text(
+                                    l10n.notificationSettingsQuietHoursEnd),
+                                trailing: Text(
+                                    _displayTime(prefs.quietHoursEndLocal),
                                     style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         color: PatientTokens.text)),
                                 onTap: _saving
                                     ? null
-                                    : () => _pickTime(isStart: false, current: prefs)),
+                                    : () => _pickTime(
+                                        isStart: false, current: prefs)),
                           ]
                         ])),
                       ]));
@@ -286,12 +318,16 @@ class _LanguageChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 10),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-              color: selected ? PatientTokens.primaryLight : PatientTokens.surfaceSubtle,
+              color: selected
+                  ? PatientTokens.primaryLight
+                  : PatientTokens.surfaceSubtle,
               borderRadius: BorderRadius.circular(PatientTokens.cardRadius),
               border: Border.all(
-                  color: selected ? PatientTokens.primary : PatientTokens.border)),
+                  color:
+                      selected ? PatientTokens.primary : PatientTokens.border)),
           child: Text(label,
               style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  color: selected ? PatientTokens.primary : PatientTokens.text))));
+                  color:
+                      selected ? PatientTokens.primary : PatientTokens.text))));
 }

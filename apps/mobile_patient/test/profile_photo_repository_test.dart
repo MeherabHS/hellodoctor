@@ -131,20 +131,16 @@ void main() {
       expect(sent.queryParameters['profile_id'], 'dep-3');
     });
 
-    test('returns null (not a thrown error) on a 404 — no photo set',
-        () async {
+    test('returns null (not a thrown error) on a 404 — no photo set', () async {
       final dio = Dio(BaseOptions(baseUrl: 'http://localhost/api/v1'));
       dio.interceptors.add(InterceptorsWrapper(onRequest: (r, h) {
         h.reject(DioException(
             requestOptions: r,
             type: DioExceptionType.badResponse,
-            response: Response(
-                requestOptions: r,
-                statusCode: 404,
-                data: {
-                  'success': false,
-                  'error': {'message': 'Not found.'}
-                })));
+            response: Response(requestOptions: r, statusCode: 404, data: {
+              'success': false,
+              'error': {'message': 'Not found.'}
+            })));
       }));
       final repo = ProfileRepository(ApiClient(dio: dio));
 
@@ -159,24 +155,18 @@ void main() {
         h.reject(DioException(
             requestOptions: r,
             type: DioExceptionType.badResponse,
-            response: Response(
-                requestOptions: r,
-                statusCode: 500,
-                data: {
-                  'success': false,
-                  'error': {'message': 'Server error.'}
-                })));
+            response: Response(requestOptions: r, statusCode: 500, data: {
+              'success': false,
+              'error': {'message': 'Server error.'}
+            })));
       }));
       final repo = ProfileRepository(ApiClient(dio: dio));
 
-      await expectLater(
-          repo.fetchPhotoBytes(),
-          throwsA(
-              isA<ApiException>().having((e) => e.status, 'status', 500)));
+      await expectLater(repo.fetchPhotoBytes(),
+          throwsA(isA<ApiException>().having((e) => e.status, 'status', 500)));
     });
 
-    test('a network error still propagates as a thrown ApiException',
-        () async {
+    test('a network error still propagates as a thrown ApiException', () async {
       final dio = Dio(BaseOptions(baseUrl: 'http://localhost/api/v1'));
       dio.interceptors.add(InterceptorsWrapper(onRequest: (r, h) {
         h.reject(DioException(
@@ -184,8 +174,7 @@ void main() {
       }));
       final repo = ProfileRepository(ApiClient(dio: dio));
 
-      await expectLater(
-          repo.fetchPhotoBytes(),
+      await expectLater(repo.fetchPhotoBytes(),
           throwsA(isA<ApiException>().having((e) => e.status, 'status', null)));
     });
   });

@@ -269,6 +269,7 @@ class _PatientDirectoryPageState extends State<PatientDirectoryPage> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: PatientDoctorCard(
                     doctor: d,
+                    repo: _cubit.repo,
                     onProfile: () => profile(d),
                     onBook: (m) => book(d, m))))
         ]);

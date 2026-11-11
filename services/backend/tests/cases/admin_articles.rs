@@ -721,6 +721,7 @@ async fn test_cms_cover_rejects_malformed_spoofed_oversized_and_unconfigured_sto
         0
     );
     state.object_storage = None;
+    state.article_media_storage = None;
     let app = create_router(state);
     assert_eq!(
         image_upload(
@@ -754,7 +755,7 @@ async fn test_cms_abandoned_media_cleanup_preserves_current_and_clinical_objects
     .await;
     assert_eq!(res.status(), StatusCode::OK);
     let a = json_body(res).await["data"].clone();
-    let store = state.object_storage.as_ref().unwrap();
+    let store = state.article_media_storage.as_ref().unwrap();
     let abandoned = Uuid::new_v4();
     let key = format!("article-media/{abandoned}.jpg");
     sqlx::query("INSERT INTO article_media(id,article_id,object_key,content_hash,size_bytes,created_at) VALUES($1,$2,$3,'unused',1,now()-interval '2 days')").bind(abandoned).bind(uid(a["id"].as_str().unwrap())).bind(&key).execute(&pool).await.unwrap();

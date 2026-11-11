@@ -19,7 +19,7 @@ class ControlledBooking extends FakeBookingRepository {
       {required String doctorId,
       required String slotId,
       required String modality,
-      required String paymentMethodId,
+      required String? paymentMethodId,
       String? chiefComplaint,
       String? profileId}) {
     calls++;
@@ -50,6 +50,7 @@ void main() {
         appointmentId: 'a',
         appointmentNumber: 'HD1',
         status: 'PENDING_PAYMENT',
+        paymentPolicy: 'REQUIRED',
         amount: '300'));
     expect(await first, isTrue);
     expect(cubit.state.canProceed, isFalse);
@@ -91,6 +92,7 @@ void main() {
       final repo = StatusRepository(AppointmentDetailDto(
           id: 'a',
           status: payment == 'PAYMENT_HELD' ? 'CONFIRMED' : 'PENDING_PAYMENT',
+          paymentPolicy: 'REQUIRED',
           paymentStatus: payment));
       await tester.pumpWidget(MaterialApp(
           home: ConsultationStatusPage(
@@ -140,6 +142,7 @@ void main() {
     final repo = StatusRepository(AppointmentDetailDto(
       id: 'a',
       status: 'PENDING_PAYMENT',
+      paymentPolicy: 'REQUIRED',
       paymentStatus: 'INITIATED',
       holdExpiresAt: now.add(const Duration(minutes: 10)),
       serverTime: now,

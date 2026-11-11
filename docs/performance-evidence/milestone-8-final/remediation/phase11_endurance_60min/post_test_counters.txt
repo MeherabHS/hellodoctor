@@ -1,0 +1,544 @@
+﻿
+admission_dependency_pressure_pool_total{class="payment",pool="auth"} 1
+admission_dependency_pressure_pool_total{class="consultation",pool="api"} 176
+admission_dependency_pressure_pool_total{class="normal",pool="api"} 566
+admission_dependency_pressure_pool_total{class="expensive",pool="api"} 25
+admission_dependency_pressure_pool_total{class="consultation",pool="auth"} 10
+admission_dependency_pressure_pool_total{class="normal",pool="auth"} 43
+admission_accepted_total{class="payment"} 2751
+admission_accepted_total{class="expensive"} 30037
+admission_accepted_total{class="webhook"} 2749
+admission_accepted_total{class="auth"} 4
+admission_accepted_total{class="health"} 848
+admission_accepted_total{class="normal"} 449616
+admission_accepted_total{class="consultation"} 198520
+admission_rejected_total{class="consultation",reason="shared_class_budget"} 24
+admission_rejected_total{class="payment",reason="dependency_pressure"} 1
+admission_rejected_total{class="consultation",reason="lane_rate_limit"} 211
+admission_rejected_total{class="consultation",reason="dependency_pressure"} 176
+admission_rejected_total{class="expensive",reason="dependency_pressure"} 25
+admission_rejected_total{class="webhook",reason="lane_concurrency"} 1
+admission_rejected_total{class="normal",reason="limiter_unavailable"} 2
+admission_rejected_total{class="normal",reason="dependency_pressure"} 571
+admission_rejected_total{class="normal",reason="lane_concurrency"} 83
+admission_rejected_total{class="expensive",reason="account_budget"} 5
+admission_rejected_total{class="expensive",reason="lane_concurrency"} 340
+admission_rejected_total{class="consultation",reason="lane_concurrency"} 733
+admission_inflight{class="payment"} 0
+admission_inflight{class="consultation"} 0
+admission_inflight{class="expensive"} 0
+admission_inflight{class="normal"} 0
+admission_inflight{class="webhook"} 0
+admission_inflight{class="health"} 1
+admission_inflight{class="auth"} 0
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0"} 0.000716315
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.5"} 0.0007971242224425432
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.9"} 0.0010137489097675257
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.95"} 0.0010137489097675257
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.99"} 0.0010137489097675257
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.999"} 0.0010137489097675257
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="1"} 0.001169689
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/healthz"} 0.5854419699999999
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/healthz"} 363
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/overview",quantile="0"} 0.001025303
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/overview",quantile="0.5"} 
+0.0022719880784676217
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/overview",quantile="0.9"} 
+0.0022719880784676217
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/overview",quantile="0.95"} 
+0.0022719880784676217
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/overview",quantile="0.99"} 
+0.0022719880784676217
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/overview",quantile="0.999"} 
+0.0022719880784676217
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/overview",quantile="1"} 0.002846556
+admission_permit_hold_by_endpoint_seconds_sum{class="expensive",endpoint="/api/v1/admin/overview"} 15.041540530000004
+admission_permit_hold_by_endpoint_seconds_count{class="expensive",endpoint="/api/v1/admin/overview"} 527
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.5"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.9"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.95"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.99"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.999"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="1"} 0
+admission_permit_hold_by_endpoint_seconds_sum{class="auth",endpoint="/api/v1/auth/doctor/login"} 0.05941818
+admission_permit_hold_by_endpoint_seconds_count{class="auth",endpoint="/api/v1/auth/doctor/login"} 1
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.5"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.9"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.95"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.99"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.999"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="1"} 0
+admission_permit_hold_by_endpoint_seconds_sum{class="payment",endpoint="/api/v1/appointments/book"} 57.9781054040001
+admission_permit_hold_by_endpoint_seconds_count{class="payment",endpoint="/api/v1/appointments/book"} 2751
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors/:id/slots",quantile="0"} 0.004261581
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors/:id/slots",quantile="0.5"} 
+0.006169731111734044
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors/:id/slots",quantile="0.9"} 
+0.009300379989307305
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors/:id/slots",quantile="0.95"} 
+0.010818474330417879
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors/:id/slots",quantile="0.99"} 
+0.01605556085378598
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors/:id/slots",quantile="0.999"} 
+0.03393528276621985
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors/:id/slots",quantile="1"} 0.037360922
+admission_permit_hold_by_endpoint_seconds_sum{class="normal",endpoint="/api/v1/doctors/:id/slots"} 960.8931535870124
+admission_permit_hold_by_endpoint_seconds_count{class="normal",endpoint="/api/v1/doctors/:id/slots"} 134266
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors",quantile="0"} 0.002346616
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors",quantile="0.5"} 
+0.0037011932043281553
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors",quantile="0.9"} 0.0064151043028731
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors",quantile="0.95"} 
+0.007816643619933486
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors",quantile="0.99"} 
+0.01283088633772621
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors",quantile="0.999"} 
+0.01841296913581255
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctors",quantile="1"} 0.021561849
+admission_permit_hold_by_endpoint_seconds_sum{class="normal",endpoint="/api/v1/doctors"} 1199.4744615189911
+admission_permit_hold_by_endpoint_seconds_count{class="normal",endpoint="/api/v1/doctors"} 257370
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/profile",quantile="0"} 0.001164983
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/profile",quantile="0.5"} 
+0.0014559451133784203
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/profile",quantile="0.9"} 
+0.0016613910820036063
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/profile",quantile="0.95"} 
+0.0016613910820036063
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/profile",quantile="0.99"} 
+0.0016613910820036063
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/profile",quantile="0.999"} 
+0.0016613910820036063
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/profile",quantile="1"} 0.001972476
+admission_permit_hold_by_endpoint_seconds_sum{class="normal",endpoint="/api/v1/doctor/profile"} 3.2811373550000034
+admission_permit_hold_by_endpoint_seconds_count{class="normal",endpoint="/api/v1/doctor/profile"} 896
+admission_permit_hold_by_endpoint_seconds{class="webhook",endpoint="/api/v1/webhooks/payment/:provider",quantile="0"} 0
+admission_permit_hold_by_endpoint_seconds{class="webhook",endpoint="/api/v1/webhooks/payment/:provider",quantile="0.5"}
+ 0
+admission_permit_hold_by_endpoint_seconds{class="webhook",endpoint="/api/v1/webhooks/payment/:provider",quantile="0.9"}
+ 0
+admission_permit_hold_by_endpoint_seconds{class="webhook",endpoint="/api/v1/webhooks/payment/:provider",quantile="0.95"
+} 0
+admission_permit_hold_by_endpoint_seconds{class="webhook",endpoint="/api/v1/webhooks/payment/:provider",quantile="0.99"
+} 0
+admission_permit_hold_by_endpoint_seconds{class="webhook",endpoint="/api/v1/webhooks/payment/:provider",quantile="0.999
+"} 0
+admission_permit_hold_by_endpoint_seconds{class="webhook",endpoint="/api/v1/webhooks/payment/:provider",quantile="1"} 0
+admission_permit_hold_by_endpoint_seconds_sum{class="webhook",endpoint="/api/v1/webhooks/payment/:provider"} 
+64.77212700900012
+admission_permit_hold_by_endpoint_seconds_count{class="webhook",endpoint="/api/v1/webhooks/payment/:provider"} 2749
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/grievances",quantile="0"} 0.002010399
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/grievances",quantile="0.5"} 
+0.0036300820642542766
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/grievances",quantile="0.9"} 
+0.007186866459911062
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/grievances",quantile="0.95"} 
+0.010034761936446047
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/grievances",quantile="0.99"} 
+0.013370559793375945
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/grievances",quantile="0.999"} 
+0.013370559793375945
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/grievances",quantile="1"} 0.016870189
+admission_permit_hold_by_endpoint_seconds_sum{class="normal",endpoint="/api/v1/grievances"} 62.87241893900018
+admission_permit_hold_by_endpoint_seconds_count{class="normal",endpoint="/api/v1/grievances"} 5626
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/wallet/summary",quantile="0"} 
+0.001386621
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/wallet/summary",quantile="0.5"} 
+0.006822699791355938
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/wallet/summary",quantile="0.9"} 
+0.011116775335848823
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/wallet/summary",quantile="0.95"} 
+0.012604517222156364
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/wallet/summary",quantile="0.99"} 
+0.016541216904366506
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/wallet/summary",quantile="0.999"} 
+0.018512668114452187
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/wallet/summary",quantile="1"} 
+0.020206911
+admission_permit_hold_by_endpoint_seconds_sum{class="normal",endpoint="/api/v1/doctor/wallet/summary"} 
+404.24307284800346
+admission_permit_hold_by_endpoint_seconds_count{class="normal",endpoint="/api/v1/doctor/wallet/summary"} 47877
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/login",quantile="0"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/login",quantile="0.5"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/login",quantile="0.9"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/login",quantile="0.95"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/login",quantile="0.99"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/login",quantile="0.999"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/login",quantile="1"} 0
+admission_permit_hold_by_endpoint_seconds_sum{class="auth",endpoint="/api/v1/auth/admin/login"} 0.059951253
+admission_permit_hold_by_endpoint_seconds_count{class="auth",endpoint="/api/v1/auth/admin/login"} 1
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0"} 0.00461816
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.5"} 0.005872352128237455
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.9"} 0.006059669477710256
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.95"} 0.006059669477710256
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.99"} 0.006059669477710256
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.999"} 0.006059669477710256
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="1"} 0.006813946
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/metrics"} 4.311015391999996
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/metrics"} 484
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/verify-otp",quantile="0"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/verify-otp",quantile="0.5"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/verify-otp",quantile="0.9"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/verify-otp",quantile="0.95"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/verify-otp",quantile="0.99"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/verify-otp",quantile="0.999"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/admin/verify-otp",quantile="1"} 0
+admission_permit_hold_by_endpoint_seconds_sum{class="auth",endpoint="/api/v1/auth/admin/verify-otp"} 0.007168991
+admission_permit_hold_by_endpoint_seconds_count{class="auth",endpoint="/api/v1/auth/admin/verify-otp"} 1
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/verify-otp",quantile="0"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/verify-otp",quantile="0.5"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/verify-otp",quantile="0.9"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/verify-otp",quantile="0.95"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/verify-otp",quantile="0.99"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/verify-otp",quantile="0.999"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/verify-otp",quantile="1"} 0
+admission_permit_hold_by_endpoint_seconds_sum{class="auth",endpoint="/api/v1/auth/doctor/verify-otp"} 0.017804958
+admission_permit_hold_by_endpoint_seconds_count{class="auth",endpoint="/api/v1/auth/doctor/verify-otp"} 1
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/finance/summary",quantile="0"} 
+0.000867357
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/finance/summary",quantile="0.5"} 
+0.0011411713688371707
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/finance/summary",quantile="0.9"} 
+0.0012200053593180162
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/finance/summary",quantile="0.95"} 
+0.0012200053593180162
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/finance/summary",quantile="0.99"} 
+0.0012200053593180162
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/finance/summary",quantile="0.999"} 
+0.0012200053593180162
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/finance/summary",quantile="1"} 
+0.001303762
+admission_permit_hold_by_endpoint_seconds_sum{class="expensive",endpoint="/api/v1/admin/finance/summary"} 
+3.242136597999996
+admission_permit_hold_by_endpoint_seconds_count{class="expensive",endpoint="/api/v1/admin/finance/summary"} 531
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/appointments",quantile="0"} 
+0.001579662
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/appointments",quantile="0.5"} 
+0.0017722594409972851
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/appointments",quantile="0.9"} 
+0.0024869455083674176
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/appointments",quantile="0.95"} 
+0.0024869455083674176
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/appointments",quantile="0.99"} 
+0.0024869455083674176
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/appointments",quantile="0.999"} 
+0.0024869455083674176
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/appointments",quantile="1"} 
+0.002736977
+admission_permit_hold_by_endpoint_seconds_sum{class="normal",endpoint="/api/v1/doctor/appointments"} 4.240308133999999
+admission_permit_hold_by_endpoint_seconds_count{class="normal",endpoint="/api/v1/doctor/appointments"} 895
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/notifications",quantile="0"} 0.001254476
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/notifications",quantile="0.5"} 
+0.001979521706659654
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/notifications",quantile="0.9"} 
+0.00510824170719741
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/notifications",quantile="0.95"} 
+0.00510824170719741
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/notifications",quantile="0.99"} 
+0.00510824170719741
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/notifications",quantile="0.999"} 
+0.00510824170719741
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/notifications",quantile="1"} 0.00533578
+admission_permit_hold_by_endpoint_seconds_sum{class="normal",endpoint="/api/v1/notifications"} 3.1449510560000014
+admission_permit_hold_by_endpoint_seconds_count{class="normal",endpoint="/api/v1/notifications"} 896
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/slots",quantile="0"} 0.001391615
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/slots",quantile="0.5"} 
+0.001932965308619085
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/slots",quantile="0.9"} 
+0.002041439616502957
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/slots",quantile="0.95"} 
+0.002041439616502957
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/slots",quantile="0.99"} 
+0.002041439616502957
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/slots",quantile="0.999"} 
+0.002041439616502957
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/slots",quantile="1"} 0.002387068
+admission_permit_hold_by_endpoint_seconds_sum{class="normal",endpoint="/api/v1/doctor/slots"} 5.001485146999989
+admission_permit_hold_by_endpoint_seconds_count{class="normal",endpoint="/api/v1/doctor/slots"} 895
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/patients",quantile="0"} 0.000918973
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/patients",quantile="0.5"} 
+0.001118798398981342
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/patients",quantile="0.9"} 
+0.001118798398981342
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/patients",quantile="0.95"} 
+0.001118798398981342
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/patients",quantile="0.99"} 
+0.001118798398981342
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/patients",quantile="0.999"} 
+0.001118798398981342
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/patients",quantile="1"} 0.001173413
+admission_permit_hold_by_endpoint_seconds_sum{class="expensive",endpoint="/api/v1/admin/patients"} 48.01857404400001
+admission_permit_hold_by_endpoint_seconds_count{class="expensive",endpoint="/api/v1/admin/patients"} 532
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/doctor/chats",quantile="0"} 
+0.001026039
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/doctor/chats",quantile="0.5"} 
+0.0013050681372239789
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/doctor/chats",quantile="0.9"} 
+0.0015117308495181355
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/doctor/chats",quantile="0.95"} 
+0.0015117308495181355
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/doctor/chats",quantile="0.99"} 
+0.0015117308495181355
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/doctor/chats",quantile="0.999"} 
+0.0015117308495181355
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/doctor/chats",quantile="1"} 0.00229274
+admission_permit_hold_by_endpoint_seconds_sum{class="consultation",endpoint="/api/v1/doctor/chats"} 2.920261447000006
+admission_permit_hold_by_endpoint_seconds_count{class="consultation",endpoint="/api/v1/doctor/chats"} 895
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/duty",quantile="0"} 0.001357865
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/duty",quantile="0.5"} 
+0.001537035025297899
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/duty",quantile="0.9"} 
+0.00173820896527269
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/duty",quantile="0.95"} 
+0.00173820896527269
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/duty",quantile="0.99"} 
+0.00173820896527269
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/duty",quantile="0.999"} 
+0.00173820896527269
+admission_permit_hold_by_endpoint_seconds{class="normal",endpoint="/api/v1/doctor/duty",quantile="1"} 0.002807897
+admission_permit_hold_by_endpoint_seconds_sum{class="normal",endpoint="/api/v1/doctor/duty"} 3.3333887210000013
+admission_permit_hold_by_endpoint_seconds_count{class="normal",endpoint="/api/v1/doctor/duty"} 895
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/command/telemetry",quantile="0"} 
+0.001153832
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/command/telemetry",quantile="0.5"} 
+0.011649406786953653
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/command/telemetry",quantile="0.9"} 
+0.01692607378292873
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/command/telemetry",quantile="0.95"}
+ 0.018546020925694233
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/command/telemetry",quantile="0.99"}
+ 0.020247984565771752
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/command/telemetry",quantile="0.999"
+} 0.02302211467098591
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/command/telemetry",quantile="1"} 
+0.023972501
+admission_permit_hold_by_endpoint_seconds_sum{class="expensive",endpoint="/api/v1/admin/command/telemetry"} 
+334.1048109129997
+admission_permit_hold_by_endpoint_seconds_count{class="expensive",endpoint="/api/v1/admin/command/telemetry"} 26861
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/doctors",quantile="0"} 0.000868871
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/doctors",quantile="0.5"} 
+0.0010848646701358002
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/doctors",quantile="0.9"} 
+0.0010848646701358002
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/doctors",quantile="0.95"} 
+0.0010848646701358002
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/doctors",quantile="0.99"} 
+0.0010848646701358002
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/doctors",quantile="0.999"} 
+0.0010848646701358002
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/doctors",quantile="1"} 0.001230776
+admission_permit_hold_by_endpoint_seconds_sum{class="expensive",endpoint="/api/v1/admin/doctors"} 2.563073196999998
+admission_permit_hold_by_endpoint_seconds_count{class="expensive",endpoint="/api/v1/admin/doctors"} 530
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/grievances",quantile="0"} 
+0.00111643
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/grievances",quantile="0.5"} 
+0.0011815832205453595
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/grievances",quantile="0.9"} 
+0.0016415735320631755
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/grievances",quantile="0.95"} 
+0.0016415735320631755
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/grievances",quantile="0.99"} 
+0.0016415735320631755
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/grievances",quantile="0.999"} 
+0.0016415735320631755
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/grievances",quantile="1"} 
+0.002248668
+admission_permit_hold_by_endpoint_seconds_sum{class="expensive",endpoint="/api/v1/admin/grievances"} 9.211327203999993
+admission_permit_hold_by_endpoint_seconds_count{class="expensive",endpoint="/api/v1/admin/grievances"} 530
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/logs",quantile="0"} 0.001070244
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/logs",quantile="0.5"} 
+0.0011771017245275153
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/logs",quantile="0.9"} 
+0.0012117374655448493
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/logs",quantile="0.95"} 
+0.0012117374655448493
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/logs",quantile="0.99"} 
+0.0012117374655448493
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/logs",quantile="0.999"} 
+0.0012117374655448493
+admission_permit_hold_by_endpoint_seconds{class="expensive",endpoint="/api/v1/admin/logs",quantile="1"} 0.001738752
+admission_permit_hold_by_endpoint_seconds_sum{class="expensive",endpoint="/api/v1/admin/logs"} 1.4746649070000006
+admission_permit_hold_by_endpoint_seconds_count{class="expensive",endpoint="/api/v1/admin/logs"} 526
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quanti
+le="0"} 0.010057276
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quanti
+le="0.5"} 0.014865680884666554
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quanti
+le="0.9"} 0.021755253339534052
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quanti
+le="0.95"} 0.025341801404505874
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quanti
+le="0.99"} 0.03092779401801503
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quanti
+le="0.999"} 0.05432884298486838
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quanti
+le="1"} 0.059154623
+admission_permit_hold_by_endpoint_seconds_sum{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages"} 
+1883.6541186559787
+admission_permit_hold_by_endpoint_seconds_count{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages"}
+ 114670
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/telemetr
+y",quantile="0"} 0.000016161
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/telemetr
+y",quantile="0.5"} 0.0077698841766660675
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/telemetr
+y",quantile="0.9"} 0.011287041062876509
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/telemetr
+y",quantile="0.95"} 0.01391622269178473
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/telemetr
+y",quantile="0.99"} 0.019708603393531424
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/telemetr
+y",quantile="0.999"} 0.02630227038424969
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/telemetr
+y",quantile="1"} 0.030301766
+admission_permit_hold_by_endpoint_seconds_sum{class="consultation",endpoint="/api/v1/consultations/:appointment_id/tele
+metry"} 283.94970801000096
+admission_permit_hold_by_endpoint_seconds_count{class="consultation",endpoint="/api/v1/consultations/:appointment_id/te
+lemetry"} 31924
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/rtc-toke
+n",quantile="0"} 0.003004136
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/rtc-toke
+n",quantile="0.5"} 0.004779114394258389
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/rtc-toke
+n",quantile="0.9"} 0.00820427416389768
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/rtc-toke
+n",quantile="0.95"} 0.009373206608049169
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/rtc-toke
+n",quantile="0.99"} 0.014248551605247961
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/rtc-toke
+n",quantile="0.999"} 0.01776899812687857
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/consultations/:appointment_id/rtc-toke
+n",quantile="1"} 0.032891751
+admission_permit_hold_by_endpoint_seconds_sum{class="consultation",endpoint="/api/v1/consultations/:appointment_id/rtc-
+token"} 283.85385123499816
+admission_permit_hold_by_endpoint_seconds_count{class="consultation",endpoint="/api/v1/consultations/:appointment_id/rt
+c-token"} 51031
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.5"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.9"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.95"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.99"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.999"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="1"} 0
+admission_redis_check_seconds_sum{class="payment",check="shared_class_budget"} 1.9845993890000009
+admission_redis_check_seconds_count{class="payment",check="shared_class_budget"} 2750
+admission_redis_check_seconds{class="normal",check="shared_class_budget",quantile="0"} 0.000101609
+admission_redis_check_seconds{class="normal",check="shared_class_budget",quantile="0.5"} 0.00032708187643701146
+admission_redis_check_seconds{class="normal",check="shared_class_budget",quantile="0.9"} 0.0006004086629210676
+admission_redis_check_seconds{class="normal",check="shared_class_budget",quantile="0.95"} 0.0008028842280001339
+admission_redis_check_seconds{class="normal",check="shared_class_budget",quantile="0.99"} 0.001873587895061405
+admission_redis_check_seconds{class="normal",check="shared_class_budget",quantile="0.999"} 0.004504402518556701
+admission_redis_check_seconds{class="normal",check="shared_class_budget",quantile="1"} 0.005541003
+admission_redis_check_seconds_sum{class="normal",check="shared_class_budget"} 199.70255862800005
+admission_redis_check_seconds_count{class="normal",check="shared_class_budget"} 449045
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0"} 0
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.5"} 0
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.9"} 0
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.95"} 0
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.99"} 0
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.999"} 0
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="1"} 0
+admission_redis_check_seconds_sum{class="auth",check="shared_class_budget"} 0.0018572320000000001
+admission_redis_check_seconds_count{class="auth",check="shared_class_budget"} 4
+admission_redis_check_seconds{class="expensive",check="shared_class_budget",quantile="0"} 0.000161046
+admission_redis_check_seconds{class="expensive",check="shared_class_budget",quantile="0.5"} 0.000404645156765404
+admission_redis_check_seconds{class="expensive",check="shared_class_budget",quantile="0.9"} 0.0006917402533408443
+admission_redis_check_seconds{class="expensive",check="shared_class_budget",quantile="0.95"} 0.0011681896601327946
+admission_redis_check_seconds{class="expensive",check="shared_class_budget",quantile="0.99"} 0.002261108667130384
+admission_redis_check_seconds{class="expensive",check="shared_class_budget",quantile="0.999"} 0.0030631850929944706
+admission_redis_check_seconds{class="expensive",check="shared_class_budget",quantile="1"} 0.003494893
+admission_redis_check_seconds_sum{class="expensive",check="shared_class_budget"} 16.424674196000034
+admission_redis_check_seconds_count{class="expensive",check="shared_class_budget"} 30012
+admission_redis_check_seconds{class="normal",check="principal_budget",quantile="0"} 0.000141008
+admission_redis_check_seconds{class="normal",check="principal_budget",quantile="0.5"} 0.0004097759418235099
+admission_redis_check_seconds{class="normal",check="principal_budget",quantile="0.9"} 0.0007840011828819547
+admission_redis_check_seconds{class="normal",check="principal_budget",quantile="0.95"} 0.0011313993748347895
+admission_redis_check_seconds{class="normal",check="principal_budget",quantile="0.99"} 0.002613931093142109
+admission_redis_check_seconds{class="normal",check="principal_budget",quantile="0.999"} 0.005095996627033157
+admission_redis_check_seconds{class="normal",check="principal_budget",quantile="1"} 0.010727945
+admission_redis_check_seconds_sum{class="normal",check="principal_budget"} 256.6714065489982
+admission_redis_check_seconds_count{class="normal",check="principal_budget"} 449045
+admission_redis_check_seconds{class="webhook",check="shared_class_budget",quantile="0"} 0
+admission_redis_check_seconds{class="webhook",check="shared_class_budget",quantile="0.5"} 0
+admission_redis_check_seconds{class="webhook",check="shared_class_budget",quantile="0.9"} 0
+admission_redis_check_seconds{class="webhook",check="shared_class_budget",quantile="0.95"} 0
+admission_redis_check_seconds{class="webhook",check="shared_class_budget",quantile="0.99"} 0
+admission_redis_check_seconds{class="webhook",check="shared_class_budget",quantile="0.999"} 0
+admission_redis_check_seconds{class="webhook",check="shared_class_budget",quantile="1"} 0
+admission_redis_check_seconds_sum{class="webhook",check="shared_class_budget"} 1.487525158999995
+admission_redis_check_seconds_count{class="webhook",check="shared_class_budget"} 2749
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0"} 0.000196208
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.5"} 0.0004133978832925279
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.9"} 0.0007307055168755602
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.95"} 0.0010423265178369685
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.99"} 0.0023637639765009696
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.999"} 0.004890307848688
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="1"} 0.007968439
+admission_redis_check_seconds_sum{class="consultation",check="shared_class_budget"} 108.35906645399976
+admission_redis_check_seconds_count{class="consultation",check="shared_class_budget"} 198344
+admission_permit_hold_seconds{class="health",quantile="0"} 0.000716315
+admission_permit_hold_seconds{class="health",quantile="0.5"} 0.0011695923291627274
+admission_permit_hold_seconds{class="health",quantile="0.9"} 0.005872352128237455
+admission_permit_hold_seconds{class="health",quantile="0.95"} 0.006059669477710256
+admission_permit_hold_seconds{class="health",quantile="0.99"} 0.006059669477710256
+admission_permit_hold_seconds{class="health",quantile="0.999"} 0.006059669477710256
+admission_permit_hold_seconds{class="health",quantile="1"} 0.006813946
+admission_permit_hold_seconds_sum{class="health"} 4.896457361999998
+admission_permit_hold_seconds_count{class="health"} 847
+admission_permit_hold_seconds{class="auth",quantile="0"} 0
+admission_permit_hold_seconds{class="auth",quantile="0.5"} 0
+admission_permit_hold_seconds{class="auth",quantile="0.9"} 0
+admission_permit_hold_seconds{class="auth",quantile="0.95"} 0
+admission_permit_hold_seconds{class="auth",quantile="0.99"} 0
+admission_permit_hold_seconds{class="auth",quantile="0.999"} 0
+admission_permit_hold_seconds{class="auth",quantile="1"} 0
+admission_permit_hold_seconds_sum{class="auth"} 0.14434338200000002
+admission_permit_hold_seconds_count{class="auth"} 4
+admission_permit_hold_seconds{class="expensive",quantile="0"} 0.000867357
+admission_permit_hold_seconds{class="expensive",quantile="0.5"} 0.010861834891191562
+admission_permit_hold_seconds{class="expensive",quantile="0.9"} 0.01692607378292873
+admission_permit_hold_seconds{class="expensive",quantile="0.95"} 0.018546020925694233
+admission_permit_hold_seconds{class="expensive",quantile="0.99"} 0.02302211467098591
+admission_permit_hold_seconds{class="expensive",quantile="0.999"} 0.023971251580669435
+admission_permit_hold_seconds{class="expensive",quantile="1"} 0.024315601
+admission_permit_hold_seconds_sum{class="expensive"} 413.6561273929983
+admission_permit_hold_seconds_count{class="expensive"} 30037
+admission_permit_hold_seconds{class="webhook",quantile="0"} 0
+admission_permit_hold_seconds{class="webhook",quantile="0.5"} 0
+admission_permit_hold_seconds{class="webhook",quantile="0.9"} 0
+admission_permit_hold_seconds{class="webhook",quantile="0.95"} 0
+admission_permit_hold_seconds{class="webhook",quantile="0.99"} 0
+admission_permit_hold_seconds{class="webhook",quantile="0.999"} 0
+admission_permit_hold_seconds{class="webhook",quantile="1"} 0
+admission_permit_hold_seconds_sum{class="webhook"} 64.77212700900012
+admission_permit_hold_seconds_count{class="webhook"} 2749
+admission_permit_hold_seconds{class="normal",quantile="0"} 0.001164983
+admission_permit_hold_seconds{class="normal",quantile="0.5"} 0.0048030698049291234
+admission_permit_hold_seconds{class="normal",quantile="0.9"} 0.008263558104153874
+admission_permit_hold_seconds{class="normal",quantile="0.95"} 0.009915064414309342
+admission_permit_hold_seconds{class="normal",quantile="0.99"} 0.015178125204456897
+admission_permit_hold_seconds{class="normal",quantile="0.999"} 0.024894708271585082
+admission_permit_hold_seconds{class="normal",quantile="1"} 0.037360922
+admission_permit_hold_seconds_sum{class="normal"} 2646.484377305971
+admission_permit_hold_seconds_count{class="normal"} 449616
+admission_permit_hold_seconds{class="payment",quantile="0"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.5"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.9"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.95"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.99"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.999"} 0
+admission_permit_hold_seconds{class="payment",quantile="1"} 0
+admission_permit_hold_seconds_sum{class="payment"} 57.9781054040001
+admission_permit_hold_seconds_count{class="payment"} 2751
+admission_permit_hold_seconds{class="consultation",quantile="0"} 0.000016161
+admission_permit_hold_seconds{class="consultation",quantile="0.5"} 0.011579719616572167
+admission_permit_hold_seconds{class="consultation",quantile="0.9"} 0.01927203845742807
+admission_permit_hold_seconds{class="consultation",quantile="0.95"} 0.022230278617413248
+admission_permit_hold_seconds{class="consultation",quantile="0.99"} 0.029804377010476425
+admission_permit_hold_seconds{class="consultation",quantile="0.999"} 0.049792046576780255
+admission_permit_hold_seconds{class="consultation",quantile="1"} 0.059154623
+admission_permit_hold_seconds_sum{class="consultation"} 2454.3779393479736
+admission_permit_hold_seconds_count{class="consultation"} 198520
+
+

@@ -1,19 +1,19 @@
-# Azure Blob integration plan
+﻿# Azure Blob integration plan
 
-Status: **PLANNING ONLY — separate infrastructure authorization required.**
+Status: **ADAPTER IMPLEMENTED â€” Azure resource provisioning and cloud acceptance remain separately authorized.**
 
 Azure Blob Storage is HelloDoctor's approved permanent object-storage provider.
-Missing legacy S3 settings are intentional. Milestone 6D cloud verification is
-**DEFERRED — AWAITING AZURE BLOB INTEGRATION**. This plan does not configure a
-provider, install Azure dependencies, provision resources or request credentials.
-In-memory storage remains the regression fixture.
+Missing legacy S3 settings are intentional. The pinned object_store 0.14.2
+Azure backend is now enabled with explicit provider selection, separate
+clinical/article handles, and Azurite contract coverage. No provider credentials
+or Azure resources were provisioned; cloud verification remains pending.
 
 ## Current implementation and reusable boundaries
 
-- `services/backend/src/repository/mod.rs`: `AppState.object_storage` is an optional
-  `Arc<dyn object_store::ObjectStore>`. Its current factory is the legacy
-  `AmazonS3Builder`; `Cargo.toml` enables only the `object_store` AWS feature.
-  The factory remains unchanged and unconfigured during stabilization.
+- services/backend/src/repository/mod.rs: AppState.object_storage is the
+  clinical/private handle and AppState.article_media_storage is the separate
+  article-media handle. MicrosoftAzureBuilder and the explicit legacy S3
+  compatibility path are selected only by STORAGE_PROVIDER.
 - `services/backend/src/services/document_storage_service.rs`: shared private-file
   put/get/delete operations used by clinical/profile services. Database metadata
   and service authorization govern downloads; provider URLs are not public APIs.
@@ -31,17 +31,16 @@ In-memory storage remains the regression fixture.
   ownership, current cover references, approval versions and published-read rules.
   Provider choice must not change these rules or Doctor article RLS.
 
-The shared object-store seam is reusable, but the current single store handle does
-not express two separately permissioned containers. The future task must introduce
-explicit service-selected clinical/article handles or a narrow typed router at this
-boundary. Clients must never select a container or submit arbitrary object keys.
-Existing database bucket metadata must be inventoried and mapped deliberately.
+The shared object-store seam now exposes two server-selected handles for
+clinical and article-media containers. Clients never select a container or submit
+arbitrary object keys. Existing database bucket metadata remains authoritative
+for clinical ownership checks and must be inventoried before any cutover.
 
 ## Adapter decision to validate during the infrastructure task
 
 | Option | Fit and work required |
 |---|---|
-| Existing `object_store` Azure backend | First candidate for lowest service churn: preserve `ObjectStore` and in-memory tests. Confirm the pinned crate's managed/workload identity support, Azurite compatibility, conditional create, bounded reads and error mappings before enabling its Azure feature. This would replace the factory, not add a permanent second provider. |
+| Existing object_store Azure backend | Implemented. The pinned crate supplies managed identity, account-key, Azurite and conditional-create behavior while preserving the existing ObjectStore seam. |
 | Official Azure Rust Blob SDK plus `azure_identity` | Azure-native clients and identity support. Requires a small implementation of the existing storage boundary and explicit mapping of condition failures, not-found, retries, timeouts and streaming limits. Evaluate maintenance/support status and exact API versions at implementation time. |
 | Direct Azure Blob REST | Technically possible, but application code would own token acquisition/refresh, REST-version headers, retries, streaming, conditional requests and error translation. Prefer a maintained adapter/SDK unless a verified gap justifies REST. |
 
@@ -104,10 +103,10 @@ and rotation process, never client bundles or source control. See
    physical erasure. Clinical retention requirements take priority over generic
    abandoned-upload rules. Do not add a second scheduler.
 
-## Future environment configuration
+## Environment configuration
 
-These are configuration requirements to design, **not active environment variable
-names or requests to supply values during stabilization**.
+These are the implemented configuration requirements. Values remain operator-supplied
+and are not present in source control.
 
 | Environment | Required inputs and protection |
 |---|---|
@@ -120,8 +119,8 @@ Test the adapter contract against [Azurite](https://learn.microsoft.com/en-us/az
 for conditional puts, binary round trips, prefix isolation, missing-object deletes,
 failed attachment recovery and idempotent cleanup. Continue all in-memory tests.
 Azurite does not establish cloud Entra/RBAC, firewall, service retention or production
-reliability; those require explicitly authorized staging checks. No Azurite instance
-or new storage dependency was introduced in this stabilization task.
+reliability; those require explicitly authorized staging checks. The focused Azurite
+contract test runs only against an explicitly owned disposable container.
 
 ## Data inventory and migration gate
 
@@ -152,3 +151,4 @@ Patient cover reads, unpublish denial, object ownership, failure recovery, bound
 reads, encryption compatibility, cleanup and clinical-document regressions against
 approved Azure staging resources. Repeat the same persisted article walkthrough in
 an actual Patient runtime. None of those cloud checks is claimed by this plan.
+

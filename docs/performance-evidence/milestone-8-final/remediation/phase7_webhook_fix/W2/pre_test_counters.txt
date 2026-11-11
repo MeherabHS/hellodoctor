@@ -1,0 +1,4 @@
+# TYPE admission_accepted_total counter
+admission_accepted_total{class="health"} 3
+# TYPE admission_inflight gauge
+admission_inflight{class="health"} 1

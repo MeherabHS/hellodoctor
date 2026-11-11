@@ -94,6 +94,44 @@ class AuthRepository {
     }
   }
 
+  /// Step 1 of Phase 2 self-service password recovery. Always succeeds for
+  /// a syntactically valid email, by backend design, regardless of whether
+  /// an eligible account exists — see
+  /// `password_reset_service.rs::request_reset`'s doc comment. Never throws
+  /// for "no such account"; only network/validation/rate-limit failures
+  /// surface as [ApiException].
+  Future<void> requestPasswordReset({required String email}) async {
+    await api.post('/auth/password-reset/request', data: {'email': email});
+  }
+
+  /// Step 2: returns the one-time [ResetAuthorizationResult.resetAuthorization]
+  /// the final step requires. Unlike step 1, a wrong/expired code genuinely
+  /// fails here (401) — by this point the caller has already proven receipt
+  /// of the emailed code, so there is no enumeration concern left to protect.
+  Future<ResetAuthorizationResult> verifyPasswordResetOtp({
+    required String email,
+    required String otpCode,
+  }) async {
+    final response = await api.post('/auth/password-reset/verify-otp',
+        data: {'email': email, 'otp_code': otpCode});
+    return ResetAuthorizationResult.fromJson(
+        Map<String, dynamic>.from(_data(response.data) as Map));
+  }
+
+  /// Step 3: the only call that actually changes the password. Does not
+  /// sign the user in — the backend revokes every existing session for the
+  /// account as part of completing the reset, so the app must send the
+  /// person back to an ordinary sign-in screen afterward, never auto-login.
+  Future<void> completePasswordReset({
+    required String resetAuthorization,
+    required String newPassword,
+  }) async {
+    await api.post('/auth/password-reset/complete', data: {
+      'reset_authorization': resetAuthorization,
+      'new_password': newPassword,
+    });
+  }
+
   Future<void> logout() async {
     try {
       final refresh = await api.read('refresh_token');

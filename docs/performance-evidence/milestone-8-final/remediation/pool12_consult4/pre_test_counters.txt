@@ -1,0 +1,6 @@
+admission_accepted_total{class="payment"} 78
+admission_accepted_total{class="health"} 70
+admission_accepted_total{class="webhook"} 61
+admission_accepted_total{class="normal"} 20
+admission_rejected_total{class="webhook",reason="lane_concurrency"} 5
+admission_rejected_total{class="payment",reason="lane_concurrency"} 2

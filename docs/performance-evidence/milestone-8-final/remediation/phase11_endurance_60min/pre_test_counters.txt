@@ -1,0 +1,23 @@
+﻿
+admission_accepted_total{class="health"} 3
+admission_inflight{class="health"} 1
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0"} 0.001484063
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.5"} 0.0014841693452320834
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.9"} 0.0014841693452320834
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.95"} 0.0014841693452320834
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.99"} 0.0014841693452320834
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.999"} 0.0014841693452320834
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="1"} 0.004001125
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/healthz"} 0.005485188
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/healthz"} 2
+admission_permit_hold_seconds{class="health",quantile="0"} 0.001484063
+admission_permit_hold_seconds{class="health",quantile="0.5"} 0.0014841693452320834
+admission_permit_hold_seconds{class="health",quantile="0.9"} 0.0014841693452320834
+admission_permit_hold_seconds{class="health",quantile="0.95"} 0.0014841693452320834
+admission_permit_hold_seconds{class="health",quantile="0.99"} 0.0014841693452320834
+admission_permit_hold_seconds{class="health",quantile="0.999"} 0.0014841693452320834
+admission_permit_hold_seconds{class="health",quantile="1"} 0.004001125
+admission_permit_hold_seconds_sum{class="health"} 0.005485188
+admission_permit_hold_seconds_count{class="health"} 2
+
+

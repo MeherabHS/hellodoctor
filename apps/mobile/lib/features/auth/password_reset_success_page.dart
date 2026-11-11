@@ -25,7 +25,8 @@ class PasswordResetSuccessPage extends StatelessWidget {
                         width: 72,
                         height: 72,
                         decoration: const BoxDecoration(
-                            color: DoctorTokens.primary, shape: BoxShape.circle),
+                            color: DoctorTokens.primary,
+                            shape: BoxShape.circle),
                         child: const Icon(Icons.check_rounded,
                             color: Colors.white, size: 40)),
                     const SizedBox(height: 24),

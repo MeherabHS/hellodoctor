@@ -1,0 +1,9 @@
+admission_accepted_total{class="health"} 42
+admission_accepted_total{class="normal"} 37332
+admission_accepted_total{class="expensive"} 1935
+admission_accepted_total{class="payment"} 3889
+admission_accepted_total{class="webhook"} 3683
+admission_accepted_total{class="consultation"} 5853
+admission_rejected_total{class="consultation",reason="lane_concurrency"} 12
+admission_rejected_total{class="webhook",reason="lane_concurrency"} 148
+admission_rejected_total{class="expensive",reason="lane_concurrency"} 32

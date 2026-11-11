@@ -2,9 +2,11 @@ use crate::repository::AppState;
 use crate::{ip_jail, rate_limit};
 use axum::{
     extract::{ConnectInfo, Request, State},
+    http::{HeaderMap, Method, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
 };
+use sha2::{Digest, Sha256};
 use std::net::SocketAddr;
 
 /// Runs ahead of everything else (auth, ABAC, handlers): jails IPs that have recently
@@ -18,6 +20,25 @@ pub async fn global_guard_middleware(
     request: Request,
     next: Next,
 ) -> Response {
+    // A restored environment starts read-mostly. Authentication and health
+    // endpoints remain available for the recovery operator, while every other
+    // mutating API is rejected until the process is restarted with
+    // RECOVERY_MODE=false. This prevents payments, registration, consultation
+    // mutations and arbitrary recovered outbox replay during reconciliation.
+    let operator_authenticated = recovery_operator_authenticated(&state, request.headers());
+    if state.config.recovery_mode
+        && !recovery_request_allowed(
+            request.method(),
+            request.uri().path(),
+            operator_authenticated,
+        )
+    {
+        return crate::admission::reject(
+            StatusCode::SERVICE_UNAVAILABLE,
+            crate::admission::classify(request.method(), request.uri().path()),
+            "recovery_mode",
+        );
+    }
     // Local admission already bounded these independent recovery/callback lanes.
     // IP jail or Redis failures for public-user traffic must not block health.
     // Authenticated provider callbacks have their own signature and shared budget.
@@ -65,5 +86,83 @@ pub async fn global_guard_middleware(
             )
         }
         Ok(Err(error)) => error.into_response(),
+    }
+}
+
+pub(crate) fn recovery_operator_authenticated(state: &AppState, headers: &HeaderMap) -> bool {
+    let Some(expected) = state.config.recovery_operator_token_sha256.as_deref() else {
+        return false;
+    };
+    let Some(presented) = headers
+        .get("x-recovery-operator-token")
+        .and_then(|value| value.to_str().ok())
+    else {
+        return false;
+    };
+    operator_digest_matches(expected, presented)
+}
+
+/// `pub` (not just `pub(crate)`) so the operator-run `dr_reconcile` example
+/// binary (Remediation E1) can authenticate itself with the exact same
+/// constant-time comparison this HTTP guard uses, rather than a second,
+/// independently-maintained implementation.
+pub fn operator_digest_matches(expected: &str, presented: &str) -> bool {
+    let actual = hex::encode(Sha256::digest(presented.as_bytes()));
+    let expected = expected.to_ascii_lowercase();
+    actual.len() == expected.len()
+        && actual
+            .as_bytes()
+            .iter()
+            .zip(expected.as_bytes())
+            .fold(0u8, |difference, (left, right)| difference | (left ^ right))
+            == 0
+}
+
+fn recovery_request_allowed(method: &Method, path: &str, operator_authenticated: bool) -> bool {
+    if path == "/healthz" {
+        return true;
+    }
+    *method == Method::GET && path == "/api/v1/recovery/status" && operator_authenticated
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{operator_digest_matches, recovery_request_allowed};
+    use axum::http::Method;
+    use sha2::Digest;
+
+    #[test]
+    fn recovery_mode_allows_only_health_and_operator_status() {
+        assert!(recovery_request_allowed(&Method::GET, "/healthz", false));
+        assert!(recovery_request_allowed(
+            &Method::GET,
+            "/api/v1/recovery/status",
+            true
+        ));
+        assert!(!recovery_request_allowed(
+            &Method::GET,
+            "/api/v1/recovery/status",
+            false
+        ));
+        assert!(!recovery_request_allowed(
+            &Method::GET,
+            "/api/v1/articles",
+            true
+        ));
+        assert!(!recovery_request_allowed(
+            &Method::POST,
+            "/api/v1/auth/admin/login",
+            true
+        ));
+    }
+
+    #[test]
+    fn recovery_operator_token_is_digest_bound_and_rejects_stale_values() {
+        let expected = hex::encode(sha2::Sha256::digest(b"synthetic-recovery-token"));
+        assert!(operator_digest_matches(
+            &expected,
+            "synthetic-recovery-token"
+        ));
+        assert!(!operator_digest_matches(&expected, "stale-token"));
     }
 }

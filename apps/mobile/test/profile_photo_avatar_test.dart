@@ -91,8 +91,8 @@ void main() {
   group('ProfilePhotoAvatar', () {
     testWidgets('shows the person placeholder when no photo and not loading',
         (tester) async {
-      await tester
-          .pumpWidget(harness(const DoctorState(photoBytes: null, photoLoading: false)));
+      await tester.pumpWidget(
+          harness(const DoctorState(photoBytes: null, photoLoading: false)));
       // Two pumps: the widget's own post-frame callback fires loadPhoto() when
       // no bytes are seeded yet, and its (stubbed, no-op) result needs an
       // extra pump to be reflected back into the rebuilt tree.

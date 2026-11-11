@@ -37,6 +37,16 @@ class FakeBookingRepository extends BookingRepository {
   Map<String, dynamic>? lastBookArgs;
   int uploadCallCount = 0;
   int? uploadResult;
+  BookingPolicyDto bookingPolicyResult =
+      const BookingPolicyDto(paymentRequired: true);
+  Object? bookingPolicyError;
+
+  @override
+  Future<BookingPolicyDto> bookingPolicy() async {
+    if (bookingPolicyError != null) throw bookingPolicyError!;
+    return bookingPolicyResult;
+  }
+
   Object? uploadError;
   List<PatientPaymentMethodDto>? paymentMethodsResult;
   Object? paymentMethodsError;
@@ -55,7 +65,7 @@ class FakeBookingRepository extends BookingRepository {
     required String doctorId,
     required String slotId,
     required String modality,
-    required String paymentMethodId,
+    required String? paymentMethodId,
     String? chiefComplaint,
     String? profileId,
   }) async {
@@ -205,6 +215,7 @@ void main() {
         appointmentId: 'apt-1',
         appointmentNumber: 'APT-20261102-ABC12345',
         status: 'PENDING_PAYMENT',
+        paymentPolicy: 'REQUIRED',
         amount: '630.00',
       );
       final ok = await cubit.submit(profileId: 'dep-1');
@@ -318,6 +329,7 @@ void main() {
         appointmentId: 'apt-1',
         appointmentNumber: 'APT-20261102-ABC12345',
         status: 'PENDING_PAYMENT',
+        paymentPolicy: 'REQUIRED',
         amount: '630.00',
       );
       await cubit.submit();

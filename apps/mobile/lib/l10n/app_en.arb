@@ -1,0 +1,62 @@
+{
+  "@@locale": "en",
+  "notificationsTitle": "Notifications",
+  "notificationsSubtitle": "Account & activity updates",
+  "notificationsMarkAllRead": "Mark all read",
+  "notificationsLoadError": "Notifications could not be loaded. Please retry.",
+  "notificationsRefreshError": "Notifications could not be refreshed. Please retry.",
+  "notificationsEmpty": "No notifications yet",
+  "notificationsLoadOlder": "Load earlier notifications",
+  "notificationsLoadingOlder": "Loading earlier notifications...",
+  "notificationDestinationError": "This destination is unavailable or you no longer have access. Please try again from your inbox.",
+  "retryButton": "Retry",
+  "appointmentTitle": "Appointment",
+  "appointmentReference": "Booking reference",
+  "refreshButton": "Refresh",
+  "doctorLabel": "Doctor",
+  "patientLabel": "Patient",
+  "restoringSession": "Restoring secure Doctor session...",
+  "notificationLanguage": "Notification language",
+  "notificationSettingsError": "Could not save notification settings.",
+  "appointmentStatusPendingPayment": "Payment pending",
+  "appointmentStatusConfirmed": "Confirmed",
+  "appointmentStatusWaiting": "Waiting",
+  "appointmentStatusInConsultation": "In consultation",
+  "appointmentStatusCompleted": "Completed",
+  "appointmentStatusCancelled": "Cancelled",
+  "appointmentStatusExpired": "Expired",
+  "appointmentStatusRefunded": "Refunded",
+  "appointmentStatusDisputed": "Under review",
+  "appointmentStatusPrematureTermination": "Interrupted",
+  "cacheOffline": "Offline — showing saved data",
+  "cacheLastUpdated": "Last updated {time}",
+  "@cacheLastUpdated": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheOfflineUpdated": "Offline — showing saved data · Last updated {time}",
+  "@cacheOfflineUpdated": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTitle": "Notification settings",
+  "settingsLoadError": "Unable to load notification settings.",
+  "settingsGreetings": "Greetings",
+  "settingsGreetingsHelp": "Good-morning, birthday and Kenyan holiday messages",
+  "settingsReligious": "Religious holiday greetings",
+  "settingsReligiousHelp": "Eid, Good Friday, Easter and Christmas messages",
+  "settingsRoutine": "Routine updates",
+  "settingsRoutineHelp": "Article status and other operational notices",
+  "settingsAnnouncements": "Announcements",
+  "settingsAnnouncementsHelp": "Optional engagement and announcement notices",
+  "settingsQuietHours": "Quiet hours",
+  "settingsQuietHoursHelp": "Hold non-urgent notifications during this window. Consultation reminders and time-sensitive alerts are never delayed.",
+  "settingsStartsAt": "Starts at",
+  "settingsEndsAt": "Ends at"
+}

@@ -765,3 +765,245 @@ timeout did not recur; its evidence and unchanged deadline/pool settings remain.
 No overlap or full-suite retry. Automated gate GREEN; real device/live cross-app
 verification remains unavailable. Azure and GitHub migration were not started.
 Stop at 6F. Details: [6F report](MILESTONE_6F_REPORT.md).
+
+### Remediation A ? financial integrity and account erasure ? 2026-10-26
+
+Automated application gate **GREEN** from `main` / `47078ee`. Independently
+reproduced and fixed abandoned unpaid checkout disposition, atomic refund completion,
+and truthful durable account erasure. Also corrected current funded-volume/Admin
+escrow projections and an in-flight device-registration/erasure race. Two additive
+forward/down migrations; RLS, ABAC, separated roles, encryption, production deadlines
+and pools preserved. Historical local inventory was read-only; no automatic repairs.
+
+Final source: **419 backend integration passed, 0 failed, 4 existing benchmarks
+ignored**, serialized in **1196.53 seconds** within the 40-minute cap. Source hash
+unchanged. **91 library**, **21 focused Remediation A**, **109 Admin Web**, **12 Doctor
+auth** and **13 Patient auth** tests passed; counts overlap the full suite where
+applicable. Rust fmt/Clippy/check and Admin typecheck/lint/build passed; lint retains
+one existing Campaign warning. The old acquisition timeout did not recur. Invalid
+fixture/preliminary interrupted runs remain recorded separately.
+
+No provider transfer/refund execution, Azure connectivity, cloud backup/version
+deletion or physical-device acceptance is claimed. No Git staging/commits/push,
+production changes or historical reconciliation. Stop after Remediation A; Admin
+session/unsaved-content, notification reliability and Azure remain separate work.
+See [completion report](REMEDIATION_A_REPORT.md) and
+[review-only historical reconciliation/rollout](REMEDIATION_A_RECONCILIATION.md).
+
+### Remediation B - Admin session and editor correctness - 2026-10-26
+
+Scoped automated application gate **GREEN**. Shared BFF session recovery now
+handles missing/expired access, legacy shell-marker expiry, secure-cookie clearing,
+revocation and coordinated refresh. The existing Admin navigation protects unsaved
+article/cover/quiz/import state; pending operations prevent unsafe unmount. MCQ
+imports share a mutation gate and ignore stale/unmounted responses.
+
+Verified **126 Admin tests** (98 native + 28 component), typecheck, ESLint (0 errors,
+1 existing Campaign warning), production build and **24 production-runtime browser
+checks** with synthetic loopback authority/data and owned Redis. Real deployment
+TLS/MFA/replica topology/device behavior remain unverified. No backend/schema
+changes or backend full-suite repeat; prior 419/0/4 and library 91 are historical
+unchanged-code baselines. Remediation A changes are preserved; the future payment
+adapter's durable STARTED-before-provider requirement remains intact.
+
+No Git staging/commits/push, production data changes, Azure or Remediation C.
+See [completion report](REMEDIATION_B_REPORT.md). Stop after Remediation B.
+## Milestone 7A â€” Unified environment configuration (2026-10-27)
+
+Implemented the private VM configuration preparation: root `.env.example`, explicit backend `HELLODOCTOR_ENV_FILE` loading, fail-closed `PASSWORD_RESET_ENABLED=false`, secret-scoped VM Compose mapping, configuration preflight example, deployment-context exclusions and operator guides. Azure Blob, live providers and deployment remain deferred. Verification: backend 445/445 integration, Rust library 92/92, Admin Web 126/126, Doctor Web 85/85, static gates and cargo audit passed.
+
+
+## Milestone 7B — Azure Blob storage adapter (2026-10-27)
+
+Implemented explicit Azure Blob provider selection using the pinned object_store 0.14.2 backend. Clinical and article-media handles use separate configured private containers; managed identity, account-key and Azurite modes are validated without fallback. Existing encryption, integrity, authorization and cleanup paths remain authoritative. Verification: Rust library 96/96, backend 446/446 integration with 4 ignored, Azurite contract 1/1, static gates and cargo audit passed. Actual Azure cloud/RBAC acceptance remains pending authorized resources.
+
+See [completion report](MILESTONE_7B_AZURE_BLOB_REPORT.md). No Azure provisioning, deployment, migration, staging, commit or push was performed.
+
+## Milestone 8, Workstream 1 — Memory profiling (2026-10-31)
+
+Verified Configuration A's single-VM resource budget live via `docker inspect`/cgroup
+reads (not just the compose file), captured real idle/active/peak/post-load memory
+under a REALISTIC_RAMP (1,200-session) run and a SIMULTANEOUS_BURST stress profile,
+confirmed Redis TTL expiry genuinely reclaims keys, and ran a 5-episode repeated-cycle
+test proving backend/Postgres memory stabilizes rather than growing unbounded across
+~25 minutes of mixed load. Admin Web + Doctor Web real idle footprint measured
+(~172 MB combined) — neither is containerized yet, a disclosed gap, not a claimed-done
+item. Clinical document upload/download could not be verified: STORAGE_PROVIDER is
+unset in this environment, failing closed with a clean 409.
+
+Verdict: PARTIAL, not GREEN — real, usable evidence gathered, but cold-start and a
+true multi-hour sustained window were explicitly deferred to Workstream 2.
+See [memory profile report](MILESTONE_8_MEMORY_PROFILE.md).
+
+## Milestone 8, Workstream 2 — Sustained reliability (2026-10-31)
+
+Fixed a confirmed, reproducible defect: transaction_number was derived from only
+the first 8 hex characters of a UUID (32-bit space), a real collision risk at scale;
+switched to the full UUID. 129/129 library tests pass; verified live under real
+traffic with zero new collisions. Implemented the approved single-VM production
+architecture (backend+Redis+PostgreSQL all sharing one 4-vCPU/8-GiB budget, no
+dedicated database cores) in docker-compose.configA.yml, live-verified via
+docker inspect. A 40-minute, 2,000-session benchmark on this corrected topology
+showed zero real errors, zero OOM, zero restarts, ~160 RPS sustained, and
+Postgres memory climbing for ~20 minutes then plateauing — the clean sustained-duration
+answer this milestone needed. A first attempt at this run was invalidated and
+re-run: the benchmark harness itself (not the backend) minted login tokens once and
+never renewed them past their real 15-minute TTL, causing a mass 401/429 collapse
+that was proven (via src/admission.rs's principal() fallback to a shared
+anon:<ip> bucket) to be the backend's anonymous-traffic fairness guard working
+correctly against the harness's own bug, not a capacity defect. Fixed in
+examples/capacity_test.rs (proactive token re-mint, same signing-key shortcut
+already used for initial auth); fix validated clean in a 20-minute run before the
+real 40-minute rerun. Identified, but did not fix, a critical gap: no backup/WAL
+mechanism exists for the now-self-hosted PostgreSQL (owned separately per the
+project's current split of responsibilities).
+
+Verdict: PARTIAL — backend performance/stability GREEN at the 2,000-session
+objective; PostgreSQL backup/DR and Admin/Doctor Web containerization remain open.
+See [sustained reliability report](MILESTONE_8_SUSTAINED_RELIABILITY.md).
+
+## Milestone 8, Workstream 3 — Functional dependency verification (2026-10-31)
+
+Built the real Patient/Doctor/Admin/backend dependency matrix by direct code
+inspection (correcting an internal mix-up: apps/mobile is the Doctor Flutter
+client, apps/mobile_patient is Patient — a separate codebase, both independently
+confirmed to handle token refresh correctly). Re-ran the full backend integration
+suite correctly after fixing my own test-setup errors (missing --test-threads=1
+and a missing disposable Redis fixture, both explicitly documented requirements I'd
+missed) — final: 462/464 backend integration, 129/129 library, 302/302 Flutter,
+98/98 Admin Web (including real cross-process Redis-coordination tests, unlocked by
+provisioning the same fixture pattern), 85/85 Doctor Web; both integration
+failures individually reproduced-or-not and classified as test-isolation artifacts,
+not backend defects. Live-verified the real authentication lifecycle against real
+accounts (not the benchmark harness's bypass): refresh rotation, full-family
+revocation on reuse, real server-side logout invalidation, and confirmed concurrent
+requests without client-side dedup would legitimately revoke their own session —
+exactly why all three real clients already have that dedup. Doctor Web's missing
+cross-process refresh lock was investigated and found NOT reproducible under its
+actual single-instance deployment. All six end-to-end business flows (registration
+through consultation, doctor approval, CMS publish with negative-case, and three
+failure/recovery scenarios including concurrent double-booking) verified PASS with
+real HTTP evidence. Found and fixed a real, actionable gap: MAX_ACTIVE_USERS
+(a controlled-pilot admission cap counting all active users regardless of role) was
+still at its original 1,200 default and had started silently blocking new
+registration once this session's own 10,000-patient test dataset exceeded it;
+raised to 15,000 (10,000-user target plus headroom) in .env/.env.example,
+live-verified. One secondary finding flagged, not fixed (possible missing
+backend-side separation-of-duty on non-sensitive article self-approval — scope
+unconfirmed). All synthetic capacity-test data (~10,000 users and everything built
+on them) removed from Config A's database after this workstream; reference/config
+data (consent documents, notification templates) preserved untouched.
+
+Verdict: GREEN for everything verifiable in this environment; does not constitute
+overall Milestone 8 acceptance — PostgreSQL backup/DR, Admin/Doctor Web
+containerization, and live-provider verification (Agora join, FCM delivery, real
+payment gateway, real Azure Blob) remain separate, open gates.
+See [functional dependency verification report](MILESTONE_8_FUNCTIONAL_DEPENDENCY_VERIFICATION.md).
+
+No Git staging/commits/push was performed. Config A was stopped after this
+workstream (user confirmed no further testing needed); its images/volumes were not
+deleted. Code cleanup, redundancy inspection and file reorganization are queued as
+the next phase of work, not started.
+
+### 2026-11-02 - Milestone 8 six-service performance remediation: RLS root cause fixed, remaining bottleneck is host CPU
+
+Continuation of the six-service (backend/Postgres/Redis/Caddy/Admin-Web/Doctor-Web)
+benchmark investigation against the hellodoctor-m8-final-local Docker stack (a
+dedicated disposable benchmark project, never the shared dev database/Redis or any
+other running stack). Full evidence in
+docs/MILESTONE_8_SIX_SERVICE_PERFORMANCE_REMEDIATION.md (Phases 1-4). No Git
+staging/commits/push performed; everything below is uncommitted working-tree state.
+
+Root cause of the active-web-load degradation flagged in an earlier session's
+contaminated 60-minute run was isolated precisely: GET /api/v1/doctor/chats and
+GET /api/v1/doctor/appointments (used by Doctor-Web and the Flutter Doctor app
+alike) measured 3,452ms/3,196ms under real RLS enforcement vs 148ms with RLS
+bypassed - a 23x slowdown from four RLS policies resolving "is the caller the
+doctor who owns this row" via a correlated per-row subquery into doctor_profiles,
+confirmed via EXPLAIN (ANALYZE, BUFFERS) against the real hellodoctor_api role, not
+a missing index.
+
+Fixed with migration 20261204000001_doctor_rls_identity_lookup_performance (adds a
+STABLE fn_current_doctor_profile_id() the planner can evaluate once per statement
+instead of once per row; rewrites appointments_access/chat_conversations_access/
+chat_messages_access/consultation_sessions_access to use it) plus a
+doctor_handlers.rs query restructuring (list_own_appointments/list_own_chats now
+defer the patient_profiles join and doctor_history_context_allowed() to only the
+already-paginated result rows). patient_profiles_access's fn_doctor_treats_patient
+(a richer verification/active-account/consultation-state check, not a pure
+identity lookup) was deliberately left untouched. Correctness verified first in an
+isolated clone database (pg_dump/restore, never the live/shared DB) across
+doctor/patient/admin/cross-identity/unauthenticated scenarios. Full regression
+suite - cargo test --test api_tests -- --test-threads=1 with the disposable
+TEST_REDIS_URL fixture, the exact CI invocation - passed 476/476, 0 failed, 5
+ignored after the fix. Deployed live to the real hellodoctor-m8-final-local
+database via the normal sqlx::migrate! path; confirmed via direct EXPLAIN ANALYZE
+against the live database: 1,631ms, consistent with the clone's 1,368ms.
+
+The fix alone does not close the full-system gap, and the real remaining cause is
+now known with evidence, not assumed. Re-measuring required building real,
+version-controlled tooling (services/backend/examples/web_workload.rs,
+rtc_token_scenario.rs, services/backend/scripts/run_six_service_web_comparison.ps1,
+sample_live_instrumentation.ps1) and finding/fixing seven real bugs along the way,
+none in the fix itself: a PS7-only Invoke-WebRequest flag that does not exist on
+this host's Windows PowerShell 5.1; a live Process object passed through
+Start-Job's -ArgumentList (cannot serialize across the job boundary); a relative
+output path resolved against the wrong working directory by .NET APIs; an
+async-event log capture that silently lost a non-deterministic tail of each run's
+output (fixed with plain Start-Process file redirection instead); docker stats
+per-container CPU sampling had never actually worked in any run this whole
+investigation did (Start-Job does not reliably inherit Docker CLI context, and
+separately {{.Container}} is the container ID, not its name - needed {{.Name}});
+and a real business-rule confound - check_booking_limit/check_grievance_limit
+(10/hour, 3/24h per account) had accumulated genuine state in Redis from the day's
+many benchmark runs (1,102 accounts already at 4-18 toward the booking cap before
+a comparison run even started), which first looked like a severe booking-success
+regression and was actually test-fixture contamination. Fixed with a narrowly
+scoped reset step in the comparison script clearing only
+ratelimit:booking:*/ratelimit:grievance:* on this benchmark's own isolated Redis
+container, never any other key.
+
+With that state controlled and live pg_stat_activity wait-event plus per-container
+CPU instrumentation added, three repeatable 360-second runs of the same 3-Admin/
+5-Doctor-worker scenario landed in a tight, reproducible band: true system error
+rate 11.65-13.39% (target 0.35%, still far away) and booking success 73.7-76.4% (a
+real improvement over the original pre-fix 70.6% baseline, not noise). Decisive
+finding: PostgreSQL connections never exceeded 6 of a configured 50-connection
+pool (connection count was never the constraint); wait-event sampling shows active
+queries are CPU-bound, not lock- or I/O-bound; and Postgres alone consistently
+peaked at 232-314% CPU - over half, sometimes over three-quarters, of this
+topology's entire 4 vCPU budget - on top of the backend's own 146-173% peak. The
+remaining ~1.6s of real CPU work per call on these two endpoints (now dominated by
+the deliberately-untouched fn_doctor_treats_patient/doctor_history_context_allowed
+business checks) is by itself enough to saturate a shared 4-core host at only this
+modest concurrency. The next lever is a CPU-capacity question (host sizing,
+further security-reviewed optimization of those two specific checks, or
+client-side caching to call them less often), not another admission/pool/lane
+tuning pass.
+
+Config unchanged and not to be altered without new evidence:
+DB_POOL_MAX_CONNECTIONS_PER_ROLE=10 (scoped override in
+deploy/single-vm/compose.local-verification.yml, never the shared
+services/backend/.env), Consultation admission lane n.min(6) in admission.rs (kept
+from this investigation's earlier stage - real benefit, ~0 rejections even under
+40-worker stress). Milestone 8 performance acceptance remains NOT READY at
+166-170 RPS, let alone the product-owner's staged 200/250 RPS targets (recorded,
+not attempted). Files changed, all uncommitted: the migration pair,
+services/backend/src/admission.rs, services/backend/src/api/v1/doctor_handlers.rs,
+the three new examples/scripts files above, and evidence under
+docs/performance-evidence/milestone-8-final/remediation/phase{2,3,4}_*.
+
+
+### 2026-11-02/03 â€” Milestone 8 Phase 5/6: Admin Telemetry index, chat denormalization, notification-scheduler efficiency fixes
+
+Continuation of the Phase 4 six-service performance investigation, scoped entirely to removing avoidable application/database work before treating the 4-vCPU/8-GB topology as capacity-insufficient. No pool sizes, admission limits, RLS, Agora, or payment logic changed anywhere in this pass.
+
+**Phase 5 (deployed and six-service-validated):** `chat_conversations.doctor_id` was missing an index (full table scan on 80K+ rows); `last_message_at` was recomputed via `MAX(chat_messages.sent_at)` on every `GET /doctor/chats` call, re-triggering `chat_messages_access` RLS once per raw message row (3,591 executions measured for one doctor). Fixed via a new index plus denormalizing `last_message_at` onto `chat_conversations`, maintained by a narrowly-scoped (`SECURITY INVOKER`, single-column-grant) trigger on `chat_messages` insert. Doctor Chats: 2,026ms â†’ 400ms (5.06x), live-verified against the real production database and a real end-to-end chat message send. Controlled six-service comparison (identical starting dataset, migration-only A/B) showed the admin-telemetry index (below) genuinely improved that endpoint's own error rate but left the system-wide error rate flat â€” confirmed a true CPU-capacity-bound regime at this concurrency, not a single-query problem. Full detail: `MILESTONE_8_PHASE5_EFFICIENCY_INVESTIGATION.md`, `MILESTONE_8_PHASE5_SIX_SERVICE_COMPARISON.md`.
+
+**Phase 6, Admin Telemetry (deployed and six-service-validated):** `pg_stat_statements` profiling found `consultation_repo::list_monitoring()` (behind `GET /admin/command/telemetry`) was the single highest cumulative-cost query (27% of sampled DB time) â€” a full sequential scan + sort over `consultation_sessions` (86K+ rows), zero supporting index. A partial expression index matching the exact filter/sort eliminated the sort entirely: 76ms â†’ 0.24ms (318x) in isolation. Important corrections made along the way: the query's outsized share of total benchmark cost was substantially a synthetic-workload artifact (`capacity_test.rs` fires this call from 4% of all simulated *patient* session action-rolls, not realistic admin headcount â€” confirmed the real Admin-Web client only polls it every 30s); `fn_doctor_treats_patient`/`doctor_history_context_allowed` (the original Phase 4 suspects) were independently re-confirmed NOT to be the bottleneck. A controlled A/B (identical snapshot data, index-only difference, both runs sequential on the same host) showed Admin Telemetry's own syserr rate improved 40.1% â†’ 24.9% reproducibly, Postgres peak CPU dropped modestly (368%â†’327%), but system-wide error rate and booking success did not move outside normal run-to-run variance â€” consistent with, not contradictory to, the CPU-capacity-bound diagnosis. A pre-existing, unrelated correctness bug was found and documented but not fixed this pass: `completed_today` in the telemetry response is structurally near-always zero (computed only from the already-filtered active/needs-review session set, which by definition excludes COMPLETED sessions).
+
+**Phase 6, notification scheduler (code-complete, tested, regression-green; not yet deployed or six-service-validated):** found and fixed the same bug shape in four scheduler passes in `notification_scheduler.rs`: `run_hold_notification_pass` (both its active-hold and expired-hold loops â€” the latter unboundedly growing, since `appointment_expiry_cleanup_jobs` rows are never deleted; 16,902 already-notified historical rows were being re-rendered every single 60-second tick, forever), `run_greeting_pass`, `run_health_education_pass`, and `run_holiday_pass` (all three gated by a coarse "is it the right day" condition that stays open all day, re-fetching and re-rendering every recipient on every tick regardless of whether they were already notified â€” caught live, actually firing at ~10,000 calls/tick on a real Monday while investigating an unrelated pass). Fixed uniformly with index-backed `NOT EXISTS` filters on the existing `notifications.dedup_key` unique constraint, which remains the authoritative concurrency safeguard underneath every fix. Measured (real per-run deltas, not cumulative stats): 35.1s â†’ 60.5ms for a 10,000-recipient repeated tick (580x) once the fix was genuinely applied â€” an earlier attempt silently failed to apply (a multi-match `Edit` ambiguity from near-duplicate query shapes in this file) and was only caught by this same timing measurement, since the pre-existing dedup constraint alone made the correctness tests pass regardless of whether the optimization was active; the fix and a permanent regression-guard test (asserting tick 2 must be >10x faster than tick 1) were added afterward. Measured the first-run burst cost too (35s for 10,000 recipients, which would otherwise block every other sequential scheduler pass in the same tick for that long) and added bounded, cross-tick-resumable batching (1,000/tick via `LIMIT`, naturally resuming via the same `NOT EXISTS` filter â€” no separate cursor state) after confirming no existing batching mechanism was present; verified 1,000â†’2,000â†’2,500â†’2,500 progression across four ticks for a 2,500-recipient backlog.
+
+28 new focused tests added (`schedule_exclusivity.rs`); full backend regression **486/486 passed, 0 failed, 5 ignored**. One unrelated pre-existing test failure (`test_consultation_video_retains_identity_and_separate_chat_booking`) was found, root-caused, and fixed along the way: it relied on the default `view=upcoming` filter, which is intentionally same-Nairobi-day-only by design (confirmed against `doctor_handlers.rs`'s own documented three-way `upcoming`/`schedule`/`all` view contract and an existing, correctly-designed deterministic boundary test) â€” not a production bug. Fixed by switching the test to the documented `view=all`.
+
+Scheduler-fix backend image is built (`hellodoctor-backend:m8-final-local`) but **not yet deployed** to the live `hellodoctor-m8-final-local` benchmark stack, and the planned clean per-run scheduler measurement plus a repeat six-service Scenario B (combined admin-telemetry-index + scheduler-fix effect) have **not yet been run** â€” stopped here at the user's request to close out the session. Secrets file (`services/backend/scripts/.bench_secrets.env`) deleted. Disk cleanup performed separately (cargo registry cache + Docker build cache + target/debug + one orphaned container/image): ~23GB freed. No git staging/commit/push performed anywhere in this pass.

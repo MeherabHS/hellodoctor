@@ -6,6 +6,7 @@ import '../../../core/cache/patient_cache_store.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../core/l10n/patient_labels.dart';
 import '../../../l10n/app_localizations.dart';
@@ -16,6 +17,7 @@ import '../booking/patient_booking_page.dart';
 import '../profile/family_profiles_cubit.dart';
 import 'directory_models.dart';
 import 'directory_repository.dart';
+import 'doctor_photo_avatar.dart';
 
 /// `prototype/index.html` view-9 — Doctor Profile. The "Availability" tab
 /// deliberately does NOT reproduce the prototype's static
@@ -97,6 +99,47 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     ));
   }
 
+  /// Tapping a slot in the Availability tab's preview list must land the
+  /// patient in the same real booking flow the "Book Video"/"Book Chat"
+  /// buttons below it already use — it is not a separate booking path. When
+  /// the doctor supports only one modality, that one is opened directly;
+  /// when both are supported, a short chooser decides which; when neither
+  /// fee is configured, there is genuinely nothing to book yet, so this says
+  /// so explicitly instead of opening a flow that would fail.
+  Future<void> _handleSlotTap(PublicDoctorDto doctor) async {
+    final supportsVideo = doctor.supportsVideo;
+    final supportsChat = doctor.supportsChat;
+    if (!supportsVideo && !supportsChat) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text(AppLocalizations.of(context).doctorBookingUnavailable)));
+      return;
+    }
+    if (supportsVideo && supportsChat) {
+      final modality = await showModalBottomSheet<String>(
+        context: context,
+        builder: (sheetContext) => SafeArea(
+          child: Wrap(children: [
+            ListTile(
+              leading: const Icon(Icons.videocam_outlined),
+              title: Text(AppLocalizations.of(context).consultBookVideo),
+              onTap: () => Navigator.of(sheetContext).pop('VIDEO'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: Text(AppLocalizations.of(context).consultBookChat),
+              onTap: () => Navigator.of(sheetContext).pop('CHAT'),
+            ),
+          ]),
+        ),
+      );
+      if (modality == null || !mounted) return;
+      _openBooking(doctor, modality);
+      return;
+    }
+    _openBooking(doctor, supportsVideo ? 'VIDEO' : 'CHAT');
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -157,7 +200,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
                   children: [
-                    DoctorProfileSummary(doctor: doctor),
+                    DoctorProfileSummary(doctor: doctor, repo: _repo),
                     const SizedBox(height: 14),
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       _TabButton(
@@ -181,7 +224,9 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                     if (_tab == 'about')
                       _AboutCard(doctor: doctor)
                     else
-                      _AvailabilityCard(future: _slotsFuture!),
+                      _AvailabilityCard(
+                          future: _slotsFuture!,
+                          onSelectSlot: () => _handleSlotTap(doctor)),
                     const SizedBox(height: 16),
                     if (doctor.supportsVideo) ...[
                       Text(
@@ -216,20 +261,15 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
 }
 
 class DoctorProfileSummary extends StatelessWidget {
-  const DoctorProfileSummary({super.key, required this.doctor});
+  const DoctorProfileSummary(
+      {super.key, required this.doctor, required this.repo});
   final PublicDoctorDto doctor;
+  final DirectoryRepository repo;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return Column(children: [
-      CircleAvatar(
-          radius: 36,
-          backgroundColor: PatientTokens.surfaceSubtle,
-          child: Text(doctor.initials,
-              style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w600,
-                  color: PatientTokens.primaryDark))),
+      DoctorPhotoAvatar.forDoctor(doctor: doctor, repo: repo, radius: 36),
       const SizedBox(height: 16),
       Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -322,8 +362,13 @@ class _AboutCard extends StatelessWidget {
 }
 
 class _AvailabilityCard extends StatelessWidget {
-  const _AvailabilityCard({required this.future});
+  const _AvailabilityCard({required this.future, required this.onSelectSlot});
   final Future<List<DoctorSlotDto>> future;
+
+  /// Tapping any slot in this preview starts the real booking flow (see
+  /// `_DoctorProfilePageState._handleSlotTap`) — this list is not a separate,
+  /// inert read-only view from the "Book Video"/"Book Chat" buttons below it.
+  final VoidCallback onSelectSlot;
   @override
   Widget build(BuildContext context) => PatientCard(
         child: FutureBuilder<List<DoctorSlotDto>>(
@@ -348,11 +393,24 @@ class _AvailabilityCard extends StatelessWidget {
                         color: PatientTokens.text)),
                 const SizedBox(height: 8),
                 for (final slot in slots.take(5))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(_format(slot.startTime),
-                        style: const TextStyle(
-                            fontSize: 12, color: PatientTokens.textSub)),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: onSelectSlot,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(children: [
+                          Expanded(
+                              child: Text(_format(slot.startTime),
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: PatientTokens.textSub))),
+                          Icon(Icons.chevron_right,
+                              size: 16, color: PatientTokens.textSub),
+                        ]),
+                      ),
+                    ),
                   ),
               ],
             );
@@ -360,6 +418,5 @@ class _AvailabilityCard extends StatelessWidget {
         ),
       );
 
-  String _format(DateTime t) =>
-      '${t.day}/${t.month} • ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  String _format(DateTime t) => '${t.day}/${t.month} • ${formatTime12h(t)}';
 }

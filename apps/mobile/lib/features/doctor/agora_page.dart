@@ -33,7 +33,10 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
       engine: RealAgoraEngine(),
       mintToken: _mintToken,
       requestPermissions: _requestPermissions,
-      telemetrySubmit: (events) => context.read<DoctorCubit>().repo.telemetry(widget.appointmentId, events),
+      telemetrySubmit: (events) => context
+          .read<DoctorCubit>()
+          .repo
+          .telemetry(widget.appointmentId, events),
     )..addListener(_onControllerChanged);
     _controller.start();
   }

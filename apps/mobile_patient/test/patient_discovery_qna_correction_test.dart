@@ -11,6 +11,7 @@ import 'package:hellodoctor_mobile_patient/features/patient/directory/patient_di
 import 'package:hellodoctor_mobile_patient/core/theme/tokens.dart';
 import 'package:hellodoctor_mobile_patient/features/patient/directory/consultation_actions.dart';
 import 'package:hellodoctor_mobile_patient/features/patient/directory/directory_models.dart';
+import 'package:hellodoctor_mobile_patient/features/patient/directory/directory_repository.dart';
 import 'package:hellodoctor_mobile_patient/features/patient/directory/doctor_profile_page.dart';
 import 'package:hellodoctor_mobile_patient/features/patient/profile/family_profiles_cubit.dart';
 import 'package:hellodoctor_mobile_patient/features/patient/profile/family_profiles_repository.dart';
@@ -75,6 +76,12 @@ class MemoryTokens implements TokenStore {
     values.clear();
   }
 }
+
+/// A throwaway repo for widget tests that only render `PatientDoctorCard`/
+/// `DoctorProfileSummary` directly — every fixture doctor here has no photo
+/// fields, so `DoctorPhotoAvatar` never actually calls through this.
+DirectoryRepository fakeDirectoryRepo() =>
+    DirectoryRepository(ApiClient(dio: Dio(), tokenStore: MemoryTokens()));
 
 Widget host(Widget child, {double scale = 1, String language = 'en'}) =>
     MaterialApp(
@@ -193,7 +200,10 @@ void main() {
             body: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: PatientDoctorCard(
-                    doctor: d, onProfile: () {}, onBook: (_) {}))),
+                    doctor: d,
+                    repo: fakeDirectoryRepo(),
+                    onProfile: () {},
+                    onBook: (_) {}))),
         scale: 1.5,
         language: 'sw'));
     await tester.pumpAndSettle();
@@ -246,7 +256,10 @@ void main() {
                               onVisitType: () {}),
                           const SizedBox(height: 20),
                           PatientDoctorCard(
-                              doctor: doctor, onProfile: () {}, onBook: (_) {}),
+                              doctor: doctor,
+                              repo: fakeDirectoryRepo(),
+                              onProfile: () {},
+                              onBook: (_) {}),
                         ]))),
             scale: scale));
         await tester.pumpAndSettle();
@@ -266,7 +279,8 @@ void main() {
             Scaffold(
                 body: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
-                    child: DoctorProfileSummary(doctor: doctor))),
+                    child: DoctorProfileSummary(
+                        doctor: doctor, repo: fakeDirectoryRepo()))),
             scale: scale));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
@@ -296,6 +310,7 @@ void main() {
               padding: const EdgeInsets.all(20),
               child: PatientDoctorCard(
                   doctor: doctor,
+                  repo: fakeDirectoryRepo(),
                   onProfile: () {},
                   onBook: (m) => chosen = m)))));
       await tester.pumpAndSettle();
@@ -322,6 +337,108 @@ void main() {
       expect(d.supportsChat, false);
     }
   });
+  test('photo presence and cache-busting fields parse from the directory DTO',
+      () {
+    final withPhoto = PublicDoctorDto.fromJson({
+      ...doctorJson,
+      'profile_picture_size_bytes': 20480,
+      'profile_picture_updated_at': '2026-10-14T09:00:00Z',
+    });
+    expect(withPhoto.hasPhoto, true);
+    expect(withPhoto.photoUpdatedAt, DateTime.parse('2026-10-14T09:00:00Z'));
+    final withoutPhoto = PublicDoctorDto.fromJson(doctorJson);
+    expect(withoutPhoto.hasPhoto, false);
+    expect(withoutPhoto.photoUpdatedAt, isNull);
+  });
+  testWidgets(
+      'availability-tab slot tap routes into the real booking flow for a single supported modality',
+      (tester) async {
+    await viewport(tester, 320);
+    final connectivity = ConnectivityService();
+    addTearDown(connectivity.dispose);
+    final dio = Dio();
+    final api = ApiClient(dio: dio, tokenStore: MemoryTokens());
+    addTearDown(api.dispose);
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+      final dynamic data = o.path.endsWith('/slots')
+          ? [
+              {
+                'id': 'slot-1',
+                'doctor_id': 'doctor-test',
+                'start_time': '2026-10-14T09:00:00Z',
+                'end_time': '2026-10-14T09:30:00Z',
+              }
+            ]
+          : {...doctorJson, 'consultation_fee_chat': '0'};
+      h.resolve(Response(
+          requestOptions: o,
+          statusCode: 200,
+          data: {'success': true, 'data': data}));
+    }));
+    final family = FamilyProfilesCubit(FamilyProfilesRepository(api));
+    addTearDown(family.close);
+    await tester.pumpWidget(host(DoctorProfilePage(
+        doctorId: 'doctor-test',
+        api: api,
+        cache: null,
+        connectivity: connectivity,
+        familyProfilesCubit: family)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Availability'));
+    await tester.pumpAndSettle();
+    expect(find.text('Book Video'), findsNothing);
+    await tester.tap(find.byIcon(Icons.chevron_right).first);
+    await tester.pumpAndSettle();
+    // Only VIDEO is priced here, so tapping the slot must go straight into
+    // PatientBookingPage (identified by its own page title) rather than
+    // showing a modality chooser.
+    expect(find.text('Book Video Consultation'), findsOneWidget);
+  });
+  testWidgets(
+      'availability-tab slot tap tells the patient booking is unavailable when neither modality is priced',
+      (tester) async {
+    await viewport(tester, 320);
+    final connectivity = ConnectivityService();
+    addTearDown(connectivity.dispose);
+    final dio = Dio();
+    final api = ApiClient(dio: dio, tokenStore: MemoryTokens());
+    addTearDown(api.dispose);
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+      final dynamic data = o.path.endsWith('/slots')
+          ? [
+              {
+                'id': 'slot-1',
+                'doctor_id': 'doctor-test',
+                'start_time': '2026-10-14T09:00:00Z',
+                'end_time': '2026-10-14T09:30:00Z',
+              }
+            ]
+          : {
+              ...doctorJson,
+              'consultation_fee_video': '0',
+              'consultation_fee_chat': '0'
+            };
+      h.resolve(Response(
+          requestOptions: o,
+          statusCode: 200,
+          data: {'success': true, 'data': data}));
+    }));
+    final family = FamilyProfilesCubit(FamilyProfilesRepository(api));
+    addTearDown(family.close);
+    await tester.pumpWidget(host(DoctorProfilePage(
+        doctorId: 'doctor-test',
+        api: api,
+        cache: null,
+        connectivity: connectivity,
+        familyProfilesCubit: family)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Availability'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.chevron_right).first);
+    await tester.pumpAndSettle();
+    expect(find.text("This doctor hasn't set up consultation booking yet."),
+        findsOneWidget);
+  });
   testWidgets('neither mode offers profile without fake booking',
       (tester) async {
     await viewport(tester, 320);
@@ -331,7 +448,11 @@ void main() {
       'consultation_fee_chat': '0'
     });
     await tester.pumpWidget(host(Scaffold(
-        body: PatientDoctorCard(doctor: d, onProfile: () {}, onBook: (_) {}))));
+        body: PatientDoctorCard(
+            doctor: d,
+            repo: fakeDirectoryRepo(),
+            onProfile: () {},
+            onBook: (_) {}))));
     await tester.pumpAndSettle();
     expect(find.text('View profile'), findsOneWidget);
     expect(find.text('Consult'), findsNothing);
@@ -346,8 +467,8 @@ void main() {
     });
     expect(d.fullName, contains('47278ee148'));
     expect(d.displayName, 'Dr. Synthetic Kenya Review');
-    await tester
-        .pumpWidget(host(Scaffold(body: DoctorProfileSummary(doctor: d))));
+    await tester.pumpWidget(host(Scaffold(
+        body: DoctorProfileSummary(doctor: d, repo: fakeDirectoryRepo()))));
     await tester.pumpAndSettle();
     expect(find.textContaining('Approve'), findsNothing);
     expect(find.textContaining('47278ee148'), findsNothing);

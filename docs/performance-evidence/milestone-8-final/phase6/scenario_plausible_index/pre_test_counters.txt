@@ -1,0 +1,9 @@
+﻿
+admission_accepted_total{class="health"} 2
+admission_accepted_total{class="auth"} 2
+admission_accepted_total{class="expensive"} 3
+admission_inflight{class="expensive"} 0
+admission_inflight{class="health"} 1
+admission_inflight{class="auth"} 0
+
+

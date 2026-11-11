@@ -83,41 +83,16 @@ CREATE INDEX idx_auth_sessions_family ON auth_sessions(token_family_id);
 CREATE UNIQUE INDEX idx_auth_sessions_token ON auth_sessions(refresh_token_hash) WHERE revoked_at IS NULL;
 
 -- ============================================================================
--- 1b. MFA CREDENTIALS (TOTP / Recovery for Doctors & Admins)
+-- 1b. MFA CREDENTIALS (REMOVED — see migration 20261202000002_remove_admin_totp)
 -- ============================================================================
-CREATE TYPE mfa_method_enum AS ENUM ('TOTP', 'PASSKEY');
-
-CREATE TABLE mfa_credentials (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    method mfa_method_enum NOT NULL DEFAULT 'TOTP',
-    totp_secret_encrypted BYTEA NOT NULL, -- Encrypted via KMS/envelope encryption, NOT hashed
-    recovery_codes_hash TEXT[], -- Array of Argon2id hashed one-time recovery codes
-    is_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    enabled_at TIMESTAMPTZ,
-    last_verified_at TIMESTAMPTZ,
-    revoked_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE UNIQUE INDEX idx_mfa_user_method ON mfa_credentials(user_id, method) WHERE revoked_at IS NULL;
-
--- Notes:
--- The TOTP secret must be stored ENCRYPTED (not hashed) because the server
--- needs the plaintext secret to verify time-based codes.
--- Use envelope encryption: encrypt with a data encryption key (DEK),
--- which is itself encrypted by a KMS master key.
---
--- MFA Enrollment Flow:
---   1. Server generates TOTP secret, encrypts with DEK, stores in DB
---   2. Server returns QR code / otpauth:// URI to admin's authenticator app
---   3. Admin enters verification code to confirm enrollment
---   4. is_enabled = TRUE, enabled_at = now()
---
--- MFA Reset / Lost Device:
---   1. Admin uses one of 8 pre-generated recovery codes (one-time use)
---   2. After recovery code used, hash is removed from array
---   3. If all codes exhausted, PLATFORM_ADMIN must reset MFA manually
---   4. Reset requires re-enrollment and generates new codes
+-- `mfa_credentials` and `mfa_method_enum` (TOTP second factor for Admin
+-- login) were dropped. No self-service enrollment endpoint for it was ever
+-- built — a credential could only be provisioned by hand-inserting a row —
+-- and it duplicated protection the OTP challenge/attempt-count/`ip_jail`
+-- stack already provides for every role. Admin login now uses the same
+-- single-factor (password + emailed OTP) shape as Doctor and Patient; see
+-- `pending_mfa_challenges` below, the generic OTP-challenge bootstrap table
+-- all three roles share, which is unrelated and unaffected by this removal.
 
 -- ============================================================================
 -- 2. PATIENT PROFILES
@@ -629,7 +604,7 @@ GRANT UPDATE ON patient_profiles TO hellodoctor_api;
 GRANT INSERT ON appointments, appointment_clinical_intake,
     prescriptions, prescription_intake_documents, chat_conversations,
     chat_messages, grievance_reports TO hellodoctor_api;
-GRANT SELECT, INSERT, UPDATE ON users, auth_sessions, mfa_credentials
+GRANT SELECT, INSERT, UPDATE ON users, auth_sessions
     TO hellodoctor_auth_worker;
 GRANT SELECT, UPDATE ON appointments, doctor_schedule_slots, transactions
     TO hellodoctor_payment_worker;

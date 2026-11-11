@@ -1,0 +1,55 @@
+﻿# scraped_at=20261103_214316_504
+# TYPE http_requests_total counter
+http_requests_total{method="GET",path="/healthz",status="200"} 129
+http_requests_total{method="GET",path="/metrics",status="200"} 140
+
+# TYPE admission_accepted_total counter
+admission_accepted_total{class="health"} 270
+
+# TYPE db_pool_idle gauge
+db_pool_idle{role="payment"} 1
+db_pool_idle{role="api"} 1
+db_pool_idle{role="auth"} 0
+db_pool_idle{role="finance"} 0
+
+# TYPE admission_inflight gauge
+admission_inflight{class="health"} 1
+
+# TYPE db_pool_size gauge
+db_pool_size{role="auth"} 0
+db_pool_size{role="api"} 1
+db_pool_size{role="payment"} 1
+db_pool_size{role="finance"} 0
+
+# TYPE http_request_duration_seconds summary
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0"} 0.000846072
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.5"} 0.000948053115563247
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.9"} 0.0009618038481358779
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.95"} 0.0009618038481358779
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.99"} 0.0009618038481358779
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.999"} 0.0009618038481358779
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="1"} 0.001015972
+http_request_duration_seconds_sum{method="GET",path="/healthz",status="200"} 0.13169327900000005
+http_request_duration_seconds_count{method="GET",path="/healthz",status="200"} 129
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0"} 0.001204596
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.5"} 0.0018575441261994767
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.9"} 0.04081522866326934
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.95"} 0.040962428287295446
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.99"} 0.04101161270615334
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.999"} 0.04101161270615334
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="1"} 0.04116159
+http_request_duration_seconds_sum{method="GET",path="/metrics",status="200"} 2.736505741
+http_request_duration_seconds_count{method="GET",path="/metrics",status="200"} 140
+
+# TYPE db_acquire_seconds summary
+db_acquire_seconds{quantile="0"} 0.000188459
+db_acquire_seconds{quantile="0.5"} 0.00028418076317626956
+db_acquire_seconds{quantile="0.9"} 0.00041788677684024737
+db_acquire_seconds{quantile="0.95"} 0.00041788677684024737
+db_acquire_seconds{quantile="0.99"} 0.00041788677684024737
+db_acquire_seconds{quantile="0.999"} 0.00041788677684024737
+db_acquire_seconds{quantile="1"} 0.000454832
+db_acquire_seconds_sum 0.04901682799999998
+db_acquire_seconds_count 176
+
+

@@ -19,7 +19,7 @@ export type RefreshResult =
   | { outcome: 'failed' }
   | { outcome: 'raced' };
 
-const LOCK_TTL_MS = 8000; // Bounds how long a crashed/hung leader can block followers.
+const LOCK_TTL_MS = 20000; // Covers the bounded 15-second refresh request and cleanup.
 const LOCK_POLL_INTERVAL_MS = 150;
 const LOCK_WAIT_BUDGET_MS = 3000; // Bounded wait for a follower; always returns, never deadlocks.
 
@@ -48,16 +48,19 @@ export function refreshCoordinator(graceMs = 5000, redisClientOverride?: RedisCl
   // its own lazily-created Redis connection attempt, evaluated from
   // process.env.REDIS_URL the first time it's actually needed. `undefined` =
   // not yet attempted; `null` = REDIS_URL unset or connection failed, meaning
-  // cross-process coordination is unavailable and we fall back to
+  // cross-process coordination is unavailable. An explicitly configured Redis must
+  // remain available; an unconfigured single-process development server uses
   // same-process-only dedupe (this module's original behavior, which is
   // correct for the single-instance deployment this repo currently
-  // evidences). Any Redis failure here fails OPEN to that fallback rather
-  // than breaking login.
+  // evidences). Configured Redis failure prevents rotation until coordination recovers.
   let redisClient: RedisClientType | null | undefined;
   let redisConnectPromise: Promise<RedisClientType | null> | null = null;
 
   async function getRedis(): Promise<RedisClientType | null> {
     if (redisClientOverride !== undefined) return redisClientOverride;
+    if(process.env.REDIS_URL&&(redisClient===null||(redisClient&&!redisClient.isReady))){
+      redisClient=undefined;redisConnectPromise=null;
+    }
     if (redisClient !== undefined) return redisClient;
     const url = process.env.REDIS_URL;
     if (!url) {
@@ -70,7 +73,7 @@ export function refreshCoordinator(graceMs = 5000, redisClientOverride?: RedisCl
         const client = createClient({ url, socket: { connectTimeout: 2000, reconnectStrategy: false } });
         client.on('error', () => {
           // Swallow async client errors so they never crash the process; the
-          // next call to getRedis() will simply fail open.
+          // caller fails closed if configured coordination is unavailable.
         });
         await client.connect();
         redisClient = client as RedisClientType;
@@ -98,6 +101,7 @@ export function refreshCoordinator(graceMs = 5000, redisClientOverride?: RedisCl
     const p = (async (): Promise<RefreshResult> => {
       const redis = await getRedis();
       if (!redis) {
+        if(redisClientOverride===undefined&&process.env.REDIS_URL)throw new Error('Refresh coordination unavailable.');
         // No cross-process coordination available/configured — original
         // single-process behavior, verbatim.
         const tokens = await rotate();
@@ -118,14 +122,13 @@ export function refreshCoordinator(graceMs = 5000, redisClientOverride?: RedisCl
           const tokens = await rotate();
           return tokens ? { outcome: 'rotated' as const, tokens } : { outcome: 'failed' as const };
         } finally {
-          // Best-effort compare-and-delete release; the PX TTL above is the
-          // real safety net if this fails or the process dies mid-rotation,
-          // so a crashed leader can never deadlock other instances for more
-          // than LOCK_TTL_MS.
+          // Keep a short, secret-free completion marker. A replica arriving
+          // after release may still carry the old browser cookie; rotating it
+          // again would trigger backend reuse revocation of a valid session.
           await redis
             .eval(
-              'if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end',
-              { keys: [lockKey], arguments: [instanceId] },
+              'if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("PSETEX", KEYS[1], ARGV[2], "completed") else return 0 end',
+              { keys: [lockKey], arguments: [instanceId,String(Math.max(1,graceMs))] },
             )
             .catch(() => {});
         }
@@ -141,16 +144,17 @@ export function refreshCoordinator(graceMs = 5000, redisClientOverride?: RedisCl
       const deadline = Date.now() + LOCK_WAIT_BUDGET_MS;
       while (Date.now() < deadline) {
         await new Promise((resolve) => setTimeout(resolve, LOCK_POLL_INTERVAL_MS));
-        const stillLocked = await redis.exists(lockKey).catch(() => 0);
-        if (!stillLocked) break;
+        const owner = await redis.get(lockKey).catch(() => null);
+        if (!owner||owner==='completed') break;
       }
       return { outcome: 'raced' as const };
     })();
 
     rotations.set(refresh, p);
-    void p.finally(() => {
+    const cleanup=() => {
       setTimeout(() => rotations.delete(refresh), graceMs).unref();
-    });
+    };
+    void p.then(cleanup,cleanup);
     return p;
   };
 }

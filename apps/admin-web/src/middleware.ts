@@ -78,8 +78,9 @@ export async function middleware(req: NextRequest) {
 
   const hasSession = req.cookies.has(SESSION_MARKER);
   if (!hasSession && !pathname.startsWith('/api/')) {
-    const loginUrl = new URL('/login', process.env.ADMIN_WEB_ORIGIN || req.url);
-    return NextResponse.redirect(loginUrl);
+    // /api-scoped refresh cookies are intentionally invisible on page requests.
+    // Recover there before deciding this browser needs the login form.
+    return NextResponse.redirect(new URL('/api/session', process.env.ADMIN_WEB_ORIGIN || req.url));
   }
 
   return next();

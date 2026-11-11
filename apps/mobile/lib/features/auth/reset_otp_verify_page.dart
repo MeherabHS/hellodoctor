@@ -8,7 +8,8 @@ import 'create_new_password_page.dart';
 /// Phase 2 — step 2 ("Check your email"). Enters the 6-digit code; on
 /// success, moves on to [CreateNewPasswordPage].
 class ResetOtpVerifyPage extends StatefulWidget {
-  const ResetOtpVerifyPage({super.key, required this.auth, required this.challenge});
+  const ResetOtpVerifyPage(
+      {super.key, required this.auth, required this.challenge});
   final AuthCubit auth;
   final PasswordResetOtpSent challenge;
   @override
@@ -125,8 +126,7 @@ class _ResetOtpVerifyPageState extends State<ResetOtpVerifyPage> {
                                               "Didn't get a code? Start over"))),
                                   if (s is AuthFailure)
                                     Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 14),
+                                        padding: const EdgeInsets.only(top: 14),
                                         child: Text(s.message,
                                             style: const TextStyle(
                                                 color: DoctorTokens.danger))),

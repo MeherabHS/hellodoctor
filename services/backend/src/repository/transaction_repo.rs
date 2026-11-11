@@ -1,16 +1,26 @@
 use crate::domain::ids::DoctorProfileId;
 use crate::domain::models::{PaymentStatus, Transaction};
-use chrono::Utc;
+use bigdecimal::BigDecimal;
+use chrono::{NaiveDate, Utc};
 use sqlx::PgExecutor;
 use uuid::Uuid;
+
+/// The exact `payment_status` set `admin_handlers::contributes_funded_volume`
+/// already defines in Rust -- duplicated here as a literal SQL `IN (...)` so
+/// the aggregate queries below answer the identical question, pushed into
+/// SQL instead of evaluated per-row in the application after a full-table
+/// fetch. Keep in sync with that function if the funded-volume definition
+/// ever changes.
+const FUNDED_VOLUME_STATUSES: &str =
+    "'PAYMENT_HELD','SETTLED_TO_DOCTOR','DISBURSED','REFUND_PENDING'";
 
 pub async fn insert<'e, E: PgExecutor<'e>>(
     executor: E,
     txn: &Transaction,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO transactions (id, transaction_number, appointment_id, payment_session_id, gateway, gateway_reference, gross_amount, platform_fee_amount, net_amount, payment_status, created_at, settled_at, currency, payment_method_id) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
+        "INSERT INTO transactions (id, transaction_number, appointment_id, payment_session_id, gateway, gateway_reference, gross_amount, platform_fee_amount, net_amount, payment_status, created_at, settled_at, currency, payment_method_id,provider_request_state) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'NOT_STARTED')",
     )
     .bind(txn.id)
     .bind(&txn.transaction_number)
@@ -66,12 +76,127 @@ pub async fn list_all<'e, E: PgExecutor<'e>>(executor: E) -> Result<Vec<Transact
     .await
 }
 
+/// M8-G-20: scoped alternative to `list_all` for `GET
+/// /admin/finance/transactions?month=YYYY-MM` — the month filter previously
+/// fetched every transaction ever created (`list_all`) and discarded
+/// everything outside the requested month in Rust via `Vec::retain`. Under a
+/// measured 10,000-row fixture this cost ~190ms in deserialization alone
+/// before a single row was ever examined for relevance; pushing the same
+/// filter into SQL (confirmed equivalent to the original
+/// `created_at.date_naive() >= start && < end` comparison, since
+/// `created_at` is always `DateTime<Utc>` and `start`/`end` are bound here as
+/// UTC midnight instants of those same dates) measured at ~1ms for the
+/// equivalent result set. `start` is inclusive, `end` is exclusive — same
+/// semantics as the `NaiveDate` range `parse_optional_month` already
+/// produces in `admin_handlers.rs`.
+pub async fn list_in_range<'e, E: PgExecutor<'e>>(
+    executor: E,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> Result<Vec<Transaction>, sqlx::Error> {
+    let start = start.and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let end = end.and_hms_opt(0, 0, 0).unwrap().and_utc();
+    sqlx::query_as::<_, Transaction>(
+        "SELECT id, transaction_number, appointment_id, payment_session_id, gateway, gateway_reference, gross_amount, platform_fee_amount, net_amount, payment_status, reconciliation_required, created_at, settled_at, currency, disbursement_item_id, payment_method_id \
+         FROM transactions WHERE created_at >= $1 AND created_at < $2 ORDER BY created_at DESC",
+    )
+    .bind(start)
+    .bind(end)
+    .fetch_all(executor)
+    .await
+}
+
+/// Milestone 8 Phase 7 Finance SQL remediation (2026-11-03): `GET
+/// /admin/overview` only ever needed two lifetime sums, but previously called
+/// `list_all()` (every transaction row, including its `transaction_number`/
+/// `gateway_reference`/every other column, fetched and deserialized) and
+/// summed `gross_amount`/`platform_fee_amount` in Rust after filtering by
+/// `contributes_funded_volume`. `EXPLAIN (ANALYZE, BUFFERS)` against the real
+/// `hellodoctor_api` role confirmed that query's `ORDER BY created_at DESC`
+/// (needed by `list_all`'s other callers, not by this one) forces a full
+/// sequential scan plus an external-merge disk sort — measured at ~20MB of
+/// temp-file I/O per call against this deployment's transaction volume, with
+/// zero `WHERE`/`LIMIT`. A pure aggregate needs no sort at all (nothing here
+/// is ordered), so this eliminates the spill at its source instead of only
+/// narrowing it. The `IN (...)` filter is applied in SQL via
+/// `FILTER (WHERE ...)`, matching `admin_handlers::contributes_funded_volume`
+/// exactly — same question, computed by Postgres instead of by Rust after a
+/// full-table transfer.
+pub async fn funded_volume_totals<'e, E: PgExecutor<'e>>(
+    executor: E,
+) -> Result<(BigDecimal, BigDecimal), sqlx::Error> {
+    sqlx::query_as(&format!(
+        "SELECT COALESCE(SUM(gross_amount) FILTER (WHERE payment_status IN ({statuses})),0), \
+                COALESCE(SUM(platform_fee_amount) FILTER (WHERE payment_status IN ({statuses})),0) \
+         FROM transactions",
+        statuses = FUNDED_VOLUME_STATUSES
+    ))
+    .fetch_one(executor)
+    .await
+}
+
+/// Aggregate totals `GET /admin/finance/summary` needs. Mirrors
+/// `funded_volume_totals`'s rationale: the handler never returns individual
+/// transaction rows, only sums, so there is no reason to fetch rows (or sort
+/// them) at all. `start`/`end` reuse `list_in_range`'s exact semantics (UTC
+/// midnight instants of the given dates, start inclusive/end exclusive,
+/// already confirmed equivalent to the prior `created_at.date_naive()`
+/// comparison); `None` means "lifetime", matching `get_finance_summary`'s
+/// previous unfiltered `list_all()` path for the no-`?month=` case.
+pub struct FinanceSummaryTotals {
+    pub total_gross: BigDecimal,
+    pub total_platform_fee: BigDecimal,
+    pub total_net: BigDecimal,
+    pub card_volume: BigDecimal,
+    pub mpesa_volume: BigDecimal,
+}
+
+pub async fn finance_summary_totals<'e, E: PgExecutor<'e>>(
+    executor: E,
+    range: Option<(NaiveDate, NaiveDate)>,
+) -> Result<FinanceSummaryTotals, sqlx::Error> {
+    let (start, end) = match range {
+        Some((start, end)) => (
+            Some(start.and_hms_opt(0, 0, 0).unwrap().and_utc()),
+            Some(end.and_hms_opt(0, 0, 0).unwrap().and_utc()),
+        ),
+        None => (None, None),
+    };
+    // Bank transfer is grouped into `card_volume` here, matching the
+    // pre-existing Rust-side `match` in `get_finance_summary` exactly
+    // (`Gateway::Card | Gateway::BankTransfer => card_vol += ...`).
+    // BKASH/NAGAD (historical, pre-Kenya-cutover rows only) are deliberately
+    // excluded from both buckets, same as before.
+    let row: (BigDecimal, BigDecimal, BigDecimal, BigDecimal, BigDecimal) = sqlx::query_as(&format!(
+        "SELECT \
+           COALESCE(SUM(gross_amount) FILTER (WHERE payment_status IN ({statuses})),0), \
+           COALESCE(SUM(platform_fee_amount) FILTER (WHERE payment_status IN ({statuses})),0), \
+           COALESCE(SUM(net_amount) FILTER (WHERE payment_status IN ({statuses})),0), \
+           COALESCE(SUM(gross_amount) FILTER (WHERE payment_status IN ({statuses}) AND gateway IN ('CARD','BANK_TRANSFER')),0), \
+           COALESCE(SUM(gross_amount) FILTER (WHERE payment_status IN ({statuses}) AND gateway='MPESA'),0) \
+         FROM transactions \
+         WHERE ($1::timestamptz IS NULL OR created_at >= $1) AND ($2::timestamptz IS NULL OR created_at < $2)",
+        statuses = FUNDED_VOLUME_STATUSES
+    ))
+    .bind(start)
+    .bind(end)
+    .fetch_one(executor)
+    .await?;
+    Ok(FinanceSummaryTotals {
+        total_gross: row.0,
+        total_platform_fee: row.1,
+        total_net: row.2,
+        card_volume: row.3,
+        mpesa_volume: row.4,
+    })
+}
+
 pub async fn mark_payment_held<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
     gateway_reference: &str,
 ) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query("UPDATE transactions SET payment_status = 'PAYMENT_HELD', gateway_reference = $2 WHERE id = $1 AND payment_status IN ('INITIATED','FAILED') AND gateway_reference IS NULL")
+    let result = sqlx::query("UPDATE transactions SET payment_status = 'PAYMENT_HELD', gateway_reference = $2,provider_request_state='STARTED' WHERE id = $1 AND payment_status IN ('INITIATED','FAILED') AND gateway_reference IS NULL")
         .bind(id)
         .bind(gateway_reference)
         .execute(executor)
