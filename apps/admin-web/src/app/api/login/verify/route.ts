@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { setSessionCookies, backendUrl, backendHeaders } from '@/lib/session';
 import { readAuthBody, AuthBodyError } from '@/lib/turnstile';
+import { validateAdminVerifyBody } from '@/lib/adminVerify';
 
 // Step 2 of admin login: the session_token from /api/login plus the
-// one-time code the admin received by email. Proxies to the Rust backend's
-// /auth/admin/verify-otp — identical shape to Doctor/Patient's own
-// verify-otp step; Admin's mandatory authenticator (TOTP) second factor was
-// removed (see docs/AUTH_SECURITY.md §2.4). Only on success here are the
-// real access/refresh tokens stored in HttpOnly cookies — client-side
-// JavaScript never sees them at either step, which is the whole point of
-// the BFF pattern over storing a bearer token in localStorage.
+// one-time verification code the admin received by email. Proxies to the
+// Rust backend's /auth/admin/verify-otp. Admin, Doctor and Patient share
+// this same single-factor-OTP MFA shape; there is no authenticator-app
+// factor, and the backend's AdminVerifyOtpRequest has no such field. Only
+// on success here are the real access/refresh tokens stored in HttpOnly
+// cookies — client-side JavaScript never sees them at either step, which
+// is the whole point of the BFF pattern over storing a bearer token in
+// localStorage.
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
   try {
@@ -18,10 +20,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Invalid sign-in form.' }, { status: error instanceof AuthBodyError ? error.status : 400 });
   }
 
-  const { session_token, otp_code } = body;
-  if (typeof session_token !== 'string' || typeof otp_code !== 'string' || !session_token || session_token.length > 256 || !/^[0-9]{6}$/.test(otp_code)) {
-    return NextResponse.json({ success: false, error: 'session_token and otp_code are required.' }, { status: 400 });
+  const validated = validateAdminVerifyBody(body);
+  if ('error' in validated) {
+    return NextResponse.json({ success: false, error: validated.error }, { status: validated.status });
   }
+  const { session_token, otp_code } = validated;
 
   let backendRes: Response;
   try {

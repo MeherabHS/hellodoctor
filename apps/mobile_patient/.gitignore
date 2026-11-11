@@ -58,3 +58,11 @@ app.*.map.json
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 lib/firebase_options.dart
+
+# Internal-testing release-signing keystore and its credentials — a
+# per-deployment secret (never a production/Play Store key), supplied only
+# through the deployment secret process, never committed. See
+# android/app/build.gradle.kts's internalTestKeystoreProperties block.
+android/app/internal-test-keystore.properties
+android/app/*.jks
+android/app/*.keystore

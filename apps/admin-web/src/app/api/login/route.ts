@@ -5,9 +5,9 @@ import { webAuthAssertion } from '@/lib/web-assertion';
 
 // Step 1 verifies the browser challenge before forwarding password credentials.
 // The backend emails a short-lived OTP challenge and issues no session here.
-// Step 2 requires that challenge plus the emailed OTP — the same two-step
-// shape as Doctor/Patient login; Admin's authenticator (TOTP) second factor
-// was removed (see docs/AUTH_SECURITY.md §2.4).
+// Step 2 requires that challenge plus the emailed OTP — Admin, Doctor and
+// Patient share this same single-factor-OTP MFA shape; there is no
+// authenticator-app factor.
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>;
   try {

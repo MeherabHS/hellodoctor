@@ -1,5 +1,15 @@
 name: Disposable Ubuntu ARM64 six-service integration
 
+# PREREQUISITE (applies to this pre-existing file too, not just the new
+# publish/recovery drafts): GitHub's docs state "To trigger the
+# workflow_dispatch event, your workflow must be in the default branch," as
+# a standing condition. This file exists only on test/ubuntu-arm64-validation
+# today, which has never been merged - it is therefore NOT currently
+# dispatchable via UI, `gh workflow run`, or the REST API, against any ref.
+# See arm64-ghcr-publish.yml's header comment for the proposed safe path
+# (a minimal, workflow-files-only PR to the default branch) that avoids
+# merging the broader application changes just to enable dispatch.
+
 on:
   workflow_dispatch:
     inputs:
@@ -28,6 +38,15 @@ jobs:
     name: ARM64 disposable six-service smoke and restart
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 45
+    # Review fix applied: the three input images are private GHCR packages
+    # (docs/ARM64_GHCR_PUBLICATION_HANDOFF.md requires Private visibility).
+    # `contents: read` alone does not authenticate `docker compose up`'s
+    # image pulls - without `packages: read` plus an explicit `docker login`
+    # below, every pull would fail with `unauthorized`/`denied` even though
+    # the four images published correctly.
+    permissions:
+      contents: read
+      packages: read
     env:
       POSTGRES_USER: postgres
       POSTGRES_DB: hellodoctor
@@ -52,20 +71,56 @@ jobs:
       PROXY_BIND_ADDRESS: 127.0.0.1
       PROXY_HTTP_PORT: "58080"
       PROXY_HTTPS_PORT: "58443"
+      PROJECT: hellodoctor-arm64-ci
+      # Review fix applied: a single source of truth for the compose command,
+      # used by every step below (via `$DC`), so the project name and file
+      # list can never silently diverge between steps.
+      DC: >-
+        docker compose -p hellodoctor-arm64-ci
+        -f deploy/single-vm/compose.yml
+        -f deploy/single-vm/compose.local-verification.yml
+        -f deploy/single-vm/compose.arm64-ci.yml
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - name: Record checked-out application revision
         shell: bash
         run: |
           set -euo pipefail
           test -z "$(git status --porcelain)"
-          echo "SOURCE_REVISION=$(git rev-parse HEAD)"
+          echo "SOURCE_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
       - name: Verify native runner
         shell: bash
         run: |
           set -euo pipefail
           test "$(uname -m)" = aarch64
           test "$(docker info --format '{{.Architecture}}')" = aarch64
+      - name: Log in to GHCR to pull the private digest-pinned images
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Verify each input image reference is digest-pinned and architecture-correct
+        shell: bash
+        # Review ask: "verify immutable digest references ... and image
+        # architecture" for the images this workflow consumes.
+        run: |
+          set -euo pipefail
+          for ref in "$BACKEND_RUNTIME_IMAGE" "$ADMIN_WEB_IMAGE" "$DOCTOR_WEB_IMAGE"; do
+            case "$ref" in
+              *@sha256:*) ;;
+              *) echo "::error::$ref is not digest-pinned (expected an '@sha256:...' reference, never a mutable tag)"; exit 1 ;;
+            esac
+            docker pull "$ref"
+            arch="$(docker image inspect --format '{{.Architecture}}' "$ref")"
+            test "$arch" = arm64 || { echo "::error::$ref reports architecture '$arch', expected arm64"; exit 1; }
+            echo "PASS: $ref is digest-pinned and arm64"
+          done
+      - name: Install psql and redis-cli probe clients
+        shell: bash
+        # DRAFT NOTE: confirm whether the ubuntu-24.04-arm hosted runner image
+        # already ships postgresql-client/redis-tools before relying on this;
+        # if it does, this step is redundant but harmless (apt is idempotent).
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends postgresql-client redis-tools
       - name: Prepare synthetic backend environment
         shell: bash
         run: |
@@ -76,51 +131,268 @@ jobs:
           DATABASE_URL=postgres://postgres:m8-arm64-ci-password@postgres:5432/hellodoctor
           DEV_AUTH_OTP_ENABLED=true
           DEV_SIMULATION_ENABLED=true
+          SEED_DEV_DATA=true
           STORAGE_PROVIDER=disabled
           RECOVERY_MODE=false
           GLOBAL_IP_RATE_LIMIT_PER_MIN=100000
           DB_POOL_MAX_CONNECTIONS_PER_ROLE=10
           EOF
-      - name: Render disposable Compose configuration
-        run: >-
-          docker compose -f deploy/single-vm/compose.yml
-          -f deploy/single-vm/compose.local-verification.yml
-          -f deploy/single-vm/compose.arm64-ci.yml config --quiet
+      - name: Render and assert the fully merged Compose configuration
+        shell: bash
+        # Review fix applied: this used to be `config --quiet` (syntax-only).
+        # `environment:` maps merge by key across -f files with the LAST file
+        # winning per key, and env_file is lower precedence than environment
+        # for the same name - so it is possible for a later override file (or
+        # a future edit to compose.yml) to silently reintroduce a production
+        # value for one of these names. Assert the actual rendered values
+        # rather than trusting the file layering by inspection.
+        run: |
+          set -euo pipefail
+          $DC config > /tmp/hellodoctor-arm64/rendered-compose.yml
+          python3 - <<'PYEOF'
+          import sys, yaml
+          d = yaml.safe_load(open('/tmp/hellodoctor-arm64/rendered-compose.yml', encoding='utf-8'))
+          be = d['services']['backend']['environment']
+          expected = {
+              'ENVIRONMENT': 'development',
+              'DEV_AUTH_OTP_ENABLED': 'true',
+              'DEV_SIMULATION_ENABLED': 'true',
+              'SEED_DEV_DATA': 'true',
+              'STORAGE_PROVIDER': 'disabled',
+          }
+          bad = {k: (be.get(k), v) for k, v in expected.items() if str(be.get(k)) != v}
+          if bad:
+              print(f"::error::backend environment does not match expected disposable values: {bad}")
+              sys.exit(1)
+          print("PASS: rendered backend environment carries the intended disposable dev values, not production values")
+          PYEOF
       - name: Start six services with synthetic volumes
-        run: >-
-          docker compose -f deploy/single-vm/compose.yml
-          -f deploy/single-vm/compose.local-verification.yml
-          -f deploy/single-vm/compose.arm64-ci.yml up -d
+        run: $DC up -d
       - name: Wait for service health
         shell: bash
         run: |
           set -euo pipefail
-          project='hellodoctor-arm64-ci'
           for attempt in $(seq 1 30); do
-            health="$(docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml ps --all --format '{{.Health}}')"
+            health="$($DC ps --all --format '{{.Health}}')"
             if [ "$(printf '%s\n' "$health" | grep -c '^healthy$' || true)" -ge 6 ]; then exit 0; fi
             sleep 10
           done
-          docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml ps
+          $DC ps
           exit 1
       - name: Check architecture and basic routing
         shell: bash
         run: |
           set -euo pipefail
-          project='hellodoctor-arm64-ci'
-          docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml ps
+          $DC ps
           curl --fail --silent --show-error -H 'Host: api.localhost' http://127.0.0.1:58080/healthz
           curl --fail --silent --show-error -H 'Host: admin.localhost' http://127.0.0.1:58080/login >/dev/null
           curl --fail --silent --show-error -H 'Host: doctor.localhost' http://127.0.0.1:58080/ >/dev/null
+      - name: Verify Admin/Doctor Web container health and Redis connectivity
+        shell: bash
+        # Review fix applied: the generic "6 healthy containers" count above
+        # proves the six services came up, but not specifically which ones.
+        # Name admin-web/doctor-web explicitly, and separately prove
+        # admin-web can actually reach Redis on the `data` network, since
+        # admin-web's own refresh-coordination (apps/admin-web/src/lib/
+        # refresh.ts) depends on it. doctor-web has no Redis usage anywhere
+        # in its source (grep-verified) and is correctly NOT on the `data`
+        # network in production compose.yml - this is confirmed intentional,
+        # not a defect, so no Redis check is performed for doctor-web.
+        run: |
+          set -euo pipefail
+          for svc in admin-web doctor-web; do
+            cid="$($DC ps -q "$svc")"
+            status="$(docker inspect -f '{{.State.Health.Status}}' "$cid")"
+            test "$status" = "healthy" || { echo "::error::$svc container health status is '$status', expected 'healthy'"; exit 1; }
+            echo "PASS: $svc container health status is healthy"
+          done
+          admin_cid="$($DC ps -q admin-web)"
+          docker exec "$admin_cid" node -e "
+            const net = require('net');
+            const s = net.connect(6379, 'redis');
+            s.setTimeout(3000, () => { console.error('timeout'); process.exit(1); });
+            s.on('connect', () => { s.end(); process.exit(0); });
+            s.on('error', (e) => { console.error(e); process.exit(1); });
+          " || { echo "::error::admin-web cannot reach redis:6379 on the data network"; exit 1; }
+          echo "PASS: admin-web can reach redis:6379"
+      - name: Verify capability-role grants and RLS enforcement
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x deploy/single-vm/verify-rls-negative-access.sh
+          PGHOST=127.0.0.1 PGPORT=55432 POSTGRES_USER="$POSTGRES_USER" \
+          POSTGRES_DB="$POSTGRES_DB" POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
+            deploy/single-vm/verify-rls-negative-access.sh
+      - name: Write a PostgreSQL persistence marker before restart
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -v ON_ERROR_STOP=1 \
+            -c "CREATE TABLE IF NOT EXISTS arm64_ci_persistence_probe (id INT PRIMARY KEY, note TEXT, written_at TIMESTAMPTZ NOT NULL DEFAULT now());" \
+            -c "INSERT INTO arm64_ci_persistence_probe (id, note) VALUES (1, 'pre-restart-marker') ON CONFLICT (id) DO NOTHING;"
+      - name: Write a Redis persistence marker before restart
+        shell: bash
+        run: redis-cli -h 127.0.0.1 -p 56379 SET arm64_ci_persistence_probe pre-restart-marker
+      - name: Exercise synthetic booking and chat with deterministic assertions
+        shell: bash
+        working-directory: services/backend
+        env:
+          CAPACITY_BASE_URL: http://127.0.0.1:58280
+          CAPACITY_DATABASE_URL: postgres://postgres:${{ env.POSTGRES_PASSWORD }}@127.0.0.1:55432/hellodoctor
+          CAPACITY_MODE: sessions
+          CAPACITY_ACTIVE_SESSIONS: "3"
+          CAPACITY_RAMP_SECS: "0"
+          CAPACITY_THINK_MIN_SECS: "1"
+          CAPACITY_THINK_MAX_SECS: "2"
+          CAPACITY_DURATION_SECS: "15"
+        # Review fix applied: the previous draft ran the harness in its
+        # default open-loop RPS mode and treated the harness's own exit code
+        # as "synthetic booking/consultation/chat verified" - that mode
+        # dispatches a randomized weighted action mix, so a short run gives
+        # no deterministic guarantee any booking or chat action actually
+        # fired. CAPACITY_ISOLATED_ACTION (capacity_test.rs's own
+        # Milestone 8 Workstream 1 addition) forces every session to
+        # dispatch ONLY the named action, which both guarantees the
+        # operation runs and matches an already-reviewed, already-used
+        # harness mode rather than inventing new dispatch logic. The actual
+        # PASS/FAIL gate is the row-count assertions in the next step, not
+        # this command's exit code.
+        run: |
+          set -euo pipefail
+          echo "BOOKING_WINDOW_STARTED=$(date -u +%FT%TZ)" >> "$GITHUB_ENV"
+          CAPACITY_ISOLATED_ACTION=booking_payment cargo run --release --example capacity_test
+          CAPACITY_ISOLATED_ACTION=chat cargo run --release --example capacity_test
+      - name: Assert booking and chat rows were actually created
+        shell: bash
+        run: |
+          set -euo pipefail
+          appt_count="$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -t -A -v ON_ERROR_STOP=1 \
+            -c "SELECT count(*) FROM appointments WHERE created_at >= '${BOOKING_WINDOW_STARTED}'::timestamptz;")"
+          chat_count="$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -t -A -v ON_ERROR_STOP=1 \
+            -c "SELECT count(*) FROM chat_messages WHERE created_at >= '${BOOKING_WINDOW_STARTED}'::timestamptz;")"
+          test "$appt_count" -gt 0 || { echo "::error::no appointments created by the synthetic booking run (count=$appt_count)"; exit 1; }
+          test "$chat_count" -gt 0 || { echo "::error::no chat messages created by the synthetic chat run (count=$chat_count)"; exit 1; }
+          echo "PASS: synthetic run deterministically created $appt_count appointment(s) and $chat_count chat message(s)"
+          echo "NOT TESTED: consultation_sessions - capacity_test.rs's CAPACITY_ISOLATED_ACTION only supports booking_payment/chat; a consultation/RTC action would need a doctor-side isolated action added to that harness first. Do not treat consultation operations as verified."
+      - name: Verify container filesystem permissions and security restrictions
+        shell: bash
+        run: |
+          set -euo pipefail
+          for svc in backend admin-web doctor-web proxy; do
+            cid="$($DC ps -q "$svc")"
+            ro="$(docker inspect -f '{{.HostConfig.ReadonlyRootfs}}' "$cid")"
+            nnp="$(docker inspect -f '{{json .HostConfig.SecurityOpt}}' "$cid")"
+            capdrop="$(docker inspect -f '{{json .HostConfig.CapDrop}}' "$cid")"
+            test "$ro" = "true" || { echo "::error::$svc rootfs is not read-only ($ro)"; exit 1; }
+            echo "$nnp" | grep -qi "no-new-privileges:true" || { echo "::error::$svc missing no-new-privileges"; exit 1; }
+            echo "$capdrop" | grep -qi '"ALL"' || { echo "::error::$svc did not drop ALL capabilities"; exit 1; }
+            if docker exec "$cid" sh -c 'touch /arm64-ci-write-probe' 2>/dev/null; then
+              echo "::error::$svc allowed a write to its read-only rootfs"; exit 1
+            fi
+            echo "PASS: $svc is read-only rootfs, no-new-privileges, CapDrop ALL, and rejects a rootfs write"
+          done
+          net="$(docker network inspect "${PROJECT}_data" --format '{{json .Internal}}')"
+          test "$net" = "true" || { echo "::error::data network is not internal"; exit 1; }
+          echo "PASS: data network is internal:true"
+      - name: Exercise the full Admin login, OTP, protected BFF request and refresh sequence
+        shell: bash
+        # Review fix applied: the previous draft only checked for *a*
+        # Set-Cookie header on the login step-1 response and demoted a
+        # missing cookie to a NOTE, and it printed raw response headers
+        # (which, on a real deployment, would include the session cookie
+        # value). This version drives the complete two-step OTP login using
+        # the seeded dev admin (services/backend/src/seed.rs
+        # SEED_ADMIN_EMAIL/PASSWORD, only present because SEED_DEV_DATA=true
+        # was asserted above), exercises a protected route through the
+        # admin-web BFF proxy, and triggers the refresh path - and a missing
+        # or malformed cookie is a hard failure (`exit 1`), never a note.
+        # Cookie attribute values and the raw access/refresh tokens are never
+        # printed: only attribute NAMES (HttpOnly/Secure/SameSite/Path) are
+        # grepped for and reported as present/absent.
+        env:
+          CA_PATH: /tmp/hellodoctor-arm64/caddy-internal-ca.pem
+          COOKIE_JAR: /tmp/hellodoctor-arm64/admin-cookies.txt
+        run: |
+          set -euo pipefail
+          $DC -f deploy/single-vm/compose.arm64-ci-tls.yml up -d proxy
+          for attempt in $(seq 1 15); do
+            curl --silent --fail -o /dev/null http://127.0.0.1:58080/healthz 2>/dev/null && break
+            sleep 2
+          done
+          docker cp "$($DC -f deploy/single-vm/compose.arm64-ci-tls.yml ps -q proxy):/data/caddy/pki/authorities/local/root.crt" "$CA_PATH"
+
+          curl --fail --silent --show-error --cacert "$CA_PATH" --resolve api.localhost:58443:127.0.0.1 https://api.localhost:58443/healthz
+
+          step1_headers="$(mktemp)"
+          step1_body="$(curl --silent --show-error --cacert "$CA_PATH" --resolve admin.localhost:58443:127.0.0.1 \
+            -D "$step1_headers" -X POST https://admin.localhost:58443/api/login \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"admin@hellodoctor.health","password":"AdminPass123!"}')"
+          grep -q '"success":true' <<<"$step1_body" || { echo "::error::admin login step 1 did not report success"; exit 1; }
+          otp_code="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['data'].get('debug_otp_code',''))" "$step1_body")"
+          session_token="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['data'].get('session_token',''))" "$step1_body")"
+          test -n "$otp_code" || { echo "::error::no debug_otp_code in login step 1 response - DEV_AUTH_OTP_ENABLED/ENVIRONMENT bypass may not be active for admin-web"; exit 1; }
+
+          step2_headers="$(mktemp)"
+          step2_body="$(curl --silent --show-error --cacert "$CA_PATH" --resolve admin.localhost:58443:127.0.0.1 \
+            -D "$step2_headers" -c "$COOKIE_JAR" -X POST https://admin.localhost:58443/api/login/verify \
+            -H 'Content-Type: application/json' \
+            -d "{\"session_token\":\"${session_token}\",\"otp_code\":\"${otp_code}\"}")"
+          grep -q '"success":true' <<<"$step2_body" || { echo "::error::admin login step 2 (OTP verify) did not report success"; exit 1; }
+
+          grep -qi '^set-cookie:' "$step2_headers" || { echo "::error::login step 2 set no cookies at all"; exit 1; }
+          for attr in HttpOnly Secure SameSite=Strict; do
+            grep -qi "$attr" "$step2_headers" || { echo "::error::session cookie is missing the '$attr' attribute"; exit 1; }
+          done
+          echo "PASS: session cookies set with HttpOnly, Secure and SameSite=Strict (values not logged)"
+
+          # apps/admin-web/src/app/api/proxy/[...path]/route.ts forwards
+          # /api/proxy/{path} -> backend /api/v1/{path} with the bearer
+          # attached server-side from the HttpOnly cookie. GET
+          # /api/v1/admin/doctors/pending-verification (docs/API_SPEC.md)
+          # requires ClinicalAdmin/PlatformAdmin, which the seeded dev admin
+          # (services/backend/src/seed.rs ADMIN_USER_ID) holds.
+          protected_status="$(curl --silent --show-error --cacert "$CA_PATH" --resolve admin.localhost:58443:127.0.0.1 \
+            -o /dev/null -w '%{http_code}' -b "$COOKIE_JAR" https://admin.localhost:58443/api/proxy/admin/doctors/pending-verification)"
+          test "$protected_status" = "200" || { echo "::error::protected admin BFF route returned $protected_status, expected 200"; exit 1; }
+          echo "PASS: protected request through the admin-web BFF proxy succeeded using the session cookie"
+          echo "NOT TESTED: the transparent refresh-on-401 path in this same proxy route. The access token is freshly minted (15-minute TTL) at this point in the flow, so this call will not naturally hit the 401-then-refresh branch. Exercising it deterministically needs either a short-TTL test token (a backend test hook, not something this script should invent) or waiting out the real TTL, which is too slow for CI. Do not treat refresh as verified from this step alone."
+          rm -f "$step1_headers" "$step2_headers"
       - name: Restart services and verify recovery
         shell: bash
         run: |
           set -euo pipefail
-          project='hellodoctor-arm64-ci'
-          docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml restart postgres redis backend admin-web doctor-web proxy
+          $DC restart postgres redis backend admin-web doctor-web proxy
           sleep 20
-          docker compose -p "$project" -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml ps
+          $DC ps
           curl --fail --silent --show-error -H 'Host: api.localhost' http://127.0.0.1:58080/healthz
+      - name: Verify PostgreSQL and Redis persistence markers survived the restart
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg_value="$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -t -A -v ON_ERROR_STOP=1 \
+            -c "SELECT note FROM arm64_ci_persistence_probe WHERE id = 1;")"
+          test "$pg_value" = "pre-restart-marker" || { echo "::error::postgres persistence marker lost across restart (got: $pg_value)"; exit 1; }
+          redis_value="$(redis-cli -h 127.0.0.1 -p 56379 GET arm64_ci_persistence_probe)"
+          test "$redis_value" = "pre-restart-marker" || { echo "::error::redis persistence marker lost across restart (got: $redis_value)"; exit 1; }
+          echo "PASS: PostgreSQL and Redis both retained their pre-restart markers"
+      - name: Capture resource usage evidence
+        if: always()
+        shell: bash
+        run: docker stats --no-stream || true
       - name: Tear down disposable project
         if: always()
-        run: docker compose -p hellodoctor-arm64-ci -f deploy/single-vm/compose.yml -f deploy/single-vm/compose.local-verification.yml -f deploy/single-vm/compose.arm64-ci.yml down -v --remove-orphans
+        run: $DC down -v --remove-orphans
+      - name: Verify no disposable integration volumes were left behind
+        if: always()
+        shell: bash
+        # Review fix applied: explicitly verify cleanup instead of assuming
+        # `down -v` removed everything. All volumes this stack declares
+        # (m8-final-local-*, caddydata-tls, caddyconfig-tls) are `external:
+        # false` (confirmed by reading the compose files), so `down -v`
+        # should remove them; this step catches it if that ever stops being
+        # true rather than silently leaking disposable CI volumes.
+        run: |
+          leftover="$(docker volume ls --filter name=m8-final-local -q; docker volume ls --filter name=hellodoctor-arm64-ci -q)"
+          test -z "$leftover" || { echo "::error::leftover volumes after teardown: $leftover"; docker volume rm $leftover || true; exit 1; }
+          echo "PASS: no leftover disposable volumes"
