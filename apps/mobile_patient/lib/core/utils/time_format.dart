@@ -1,3 +1,5 @@
+import '../l10n/kenya_time.dart';
+
 /// Formats an already-local [DateTime] as a 12-hour clock time with an
 /// uppercase AM/PM suffix (e.g. `21:20` → `9:20 PM`). Every appointment/slot
 /// screen must use this instead of hand-rolled 24-hour formatting so the
@@ -12,3 +14,9 @@ String formatTime12h(DateTime t) {
   final minute = t.minute.toString().padLeft(2, '0');
   return '$hour12:$minute $period';
 }
+
+/// Clock time of [instant] in Africa/Nairobi, explicitly labelled
+/// `EAT` (UTC+3). Converts regardless of the zone [instant] arrives in, so the
+/// device's own timezone can never leak into what a patient or doctor sees.
+String formatTimeEat(DateTime instant) =>
+    '${formatTime12h(kenyaTime(instant))} EAT';

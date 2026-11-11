@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/l10n/kenya_time.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
@@ -451,12 +452,15 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
       };
 
   String _formatSlot(AppLocalizations l10n, DateTime start) {
-    final today = DateTime.now();
-    final isToday = start.year == today.year &&
-        start.month == today.month &&
-        start.day == today.day;
-    final time = formatTime12h(start);
-    return '${isToday ? l10n.todayLabel : '${start.day}/${start.month}'}, $time';
+    // Both sides of the "today" comparison are Nairobi wall-clock, never the
+    // device's own zone.
+    final eat = kenyaTime(start);
+    final today = kenyaTime(DateTime.now());
+    final isToday = eat.year == today.year &&
+        eat.month == today.month &&
+        eat.day == today.day;
+    final time = formatTimeEat(start);
+    return '${isToday ? l10n.todayLabel : '${eat.day}/${eat.month}'}, $time';
   }
 }
 

@@ -156,7 +156,7 @@ void main() {
       final local = kenyaTime(DateTime.parse('2026-11-01T07:00:00Z'));
       final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
       final label =
-          '${hour.toString().padLeft(2, '0')}:00 ${local.hour >= 12 ? 'PM' : 'AM'}';
+          '${hour.toString().padLeft(2, '0')}:00 ${local.hour >= 12 ? 'PM' : 'AM'} EAT';
       await tester.tap(find.text(label));
       await tester.pumpAndSettle();
       await capture(tester, 'chat_slot_booking_${width.toInt()}');

@@ -452,5 +452,5 @@ class _AvailabilityCard extends StatelessWidget {
         ),
       );
 
-  String _format(DateTime t) => '${t.day}/${t.month} • ${formatTime12h(t)}';
+  String _format(DateTime t) => '${t.day}/${t.month} • ${formatTimeEat(t)}';
 }
