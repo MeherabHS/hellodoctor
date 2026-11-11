@@ -1,4 +1,5 @@
 use crate::auth_context::AuthContext;
+use crate::domain::join_window;
 use crate::domain::models::*;
 use crate::error::AppError;
 use crate::repository::{
@@ -56,21 +57,36 @@ pub struct ReconnectWindow {
     pub duration_seconds: Option<i64>,
 }
 
+fn status_str(s: &AppointmentStatus) -> &'static str {
+    match s {
+        AppointmentStatus::Confirmed => "CONFIRMED",
+        AppointmentStatus::InConsultation => "IN_CONSULTATION",
+        // Anything else is not joinable; the evaluator maps it to INVALID_STATE.
+        _ => "OTHER",
+    }
+}
+
+fn modality_str(m: &Modality) -> &'static str {
+    match m {
+        Modality::Video => "VIDEO",
+        _ => "CHAT",
+    }
+}
+
 pub struct ConsultationService;
 
 impl ConsultationService {
-    /// Mint secure, unpredictable Agora RTC Token (server-side only)
-    pub async fn mint_agora_token(
-        state: &AppState,
+    /// Authenticates the caller as an authorized participant (Patient, a
+    /// Patient's guardian, or the verified Doctor) of `appointment_id` and
+    /// returns the appointment and its slot. Shared by the token mint and the
+    /// read-only eligibility check so both apply identical authorization.
+    async fn load_participant_context(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
         ctx: &AuthContext,
         appointment_id: Uuid,
-        agora_app_id: &str,
-        agora_certificate: &str,
-    ) -> Result<AgoraTokenResponse, AppError> {
+    ) -> Result<(Appointment, ScheduleSlot), AppError> {
         let user_id = ctx.user_id;
-        let mut tx = state.begin_authed(ctx).await?;
-
-        let apt = crate::repository::appointment_repo::find_by_id(&mut *tx, appointment_id)
+        let apt = crate::repository::appointment_repo::find_by_id(&mut **tx, appointment_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Appointment record not found.".into()))?;
 
@@ -90,10 +106,10 @@ impl ConsultationService {
         // consultation would be wrongly rejected as "not an authorized
         // participant" — caught directly by this service's own test, not
         // just reasoned about.
-        let is_patient = match patient_repo::find_by_id(&mut *tx, apt.patient_id).await? {
+        let is_patient = match patient_repo::find_by_id(&mut **tx, apt.patient_id).await? {
             Some(p) if p.user_id == Some(user_id) => true,
             Some(p) => match p.guardian_patient_id {
-                Some(guardian_id) => patient_repo::find_by_id(&mut *tx, guardian_id)
+                Some(guardian_id) => patient_repo::find_by_id(&mut **tx, guardian_id)
                     .await?
                     .map(|g| g.user_id == Some(user_id))
                     .unwrap_or(false),
@@ -101,7 +117,7 @@ impl ConsultationService {
             },
             None => false,
         };
-        let is_doctor = doctor_repo::find_by_id(&mut *tx, apt.doctor_id)
+        let is_doctor = doctor_repo::find_by_id(&mut **tx, apt.doctor_id)
             .await?
             .map(|d| d.user_id == user_id && d.is_professionally_verified())
             .unwrap_or(false);
@@ -112,44 +128,75 @@ impl ConsultationService {
             ));
         }
 
-        if apt.modality != Modality::Video {
-            return Err(AppError::Forbidden(
-                "Video access is only available for video consultations.".into(),
-            ));
-        }
-
-        if apt.status != AppointmentStatus::Confirmed
-            && apt.status != AppointmentStatus::InConsultation
-        {
-            return Err(AppError::Conflict(
-                "Consultation room is only accessible for CONFIRMED appointments.".into(),
-            ));
-        }
-
-        // Temporal window gate (docs/AUTH_SECURITY.md §10.2, Pass 2 fix —
-        // previously entirely absent: a confirmed appointment's status alone
-        // let a participant mint a working RTC token arbitrarily early or
-        // indefinitely late). Configurable via `AGORA_TOKEN_WINDOW_*_MINS`
-        // rather than hardcoded, since the real policy is a product
-        // decision. Scoped to the two already-verified participants only —
-        // this is a conformance/business-rule gate, not a cross-tenant
-        // authorization boundary (that's the ownership check above).
-        let slot = doctor_repo::find_slot(&mut *tx, apt.slot_id)
+        let slot = doctor_repo::find_slot(&mut **tx, apt.slot_id)
             .await?
             .ok_or_else(|| {
                 AppError::internal("Schedule slot for a confirmed appointment is missing.".into())
             })?;
+        Ok((apt, slot))
+    }
+
+    /// Read-only join eligibility for the caller's own appointment: same
+    /// authorization and policy as the token mint, but creates no session and
+    /// takes no reservation. Lets clients show a locked state / countdown and
+    /// revalidate at the boundary without attempting token issuance.
+    pub async fn join_eligibility(
+        state: &AppState,
+        ctx: &AuthContext,
+        appointment_id: Uuid,
+    ) -> Result<join_window::JoinEligibility, AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        let (apt, slot) = Self::load_participant_context(&mut tx, ctx, appointment_id).await?;
+        let recovery_state = consultation_repo::find_by_appointment(&mut *tx, appointment_id)
+            .await?
+            .map(|s| s.recovery_state);
+        let eligibility = join_window::evaluate(
+            status_str(&apt.status),
+            modality_str(&apt.modality),
+            slot.start_time,
+            slot.end_time,
+            Utc::now(),
+            state.config.agora_token_window_before_mins,
+            state.config.agora_token_window_after_mins,
+        )
+        .with_recovery_state(recovery_state.as_deref());
+        tx.commit().await?;
+        Ok(eligibility)
+    }
+
+    /// Mint secure, unpredictable Agora RTC Token (server-side only)
+    pub async fn mint_agora_token(
+        state: &AppState,
+        ctx: &AuthContext,
+        appointment_id: Uuid,
+        agora_app_id: &str,
+        agora_certificate: &str,
+    ) -> Result<AgoraTokenResponse, AppError> {
+        let user_id = ctx.user_id;
+        let mut tx = state.begin_authed(ctx).await?;
+
+        let (apt, slot) = Self::load_participant_context(&mut tx, ctx, appointment_id).await?;
+
+        // The ONE authoritative join policy (`domain::join_window`): the same
+        // evaluator the read-only eligibility endpoint and the appointment
+        // lists use, so clients show exactly what is enforced here.
         let now = Utc::now();
-        let window_start =
-            slot.start_time - Duration::minutes(state.config.agora_token_window_before_mins);
-        let window_end =
-            slot.end_time + Duration::minutes(state.config.agora_token_window_after_mins);
-        if now < window_start || now > window_end {
-            return Err(AppError::Forbidden(
-                "The consultation room is not open yet, or this appointment's window has closed."
-                    .into(),
-            ));
+        let eligibility = join_window::evaluate(
+            status_str(&apt.status),
+            modality_str(&apt.modality),
+            slot.start_time,
+            slot.end_time,
+            now,
+            state.config.agora_token_window_before_mins,
+            state.config.agora_token_window_after_mins,
+        );
+        if !eligibility.eligible {
+            return Err(AppError::JoinDenied {
+                reason: eligibility.reason,
+                message: join_window::denial_message(eligibility.reason).into(),
+            });
         }
+        let window_end = eligibility.join_close_at;
 
         let session = match consultation_repo::find_by_appointment(&mut *tx, appointment_id).await?
         {
@@ -185,9 +232,10 @@ impl ConsultationService {
         };
 
         if session.recovery_state == "NEEDS_REVIEW" {
-            return Err(AppError::Conflict(
-                "This consultation needs review before it can be rejoined.".into(),
-            ));
+            return Err(AppError::JoinDenied {
+                reason: join_window::REASON_NEEDS_REVIEW,
+                message: join_window::denial_message(join_window::REASON_NEEDS_REVIEW).into(),
+            });
         }
 
         // M8-G-30: at most one live-consultation reservation per user_id,

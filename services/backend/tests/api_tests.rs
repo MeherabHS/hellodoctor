@@ -52,6 +52,8 @@ mod admin_quizzes;
 mod admission_capacity_bench;
 #[path = "cases/admission_control_fairness.rs"]
 mod admission_control_fairness;
+#[path = "cases/consultation_join_window.rs"]
+mod consultation_join_window;
 #[path = "cases/consultation_live_reservation.rs"]
 mod consultation_live_reservation;
 #[path = "cases/consultation_recovery.rs"]
