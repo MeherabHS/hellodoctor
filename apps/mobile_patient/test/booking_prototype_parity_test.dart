@@ -17,6 +17,7 @@ import 'patient_discovery_qna_correction_test.dart'
 
 /// Set `--dart-define=OUT_DIR=<dir>` to also save PNG screenshots.
 const _out = String.fromEnvironment('OUT_DIR');
+const _width = int.fromEnvironment('WIDTH', defaultValue: 360);
 
 /// Prototype `view-4` (index.html "Scheduled Video Consultation") parity: the
 /// same booking steps must show whether payment is required or deferred; only
@@ -34,7 +35,8 @@ void main() {
   Future<void> pump(WidgetTester tester,
       {required bool paymentRequired,
       required String fee,
-      double width = 360}) async {
+      double? width}) async {
+    width ??= _width.toDouble();
     tester.view.physicalSize = Size(width, 1500);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -116,7 +118,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
         find.widgetWithText(FilledButton, 'Confirm Booking →'), findsOneWidget);
-    await shot(tester, 'deferred_booking_360');
+    await shot(tester, 'deferred_booking_$_width');
   });
 
   testWidgets('paid mode keeps the same steps plus total and payment picker',
@@ -127,7 +129,7 @@ void main() {
     expect(find.text('KES 630'), findsWidgets);
     expect(find.text('Payable now'), findsNothing);
     expect(find.textContaining('24-Hour Chat Included:'), findsOneWidget);
-    await shot(tester, 'paid_booking_360');
+    await shot(tester, 'paid_booking_$_width');
   });
 
   List<String> chipLabels(WidgetTester tester) => tester
