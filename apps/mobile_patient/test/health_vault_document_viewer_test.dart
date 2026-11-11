@@ -7,6 +7,7 @@
 // and the Remediation E2 report for why only graceful-failure, not real
 // on-device rendering, is verified here.
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -114,11 +115,21 @@ Widget _harness(VaultRepository repo) => MaterialApp(
       ),
     );
 
+/// `pdfx` (see the Doctor app's equivalent test file for the full
+/// explanation) has no desktop rendering backend on Linux at all —
+/// `PdfDocument.openData` throws `PlatformNotSupportedException` before
+/// even reaching a platform channel, as soon as `ClinicalPdfViewer` is
+/// constructed, regardless of what its own `load` callback does. Skipped
+/// only on that one host platform; every other test in this file (and the
+/// real app, on every real target platform) is unaffected.
+bool get _hostLacksPdfSupport => Platform.isLinux;
+
 void main() {
   group('Health Vault document viewing (Remediation E2)', () {
     testWidgets(
         'a PDF document routes to the in-app ClinicalPdfViewer, not an '
-        'external launch', (tester) async {
+        'external launch',
+        skip: _hostLacksPdfSupport, (tester) async {
       final repo = _FakeVaultRepository(
         [PatientDocumentDto.fromJson(_pdfDoc)],
         fetch: () async => TypedBytes(
@@ -193,7 +204,8 @@ void main() {
 
     testWidgets(
         'a server content-type that disagrees with the declared PDF mime '
-        'type is rejected rather than rendered', (tester) async {
+        'type is rejected rather than rendered',
+        skip: _hostLacksPdfSupport, (tester) async {
       final repo = _FakeVaultRepository(
         [PatientDocumentDto.fromJson(_pdfDoc)],
         // Declared application/pdf, but the server actually served an image.
@@ -219,7 +231,7 @@ void main() {
     });
 
     testWidgets('expired/revoked authentication on PDF fetch does not crash',
-        (tester) async {
+        skip: _hostLacksPdfSupport, (tester) async {
       final repo = _FakeVaultRepository(
         [PatientDocumentDto.fromJson(_pdfDoc)],
         fetch: () async => throw const ApiException(401, 'Session expired.'),
