@@ -467,6 +467,7 @@ async fn preflight(
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn admin_worker(
     client: reqwest::Client,
     base_url: String,
@@ -537,6 +538,7 @@ async fn admin_worker(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn doctor_worker(
     client: reqwest::Client,
     base_url: String,
@@ -748,10 +750,10 @@ async fn main() {
     let doctor_scope = Uuid::new_v4();
     let admin_cookie_initial = admin_cookie(&admin_access_token);
     let doctor_cookie_initial = doctor_cookie(&doctor_access_token, doctor_scope);
-    let admin_identities = vec![AdminIdentity {
+    let admin_identities = [AdminIdentity {
         cookie: Arc::new(RwLock::new(admin_cookie_initial.clone())),
     }];
-    let doctor_identities = vec![DoctorIdentity {
+    let doctor_identities = [DoctorIdentity {
         cookie: Arc::new(RwLock::new(doctor_cookie_initial.clone())),
     }];
     println!(
