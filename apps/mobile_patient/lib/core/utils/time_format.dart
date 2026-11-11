@@ -15,6 +15,32 @@ String formatTime12h(DateTime t) {
   return '$hour12:$minute $period';
 }
 
+/// "11:24 PM EAT", prefixed with the EAT date ("12 Nov, ...") when [instant]
+/// is not today in Africa/Nairobi. `now` is injectable for tests.
+String formatEatDateTime(DateTime instant, {DateTime? now}) {
+  final eat = kenyaTime(instant);
+  final today = kenyaTime(now ?? DateTime.now());
+  final sameDay = eat.year == today.year &&
+      eat.month == today.month &&
+      eat.day == today.day;
+  if (sameDay) return formatTimeEat(instant);
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec'
+  ];
+  return '${eat.day} ${months[eat.month - 1]}, ${formatTimeEat(instant)}';
+}
+
 /// Clock time of [instant] in Africa/Nairobi, explicitly labelled
 /// `EAT` (UTC+3). Converts regardless of the zone [instant] arrives in, so the
 /// device's own timezone can never leak into what a patient or doctor sees.
