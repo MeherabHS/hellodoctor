@@ -53,6 +53,15 @@ class PublicDoctorDto {
   // Matches DoctorQuery: a positive configured fee enables that modality.
   bool get supportsVideo => _positiveFee(consultationFeeVideo);
   bool get supportsChat => _positiveFee(consultationFeeChat);
+
+  /// Whether VIDEO can be booked. When the server's booking policy says no
+  /// payment is required (`FINANCIAL_MODULE_MODE=deferred`) an unpriced doctor
+  /// is still bookable — the deferred booking endpoint never charges the fee,
+  /// so a zero fee must not hide the modality. In paid mode the configured
+  /// fee remains the offering signal, exactly as before. CHAT stays
+  /// fee-driven (its booking flow is payment-specific).
+  bool videoBookable({required bool paymentRequired}) =>
+      !paymentRequired || supportsVideo;
   static bool _positiveFee(String fee) {
     final value = double.tryParse(fee);
     return value != null && value.isFinite && value > 0;
