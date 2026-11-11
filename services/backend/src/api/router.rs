@@ -501,6 +501,10 @@ fn protected_routes() -> Router<AppState> {
             axum::routing::post(consultation_handlers::mint_agora_token),
         )
         .route(
+            "/consultations/:appointment_id/join-eligibility",
+            get(consultation_handlers::join_eligibility),
+        )
+        .route(
             "/consultations/:appointment_id/telemetry",
             axum::routing::post(consultation_handlers::submit_telemetry),
         )

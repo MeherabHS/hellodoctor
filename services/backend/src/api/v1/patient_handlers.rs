@@ -468,6 +468,18 @@ pub async fn list_own_appointments(
                 "empty_room_deadline": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("empty_room_deadline"),
                 "patient_present": r.get::<Option<bool>, _>("patient_present"),
                 "doctor_present": r.get::<Option<bool>, _>("doctor_present"),
+                // Server-derived join eligibility (single authoritative policy).
+                "join": crate::domain::join_window::evaluate(
+                    &r.get::<String, _>("status"),
+                    &r.get::<String, _>("modality"),
+                    r.get::<chrono::DateTime<chrono::Utc>, _>("start_time"),
+                    r.get::<chrono::DateTime<chrono::Utc>, _>("end_time"),
+                    chrono::Utc::now(),
+                    state.config.agora_token_window_before_mins,
+                    state.config.agora_token_window_after_mins,
+                )
+                .with_recovery_state(r.get::<Option<String>, _>("consultation_recovery_state").as_deref())
+                .to_json(),
             })
         })
         .collect();
