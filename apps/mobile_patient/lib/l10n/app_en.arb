@@ -1383,6 +1383,10 @@
       }
     }
   },
+  "bookingPolicyUnavailable": "Couldn't check booking availability. Check your connection and try again.",
+  "@bookingPolicyUnavailable": {
+    "description": "Patient interface: bookingPolicyUnavailable"
+  },
   "doctorBookingUnavailable": "This doctor hasn't set up consultation booking yet.",
   "@doctorBookingUnavailable": {
     "description": "Patient interface: doctorBookingUnavailable"

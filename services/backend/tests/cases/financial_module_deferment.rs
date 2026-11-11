@@ -342,3 +342,155 @@ async fn test_payment_webhook_cannot_match_a_deferred_appointment(pool: PgPool) 
     let res_webhook = send_webhook(&app, &body_str, &sig).await;
     assert_eq!(res_webhook.status(), StatusCode::NOT_FOUND);
 }
+
+// ---------------------------------------------------------------------------
+// P0 regression: "This doctor hasn't set up consultation booking yet."
+// Self-registered doctors are created with consultation fees of 0
+// (auth_handlers.rs). In deferred mode no fee is charged, so such a doctor
+// must still be discoverable (VIDEO filter) and bookable; in enabled mode the
+// fee remains the offering signal, exactly as before.
+// ---------------------------------------------------------------------------
+
+async fn unprice_doctor1(pool: &PgPool) {
+    sqlx::query(
+        "UPDATE doctor_profiles SET consultation_fee_video = 0, consultation_fee_chat = 0 WHERE id = $1",
+    )
+    .bind(Uuid::parse_str(DOCTOR1_PROFILE_ID).unwrap())
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
+async fn first_bookable_slot(app: &axum::Router, token: &str) -> Uuid {
+    let res = get(
+        app,
+        &format!("/api/v1/doctors/{DOCTOR1_PROFILE_ID}/slots"),
+        Some(token),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    Uuid::parse_str(json_body(res).await["data"][0]["id"].as_str().unwrap()).unwrap()
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_deferred_unpriced_doctor_is_listed_and_bookable(pool: PgPool) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    unprice_doctor1(&pool).await;
+    let patient_token = fresh_patient_token(&pool).await;
+
+    let listed = get(&app, "/api/v1/doctors?modality=VIDEO", Some(&patient_token)).await;
+    assert_eq!(listed.status(), StatusCode::OK);
+    assert!(
+        json_body(listed).await["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["id"] == DOCTOR1_PROFILE_ID),
+        "deferred mode must not hide an unpriced verified doctor from the VIDEO directory"
+    );
+
+    let slot_id = first_bookable_slot(&app, &patient_token).await;
+    let res = post(
+        &app,
+        "/api/v1/appointments/book",
+        Some(&patient_token),
+        &serde_json::json!({"doctor_id": DOCTOR1_PROFILE_ID, "slot_id": slot_id, "modality": "VIDEO"}),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let body = json_body(res).await;
+    assert_eq!(body["data"]["status"], "CONFIRMED");
+    assert_eq!(body["data"]["payment_policy"], "NOT_REQUIRED");
+    let apt_id = Uuid::parse_str(body["data"]["appointment_id"].as_str().unwrap()).unwrap();
+    assert!(
+        hellodoctor_backend::repository::transaction_repo::find_by_appointment(&pool, apt_id)
+            .await
+            .unwrap()
+            .is_none(),
+        "deferred booking must never create a transaction"
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_enabled_mode_unpriced_doctor_stays_unlisted_for_video(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    unprice_doctor1(&pool).await;
+    let patient_token = fresh_patient_token(&pool).await;
+    let listed = get(&app, "/api/v1/doctors?modality=VIDEO", Some(&patient_token)).await;
+    assert_eq!(listed.status(), StatusCode::OK);
+    assert!(!json_body(listed).await["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|d| d["id"] == DOCTOR1_PROFILE_ID));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_deferred_booking_rejects_expired_cancelled_and_blocked_slots(pool: PgPool) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    let patient_token = fresh_patient_token(&pool).await;
+    let doctor = Uuid::parse_str(DOCTOR1_PROFILE_ID).unwrap();
+
+    // One slot per non-bookable condition, far from any seeded slot.
+    let mut ids = Vec::new();
+    for (offset_days, status) in [(-3i64, "AVAILABLE"), (40, "CANCELLED"), (41, "BLOCKED")] {
+        let id = Uuid::new_v4();
+        sqlx::query(
+            "INSERT INTO doctor_schedule_slots (id, doctor_id, start_time, end_time, status, created_at) \
+             VALUES ($1, $2, now() + make_interval(days => $3::int), now() + make_interval(days => $3::int, mins => 30), $4::slot_status_enum, now())",
+        )
+        .bind(id)
+        .bind(doctor)
+        .bind(offset_days as i32)
+        .bind(status)
+        .execute(&pool)
+        .await
+        .unwrap();
+        ids.push(id);
+    }
+
+    // The patient-facing listing never offers any of them...
+    let listing = json_body(
+        get(
+            &app,
+            &format!("/api/v1/doctors/{DOCTOR1_PROFILE_ID}/slots"),
+            Some(&patient_token),
+        )
+        .await,
+    )
+    .await;
+    for id in &ids {
+        assert!(!listing["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["id"] == id.to_string()));
+    }
+    // ...and the booking transaction itself rejects them (server-authoritative,
+    // not merely hidden by the client).
+    for id in ids {
+        let res = post(
+            &app,
+            "/api/v1/appointments/book",
+            Some(&patient_token),
+            &serde_json::json!({"doctor_id": DOCTOR1_PROFILE_ID, "slot_id": id, "modality": "VIDEO"}),
+        )
+        .await;
+        assert_eq!(res.status(), StatusCode::CONFLICT, "slot {id}");
+    }
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_deferred_booking_requires_authentication(pool: PgPool) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    let patient_token = fresh_patient_token(&pool).await;
+    let slot_id = first_bookable_slot(&app, &patient_token).await;
+    let res = post(
+        &app,
+        "/api/v1/appointments/book",
+        None,
+        &serde_json::json!({"doctor_id": DOCTOR1_PROFILE_ID, "slot_id": slot_id, "modality": "VIDEO"}),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}

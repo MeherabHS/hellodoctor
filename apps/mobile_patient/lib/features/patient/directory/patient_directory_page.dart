@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/cache/patient_cache_store.dart';
@@ -36,6 +38,11 @@ class PatientDirectoryPage extends StatefulWidget {
 
 class _PatientDirectoryPageState extends State<PatientDirectoryPage> {
   late final DirectoryCubit _cubit;
+
+  /// Server-controlled (`GET /config/booking-policy`). Defaults to `true`
+  /// (today's paid behavior) until the policy is known; only an explicit
+  /// `payment_required: false` unlocks unpriced-doctor booking.
+  bool _paymentRequired = true;
   static const specialties = [
     'all',
     'Internal Medicine',
@@ -51,6 +58,7 @@ class _PatientDirectoryPageState extends State<PatientDirectoryPage> {
         DirectoryRepository(widget.api,
             cache: widget.cache, connectivity: widget.connectivity),
         connectivity: widget.connectivity);
+    unawaited(_loadPolicy());
     if (widget.initialModality == 'all') {
       _cubit.load();
     } else {
@@ -62,6 +70,17 @@ class _PatientDirectoryPageState extends State<PatientDirectoryPage> {
   void dispose() {
     _cubit.close();
     super.dispose();
+  }
+
+  Future<void> _loadPolicy() async {
+    try {
+      final policy =
+          await BookingRepository(widget.api, connectivity: widget.connectivity)
+              .bookingPolicy();
+      if (mounted) setState(() => _paymentRequired = policy.paymentRequired);
+    } catch (_) {
+      // Keep the safe paid default; the booking page re-checks the policy.
+    }
   }
 
   void profile(PublicDoctorDto d) =>
@@ -270,6 +289,7 @@ class _PatientDirectoryPageState extends State<PatientDirectoryPage> {
                 child: PatientDoctorCard(
                     doctor: d,
                     repo: _cubit.repo,
+                    paymentRequired: _paymentRequired,
                     onProfile: () => profile(d),
                     onBook: (m) => book(d, m))))
         ]);

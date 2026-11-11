@@ -295,6 +295,7 @@
   "doctorChatFee": "Ada ya Mazungumzo ya Kimatibabu ya Saa 24:",
   "doctorNoSlots": "Hakuna nafasi zijazo zinazoweza kupangwa kwa sasa.",
   "doctorSlotCount": "Nafasi {count} zinapatikana kwa kupanga",
+  "bookingPolicyUnavailable": "Imeshindwa kuthibitisha upatikanaji wa miadi. Angalia mtandao wako na ujaribu tena.",
   "doctorBookingUnavailable": "Daktari huyu bado hajaweka mpangilio wa kupanga miadi.",
   "doctorVideoBooking": "Miadi ya Video (KES {fee})",
   "doctorChatBooking": "Mazungumzo ya saa 24 (KES {fee})",

@@ -9,22 +9,27 @@ import 'doctor_photo_avatar.dart';
 /// Paid CHAT uses the existing slot picker and payment flow, never instant chat.
 Future<void> showConsultationChoices(BuildContext context,
     {required PublicDoctorDto doctor,
+    bool paymentRequired = true,
     required ValueChanged<String> onBook}) async {
   final modality = await showModalBottomSheet<String>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (_) => ConsultationChoices(doctor: doctor),
+    builder: (_) =>
+        ConsultationChoices(doctor: doctor, paymentRequired: paymentRequired),
   );
   if (context.mounted && modality != null) onBook(modality);
 }
 
 class ConsultationChoices extends StatelessWidget {
-  const ConsultationChoices({super.key, required this.doctor});
+  const ConsultationChoices(
+      {super.key, required this.doctor, this.paymentRequired = true});
   final PublicDoctorDto doctor;
+  final bool paymentRequired;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final video = doctor.videoBookable(paymentRequired: paymentRequired);
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
@@ -33,16 +38,21 @@ class ConsultationChoices extends StatelessWidget {
           const SizedBox(height: 8),
           Text(doctor.displayName,
               style: Theme.of(context).textTheme.bodyMedium),
-          if (doctor.supportsVideo) ...[
+          if (video) ...[
             const SizedBox(height: 24),
-            _option(context, Icons.videocam_outlined, l.consultVideo,
-                doctor.consultationFeeVideo, l.consultBookVideo, 'VIDEO'),
+            _option(
+                context,
+                Icons.videocam_outlined,
+                l.consultVideo,
+                doctor.supportsVideo ? doctor.consultationFeeVideo : null,
+                l.consultBookVideo,
+                'VIDEO'),
           ],
-          if (doctor.supportsVideo && doctor.supportsChat)
+          if (video && doctor.supportsChat)
             const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24), child: Divider()),
           if (doctor.supportsChat) ...[
-            if (!doctor.supportsVideo) const SizedBox(height: 24),
+            if (!video) const SizedBox(height: 24),
             _option(context, Icons.chat_bubble_outline_rounded, l.consultChat,
                 doctor.consultationFeeChat, l.consultBookChat, 'CHAT'),
           ],
@@ -51,7 +61,7 @@ class ConsultationChoices extends StatelessWidget {
     );
   }
 
-  Widget _option(BuildContext context, IconData icon, String title, String fee,
+  Widget _option(BuildContext context, IconData icon, String title, String? fee,
       String action, String modality) {
     final l = AppLocalizations.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -62,8 +72,10 @@ class ConsultationChoices extends StatelessWidget {
             child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
       ]),
       const SizedBox(height: 8),
-      Text('KES $fee', style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 4),
+      if (fee != null) ...[
+        Text('KES $fee', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 4),
+      ],
       Text(l.consultSlotNotice),
       const SizedBox(height: 16),
       SizedBox(
@@ -117,14 +129,17 @@ class PatientDoctorCard extends StatelessWidget {
       required this.doctor,
       required this.repo,
       required this.onProfile,
-      required this.onBook});
+      required this.onBook,
+      this.paymentRequired = true});
   final PublicDoctorDto doctor;
+  final bool paymentRequired;
   final DirectoryRepository repo;
   final VoidCallback onProfile;
   final ValueChanged<String> onBook;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final video = doctor.videoBookable(paymentRequired: paymentRequired);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -178,20 +193,22 @@ class PatientDoctorCard extends StatelessWidget {
             OutlinedButton(
                 onPressed: onProfile,
                 child: Text(l.consultProfile, textAlign: TextAlign.center)),
-            if (doctor.supportsVideo || doctor.supportsChat)
+            if (video || doctor.supportsChat)
               FilledButton(
                   onPressed: () {
-                    if (doctor.supportsVideo && doctor.supportsChat) {
+                    if (video && doctor.supportsChat) {
                       showConsultationChoices(context,
-                          doctor: doctor, onBook: onBook);
+                          doctor: doctor,
+                          paymentRequired: paymentRequired,
+                          onBook: onBook);
                     } else {
-                      onBook(doctor.supportsVideo ? 'VIDEO' : 'CHAT');
+                      onBook(video ? 'VIDEO' : 'CHAT');
                     }
                   },
                   child: Text(
-                      doctor.supportsVideo && doctor.supportsChat
+                      video && doctor.supportsChat
                           ? l.consultAction
-                          : doctor.supportsVideo
+                          : video
                               ? l.consultBookVideo
                               : l.consultBookChat,
                       textAlign: TextAlign.center)),
