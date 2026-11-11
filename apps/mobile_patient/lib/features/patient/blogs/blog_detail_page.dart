@@ -99,7 +99,7 @@ class _BlogDetailPageState extends State<BlogDetailPage> {
                       Expanded(
                         child: Text(
                             article.isAdmin
-                                ? article.authorName
+                                ? l10n.blogsEditorial
                                 : '${article.authorName} • ${article.specialty}',
                             style: const TextStyle(
                                 fontSize: 12, color: PatientTokens.textSub)),

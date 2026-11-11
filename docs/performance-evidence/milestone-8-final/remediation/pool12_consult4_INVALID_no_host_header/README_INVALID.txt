@@ -1,0 +1,1 @@
+INVALID: this run was sent without CAPACITY_HOST_HEADER=api.localhost, so every request hit Caddy's own blank 200 fallback and never reached the backend. Kept only as a record of the mistake. See parent dir's actual pool12_consult4/ for the corrected run.

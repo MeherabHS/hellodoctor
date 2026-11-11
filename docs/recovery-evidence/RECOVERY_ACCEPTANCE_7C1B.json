@@ -1,0 +1,28 @@
+﻿{
+  "incident_id": "synthetic-7c1b-local-20261029",
+  "fixture_id": "docker-tmpfs-pg16-recovery-fixture",
+  "source_database": "disposable-postgresql-source",
+  "target_database": "disposable-postgresql-target",
+  "selected_recovery_timestamp": "2026-10-28T15:03:35Z",
+  "latest_restored_transaction_timestamp": "2026-10-28T15:03:35Z",
+  "durations_ms": {
+    "backup_creation": null,
+    "database_restore": null,
+    "object_restore": 1066.28,
+    "application_reconstruction": null,
+    "reconciliation": 1407.96,
+    "total_validated_recovery": null
+  },
+  "artifact_version": "hellodoctor-backend-v2.4.0",
+  "migration_version": "20261130000003",
+  "checks": [
+    {"name": "postgresql-physical-pitr", "status": "PASSED", "evidence": "pre-point row restored; post-point row absent; target promoted"},
+    {"name": "recovery-mode-safety", "status": "PASSED", "evidence": "health and operator status allowed; ordinary auth, clinical and external-effect routes denied"},
+    {"name": "erasure-journal-integrity", "status": "PASSED", "evidence": "7 local tests cover tampering, reordering, truncation and missing checkpoint"},
+    {"name": "encrypted-object-recovery", "status": "PASSED", "evidence": "in-memory backup-copy restore, hash and key checks passed"},
+    {"name": "full-seeded-application-reconstruction", "status": "NOT_EXECUTED", "evidence": "synthetic business records were not fully seeded through the application"},
+    {"name": "azurite-backup-copy", "status": "NOT_EXECUTED", "evidence": "Azurite container setup was not completed"},
+    {"name": "azure-cloud-recovery", "status": "NOT_EXECUTED", "evidence": "no Azure resources are authorized"}
+  ],
+  "outcome": "PARTIAL"
+}

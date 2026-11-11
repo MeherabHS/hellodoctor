@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/utils/time_format.dart';
 import 'doctor_models.dart';
 
 class ClinicalMessageBubble extends StatelessWidget {
@@ -19,9 +20,7 @@ class ClinicalMessageBubble extends StatelessWidget {
     final local = DateTime.tryParse(message.sentAt)
         ?.toUtc()
         .add(const Duration(hours: 3));
-    final time = local == null
-        ? ''
-        : '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    final time = local == null ? '' : formatTime12h(local);
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(

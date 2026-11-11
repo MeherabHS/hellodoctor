@@ -68,6 +68,57 @@ pub async fn revoke_family<'e, E: PgExecutor<'e>>(
     Ok(())
 }
 
+/// Account-wide "sign out everywhere except here" — previously the one
+/// missing primitive flagged during the Phase 0 email audit (only
+/// `revoke_family`, scoped to a single login lineage, existed in live
+/// code; a true "every session for this user" revoke only ever existed in
+/// the offline `examples/reset_admin_password.rs` operator tool). Built now
+/// for the change-password flow, where it is a real security requirement:
+/// a password change must invalidate every OTHER active session, since
+/// whoever had the old password may still hold a live token. Excludes
+/// `keep_session_id` (the leaf `auth_sessions.id` making this very
+/// request) rather than a `token_family_id`, because at most one leaf per
+/// family is ever active (`rotated_at IS NULL`) — excluding the current
+/// active leaf is equivalent to excluding its whole family, and this
+/// avoids a second lookup to resolve that family id. Returns the number of
+/// sessions revoked.
+pub async fn revoke_all_other_sessions_for_user<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: UserId,
+    keep_session_id: Uuid,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        "UPDATE auth_sessions SET revoked_at = $3 \
+         WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL",
+    )
+    .bind(user_id)
+    .bind(keep_session_id)
+    .bind(Utc::now())
+    .execute(executor)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+/// Full account-wide "sign out everywhere" — unlike
+/// `revoke_all_other_sessions_for_user`, there is no session to keep,
+/// because the caller (password reset) is never an authenticated session to
+/// begin with. Used exactly once, after a reset completes, so whoever held
+/// the old password's live tokens is force-logged-out everywhere. Returns
+/// the number of sessions revoked.
+pub async fn revoke_all_sessions_for_user<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: UserId,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        "UPDATE auth_sessions SET revoked_at = $2 WHERE user_id = $1 AND revoked_at IS NULL",
+    )
+    .bind(user_id)
+    .bind(Utc::now())
+    .execute(executor)
+    .await?;
+    Ok(result.rows_affected())
+}
+
 pub async fn consume_refresh_token(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     session_id: Uuid,

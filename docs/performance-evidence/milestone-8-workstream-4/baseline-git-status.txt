@@ -1,0 +1,248 @@
+ M .dockerignore
+ M .github/workflows/backend-migrations.yml
+ M .github/workflows/security-scan.yml
+ M apps/admin-web/package-lock.json
+ M apps/admin-web/src/app/api/article-media/[id]/route.ts
+ M apps/admin-web/src/app/api/diagnostics/route.ts
+ M apps/admin-web/src/app/api/documents/download/route.ts
+ M apps/admin-web/src/app/api/login/route.ts
+ M apps/admin-web/src/app/api/login/verify/route.ts
+ M apps/admin-web/src/app/api/proxy/[...path]/route.ts
+ M apps/admin-web/src/app/login/page.tsx
+ M apps/admin-web/src/app/page.tsx
+ M apps/admin-web/src/components/blogs/ArticleEditor.tsx
+ M apps/admin-web/src/components/blogs/BlogManager.tsx
+ M apps/admin-web/src/components/blogs/CategoryManager.tsx
+ M apps/admin-web/src/components/blogs/McqBuilder.tsx
+ M apps/admin-web/src/components/blogs/QuizImport.tsx
+ M apps/admin-web/src/data/adminStore.ts
+ M apps/admin-web/src/lib/api.ts
+ M apps/admin-web/src/lib/refresh.ts
+ M apps/admin-web/src/lib/session.ts
+ M apps/admin-web/src/lib/useBackendSync.ts
+ M apps/admin-web/src/middleware.ts
+ M apps/admin-web/tests/blog-preview.test.tsx
+ M apps/admin-web/tests/refresh.test.ts
+ M apps/doctor-web/package-lock.json
+ M apps/doctor-web/package.json
+ M apps/mobile/lib/app.dart
+ M apps/mobile/lib/core/network/api_client.dart
+ M apps/mobile/lib/core/notifications/local_notification_service.dart
+ M apps/mobile/lib/core/notifications/push_notification_service.dart
+ M apps/mobile/lib/core/video/agora_engine.dart
+ M apps/mobile/lib/core/video/call_controller.dart
+ M apps/mobile/lib/core/widgets/doctor_widgets.dart
+ M apps/mobile/lib/features/doctor/agora_page.dart
+ M apps/mobile/lib/features/doctor/articles_page.dart
+ M apps/mobile/lib/features/doctor/clinical_image_viewer.dart
+ M apps/mobile/lib/features/doctor/doctor_cubit.dart
+ M apps/mobile/lib/features/doctor/doctor_pages.dart
+ M apps/mobile/lib/features/doctor/doctor_repository.dart
+ M apps/mobile/lib/features/doctor/profile_photo_avatar.dart
+ M apps/mobile/lib/features/notifications/notification_center_page.dart
+ M apps/mobile/lib/features/notifications/notification_models.dart
+ M apps/mobile/lib/features/notifications/notification_repository.dart
+ M apps/mobile/lib/features/settings/notification_settings_page.dart
+ M apps/mobile/pubspec.lock
+ M apps/mobile/pubspec.yaml
+ M apps/mobile/test/core/video/call_controller_test.dart
+ M apps/mobile/test/core/video/call_screen_guard_test.dart
+ M apps/mobile/test/notification_center_page_test.dart
+ M apps/mobile/test/notification_repository_test.dart
+ M apps/mobile/test/profile_photo_avatar_test.dart
+ M apps/mobile/test/profile_photo_repository_test.dart
+ M apps/mobile/test/push_notification_service_test.dart
+ M apps/mobile_patient/lib/app.dart
+ M apps/mobile_patient/lib/core/network/api_client.dart
+ M apps/mobile_patient/lib/core/notifications/local_notification_service.dart
+ M apps/mobile_patient/lib/core/notifications/push_notification_service.dart
+ M apps/mobile_patient/lib/core/video/agora_engine.dart
+ M apps/mobile_patient/lib/core/video/call_controller.dart
+ M apps/mobile_patient/lib/features/notifications/notification_center_page.dart
+ M apps/mobile_patient/lib/features/notifications/notification_models.dart
+ M apps/mobile_patient/lib/features/notifications/notification_repository.dart
+ M apps/mobile_patient/lib/features/notifications/notification_settings_page.dart
+ M apps/mobile_patient/lib/features/patient/blogs/blog_detail_page.dart
+ M apps/mobile_patient/lib/features/patient/blogs/blogs_models.dart
+ M apps/mobile_patient/lib/features/patient/blogs/blogs_page.dart
+ M apps/mobile_patient/lib/features/patient/blogs/blogs_repository.dart
+ M apps/mobile_patient/lib/features/patient/booking/booking_models.dart
+ M apps/mobile_patient/lib/features/patient/chat/consultation_status_page.dart
+ M apps/mobile_patient/lib/features/patient/home/home_models.dart
+ M apps/mobile_patient/lib/features/patient/home/patient_home_page.dart
+ M apps/mobile_patient/lib/features/patient/profile/profile_cubit.dart
+ M apps/mobile_patient/lib/features/patient/profile/profile_photo_avatar.dart
+ M apps/mobile_patient/lib/features/patient/vault/health_vault_page.dart
+ M apps/mobile_patient/lib/features/patient/vault/vault_repository.dart
+ M apps/mobile_patient/lib/features/patient/video/agora_call_page.dart
+ M apps/mobile_patient/lib/l10n/app_en.arb
+ M apps/mobile_patient/lib/l10n/app_sw.arb
+ M apps/mobile_patient/pubspec.lock
+ M apps/mobile_patient/pubspec.yaml
+ M apps/mobile_patient/test/admin_articles_test.dart
+ M apps/mobile_patient/test/core/video/call_controller_test.dart
+ M apps/mobile_patient/test/locale_controller_test.dart
+ M apps/mobile_patient/test/notification_repository_test.dart
+ M apps/mobile_patient/test/patient_quiz_test.dart
+ M apps/mobile_patient/test/profile_photo_avatar_test.dart
+ M apps/mobile_patient/test/profile_photo_cubit_test.dart
+ M apps/mobile_patient/test/profile_photo_repository_test.dart
+ M apps/mobile_patient/test/push_notification_service_test.dart
+ M docs/API_SPEC.md
+ M docs/AUTH_SECURITY.md
+ M docs/AZURE_BLOB_INTEGRATION_PLAN.md
+ M docs/CHECKPOINT.md
+ M docs/DATABASE_SCHEMA.md
+ M docs/DEFINITION_OF_DONE.md
+ M docs/DOMAIN_MODEL.md
+ M docs/FCM_SETUP.md
+ M docs/PROGRESS.md
+ M docs/TESTING_STRATEGY.md
+ M services/backend/.env.example
+ M services/backend/Cargo.lock
+ M services/backend/Cargo.toml
+ M services/backend/Dockerfile
+ M services/backend/examples/capacity_test.rs
+ D services/backend/examples/encrypt_admin_totp.rs
+ M services/backend/examples/load_test.rs
+ M services/backend/scripts/sample_container_resources.ps1
+ M services/backend/scripts/seed_benchmark_dataset_template.sql
+ M services/backend/scripts/seed_capacity_dataset.sql
+ M services/backend/src/admission.rs
+ M services/backend/src/api/middleware/global_guard.rs
+ M services/backend/src/api/router.rs
+ M services/backend/src/api/v1/admin_handlers.rs
+ M services/backend/src/api/v1/article_handlers.rs
+ M services/backend/src/api/v1/auth_handlers.rs
+ M services/backend/src/api/v1/campaign_handlers.rs
+ M services/backend/src/api/v1/chat_attachment_handlers.rs
+ M services/backend/src/api/v1/notification_handlers.rs
+ M services/backend/src/config.rs
+ M services/backend/src/crypto.rs
+ M services/backend/src/domain/models.rs
+ M services/backend/src/main.rs
+ M services/backend/src/repository/admin_article_repo.rs
+ M services/backend/src/repository/appointment_repo.rs
+ M services/backend/src/repository/campaign_repo.rs
+ M services/backend/src/repository/mod.rs
+ M services/backend/src/repository/notification_repo.rs
+ M services/backend/src/repository/transaction_repo.rs
+ D services/backend/src/services/admin_totp.rs
+ M services/backend/src/services/appointment_service.rs
+ M services/backend/src/services/article_media_service.rs
+ M services/backend/src/services/auth_service.rs
+ M services/backend/src/services/consultation_trace.rs
+ M services/backend/src/services/data_rights_service.rs
+ M services/backend/src/services/document_storage_service.rs
+ M services/backend/src/services/grievance_service.rs
+ M services/backend/src/services/mod.rs
+ M services/backend/src/services/notification_scheduler.rs
+ M services/backend/src/services/notification_service.rs
+ M services/backend/src/services/profile_picture_service.rs
+ M services/backend/tests/api_tests.rs
+ M services/backend/tests/cases/admin_articles.rs
+ M services/backend/tests/cases/admin_campaigns.rs
+ M services/backend/tests/cases/engagement_and_holiday_notifications.rs
+ M services/backend/tests/cases/notification_localization_preferences.rs
+ M services/backend/tests/cases/profile_pictures.rs
+ M services/backend/tests/cases/push_notification_delivery.rs
+ M services/backend/tests/cases/security_acceptance.rs
+?? .env.example
+?? .github/workflows/application-checks.yml
+?? AGENTS.md
+?? apps/admin-web/src/app/api/session/
+?? apps/admin-web/src/components/navigation/
+?? apps/admin-web/src/lib/dataRightsOutcome.ts
+?? apps/admin-web/src/lib/financeProjection.ts
+?? apps/admin-web/tests/browser/
+?? apps/admin-web/tests/data-rights-outcome.test.ts
+?? apps/admin-web/tests/editor-concurrency.test.tsx
+?? apps/admin-web/tests/finance-projection.test.ts
+?? apps/admin-web/tests/navigation-guard.test.tsx
+?? apps/doctor-web/eslint.config.mjs
+?? apps/mobile/l10n.yaml
+?? apps/mobile/lib/core/l10n/
+?? apps/mobile/lib/core/notifications/notification_taps.dart
+?? apps/mobile/lib/features/doctor/clinical_pdf_viewer.dart
+?? apps/mobile/lib/features/notifications/notification_appointment_page.dart
+?? apps/mobile/lib/features/notifications/notification_destination.dart
+?? apps/mobile/lib/features/notifications/notification_navigation.dart
+?? apps/mobile/lib/l10n/
+?? apps/mobile/test/doctor_document_viewer_test.dart
+?? apps/mobile/test/doctor_locale_test.dart
+?? apps/mobile/test/notification_navigation_test.dart
+?? apps/mobile_patient/lib/core/notifications/notification_taps.dart
+?? apps/mobile_patient/lib/features/notifications/notification_appointment_page.dart
+?? apps/mobile_patient/lib/features/notifications/notification_destination.dart
+?? apps/mobile_patient/lib/features/notifications/notification_navigation.dart
+?? apps/mobile_patient/lib/features/patient/blogs/blog_discovery_controller.dart
+?? apps/mobile_patient/lib/features/patient/vault/clinical_pdf_viewer.dart
+?? apps/mobile_patient/test/article_discovery_test.dart
+?? apps/mobile_patient/test/blog_discovery_controller_test.dart
+?? apps/mobile_patient/test/health_vault_document_viewer_test.dart
+?? apps/mobile_patient/test/notification_navigation_test.dart
+?? deploy/
+?? docs/AZURE_BLOB_SETUP.md
+?? docs/BACKUP_RESTORE_RUNBOOK.md
+?? docs/DISASTER_RECOVERY_ARCHITECTURE.md
+?? docs/DISASTER_RECOVERY_PLAN.md
+?? docs/MILESTONE_7B_AZURE_BLOB_REPORT.md
+?? docs/MILESTONE_7C_DR_REPORT.md
+?? docs/MILESTONE_8_0R_ADMISSION_CONTROL_REMEDIATION.md
+?? docs/MILESTONE_8_0_BOOKING_FAIRNESS_REMEDIATION.md
+?? docs/MILESTONE_8_0_DB_PERFORMANCE_REMEDIATION.md
+?? docs/MILESTONE_8_0_PERFORMANCE_CHARACTERIZATION.md
+?? docs/MILESTONE_8_CRITICAL_QUERY_INDEX_AUDIT.md
+?? docs/MILESTONE_8_FUNCTIONAL_DEPENDENCY_VERIFICATION.md
+?? docs/MILESTONE_8_MEMORY_PROFILE.md
+?? docs/MILESTONE_8_SUSTAINED_RELIABILITY.md
+?? docs/RECOVERY_SECURITY_MODEL.md
+?? docs/REMEDIATION_A_RECONCILIATION.md
+?? docs/REMEDIATION_A_REPORT.md
+?? docs/REMEDIATION_B_REPORT.md
+?? docs/REMEDIATION_C_REPORT.md
+?? docs/REMEDIATION_D_REPORT.md
+?? docs/REMEDIATION_E1_DR_ERASURE_REPORT.md
+?? docs/REMEDIATION_E2_CLINICAL_DOCUMENT_PRIVACY_REPORT.md
+?? docs/REMEDIATION_E3_AZURE_CONTAINER_HARDENING_REPORT.md
+?? docs/REMEDIATION_E4_DATABASE_SUPPLY_CHAIN_REPORT.md
+?? docs/UNIFIED_ENV_CONFIGURATION_REPORT.md
+?? docs/VM_CONFIGURATION_GUIDE.md
+?? docs/performance-evidence/
+?? docs/recovery-evidence/
+?? ops/
+?? services/backend/docker-compose.configA.yml
+?? services/backend/examples/clinical_doc_test.rs
+?? services/backend/examples/config_preflight.rs
+?? services/backend/examples/dr_reconcile.rs
+?? services/backend/migrations/20261130000001_remediation_a_finance.down.sql
+?? services/backend/migrations/20261130000001_remediation_a_finance.up.sql
+?? services/backend/migrations/20261130000002_durable_account_erasure.down.sql
+?? services/backend/migrations/20261130000002_durable_account_erasure.up.sql
+?? services/backend/migrations/20261130000003_notification_delivery_ownership.down.sql
+?? services/backend/migrations/20261130000003_notification_delivery_ownership.up.sql
+?? services/backend/migrations/20261201000001_dr_erasure_reconciliation.down.sql
+?? services/backend/migrations/20261201000001_dr_erasure_reconciliation.up.sql
+?? services/backend/migrations/20261202000001_fix_stale_admin_role_references.down.sql
+?? services/backend/migrations/20261202000001_fix_stale_admin_role_references.up.sql
+?? services/backend/migrations/20261202000002_remove_admin_totp.down.sql
+?? services/backend/migrations/20261202000002_remove_admin_totp.up.sql
+?? services/backend/migrations/20261202000003_chat_messages_insert_rls_performance.down.sql
+?? services/backend/migrations/20261202000003_chat_messages_insert_rls_performance.up.sql
+?? services/backend/migrations/20261202000004_maintenance_job_volatile_timestamp_scans.down.sql
+?? services/backend/migrations/20261202000004_maintenance_job_volatile_timestamp_scans.up.sql
+?? services/backend/migrations/20261202000005_t15_reminder_scan_indexes.down.sql
+?? services/backend/migrations/20261202000005_t15_reminder_scan_indexes.up.sql
+?? services/backend/scripts/cleanup_capacity_test_seed_data.sql
+?? services/backend/scripts/sample_full_telemetry.ps1
+?? services/backend/scripts/seed_capacity_dataset_scaleup_10k.sql
+?? services/backend/scripts/seed_topup_slots_for_sustained_2k.sql
+?? services/backend/src/services/dr_erasure_journal.rs
+?? services/backend/src/services/dr_reconciliation.rs
+?? services/backend/tests/azure_storage.rs
+?? services/backend/tests/cases/admission_control_fairness.rs
+?? services/backend/tests/cases/remediation_a.rs
+?? services/backend/tests/cases/remediation_c.rs
+?? services/backend/tests/cases/remediation_d.rs
+?? services/backend/tests/cases/remediation_e1.rs
+?? services/backend/tests/recovery_blob.rs

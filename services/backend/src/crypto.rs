@@ -275,8 +275,26 @@ pub fn hash_code(code: &str) -> String {
     format!("{:x}", Sha256::digest(code.as_bytes()))
 }
 
+/// Remediation E4 (Phase 1 finding #4 / Phase 5): byte-wise constant-time
+/// equality for comparing digests (OTP/MFA code hashes, HMACs) so an
+/// attacker measuring response latency across many attempts cannot use
+/// early-exit `==` comparison to infer how many leading bytes matched.
+/// Moved here from `services/dr_erasure_journal.rs` (which already had its
+/// own private copy for HMAC verification) so both call sites share one
+/// reviewed implementation instead of two independently-written ones.
+pub(crate) fn constant_time_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    a.as_bytes()
+        .iter()
+        .zip(b.as_bytes())
+        .fold(0u8, |acc, (x, y)| acc | (x ^ y))
+        == 0
+}
+
 pub fn verify_code(code: &str, hash: &str) -> bool {
-    hash_code(code) == hash
+    constant_time_eq(&hash_code(code), hash)
 }
 
 // ---------------- Generic at-rest encryption (AES-256-GCM) ----------------
@@ -451,4 +469,38 @@ pub fn verify_access_token(token: &str, public_key_der_b64: &str) -> Result<Clai
     decode::<Claims>(token, &key, &validation)
         .map(|data| data.claims)
         .map_err(|e| AppError::Unauthorized(format!("Invalid or expired access token: {e}")))
+}
+
+#[cfg(test)]
+mod remediation_e4_constant_time_tests {
+    use super::*;
+
+    #[test]
+    fn constant_time_eq_accepts_identical_strings() {
+        assert!(constant_time_eq("abc123", "abc123"));
+    }
+
+    #[test]
+    fn constant_time_eq_rejects_different_values_same_length() {
+        assert!(!constant_time_eq("abc123", "abc124"));
+    }
+
+    #[test]
+    fn constant_time_eq_rejects_different_lengths() {
+        assert!(!constant_time_eq("short", "muchlonger"));
+    }
+
+    #[test]
+    fn constant_time_eq_rejects_empty_vs_nonempty() {
+        assert!(!constant_time_eq("", "x"));
+        assert!(constant_time_eq("", ""));
+    }
+
+    #[test]
+    fn verify_code_uses_constant_time_comparison_and_still_verifies_correctly() {
+        let hash = hash_code("913627");
+        assert!(verify_code("913627", &hash));
+        assert!(!verify_code("000000", &hash));
+        assert!(!verify_code("9136270", &hash));
+    }
 }

@@ -58,6 +58,7 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
     _cubit = BookingCubit(widget.repo,
         doctorId: widget.doctor.id, modality: widget.modality)
       ..loadSlots()
+      ..loadBookingPolicy()
       ..loadPaymentMethods(
           profileId: widget.familyProfilesCubit.state.activeProfileId);
     _availabilityRefresh = AvailabilityRefresh(() {
@@ -102,7 +103,8 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                   status: result.status,
                   startTime: slot.startTime,
                   endTime: slot.endTime,
-                  fee: result.amount),
+                  fee: result.amount,
+                  paymentPolicy: result.paymentPolicy),
               repo: widget.repo,
               myUserId: myUserId,
               familyProfilesCubit: widget.familyProfilesCubit,
@@ -199,15 +201,31 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        _FeeSummary(
-                            doctor: widget.doctor, modality: widget.modality),
-                        const SizedBox(height: 14),
-                        _PaymentMethodPicker(
-                          state: state,
-                          cubit: _cubit,
-                          profileId:
-                              widget.familyProfilesCubit.state.activeProfileId,
-                        ),
+                        if (state.paymentRequired) ...[
+                          _FeeSummary(
+                              doctor: widget.doctor,
+                              modality: widget.modality),
+                          const SizedBox(height: 14),
+                          _PaymentMethodPicker(
+                            state: state,
+                            cubit: _cubit,
+                            profileId: widget
+                                .familyProfilesCubit.state.activeProfileId,
+                          ),
+                        ] else
+                          PatientCard(
+                            child: Row(children: [
+                              const Icon(Icons.check_circle_outline,
+                                  color: PatientTokens.primary, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                  child: Text(
+                                      l10n.bookingNoPaymentRequiredNotice,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: PatientTokens.text))),
+                            ]),
+                          ),
                         if (state.submitError != null) ...[
                           const SizedBox(height: 6),
                           InlineError(state.submitError!),
@@ -236,7 +254,10 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                             height: 18,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white))
-                        : Text(l10n.bookingProceedToPayment(_fee),
+                        : Text(
+                            state.paymentRequired
+                                ? l10n.bookingProceedToPayment(_fee)
+                                : l10n.bookingConfirmNoPayment,
                             textAlign: TextAlign.center,
                             style:
                                 const TextStyle(fontWeight: FontWeight.w800)),

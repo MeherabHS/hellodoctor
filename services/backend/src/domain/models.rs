@@ -330,6 +330,23 @@ pub enum Modality {
     Chat,
 }
 
+/// Recorded once, at booking time, from the `FinancialModuleMode` in effect
+/// *then* — never re-derived later, so flipping the server-wide mode can
+/// never retroactively change what an existing appointment owes or doesn't.
+/// `Required` is the default for every historically-existing row (see
+/// migration 20261204000002). `NotRequired` is set only when
+/// `AppointmentService::book_appointment` runs in `FinancialModuleMode::Deferred`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[sqlx(
+    type_name = "payment_policy_enum",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
+pub enum PaymentPolicy {
+    Required,
+    NotRequired,
+}
+
 /// Stored as plain TEXT + CHECK constraint in Postgres (not a native enum type),
 /// so DB rows carry it as `Option<String>` and convert through this type at the edges.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -372,6 +389,7 @@ pub struct Appointment {
     pub modality: Modality,
     pub status: AppointmentStatus,
     pub consultation_fee: BigDecimal,
+    pub payment_policy: PaymentPolicy,
     pub clinical_outcome: Option<String>,
     pub completed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
@@ -609,6 +627,9 @@ pub struct Transaction {
     pub platform_fee_amount: BigDecimal, // Strictly 20%
     pub net_amount: BigDecimal,          // Strictly 80%
     pub payment_status: PaymentStatus,
+    /// Captured funds without a valid booking require reviewed reconciliation.
+    #[serde(default)]
+    pub reconciliation_required: bool,
     pub created_at: DateTime<Utc>,
     pub settled_at: Option<DateTime<Utc>>,
     pub currency: String,
@@ -798,6 +819,23 @@ pub struct PendingMfaChallenge {
     pub created_at: DateTime<Utc>,
     pub attempt_count: i16,
     pub max_attempts: i16,
+}
+
+/// Phase 2: Secure Email OTP Password Recovery. State is derived rather than
+/// stored (see migrations/20261207000001_password_reset's doc comment):
+/// `authorization_hash.is_none()` means still awaiting OTP verification,
+/// `Some` means verified and awaiting the final `complete_reset` call.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct PasswordResetRequest {
+    pub token: String,
+    pub user_id: UserId,
+    pub code_hash: String,
+    pub attempt_count: i16,
+    pub max_attempts: i16,
+    pub otp_expires_at: DateTime<Utc>,
+    pub authorization_hash: Option<String>,
+    pub authorization_expires_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

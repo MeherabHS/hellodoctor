@@ -1,13 +1,15 @@
 // ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables, use_build_context_synchronously
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../profile/family_profiles_cubit.dart';
+import 'clinical_pdf_viewer.dart';
 import 'vault_cubit.dart';
 import 'vault_models.dart';
 import 'vault_repository.dart';
@@ -51,25 +53,49 @@ class _HealthVaultPageState extends State<HealthVaultPage> {
     super.dispose();
   }
 
+  /// Remediation E2: fetches the document's bytes and cross-checks the
+  /// server's own authoritative `Content-Type` response header against the
+  /// `mimeType` declared in the document listing. A mismatch means the
+  /// listing and the actual stored object disagree about what this file is —
+  /// refuse to render either way rather than trusting either source alone.
+  Future<Uint8List> _loadVerifiedBytes(PatientDocumentDto doc) async {
+    final result =
+        await widget.repo.fetchDocumentBytes(doc.appointmentId, doc.id);
+    final declared = doc.mimeType;
+    if (declared != null &&
+        result.contentType != null &&
+        declared.toLowerCase() != result.contentType) {
+      throw const ApiException(
+          409, 'This document could not be verified and was not opened.');
+    }
+    return result.bytes;
+  }
+
   Future<void> _open(PatientDocumentDto doc) async {
     if (_openingIds.contains(doc.id)) return;
     setState(() => _openingIds.add(doc.id));
     try {
-      final url =
-          await widget.repo.resolveDownloadUrl(doc.appointmentId, doc.id);
-      if (!mounted) return;
-      if (doc.mimeType == 'image/jpeg' || doc.mimeType == 'image/png') {
+      final mime = doc.mimeType?.toLowerCase();
+      if (mime == 'image/jpeg' || mime == 'image/png') {
+        final url =
+            await widget.repo.resolveDownloadUrl(doc.appointmentId, doc.id);
+        if (!mounted) return;
         await Navigator.of(context).push(MaterialPageRoute(
           builder: (_) =>
               _ImageViewerPage(url: url, title: _titleOf(context, doc)),
         ));
-      } else {
-        final launched =
-            await launchUrl(url, mode: LaunchMode.externalApplication);
-        if (!launched && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(AppLocalizations.of(context).vaultOpenError)));
-        }
+      } else if (mime == 'application/pdf') {
+        if (!mounted) return;
+        await Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ClinicalPdfViewer(
+              load: () => _loadVerifiedBytes(doc),
+              title: _titleOf(context, doc)),
+        ));
+      } else if (mounted) {
+        // No external-application fallback for an unrecognized or missing
+        // mime type — a safe "cannot preview" state, never a guess.
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(AppLocalizations.of(context).vaultOpenError)));
       }
     } catch (_) {
       if (!mounted) return;

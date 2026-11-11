@@ -3,17 +3,15 @@ package com.hellodoctor.patient
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import android.os.Bundle
-import android.view.WindowManager
 
 class MainActivity : FlutterActivity() {
-    // Screen content here is clinical (consultation video, prescriptions,
-    // Health Vault documents) — FLAG_SECURE stops both a screenshot/screen-
-    // recording of this content by another app and the OS's own recent-apps
-    // task-switcher snapshot from ever capturing it, the same PHI-exposure
-    // side door CLAUDE.md's existing "no generic disk caching of medical
-    // images" and "never log PHI" rules already guard against by other means.
+    // FLAG_SECURE (screenshot/screen-recording/recent-apps-snapshot block for
+    // this clinical screen content) was deliberately removed here at the
+    // product owner's explicit request, after being told this trades away a
+    // real PHI-exposure protection (screenshots/recordings of consultation
+    // video, prescriptions and chat become possible again, in every build
+    // including release) — not an oversight or a debug-only carve-out.
     override fun onCreate(savedInstanceState: Bundle?) {
-        window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         super.onCreate(savedInstanceState)
     }
 

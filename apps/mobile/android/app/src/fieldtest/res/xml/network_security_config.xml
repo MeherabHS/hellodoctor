@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Narrowly-scoped LAN-testing build type (`fieldtest`), additive to and
+  independent from `release` - the real release build type's own
+  src/main/res/xml/network_security_config.xml (localhost/10.0.2.2 only,
+  hardened in commit 47078ee) is completely untouched by this file. Android
+  only merges this resource into a build that explicitly selects the
+  `fieldtest` build type; a plain `flutter build apk` release build never
+  produces this build type and is unaffected.
+
+  Only the single LAN IP this physical-device test session is actually using
+  is trusted for cleartext HTTP, not a /16 or broader range, so this stays a
+  narrow, reversible exception rather than reintroducing the "any domain"
+  gap that commit 47078ee closed. Update or remove this file (and the
+  matching API_BASE_URL dart-define) when this test session's host IP
+  changes or the field test is done - it is local test-only tooling, never
+  meant to reach a real release build or distribution channel.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.0.103</domain>
+    </domain-config>
+</network-security-config>

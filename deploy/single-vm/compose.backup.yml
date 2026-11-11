@@ -1,0 +1,141 @@
+name: hellodoctor-vm
+services:
+  postgres:
+    platform: linux/arm64
+    image: ${POSTGRES_BACKUP_IMAGE:?set the reviewed pgBackRest-enabled PostgreSQL image}
+    entrypoint: ["/usr/local/bin/postgres-entrypoint.sh"]
+    environment:
+      PGBACKREST_REPO1_TYPE: ${PGBACKREST_REPO1_TYPE:-posix}
+      PGBACKREST_REPO1_AZURE_ACCOUNT: ${PGBACKREST_REPO1_AZURE_ACCOUNT:-}
+      PGBACKREST_REPO1_AZURE_CONTAINER: ${PGBACKREST_REPO1_AZURE_CONTAINER:-}
+      PGBACKREST_REPO1_AZURE_ENDPOINT: ${PGBACKREST_REPO1_AZURE_ENDPOINT:-core.windows.net}
+      PGBACKREST_REPO1_AZURE_KEY: ${PGBACKREST_REPO1_AZURE_KEY:-}
+      PGBACKREST_REPO1_AZURE_KEY_TYPE: ${PGBACKREST_REPO1_AZURE_KEY_TYPE:-auto}
+      # Either this or PGBACKREST_REPO1_CIPHER_PASS_FILE must resolve to a
+      # non-empty value — enforced inside postgres-entrypoint.sh, not here,
+      # since compose cannot express "one of these two" as a single `:?`.
+      # The _FILE variant is preferred: it never appears in `docker inspect`
+      # or `docker exec ... env`, unlike this plain env var.
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:-}
+      PGBACKREST_REPO1_CIPHER_PASS_FILE: ${PGBACKREST_REPO1_CIPHER_PASS_FILE:-}
+      # Asynchronous archiving + a persistent spool path are opt-in (default
+      # off, unchanged synchronous behavior) until exercised under a
+      # disposable failure drill — see docs/BACKUP_RESTORE_RUNBOOK.md.
+      PGBACKREST_ARCHIVE_ASYNC: ${PGBACKREST_ARCHIVE_ASYNC:-n}
+      PGBACKREST_SPOOL_PATH: ${PGBACKREST_SPOOL_PATH:-/var/spool/pgbackrest}
+      # Automated Azure Key Vault secret retrieval (via this container's
+      # managed identity, see fetch-keyvault-secret.sh) — only activates when
+      # both are set AND PGBACKREST_REPO1_CIPHER_PASS_FILE points to a path
+      # that does not already exist. Leave unset to keep supplying the
+      # passphrase by mounting it directly (unchanged existing behavior).
+      AZURE_KEY_VAULT_NAME: ${AZURE_KEY_VAULT_NAME:-}
+      AZURE_KEY_VAULT_SECRET_NAME: ${AZURE_KEY_VAULT_SECRET_NAME:-}
+      AZURE_KEY_VAULT_SECRET_VERSION: ${AZURE_KEY_VAULT_SECRET_VERSION:-}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+    # archive_timeout bounds how long a partial (not-yet-full) WAL segment can
+    # sit unarchived during low-write periods — without it, "continuous" WAL
+    # archiving only means "archives completed segments," which can silently
+    # widen the real RPO past the documented ~15-minute target. 300s (5
+    # minutes) matches the value the audit recommended testing first; this is
+    # a ceiling, not a guarantee — archival delays, failed uploads, and a slow
+    # repository can still push actual data loss higher, which is why the
+    # monitor's `pgbackrest check` and staleness checks remain independent
+    # gates, not a substitute for this setting.
+    command: [postgres, -c, jit=off, -c, shared_preload_libraries=pg_stat_statements, -c, pg_stat_statements.track=all, -c, pg_stat_statements.max=200, -c, archive_mode=on, -c, "archive_timeout=${PG_ARCHIVE_TIMEOUT_SECONDS:-300}", -c, archive_command=pgbackrest --stanza=hellodoctor archive-push %p]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgbackrest-config:/etc/pgbackrest
+      - pgbackrest-repo:/var/lib/pgbackrest/repo1
+      - pgbackrest-socket:/var/run/postgresql
+      # archive-push (triggered by archive_command above) runs inside this
+      # container, so the spool path — when PGBACKREST_ARCHIVE_ASYNC=y — must
+      # be mounted here, not on the `backup` scheduler container. A plain
+      # (non-external) volume: unlike the repository itself, losing spooled-
+      # but-not-yet-pushed WAL is recoverable (PostgreSQL retains pg_wal until
+      # archive_command reports success and will re-spool on next attempt),
+      # so this does not need operator pre-provisioning to keep the common
+      # (archive-async=n) case friction-free.
+      - pgbackrest-spool:/var/spool/pgbackrest
+  backup:
+    platform: linux/arm64
+    build:
+      context: ./backup
+      dockerfile: pgbackrest.Dockerfile
+    image: ${POSTGRES_BACKUP_IMAGE:?set the reviewed pgBackRest-enabled PostgreSQL image}
+    environment:
+      PGBACKREST_REPO1_TYPE: ${PGBACKREST_REPO1_TYPE:-posix}
+      PGBACKREST_REPO1_AZURE_ACCOUNT: ${PGBACKREST_REPO1_AZURE_ACCOUNT:-}
+      PGBACKREST_REPO1_AZURE_CONTAINER: ${PGBACKREST_REPO1_AZURE_CONTAINER:-}
+      PGBACKREST_REPO1_AZURE_ENDPOINT: ${PGBACKREST_REPO1_AZURE_ENDPOINT:-core.windows.net}
+      PGBACKREST_REPO1_AZURE_KEY: ${PGBACKREST_REPO1_AZURE_KEY:-}
+      PGBACKREST_REPO1_AZURE_KEY_TYPE: ${PGBACKREST_REPO1_AZURE_KEY_TYPE:-auto}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:?set database owner}
+      PGDATABASE: ${POSTGRES_DB:?set database name}
+      # See the matching comment on the `postgres` service above — one of
+      # this or PGBACKREST_REPO1_CIPHER_PASS_FILE (below) must be set; the
+      # requirement is enforced inside backup-entrypoint.sh.
+      PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:-}
+      # Alerting (G-05) is opt-in: an empty BACKUP_ALERT_WEBHOOK_URL means
+      # backup-runner.sh/backup-monitor.sh log locally only and never claim
+      # external delivery. Point it at a real receiver (PagerDuty Events v2,
+      # Slack incoming webhook, or any JSON endpoint) only once tested.
+      BACKUP_ALERT_WEBHOOK_URL: ${BACKUP_ALERT_WEBHOOK_URL:-}
+      BACKUP_ALERT_WEBHOOK_AUTH_HEADER_FILE: ${BACKUP_ALERT_WEBHOOK_AUTH_HEADER_FILE:-}
+      BACKUP_ALERT_DEDUP_SECONDS: ${BACKUP_ALERT_DEDUP_SECONDS:-1800}
+      BACKUP_REPO_MAX_GROWTH_MB: ${BACKUP_REPO_MAX_GROWTH_MB:-2048}
+      # 2026-11-01 follow-up: pg_wal accumulation and data-volume free space,
+      # independent of backup-repository health (the backup container already
+      # mounts `pgdata`, so no new volume is needed for either check).
+      PG_WAL_MAX_SIZE_MB: ${PG_WAL_MAX_SIZE_MB:-4096}
+      DB_VOLUME_MIN_FREE_PERCENT: ${DB_VOLUME_MIN_FREE_PERCENT:-15}
+      # Preferred over PGBACKREST_REPO1_CIPHER_PASS: a file path (e.g. a
+      # Docker/Swarm secret mount) never appears in `docker inspect` or
+      # `docker exec ... env`, unlike a plain env var. Leave unset to keep
+      # using the env var unchanged.
+      PGBACKREST_REPO1_CIPHER_PASS_FILE: ${PGBACKREST_REPO1_CIPHER_PASS_FILE:-}
+      AZURE_KEY_VAULT_NAME: ${AZURE_KEY_VAULT_NAME:-}
+      AZURE_KEY_VAULT_SECRET_NAME: ${AZURE_KEY_VAULT_SECRET_NAME:-}
+      AZURE_KEY_VAULT_SECRET_VERSION: ${AZURE_KEY_VAULT_SECRET_VERSION:-}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      # Turns "no alert receiver configured" from a silent local-only no-op
+      # into a hard startup failure. Leave false for local/dev/CI
+      # verification; set true only for the real production deployment, after
+      # BACKUP_ALERT_WEBHOOK_URL has been pointed at a tested receiver.
+      REQUIRE_BACKUP_ALERT_WEBHOOK: ${REQUIRE_BACKUP_ALERT_WEBHOOK:-false}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pgbackrest-socket:/var/run/postgresql
+      - pgbackrest-repo:/var/lib/pgbackrest/repo1
+      - pgbackrest-config:/etc/pgbackrest
+      - pgbackrest-logs:/var/log/pgbackrest
+    networks: [data]
+    mem_limit: 256m
+    memswap_limit: 256m
+    cpuset: "0-3"
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    depends_on:
+      postgres: {condition: service_healthy}
+volumes:
+  pgbackrest-repo:
+    external: true
+    name: ${PGBACKREST_REPO_VOLUME:?set dedicated repository volume}
+  pgbackrest-config:
+    external: true
+    name: ${PGBACKREST_CONFIG_VOLUME:?set backup config volume}
+  pgbackrest-logs:
+    external: true
+    name: ${PGBACKREST_LOG_VOLUME:?set backup log volume}
+  pgbackrest-socket:
+    external: true
+    name: ${PGBACKREST_SOCKET_VOLUME:?set backup socket volume}
+  # Deliberately NOT external (unlike the four volumes above): this holds
+  # only spooled-but-not-yet-pushed WAL when PGBACKREST_ARCHIVE_ASYNC=y, which
+  # PostgreSQL will regenerate from pg_wal if lost (see the `postgres` service
+  # comment above). Requiring operator pre-provisioning here would add setup
+  # friction to every deployment, not just the ones opting into async
+  # archiving.
+  pgbackrest-spool:
+    name: ${PGBACKREST_SPOOL_VOLUME:-hellodoctor-pgbackrest-spool}

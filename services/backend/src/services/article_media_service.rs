@@ -32,7 +32,7 @@ fn object_key(id: Uuid) -> String {
 }
 fn storage(state: &AppState) -> Result<&Arc<dyn object_store::ObjectStore>, AppError> {
     state
-        .object_storage
+        .article_media_storage
         .as_ref()
         .ok_or_else(|| AppError::Conflict("Article media storage is not configured.".into()))
 }

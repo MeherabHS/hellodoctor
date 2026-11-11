@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../theme/tokens.dart';
+import '../utils/time_format.dart';
 
 class PatientCard extends StatelessWidget {
   const PatientCard(
@@ -153,9 +154,7 @@ class CacheStatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final updated = lastUpdated?.toLocal();
-    final time = updated == null
-        ? null
-        : '${updated.hour.toString().padLeft(2, '0')}:${updated.minute.toString().padLeft(2, '0')}';
+    final time = updated == null ? null : formatTime12h(updated);
     return Column(children: [
       if (refreshing) const LinearProgressIndicator(minHeight: 2),
       if (offline)

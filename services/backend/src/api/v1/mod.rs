@@ -6,6 +6,7 @@ pub mod campaign_handlers;
 pub mod chat_attachment_handlers;
 pub mod chat_handlers;
 pub mod client_error_handlers;
+pub mod config_handlers;
 pub mod consultation_handlers;
 pub mod doctor_handlers;
 pub mod grievance_handlers;

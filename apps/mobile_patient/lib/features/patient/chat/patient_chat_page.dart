@@ -8,6 +8,7 @@ import '../../../core/l10n/patient_display.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../grievance/grievance_modal.dart';
@@ -164,8 +165,9 @@ class _PatientChatPageState extends State<PatientChatPage> {
                 name: widget.doctorDisplayName,
                 expiresAt: widget.conversation.expiresAt,
                 appointmentId: widget.conversation.appointmentId,
+                closed: locked,
                 grievanceRepo: GrievanceRepository(widget.repo.api)),
-            if (!locked) _ExpiryBar(expiresAt: widget.conversation.expiresAt),
+            _ExpiryBar(expiresAt: widget.conversation.expiresAt, closed: locked),
             Expanded(
               child: BlocBuilder<ChatCubit, ChatState>(
                 builder: (context, state) {
@@ -258,7 +260,7 @@ class _PatientChatPageState extends State<PatientChatPage> {
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           child: TextField(
                             controller: _input,
-                            textInputAction: TextInputAction.newline,
+                            textInputAction: TextInputAction.send,
                             minLines: 1,
                             maxLines: 4,
                             onSubmitted: (_) => _send(),
@@ -276,27 +278,25 @@ class _PatientChatPageState extends State<PatientChatPage> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: Material(
-                          color: PatientTokens.primary,
-                          shape: const CircleBorder(),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: state.sending || _input.text.trim().isEmpty
-                                ? null
-                                : _send,
-                            child: state.sending
-                                ? const Padding(
-                                    padding: EdgeInsets.all(9),
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white))
-                                : const Icon(Icons.send,
-                                    size: 17, color: Colors.white),
-                          ),
-                        ),
-                      ),
+                      IconButton.filled(
+                          tooltip: 'Send message',
+                          onPressed:
+                              state.sending || _input.text.trim().isEmpty
+                                  ? null
+                                  : _send,
+                          style: IconButton.styleFrom(
+                              minimumSize: const Size(48, 48),
+                              backgroundColor: PatientTokens.primary,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor:
+                                  PatientTokens.surfaceSubtle),
+                          icon: state.sending
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.send, size: 20)),
                     ]),
                   ]),
                 ),
@@ -308,21 +308,29 @@ class _PatientChatPageState extends State<PatientChatPage> {
   }
 }
 
+/// Matches the Doctor app's chat top bar
+/// (apps/mobile/lib/features/doctor/doctor_pages.dart `_ChatTopBar`) exactly
+/// — same back-button/avatar sizing, bordered square icon actions and
+/// dynamic "active/closed" subtitle — so the consultation chat reads as one
+/// consistent design across both apps.
 class _ChatTopBar extends StatelessWidget {
   const _ChatTopBar({
     required this.name,
     required this.expiresAt,
     required this.appointmentId,
+    required this.closed,
     required this.grievanceRepo,
   });
   final String name;
   final DateTime expiresAt;
   final String appointmentId;
+  final bool closed;
   final GrievanceRepository grievanceRepo;
 
   @override
   Widget build(BuildContext context) {
     final initials = _initialsOf(name);
+    final colors = _avatarColors(appointmentId);
     final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
@@ -334,8 +342,8 @@ class _ChatTopBar extends StatelessWidget {
           onTap: () => Navigator.of(context).maybePop(),
           borderRadius: BorderRadius.circular(11),
           child: Container(
-            width: 48,
-            height: 48,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
                 color: PatientTokens.surfaceSubtle,
                 borderRadius: BorderRadius.circular(11),
@@ -345,14 +353,19 @@ class _ChatTopBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: PatientTokens.primaryLight,
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+              color: colors.$1,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: PatientTokens.primary, width: 1.5)),
+          alignment: Alignment.center,
           child: Text(initials,
-              style: const TextStyle(
+              style: TextStyle(
                   fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                  color: PatientTokens.primaryDark)),
+                  fontSize: 13,
+                  color: colors.$2)),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -365,21 +378,24 @@ class _ChatTopBar extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                     color: PatientTokens.text)),
-            Text(l10n.waitingRoomChatTitle,
-                style: const TextStyle(
-                    fontSize: 10, color: PatientTokens.textSub)),
+            Text(closed ? 'Consultation closed' : 'Consultation chat active',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: closed
+                        ? PatientTokens.textSub
+                        : PatientTokens.primary)),
           ]),
         ),
-        IconButton(
-          onPressed: () => showGrievanceModal(
+        _ChatIconBtn(
+          icon: Icons.report_problem_outlined,
+          tooltip: l10n.waitingRoomReportIssue,
+          onTap: () => showGrievanceModal(
             context,
             appointmentId: appointmentId,
             doctorName: name,
             repo: grievanceRepo,
           ),
-          icon: const Icon(Icons.report_problem_outlined,
-              size: 18, color: PatientTokens.danger),
-          tooltip: l10n.waitingRoomReportIssue,
         ),
       ]),
     );
@@ -399,38 +415,99 @@ class _ChatTopBar extends StatelessWidget {
   }
 }
 
+const _avatarPalette = <(Color, Color)>[
+  (Color(0xFFFEE2E2), Color(0xFFDC2626)),
+  (Color(0xFFF3E8FF), Color(0xFF7E22CE)),
+  (Color(0xFFFEF3C7), Color(0xFFB45309)),
+  (Color(0xFFECFDF5), Color(0xFF059669)),
+  (Color(0xFFEFF6FF), Color(0xFF2563EB)),
+];
+(Color, Color) _avatarColors(String seed) {
+  var hash = 0;
+  for (final unit in seed.codeUnits) {
+    hash = (hash * 31 + unit) & 0x7fffffff;
+  }
+  return _avatarPalette[hash % _avatarPalette.length];
+}
+
+/// Small square icon-button matching the Doctor app's chat top bar quick
+/// actions (`_ChatIconBtn` in doctor_pages.dart).
+class _ChatIconBtn extends StatelessWidget {
+  const _ChatIconBtn(
+      {required this.icon, required this.tooltip, required this.onTap});
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+        message: tooltip,
+        child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                    color: PatientTokens.surfaceSubtle,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: PatientTokens.border)),
+                alignment: Alignment.center,
+                child: Icon(icon,
+                    size: 17,
+                    color: onTap == null
+                        ? PatientTokens.textSub.withValues(alpha: 0.5)
+                        : PatientTokens.danger))));
+  }
+}
+
+/// Matches the Doctor app's chat expiry banner
+/// (apps/mobile/lib/features/doctor/doctor_pages.dart `_ChatExpiryBar`)
+/// exactly — a single bordered pill with an hourglass/lock icon and inline
+/// text, instead of a separate label-plus-chip layout.
 class _ExpiryBar extends StatelessWidget {
-  const _ExpiryBar({required this.expiresAt});
+  const _ExpiryBar({required this.expiresAt, required this.closed});
   final DateTime expiresAt;
+  final bool closed;
 
   @override
   Widget build(BuildContext context) {
     final remaining = expiresAt.difference(DateTime.now().toUtc());
-    final hours = remaining.inHours.clamp(0, 999);
-    final minutes = (remaining.inMinutes % 60).clamp(0, 59);
+    final label = closed
+        ? 'Consultation window closed'
+        : remaining.isNegative
+            ? '24h consultation chat active'
+            : '24h chat active (${remaining.inHours}h ${remaining.inMinutes % 60}m remaining)';
     return Container(
-      margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-          color: PatientTokens.infoLight,
-          borderRadius: BorderRadius.circular(10)),
-      child: Wrap(
-          spacing: 12,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-                AppLocalizations.of(context)
-                    .chatActiveRemaining(hours, minutes),
-                style:
-                    const TextStyle(fontSize: 11, color: PatientTokens.info)),
-            StatusChip(AppLocalizations.of(context).chat24hSession,
-                color: PatientTokens.infoLight, textColor: PatientTokens.info),
-          ]),
-    );
+        margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+            color: closed ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
+            border: Border.all(
+                color: closed
+                    ? const Color(0xFFFECACA)
+                    : const Color(0xFFA7F3D0)),
+            borderRadius: BorderRadius.circular(10)),
+        child: Row(children: [
+          Icon(closed ? Icons.lock_outline : Icons.hourglass_bottom,
+              size: 14,
+              color: closed ? PatientTokens.danger : const Color(0xFF065F46)),
+          const SizedBox(width: 6),
+          Expanded(
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: closed
+                          ? PatientTokens.danger
+                          : const Color(0xFF065F46)))),
+        ]));
   }
 }
 
+/// Matches the Doctor app's `ClinicalMessageBubble`
+/// (apps/mobile/lib/features/doctor/clinical_message_bubble.dart) exactly —
+/// same sizing, spacing, attachment row and time styling — so the
+/// consultation chat reads as one consistent design across both apps.
 class _ChatBubble extends StatelessWidget {
   const _ChatBubble(
       {required this.message, required this.fromMe, this.onViewAttachment});
@@ -440,47 +517,52 @@ class _ChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final time =
-        '${message.sentAt.hour.toString().padLeft(2, '0')}:${message.sentAt.minute.toString().padLeft(2, '0')}';
+    final text = fromMe ? Colors.white : PatientTokens.text;
+    final time = formatTime12h(message.sentAt);
     return Align(
       alignment: fromMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        constraints: const BoxConstraints(maxWidth: 280),
+        key: ValueKey('message-${message.id}'),
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .82),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: fromMe ? PatientTokens.primary : PatientTokens.surface,
-          borderRadius: BorderRadius.circular(14),
           border: fromMe ? null : Border.all(color: PatientTokens.border),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (message.content.isNotEmpty)
-            Text(message.content,
-                style: TextStyle(
-                    fontSize: 13,
-                    color: fromMe ? Colors.white : PatientTokens.text)),
-          if (message.attachmentId != null) ...[
-            Text('Clinical image',
-                style: TextStyle(
-                    color: fromMe ? Colors.white : PatientTokens.text,
-                    fontWeight: FontWeight.w600)),
-            if (message.attachmentSize != null)
-              Text('${(message.attachmentSize! / 1024).toStringAsFixed(1)} KiB',
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (message.content.isNotEmpty)
+                Text(message.content, style: TextStyle(color: text, height: 1.45)),
+              if (message.attachmentId != null) ...[
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.description_outlined, color: text, size: 20),
+                  const SizedBox(width: 8),
+                  Flexible(
+                      child: Text('Clinical image',
+                          style: TextStyle(
+                              color: text, fontWeight: FontWeight.w600))),
+                ]),
+                if (message.attachmentSize != null)
+                  Text('${(message.attachmentSize! / 1024).toStringAsFixed(1)} KiB',
+                      style: TextStyle(color: text)),
+                TextButton(
+                    onPressed: onViewAttachment,
+                    style: TextButton.styleFrom(
+                        foregroundColor: text,
+                        minimumSize: const Size(48, 48)),
+                    child: const Text('View image')),
+              ],
+              const SizedBox(height: 4),
+              Text(time,
                   style: TextStyle(
-                      color: fromMe ? Colors.white : PatientTokens.text)),
-            TextButton(
-                onPressed: onViewAttachment,
-                style: TextButton.styleFrom(
-                    foregroundColor:
-                        fromMe ? Colors.white : PatientTokens.primary),
-                child: const Text('View image')),
-          ],
-          const SizedBox(height: 3),
-          Text(time,
-              style: TextStyle(
-                  fontSize: 9.5,
-                  color: fromMe ? Colors.white70 : PatientTokens.textSub)),
-        ]),
+                      fontSize: 11,
+                      color: fromMe ? Colors.white70 : PatientTokens.textSub)),
+            ]),
       ),
     );
   }

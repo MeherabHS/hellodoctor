@@ -105,8 +105,8 @@ void main() {
   group('ProfilePhotoAvatar', () {
     testWidgets('shows the person placeholder when no photo and not loading',
         (tester) async {
-      await tester
-          .pumpWidget(harness(const ProfileState(photoBytes: null, photoLoading: false)));
+      await tester.pumpWidget(
+          harness(const ProfileState(photoBytes: null, photoLoading: false)));
       // Two pumps: the widget's own post-frame callback fires loadPhoto() when
       // no bytes are seeded yet, and its (stubbed, no-op) result needs an
       // extra pump to be reflected back into the rebuilt tree.
@@ -115,8 +115,10 @@ void main() {
 
       expect(find.byIcon(Icons.person), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsNothing);
-      expect(find.byType(CircleAvatar).evaluate().first.widget,
-          isA<CircleAvatar>().having((c) => c.backgroundImage, 'backgroundImage', isNull));
+      expect(
+          find.byType(CircleAvatar).evaluate().first.widget,
+          isA<CircleAvatar>()
+              .having((c) => c.backgroundImage, 'backgroundImage', isNull));
     });
 
     testWidgets('shows a spinner while photoLoading and no bytes yet',

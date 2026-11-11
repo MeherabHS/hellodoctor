@@ -56,8 +56,8 @@ void main() {
             'host (and none in this repository today) and must throw — the '
             'failure must reach sanitized diagnostics, not disappear '
             'silently.');
-    expect(sent.every((r) => (r.data as Map)['operation'] == 'push_init'),
-        isTrue);
+    expect(
+        sent.every((r) => (r.data as Map)['operation'] == 'push_init'), isTrue);
     expect(sent.every((r) => (r.data as Map)['screen'] == 'Notifications'),
         isTrue);
     // The in-app inbox refresh path is never invoked just because

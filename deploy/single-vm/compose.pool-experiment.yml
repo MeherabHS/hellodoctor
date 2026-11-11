@@ -1,0 +1,19 @@
+# Milestone 8 pool-capacity experiment (2026-11-04) -- OPTIONAL third override
+# layer, included only for the API-role-pool=14 test run, never for a
+# baseline/comparable run. Docker Compose merges `environment:` additively
+# across -f files, so this adds exactly one new env var on top of whatever
+# compose.yml + compose.local-verification.yml already set, without touching
+# either of those files. DB_POOL_MAX_CONNECTIONS_PER_ROLE (still "10" in
+# compose.local-verification.yml) continues to size Auth/Payment/System/
+# Finance pools AND Admission::new()'s lane-concurrency math unchanged --
+# see db_pool_max_connections_api_role_override's doc comment in
+# services/backend/src/config.rs for why this cannot silently widen admission
+# ceilings. To run the baseline (10-connection) configuration, simply omit
+# this file from the `docker compose -f ... -f ... -f ...` invocation; there
+# is nothing to revert.
+name: hellodoctor-m8-final-local
+
+services:
+  backend:
+    environment:
+      DB_POOL_MAX_CONNECTIONS_API_ROLE: "14"

@@ -1,0 +1,96 @@
+# Disposable physical-device test stack — Patient<->Doctor Agora consultation
+# verification on two real Android phones over LAN. Deliberately NOT merged
+# with docker-compose.yml, the same reasoning as docker-compose.capacity.yml:
+# Compose concatenates list-valued `volumes:` keys across merged files rather
+# than replacing them, which would try to mount two volumes onto the same
+# postgres data directory. Run as its own project so it never touches the
+# dev stack's (hellodoctor-postgres/-redis) containers, volumes, or data:
+#
+#   docker compose -f docker-compose.phonetest.yml -p hellodoctor-phonetest up -d --build
+#   docker compose -f docker-compose.phonetest.yml -p hellodoctor-phonetest down       # stop, keep data
+#   docker compose -f docker-compose.phonetest.yml -p hellodoctor-phonetest down -v    # stop + wipe this stack's own disposable volume only
+#
+# `name:` pins the Compose project name intrinsically (same fix as the
+# capacity file, after a real incident there of a bare `down -v` removing the
+# dev stack) so this can never collide with the dev stack's default
+# directory-derived project name even if someone forgets the `-p` flag.
+name: hellodoctor-phonetest
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: hellodoctor-phonetest-postgres
+    environment:
+      POSTGRES_USER: hellodoctor
+      POSTGRES_PASSWORD: hellodoctor_dev_password
+      POSTGRES_DB: hellodoctor
+    ports:
+      - "5733:5432"
+    volumes:
+      - hellodoctor_phonetest_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hellodoctor -d hellodoctor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: hellodoctor-phonetest-redis
+    ports:
+      - "6680:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hellodoctor-phonetest-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # Override host-relative values from .env to the in-network service
+      # names/ports, and bind to all interfaces so the host can publish this
+      # port to the LAN for the two physical test phones. Every other value
+      # (Agora App ID/Certificate, JWT/webhook secrets, DEV_AUTH_OTP_ENABLED,
+      # join-window minutes, etc.) still comes from the real .env file.
+      DATABASE_URL: postgres://hellodoctor:hellodoctor_dev_password@postgres:5432/hellodoctor
+      APP_DB_HOST: postgres
+      APP_DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379
+      HOST: 0.0.0.0
+      PORT: 8080
+      # Seeds the fixed synthetic demo doctor/patient fixtures (src/seed.rs)
+      # into this fresh, disposable database on first startup — exactly the
+      # accounts this physical-device test needs. Never set true against a
+      # real/shared database.
+      SEED_DEV_DATA: "true"
+    ports:
+      - "8380:8080"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: hellodoctor-phonetest-caddy
+    depends_on:
+      - backend
+    volumes:
+      - ./Caddyfile.phonetest:/etc/caddy/Caddyfile:ro
+      - ./phonetest-tls:/certs:ro
+      - hellodoctor_phonetest_caddydata:/data
+      - hellodoctor_phonetest_caddyconfig:/config
+    ports:
+      - "8443:8443"
+
+volumes:
+  hellodoctor_phonetest_pgdata:
+  hellodoctor_phonetest_caddydata:
+  hellodoctor_phonetest_caddyconfig:

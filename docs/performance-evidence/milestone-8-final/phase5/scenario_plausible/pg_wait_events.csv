@@ -1,0 +1,426 @@
+﻿timestamp,state,wait_event_type,wait_event,count
+2026-11-02T21:56:41.2576850+06:00,none,Activity,CheckpointerMain,1
+2026-11-02T21:56:41.2576850+06:00,idle,Client,ClientRead,37
+2026-11-02T21:56:41.2576850+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:56:41.2576850+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:56:41.2576850+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:56:41.2576850+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:56:48.6121204+06:00,none,Activity,CheckpointerMain,1
+2026-11-02T21:56:48.6121204+06:00,idle in transaction,Client,ClientRead,2
+2026-11-02T21:56:48.6121204+06:00,idle,Client,ClientRead,37
+2026-11-02T21:56:48.6121204+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:56:48.6121204+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:56:48.6121204+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:56:48.6121204+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:56:56.1212641+06:00,none,Activity,CheckpointerMain,1
+2026-11-02T21:56:56.1212641+06:00,idle,Client,ClientRead,34
+2026-11-02T21:56:56.1212641+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:56:56.1212641+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:56:56.1212641+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:56:56.1212641+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:57:03.1081495+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:57:03.1081495+06:00,idle,Client,ClientRead,34
+2026-11-02T21:57:03.1081495+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:57:03.1081495+06:00,idle,none,none,1
+2026-11-02T21:57:03.1081495+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:57:03.1081495+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:57:03.1081495+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:57:10.0585296+06:00,active,none,none,3
+2026-11-02T21:57:10.0585296+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:57:10.0585296+06:00,idle,Client,ClientRead,31
+2026-11-02T21:57:10.0585296+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:57:10.0585296+06:00,idle in transaction (aborted),Client,ClientRead,1
+2026-11-02T21:57:10.0585296+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:57:10.0585296+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:57:10.0585296+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:57:17.4768943+06:00,idle in transaction,Client,ClientRead,5
+2026-11-02T21:57:17.4768943+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:57:17.4768943+06:00,idle,Client,ClientRead,36
+2026-11-02T21:57:17.4768943+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:57:17.4768943+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:57:17.4768943+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:57:17.4768943+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:57:23.9912257+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:57:23.9912257+06:00,idle,Client,ClientRead,41
+2026-11-02T21:57:23.9912257+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:57:23.9912257+06:00,idle,none,none,1
+2026-11-02T21:57:23.9912257+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:57:23.9912257+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:57:23.9912257+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:57:31.0889043+06:00,active,none,none,3
+2026-11-02T21:57:31.0889043+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:57:31.0889043+06:00,idle,Client,ClientRead,39
+2026-11-02T21:57:31.0889043+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:57:31.0889043+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:57:31.0889043+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:57:31.0889043+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:57:38.5689597+06:00,active,none,none,2
+2026-11-02T21:57:38.5689597+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T21:57:38.5689597+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:57:38.5689597+06:00,idle,Client,ClientRead,38
+2026-11-02T21:57:38.5689597+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:57:38.5689597+06:00,idle,none,none,1
+2026-11-02T21:57:38.5689597+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:57:38.5689597+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:57:38.5689597+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:57:45.0990065+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:57:45.0990065+06:00,idle,Client,ClientRead,41
+2026-11-02T21:57:45.0990065+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:57:45.0990065+06:00,idle,none,none,1
+2026-11-02T21:57:45.0990065+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:57:45.0990065+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:57:45.0990065+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:57:52.1686915+06:00,active,none,none,1
+2026-11-02T21:57:52.1686915+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:57:52.1686915+06:00,idle,Client,ClientRead,40
+2026-11-02T21:57:52.1686915+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:57:52.1686915+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:57:52.1686915+06:00,active,Client,ClientRead,1
+2026-11-02T21:57:52.1686915+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:57:52.1686915+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:57:59.6101741+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:57:59.6101741+06:00,idle,Client,ClientRead,42
+2026-11-02T21:57:59.6101741+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:57:59.6101741+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:57:59.6101741+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:57:59.6101741+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:58:06.9831578+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:58:06.9831578+06:00,idle,Client,ClientRead,42
+2026-11-02T21:58:06.9831578+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:58:06.9831578+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:58:06.9831578+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:58:06.9831578+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:58:14.2058587+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T21:58:14.2058587+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:58:14.2058587+06:00,idle,Client,ClientRead,41
+2026-11-02T21:58:14.2058587+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:58:14.2058587+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:58:14.2058587+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:58:14.2058587+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:58:21.1478240+06:00,active,none,none,2
+2026-11-02T21:58:21.1478240+06:00,idle in transaction,Client,ClientRead,2
+2026-11-02T21:58:21.1478240+06:00,active,IO,WALSync,1
+2026-11-02T21:58:21.1478240+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:58:21.1478240+06:00,idle,Client,ClientRead,37
+2026-11-02T21:58:21.1478240+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:58:21.1478240+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:58:21.1478240+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:58:21.1478240+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:58:28.6722173+06:00,active,none,none,4
+2026-11-02T21:58:28.6722173+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:58:28.6722173+06:00,idle,Client,ClientRead,35
+2026-11-02T21:58:28.6722173+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:58:28.6722173+06:00,idle in transaction,none,none,1
+2026-11-02T21:58:28.6722173+06:00,idle,none,none,2
+2026-11-02T21:58:28.6722173+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:58:28.6722173+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:58:28.6722173+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:58:35.2272894+06:00,active,none,none,1
+2026-11-02T21:58:35.2272894+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:58:35.2272894+06:00,idle,Client,ClientRead,40
+2026-11-02T21:58:35.2272894+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:58:35.2272894+06:00,idle in transaction,none,none,1
+2026-11-02T21:58:35.2272894+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:58:35.2272894+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:58:35.2272894+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:58:42.2347846+06:00,active,none,none,3
+2026-11-02T21:58:42.2347846+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T21:58:42.2347846+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:58:42.2347846+06:00,idle,Client,ClientRead,37
+2026-11-02T21:58:42.2347846+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:58:42.2347846+06:00,idle in transaction (aborted),Client,ClientRead,1
+2026-11-02T21:58:42.2347846+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:58:42.2347846+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:58:42.2347846+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:58:49.7865015+06:00,active,none,none,3
+2026-11-02T21:58:49.7865015+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T21:58:49.7865015+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:58:49.7865015+06:00,idle,Client,ClientRead,37
+2026-11-02T21:58:49.7865015+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:58:49.7865015+06:00,idle,none,none,1
+2026-11-02T21:58:49.7865015+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:58:49.7865015+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:58:49.7865015+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:58:57.3475696+06:00,active,none,none,1
+2026-11-02T21:58:57.3475696+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:58:57.3475696+06:00,idle,Client,ClientRead,41
+2026-11-02T21:58:57.3475696+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:58:57.3475696+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:58:57.3475696+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:58:57.3475696+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:59:04.3426786+06:00,active,none,none,1
+2026-11-02T21:59:04.3426786+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:59:04.3426786+06:00,idle,Client,ClientRead,38
+2026-11-02T21:59:04.3426786+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:59:04.3426786+06:00,idle in transaction,none,none,1
+2026-11-02T21:59:04.3426786+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:59:04.3426786+06:00,active,Client,ClientRead,2
+2026-11-02T21:59:04.3426786+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:59:04.3426786+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:59:11.3105916+06:00,active,none,none,1
+2026-11-02T21:59:11.3105916+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:59:11.3105916+06:00,idle,Client,ClientRead,40
+2026-11-02T21:59:11.3105916+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:59:11.3105916+06:00,idle in transaction (aborted),Client,ClientRead,1
+2026-11-02T21:59:11.3105916+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:59:11.3105916+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:59:11.3105916+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:59:18.7433571+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T21:59:18.7433571+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:59:18.7433571+06:00,idle,Client,ClientRead,41
+2026-11-02T21:59:18.7433571+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:59:18.7433571+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:59:18.7433571+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:59:18.7433571+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:59:25.4052595+06:00,active,Lock,advisory,1
+2026-11-02T21:59:25.4052595+06:00,active,none,none,4
+2026-11-02T21:59:25.4052595+06:00,idle in transaction,Client,ClientRead,5
+2026-11-02T21:59:25.4052595+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:59:25.4052595+06:00,idle,Client,ClientRead,31
+2026-11-02T21:59:25.4052595+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:59:25.4052595+06:00,idle in transaction,none,none,1
+2026-11-02T21:59:25.4052595+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:59:25.4052595+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:59:25.4052595+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:59:32.3981525+06:00,active,none,none,4
+2026-11-02T21:59:32.3981525+06:00,idle in transaction,Client,ClientRead,2
+2026-11-02T21:59:32.3981525+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:59:32.3981525+06:00,idle,Client,ClientRead,36
+2026-11-02T21:59:32.3981525+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:59:32.3981525+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:59:32.3981525+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:59:32.3981525+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:59:39.9485546+06:00,active,none,none,3
+2026-11-02T21:59:39.9485546+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T21:59:39.9485546+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:59:39.9485546+06:00,idle,Client,ClientRead,36
+2026-11-02T21:59:39.9485546+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:59:39.9485546+06:00,idle in transaction,none,none,1
+2026-11-02T21:59:39.9485546+06:00,idle,none,none,1
+2026-11-02T21:59:39.9485546+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:59:39.9485546+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:59:39.9485546+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:59:47.4795281+06:00,active,none,none,3
+2026-11-02T21:59:47.4795281+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T21:59:47.4795281+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:59:47.4795281+06:00,active,Timeout,VacuumDelay,1
+2026-11-02T21:59:47.4795281+06:00,idle,Client,ClientRead,38
+2026-11-02T21:59:47.4795281+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:59:47.4795281+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:59:47.4795281+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:59:47.4795281+06:00,none,Activity,BgWriterMain,1
+2026-11-02T21:59:54.2509777+06:00,active,none,none,3
+2026-11-02T21:59:54.2509777+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T21:59:54.2509777+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T21:59:54.2509777+06:00,idle,Client,ClientRead,36
+2026-11-02T21:59:54.2509777+06:00,none,Activity,WalWriterMain,1
+2026-11-02T21:59:54.2509777+06:00,idle,none,none,1
+2026-11-02T21:59:54.2509777+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T21:59:54.2509777+06:00,active,Client,ClientRead,1
+2026-11-02T21:59:54.2509777+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T21:59:54.2509777+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:00:01.3487815+06:00,active,none,none,1
+2026-11-02T22:00:01.3487815+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T22:00:01.3487815+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:00:01.3487815+06:00,idle,Client,ClientRead,39
+2026-11-02T22:00:01.3487815+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:00:01.3487815+06:00,idle in transaction (aborted),Client,ClientRead,1
+2026-11-02T22:00:01.3487815+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:00:01.3487815+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:00:01.3487815+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:00:08.7372683+06:00,active,none,none,2
+2026-11-02T22:00:08.7372683+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:00:08.7372683+06:00,idle,Client,ClientRead,39
+2026-11-02T22:00:08.7372683+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:00:08.7372683+06:00,idle,none,none,1
+2026-11-02T22:00:08.7372683+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:00:08.7372683+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:00:08.7372683+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:00:15.2740377+06:00,active,none,none,4
+2026-11-02T22:00:15.2740377+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T22:00:15.2740377+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:00:15.2740377+06:00,idle,Client,ClientRead,37
+2026-11-02T22:00:15.2740377+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:00:15.2740377+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:00:15.2740377+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:00:15.2740377+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:00:22.4137963+06:00,active,none,none,1
+2026-11-02T22:00:22.4137963+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:00:22.4137963+06:00,idle,Client,ClientRead,40
+2026-11-02T22:00:22.4137963+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:00:22.4137963+06:00,idle in transaction (aborted),Client,ClientRead,1
+2026-11-02T22:00:22.4137963+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:00:22.4137963+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:00:22.4137963+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:00:29.8156269+06:00,active,none,none,3
+2026-11-02T22:00:29.8156269+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T22:00:29.8156269+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:00:29.8156269+06:00,idle,Client,ClientRead,38
+2026-11-02T22:00:29.8156269+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:00:29.8156269+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:00:29.8156269+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:00:29.8156269+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:00:37.2795291+06:00,active,none,none,3
+2026-11-02T22:00:37.2795291+06:00,idle in transaction,Client,ClientRead,3
+2026-11-02T22:00:37.2795291+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:00:37.2795291+06:00,idle,Client,ClientRead,36
+2026-11-02T22:00:37.2795291+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:00:37.2795291+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:00:37.2795291+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:00:37.2795291+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:00:44.6095095+06:00,active,none,none,1
+2026-11-02T22:00:44.6095095+06:00,idle in transaction,Client,ClientRead,2
+2026-11-02T22:00:44.6095095+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:00:44.6095095+06:00,idle,Client,ClientRead,39
+2026-11-02T22:00:44.6095095+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:00:44.6095095+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:00:44.6095095+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:00:44.6095095+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:00:51.4313747+06:00,active,none,none,4
+2026-11-02T22:00:51.4313747+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:00:51.4313747+06:00,idle,Client,ClientRead,37
+2026-11-02T22:00:51.4313747+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:00:51.4313747+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:00:51.4313747+06:00,idle in transaction (aborted),none,none,1
+2026-11-02T22:00:51.4313747+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:00:51.4313747+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:00:58.9477245+06:00,active,none,none,2
+2026-11-02T22:00:58.9477245+06:00,active,IO,WALSync,1
+2026-11-02T22:00:58.9477245+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:00:58.9477245+06:00,idle,Client,ClientRead,38
+2026-11-02T22:00:58.9477245+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:00:58.9477245+06:00,idle,none,none,1
+2026-11-02T22:00:58.9477245+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:00:58.9477245+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:00:58.9477245+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:01:06.4157363+06:00,active,none,none,4
+2026-11-02T22:01:06.4157363+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:01:06.4157363+06:00,idle,Client,ClientRead,36
+2026-11-02T22:01:06.4157363+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:01:06.4157363+06:00,idle in transaction,none,none,1
+2026-11-02T22:01:06.4157363+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:01:06.4157363+06:00,active,Client,ClientRead,1
+2026-11-02T22:01:06.4157363+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:01:06.4157363+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:01:13.3949375+06:00,active,none,none,4
+2026-11-02T22:01:13.3949375+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:01:13.3949375+06:00,idle,Client,ClientRead,38
+2026-11-02T22:01:13.3949375+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:01:13.3949375+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:01:13.3949375+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:01:13.3949375+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:01:20.4256283+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T22:01:20.4256283+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:01:20.4256283+06:00,idle,Client,ClientRead,41
+2026-11-02T22:01:20.4256283+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:01:20.4256283+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:01:20.4256283+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:01:20.4256283+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:01:27.8467580+06:00,active,none,none,2
+2026-11-02T22:01:27.8467580+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:01:27.8467580+06:00,idle,Client,ClientRead,38
+2026-11-02T22:01:27.8467580+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:01:27.8467580+06:00,idle in transaction,none,none,1
+2026-11-02T22:01:27.8467580+06:00,idle,none,none,1
+2026-11-02T22:01:27.8467580+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:01:27.8467580+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:01:27.8467580+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:01:35.3241816+06:00,active,none,none,3
+2026-11-02T22:01:35.3241816+06:00,none,Activity,CheckpointerMain,1
+2026-11-02T22:01:35.3241816+06:00,idle,Client,ClientRead,39
+2026-11-02T22:01:35.3241816+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:01:35.3241816+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:01:35.3241816+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:01:35.3241816+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:01:42.4260362+06:00,active,none,none,3
+2026-11-02T22:01:42.4260362+06:00,none,Activity,CheckpointerMain,1
+2026-11-02T22:01:42.4260362+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T22:01:42.4260362+06:00,idle,Client,ClientRead,38
+2026-11-02T22:01:42.4260362+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:01:42.4260362+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:01:42.4260362+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:01:42.4260362+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:01:49.9046499+06:00,active,none,none,1
+2026-11-02T22:01:49.9046499+06:00,none,Activity,CheckpointerMain,1
+2026-11-02T22:01:49.9046499+06:00,idle in transaction,Client,ClientRead,2
+2026-11-02T22:01:49.9046499+06:00,idle,Client,ClientRead,37
+2026-11-02T22:01:49.9046499+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:01:49.9046499+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:01:49.9046499+06:00,active,Client,ClientRead,2
+2026-11-02T22:01:49.9046499+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:01:49.9046499+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:01:57.4994814+06:00,active,none,none,2
+2026-11-02T22:01:57.4994814+06:00,none,Activity,CheckpointerMain,1
+2026-11-02T22:01:57.4994814+06:00,idle,Client,ClientRead,38
+2026-11-02T22:01:57.4994814+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:01:57.4994814+06:00,idle in transaction,none,none,1
+2026-11-02T22:01:57.4994814+06:00,idle,none,none,1
+2026-11-02T22:01:57.4994814+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:01:57.4994814+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:01:57.4994814+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:02:04.5574399+06:00,active,none,none,1
+2026-11-02T22:02:04.5574399+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:02:04.5574399+06:00,idle,Client,ClientRead,40
+2026-11-02T22:02:04.5574399+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:02:04.5574399+06:00,idle in transaction,none,none,1
+2026-11-02T22:02:04.5574399+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:02:04.5574399+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:02:04.5574399+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:02:11.4006184+06:00,active,none,none,2
+2026-11-02T22:02:11.4006184+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T22:02:11.4006184+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:02:11.4006184+06:00,idle,Client,ClientRead,37
+2026-11-02T22:02:11.4006184+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:02:11.4006184+06:00,idle in transaction,none,none,1
+2026-11-02T22:02:11.4006184+06:00,idle in transaction (aborted),Client,ClientRead,1
+2026-11-02T22:02:11.4006184+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:02:11.4006184+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:02:11.4006184+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:02:18.9062634+06:00,active,none,none,2
+2026-11-02T22:02:18.9062634+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T22:02:18.9062634+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:02:18.9062634+06:00,idle,Client,ClientRead,38
+2026-11-02T22:02:18.9062634+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:02:18.9062634+06:00,idle in transaction,none,none,1
+2026-11-02T22:02:18.9062634+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:02:18.9062634+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:02:18.9062634+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:02:26.4708500+06:00,active,none,none,1
+2026-11-02T22:02:26.4708500+06:00,idle in transaction,Client,ClientRead,2
+2026-11-02T22:02:26.4708500+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:02:26.4708500+06:00,idle,Client,ClientRead,36
+2026-11-02T22:02:26.4708500+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:02:26.4708500+06:00,idle,none,none,2
+2026-11-02T22:02:26.4708500+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:02:26.4708500+06:00,active,Client,ClientRead,1
+2026-11-02T22:02:26.4708500+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:02:26.4708500+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:02:33.4931864+06:00,active,none,none,4
+2026-11-02T22:02:33.4931864+06:00,idle in transaction,Client,ClientRead,1
+2026-11-02T22:02:33.4931864+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:02:33.4931864+06:00,idle,Client,ClientRead,37
+2026-11-02T22:02:33.4931864+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:02:33.4931864+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:02:33.4931864+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:02:33.4931864+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:02:40.5385564+06:00,active,none,none,1
+2026-11-02T22:02:40.5385564+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:02:40.5385564+06:00,idle,Client,ClientRead,41
+2026-11-02T22:02:40.5385564+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:02:40.5385564+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:02:40.5385564+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:02:40.5385564+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:02:47.9689813+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:02:47.9689813+06:00,idle,Client,ClientRead,39
+2026-11-02T22:02:47.9689813+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:02:47.9689813+06:00,idle,none,none,1
+2026-11-02T22:02:47.9689813+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:02:47.9689813+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:02:47.9689813+06:00,none,Activity,BgWriterMain,1
+2026-11-02T22:02:55.2614795+06:00,none,Timeout,CheckpointWriteDelay,1
+2026-11-02T22:02:55.2614795+06:00,idle,Client,ClientRead,39
+2026-11-02T22:02:55.2614795+06:00,none,Activity,WalWriterMain,1
+2026-11-02T22:02:55.2614795+06:00,none,Activity,LogicalLauncherMain,1
+2026-11-02T22:02:55.2614795+06:00,active,Client,ClientRead,1
+2026-11-02T22:02:55.2614795+06:00,none,Activity,AutoVacuumMain,1
+2026-11-02T22:02:55.2614795+06:00,none,Activity,BgWriterMain,1

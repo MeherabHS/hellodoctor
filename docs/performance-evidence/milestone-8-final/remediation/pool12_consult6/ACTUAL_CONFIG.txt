@@ -1,0 +1,1 @@
+NOTE: directory named pool12_consult6 per the Step 3 instruction's naming, but Stage A found no measurable benefit from pool=12 so it was reverted to 10. This stage's ACTUAL config is pool=10, consultation lane=n.min(6).

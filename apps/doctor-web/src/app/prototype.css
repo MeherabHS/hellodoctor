@@ -4305,16 +4305,10 @@ body.is-offline .admin-batch-payout-btn::after {
   animation: adminModalZoom .2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.loading-spinner-ring {
-  width: 44px;
-  height: 44px;
-  border: 3.5px solid #E2E8F0;
-  border-top-color: #059669;
-  border-radius: 50%;
-  animation: spinRing 0.8s linear infinite;
-  margin-bottom: 16px;
-}
-
+/* Spinner box-model now lives entirely in web.css's .web-state-spinner (the
+   only element that ever used this animation) — see that rule's comment for
+   why splitting it across two files caused a rendering bug. Keyframe kept
+   here since nothing else in this file references spinner styling. */
 @keyframes spinRing {
   to { transform: rotate(360deg); }
 }

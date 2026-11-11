@@ -21,3 +21,10 @@ Rotate DB role passwords, webhook secrets, Agora certificate, TOTP encryption
 keys, storage credentials, and messaging credentials through the deployment
 secret manager. Keep an overlap window only where the provider supports it,
 and record the key version and rollback decision in the incident log.
+
+**Exception: the pgBackRest backup-repository cipher passphrase does not
+support this pattern.** It cannot be rotated in place — there is no overlap
+window, because the old and new passphrases apply to two different
+repositories, not two versions of the same one. See
+`docs/BACKUP_ENCRYPTION_KEY_CUSTODY_RUNBOOK.md`'s "Key rotation
+considerations" section for the correct new-repository migration procedure.

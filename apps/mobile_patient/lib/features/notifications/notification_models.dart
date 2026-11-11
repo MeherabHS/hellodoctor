@@ -103,7 +103,8 @@ class NotificationPreferencesDto {
         quietHoursEnabled: j['quiet_hours_enabled'] == true,
         quietHoursStartLocal: _textOf(j['quiet_hours_start_local'], '22:00'),
         quietHoursEndLocal: _textOf(j['quiet_hours_end_local'], '07:00'),
-        greetingNotificationsEnabled: j['greeting_notifications_enabled'] == true,
+        greetingNotificationsEnabled:
+            j['greeting_notifications_enabled'] == true,
         religiousGreetingsEnabled: j['religious_greetings_enabled'] == true,
         preferredLanguage: _textOf(j['preferred_language'], 'en'),
       );

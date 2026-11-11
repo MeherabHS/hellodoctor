@@ -1,0 +1,95 @@
+name: Web and Flutter verification
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/**', '.github/workflows/application-checks.yml']
+  pull_request:
+    branches: [main]
+    paths: ['apps/**', '.github/workflows/application-checks.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: applications-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: ${{ matrix.app }} checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [admin-web, doctor-web]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports: ['16380:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      TEST_REDIS_URL: redis://127.0.0.1:16380/14
+      TEST_REDIS_FIXTURE_ID: final-remediation-ci-web
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.18.0'
+          cache: npm
+          cache-dependency-path: apps/${{ matrix.app }}/package-lock.json
+      - name: Bootstrap owned disposable Redis (Admin BFF tests only)
+        if: matrix.app == 'admin-web'
+        run: docker exec '${{ job.services.redis.id }}' redis-cli -n 14 SET hd:test-fixture:owner "$TEST_REDIS_FIXTURE_ID"
+      - run: npm ci
+      - name: Dependency security audit
+        run: npm audit --audit-level=moderate
+      - name: TypeScript
+        run: npx --no-install tsc --noEmit
+      - name: ESLint and existing source-safety checks
+        run: npm run lint
+      - name: Automated tests
+        run: npm test
+      - name: Production build (no deployment)
+        run: npm run build
+
+  flutter:
+    name: ${{ matrix.app }} checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [mobile_patient, mobile]
+    defaults:
+      run:
+        working-directory: apps/${{ matrix.app }}
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: '3.47.6'
+          cache: true
+          # SDK and Pub dependency caches only; never test-result directories.
+          cache-key: flutter-${{ runner.os }}-${{ runner.arch }}-3.47.6-${{ matrix.app }}-${{ hashFiles(format('apps/{0}/pubspec.lock', matrix.app)) }}
+      - name: Locked dependency resolution
+        run: flutter pub get --enforce-lockfile
+      - name: Generate localization from checked-in ARB
+        run: flutter gen-l10n
+      - name: Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Static analysis
+        run: flutter analyze --no-pub
+      - name: Full widget and unit suite (synthetic transports)
+        run: flutter test --no-pub

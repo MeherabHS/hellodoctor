@@ -1,0 +1,37 @@
+-- Milestone 8 Phase 5 efficiency investigation (2026-11-02).
+--
+-- Verified live via EXPLAIN (ANALYZE, BUFFERS) against the real hellodoctor_api
+-- role under real RLS context, against the hellodoctor-m8-final-local
+-- six-service benchmark database (disposable, never the shared dev database):
+-- GET /api/v1/doctor/chats's list_own_chats query (doctor_handlers.rs) runs
+-- `SELECT ... FROM chat_conversations c ... WHERE c.doctor_id=$1`. No index
+-- on chat_conversations.doctor_id existed, so this was a Seq Scan across the
+-- entire table (80,377 rows for this benchmark dataset, reading 78,351
+-- unrelated rows to find one doctor's 2,026 conversations) on every single
+-- call, contributing ~340ms of the endpoint's measured ~2,026ms before this
+-- change. This is unrelated to the Milestone 8 Phase 3 RLS identity-lookup
+-- fix (20261204000001) and unrelated to fn_doctor_treats_patient/
+-- doctor_history_context_allowed, which the live EXPLAIN plan confirmed are
+-- NOT the bottleneck here (already correctly deferred to only the
+-- already-paginated ~20 result rows by the Phase 3 doctor_handlers.rs
+-- restructuring). See docs/MILESTONE_8_PHASE5_EFFICIENCY_INVESTIGATION.md for
+-- the full before/after plan evidence.
+--
+-- This is a pure read-path accelerant with no WHERE clause narrowing which
+-- rows it covers: it changes no query result, no RLS/ABAC semantics, and no
+-- write-path authorization. Following this project's existing precedent
+-- (20261202000005_t15_reminder_scan_indexes) of a plain, non-CONCURRENTLY
+-- `CREATE INDEX` for a modest-sized table (sqlx wraps each migration in a
+-- transaction, which CONCURRENTLY cannot run inside) -- re-issue this by hand
+-- with CREATE INDEX CONCURRENTLY outside a migration transaction instead if
+-- chat_conversations grows to genuine production scale (low millions of rows
+-- or more) before this ships.
+--
+-- No index is added on chat_conversations.patient_id: no existing API query
+-- filters chat_conversations directly by patient_id (the Patient app's own
+-- appointment/chat listing is driven from appointments.patient_id, already
+-- indexed, joined to chat_conversations by its indexed appointment_id unique
+-- constraint) -- added only reflexively because it is a column referenced in
+-- an RLS predicate would not be a real, measured benefit, which this
+-- project's own prior migration explicitly cautions against.
+CREATE INDEX idx_chat_conversations_doctor ON chat_conversations(doctor_id);

@@ -433,7 +433,7 @@ async fn test_category_preferences_never_suppress_security_notifications(pool: P
         .await
         .unwrap();
         if expect_suppressed {
-            assert_eq!(status, "FAILED");
+            assert_eq!(status, "SUPPRESSED");
             assert!(error.unwrap().contains("disabled by user preference"));
         } else {
             assert_eq!(
@@ -528,7 +528,7 @@ async fn test_frequency_limit_caps_after_max_per_day_sent(pool: PgPool) {
                 "the first 2 under the cap must be delivered"
             );
         } else {
-            assert_eq!(status, "FAILED");
+            assert_eq!(status, "SUPPRESSED");
             assert!(error.unwrap().contains("daily frequency limit reached"));
         }
         let exists: bool =

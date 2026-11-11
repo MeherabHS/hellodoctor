@@ -92,6 +92,19 @@ pub async fn apply_provider_event(
             ))
         }
     };
+    // M8-G-30: the real authenticated human behind this event — whichever
+    // specific id (direct patient, guardian, or doctor) actually matched
+    // above, never re-derived. This is the identity the cross-session live
+    // reservation is keyed on.
+    let resolved_user_id: Uuid = if role == "DOCTOR" {
+        doctor_user_id
+    } else {
+        patient_user_id
+            .into_iter()
+            .chain(guardian_user_id)
+            .find(|id| derive_uid(&event.channel_name, UserId::from(*id)) == event.participant_uid)
+            .expect("role==PATIENT implies patient_match was true, so one candidate matches")
+    };
 
     let inserted = sqlx::query_scalar::<_, Uuid>(
         "INSERT INTO consultation_provider_presence_events
@@ -204,6 +217,65 @@ pub async fn apply_provider_event(
         .bind(event.provider_sequence)
         .execute(&mut *tx)
         .await?;
+
+    // M8-G-30: confirm/release the cross-session single-live-reservation
+    // claim for the real human behind this accepted event, using exactly
+    // the identity already authenticated above — never client-supplied,
+    // never derived from telemetry. See
+    // docs/MILESTONE_8_SINGLE_LIVE_CONSULTATION_DESIGN.md §6-§8: a genuine
+    // conflict here (this user already provider-confirmed live in a
+    // different, still-live session) is recorded for admin review rather
+    // than silently resolved either way, and this session's own presence
+    // above is left exactly as just recorded regardless — a physically real
+    // join must never be erased from this session's own bookkeeping just
+    // because of a reservation conflict.
+    if present {
+        let confirmed = crate::repository::consultation_repo::confirm_live_reservation(
+            &mut *tx,
+            resolved_user_id,
+            appointment_id,
+            session_id,
+            state.config.consultation_live_reservation_max_secs,
+        )
+        .await?;
+        if !confirmed {
+            let other: Option<(Uuid, Uuid)> = sqlx::query_as(
+                "SELECT appointment_id, session_id FROM consultation_live_reservations WHERE user_id=$1",
+            )
+            .bind(resolved_user_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+            let (other_appointment_id, other_session_id) =
+                other.unwrap_or((Uuid::nil(), Uuid::nil()));
+            crate::services::AuditService::log_in_tx(
+                &mut *tx,
+                crate::services::AuditLogEntry::new(
+                    None,
+                    ctx.role,
+                    "CONCURRENT_LIVE_PARTICIPATION_DETECTED",
+                    "CONSULTATION_SESSION",
+                    Some(session_id),
+                    "FLAGGED",
+                )
+                .with_after(serde_json::json!({
+                    "user_id": resolved_user_id,
+                    "this_appointment_id": appointment_id,
+                    "this_session_id": session_id,
+                    "other_appointment_id": other_appointment_id,
+                    "other_session_id": other_session_id,
+                })),
+            )
+            .await?;
+        }
+    } else {
+        crate::repository::consultation_repo::release_live_reservation(
+            &mut *tx,
+            resolved_user_id,
+            session_id,
+        )
+        .await?;
+    }
+
     if present {
         sqlx::query(
             "UPDATE appointments

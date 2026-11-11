@@ -96,7 +96,8 @@ class _ProfilePhotoAvatarState extends State<ProfilePhotoAvatar> {
     final ok = await cubit.removePhoto();
     if (!ok) {
       messenger.showSnackBar(SnackBar(
-          content: Text(cubit.state.photoError ?? l10n.profilePhotoRemoveError)));
+          content:
+              Text(cubit.state.photoError ?? l10n.profilePhotoRemoveError)));
     }
   }
 
@@ -127,8 +128,8 @@ class _ProfilePhotoAvatarState extends State<ProfilePhotoAvatar> {
             ),
             if (hasPhoto)
               ListTile(
-                leading:
-                    const Icon(Icons.delete_outline, color: PatientTokens.danger),
+                leading: const Icon(Icons.delete_outline,
+                    color: PatientTokens.danger),
                 title: Text(l10n.profilePhotoRemove,
                     style: const TextStyle(color: PatientTokens.danger)),
                 onTap: () {
@@ -168,8 +169,8 @@ class _ProfilePhotoAvatarState extends State<ProfilePhotoAvatar> {
                         ? SizedBox(
                             width: iconSize,
                             height: iconSize,
-                            child: const CircularProgressIndicator(
-                                strokeWidth: 2))
+                            child:
+                                const CircularProgressIndicator(strokeWidth: 2))
                         : Icon(Icons.person,
                             size: iconSize, color: PatientTokens.primaryDark),
               ),

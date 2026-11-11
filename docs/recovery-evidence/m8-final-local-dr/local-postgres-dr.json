@@ -1,0 +1,13 @@
+{
+    "fixture":  "hellodoctor-m8-final-dr",
+    "generated_at_utc":  "2026-11-01T03:23:31.7396963Z",
+    "checks":  {
+                   "physical_backup":  "GREEN: pg_basebackup completed and pg_verifybackup accepted the manifest",
+                   "wal_archiving":  "GREEN: 6 archived WAL segment(s) observed",
+                   "point_in_time_recovery":  "GREEN: target promoted at named restore point; pre-boundary row present and post-boundary row absent",
+                   "integrity":  "GREEN: restored table/query state and promoted PostgreSQL target verified",
+                   "retention":  "BLOCKED: no production backup scheduler/retention policy is implemented in this repository",
+                   "encryption":  "BLOCKED: backup-at-rest encryption/key custody requires the approved external backup destination",
+                   "azure_storage":  "BLOCKED: Azure subscription/Blob backup credentials unavailable"
+               }
+}

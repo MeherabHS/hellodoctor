@@ -60,6 +60,9 @@ class _StubRepository extends NotificationRepository {
   @override
   Future<void> markRead(String id) async {}
   @override
+  Future<NotificationDto> detail(String id) async =>
+      items.firstWhere((n) => n.id == id);
+  @override
   Future<int> markAllRead() async => 0;
 }
 
@@ -129,12 +132,13 @@ void main() {
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final cubit =
-        NotificationCubit(_StubRepository(unread: 1, items: [_n('n1')]));
+    final cubit = NotificationCubit(_StubRepository(
+        unread: 1, items: [_n('00000000-0000-4000-8000-000000000001')]));
     addTearDown(cubit.close);
     await tester.pumpWidget(harness(cubit));
     await tester.pump(const Duration(milliseconds: 200));
-    await tester.tap(find.textContaining('n1').first);
+    await tester
+        .tap(find.textContaining('00000000-0000-4000-8000-000000000001').first);
     await tester.pump();
     expect(cubit.state.unreadCount, 0);
     expect(cubit.state.items.single.isRead, isTrue);

@@ -197,7 +197,8 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
                           const SizedBox(height: 8),
                           Text(
                               'Chat consultation · ${a.status.replaceAll('_', ' ').toLowerCase()}'),
-                          if (a.fee != null) Text('KES ${a.fee}'),
+                          if (a.paymentRequired && a.fee != null)
+                            Text('KES ${a.fee}'),
                           const SizedBox(height: 8),
                           OutlinedButton(
                               onPressed: () async {

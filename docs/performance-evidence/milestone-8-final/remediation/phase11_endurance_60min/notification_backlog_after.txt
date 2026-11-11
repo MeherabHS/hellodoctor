@@ -1,0 +1,5 @@
+﻿ delivery_status | count  
+-----------------+--------
+ CREATED         | 120370
+(1 row)
+

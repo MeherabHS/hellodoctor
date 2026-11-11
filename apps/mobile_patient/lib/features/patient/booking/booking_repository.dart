@@ -59,12 +59,15 @@ class BookingRepository {
   /// (`appointment_handlers::book_appointment`) resolves the real gateway
   /// from it server-side and re-validates ownership, so this app never needs
   /// to send a bare `gateway` string or re-collect payment details at
-  /// booking time once a method is saved.
+  /// booking time once a method is saved. `null` is only valid when
+  /// [bookingPolicy] reported `paymentRequired == false` — the backend
+  /// itself is the only authority on that, and rejects a `null` method when
+  /// payment actually is required.
   Future<BookingResultDto> book({
     required String doctorId,
     required String slotId,
     required String modality,
-    required String paymentMethodId,
+    required String? paymentMethodId,
     String? chiefComplaint,
     String? profileId,
   }) async {
@@ -75,7 +78,7 @@ class BookingRepository {
         'doctor_id': doctorId,
         'slot_id': slotId,
         'modality': modality,
-        'payment_method_id': paymentMethodId,
+        if (paymentMethodId != null) 'payment_method_id': paymentMethodId,
         if (chiefComplaint != null && chiefComplaint.trim().isNotEmpty)
           'chief_complaint': chiefComplaint.trim(),
         if (profileId != null) 'profile_id': profileId,
@@ -84,6 +87,22 @@ class BookingRepository {
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'Booking', operation: 'book_appointment');
+      rethrow;
+    }
+  }
+
+  /// `GET /config/booking-policy` — the single server-controlled source of
+  /// truth for whether a booking about to be made requires payment. Checked
+  /// before the Fee/Payment-method UI is shown at all, never inferred
+  /// client-side.
+  Future<BookingPolicyDto> bookingPolicy() async {
+    try {
+      requireOnline();
+      final raw = _data(await api.get('/config/booking-policy'));
+      return BookingPolicyDto.fromJson(Map<String, dynamic>.from(raw as Map));
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Booking', operation: 'load_booking_policy');
       rethrow;
     }
   }

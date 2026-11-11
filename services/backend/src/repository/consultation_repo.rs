@@ -4,6 +4,16 @@ use crate::domain::models::{
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
+/// M8-G-30: how long a *mint-time-only*, not-yet-provider-confirmed
+/// reservation claim lives before it self-expires and becomes reclaimable.
+/// Deliberately short and independent of the Agora token's own (up to
+/// one-hour) cryptographic expiry — see
+/// docs/MILESTONE_8_SINGLE_LIVE_CONSULTATION_DESIGN.md §5 for why reusing
+/// the token's own TTL here was considered and rejected. This only deters
+/// an accidental near-simultaneous double-mint; it is not, and must never be
+/// treated as, proof that a participant has actually left Agora.
+pub const RESERVATION_PENDING_GRACE_SECS: i64 = 120;
+
 pub async fn insert_session<'e, E: PgExecutor<'e>>(
     executor: E,
     session: &ConsultationSession,
@@ -86,6 +96,25 @@ pub async fn list_all<'e, E: PgExecutor<'e>>(
     sqlx::query_as::<_, ConsultationSession>(
         "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at, recovery_state, empty_room_deadline, patient_present, doctor_present, patient_presence_sequence, doctor_presence_sequence FROM consultation_sessions",
     )
+    .fetch_all(executor)
+    .await
+}
+
+/// M8-G-20: scoped alternative to `list_all` for `list_admin_grievances`,
+/// which only ever needs the sessions actually referenced by the (typically
+/// small) grievance list currently being displayed — mirrors
+/// `appointment_repo::find_by_ids`'s established rationale and shape.
+pub async fn find_by_ids<'e, E: PgExecutor<'e>>(
+    executor: E,
+    ids: &[Uuid],
+) -> Result<Vec<ConsultationSession>, sqlx::Error> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    sqlx::query_as::<_, ConsultationSession>(
+        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, status, created_at, recovery_state, empty_room_deadline, patient_present, doctor_present, patient_presence_sequence, doctor_presence_sequence FROM consultation_sessions WHERE id = ANY($1)",
+    )
+    .bind(ids)
     .fetch_all(executor)
     .await
 }
@@ -213,4 +242,115 @@ pub async fn list_telemetry_events_for_session<'e, E: PgExecutor<'e>>(
     .bind(session_id)
     .fetch_all(executor)
     .await
+}
+
+/// M8-G-30 mint-time acquire/refresh. Atomic: a single `INSERT ... ON
+/// CONFLICT ... WHERE ... RETURNING` that can never raise a unique-violation
+/// error for the "someone else already holds it" case — the `WHERE` clause
+/// makes that outcome a deterministic zero-row result instead of a database
+/// error (docs/MILESTONE_8_SINGLE_LIVE_CONSULTATION_DESIGN.md §4). A
+/// same-appointment re-mint against an existing `CONFIRMED` row is always
+/// admitted as a no-op that never downgrades its state or shrinks its
+/// `expires_at` (§4 issue 2 fix) — only a same-appointment `PENDING` row is
+/// refreshed forward. Returns `true` if the caller now legitimately holds
+/// the single reservation for `user_id`.
+pub async fn acquire_live_reservation<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: Uuid,
+    appointment_id: Uuid,
+    session_id: Uuid,
+    pending_grace_secs: i64,
+) -> Result<bool, sqlx::Error> {
+    let acquired: Option<Uuid> = sqlx::query_scalar(
+        "INSERT INTO consultation_live_reservations \
+             (user_id, appointment_id, session_id, state, acquired_at, expires_at, updated_at) \
+         VALUES ($1,$2,$3,'PENDING',clock_timestamp(), \
+                 clock_timestamp() + make_interval(secs => $4), clock_timestamp()) \
+         ON CONFLICT (user_id) DO UPDATE SET \
+             appointment_id = EXCLUDED.appointment_id, \
+             session_id     = EXCLUDED.session_id, \
+             state      = CASE WHEN consultation_live_reservations.appointment_id = EXCLUDED.appointment_id \
+                                 AND consultation_live_reservations.state = 'CONFIRMED' \
+                            THEN consultation_live_reservations.state ELSE 'PENDING' END, \
+             expires_at = CASE WHEN consultation_live_reservations.appointment_id = EXCLUDED.appointment_id \
+                                 AND consultation_live_reservations.state = 'CONFIRMED' \
+                            THEN consultation_live_reservations.expires_at ELSE EXCLUDED.expires_at END, \
+             updated_at = clock_timestamp() \
+         WHERE consultation_live_reservations.appointment_id = EXCLUDED.appointment_id \
+            OR (consultation_live_reservations.state = 'PENDING' AND consultation_live_reservations.expires_at <= clock_timestamp()) \
+            OR (consultation_live_reservations.state = 'CONFIRMED' AND consultation_live_reservations.expires_at <= clock_timestamp()) \
+            OR EXISTS (SELECT 1 FROM consultation_sessions cs WHERE cs.id = consultation_live_reservations.session_id AND cs.status = 'COMPLETED') \
+            OR EXISTS (SELECT 1 FROM appointments a WHERE a.id = consultation_live_reservations.appointment_id AND a.status IN ('CANCELLED','EXPIRED')) \
+         RETURNING user_id",
+    )
+    .bind(user_id)
+    .bind(appointment_id)
+    .bind(session_id)
+    .bind(pending_grace_secs)
+    .fetch_optional(executor)
+    .await?;
+    Ok(acquired.is_some())
+}
+
+/// M8-G-30 webhook-path upgrade to `CONFIRMED` on an accepted, provider-
+/// trusted Joined event — same atomic shape as `acquire_live_reservation`,
+/// and likewise never downgrades a same-session row's own freshly-computed
+/// backstop. Returns `true` if this session now legitimately holds the
+/// reservation. `false` means a genuine, unresolved conflict with a
+/// *different*, still-live session exists for this `user_id` — the caller
+/// (`apply_provider_event`) must not treat this as an error: this session's
+/// own presence is still recorded normally (the join is physically real),
+/// and a `CONCURRENT_LIVE_PARTICIPATION_DETECTED` audit event is written
+/// instead (design doc §6) — this function only reports the fact, callers
+/// decide what to do about it.
+pub async fn confirm_live_reservation<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: Uuid,
+    appointment_id: Uuid,
+    session_id: Uuid,
+    backstop_secs: i64,
+) -> Result<bool, sqlx::Error> {
+    let confirmed: Option<Uuid> = sqlx::query_scalar(
+        "INSERT INTO consultation_live_reservations \
+             (user_id, appointment_id, session_id, state, acquired_at, expires_at, updated_at) \
+         VALUES ($1,$2,$3,'CONFIRMED',clock_timestamp(), \
+                 clock_timestamp() + make_interval(secs => $4), clock_timestamp()) \
+         ON CONFLICT (user_id) DO UPDATE SET \
+             appointment_id = EXCLUDED.appointment_id, \
+             session_id     = EXCLUDED.session_id, \
+             state          = 'CONFIRMED', \
+             expires_at     = EXCLUDED.expires_at, \
+             updated_at     = clock_timestamp() \
+         WHERE consultation_live_reservations.appointment_id = EXCLUDED.appointment_id \
+            OR (consultation_live_reservations.state = 'PENDING' AND consultation_live_reservations.expires_at <= clock_timestamp()) \
+            OR (consultation_live_reservations.state = 'CONFIRMED' AND consultation_live_reservations.expires_at <= clock_timestamp()) \
+            OR EXISTS (SELECT 1 FROM consultation_sessions cs WHERE cs.id = consultation_live_reservations.session_id AND cs.status = 'COMPLETED') \
+            OR EXISTS (SELECT 1 FROM appointments a WHERE a.id = consultation_live_reservations.appointment_id AND a.status IN ('CANCELLED','EXPIRED')) \
+         RETURNING user_id",
+    )
+    .bind(user_id)
+    .bind(appointment_id)
+    .bind(session_id)
+    .bind(backstop_secs)
+    .fetch_optional(executor)
+    .await?;
+    Ok(confirmed.is_some())
+}
+
+/// M8-G-30 release on an accepted, provider-trusted Left event. Scoped to
+/// `session_id` so it can never delete a reservation that legitimately
+/// points at a *different* session for this user (the §6 conflict case) —
+/// only this exact (user, session) pair's own reservation is ever removed
+/// here.
+pub async fn release_live_reservation<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: Uuid,
+    session_id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM consultation_live_reservations WHERE user_id=$1 AND session_id=$2")
+        .bind(user_id)
+        .bind(session_id)
+        .execute(executor)
+        .await?;
+    Ok(())
 }

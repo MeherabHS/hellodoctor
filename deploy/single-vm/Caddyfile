@@ -1,0 +1,39 @@
+{
+    admin off
+    email {$ACME_EMAIL}
+}
+
+(forwarding) {
+    # Overwrite client-supplied assertions; the application validates one IP.
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Forwarded-Proto https
+    header_up -Forwarded
+    header_up -X-Real-IP
+    header_up -X-HelloDoctor-Proxy
+    header_up -X-HelloDoctor-Auth-Assertion
+}
+
+{$API_HOST} {
+    reverse_proxy backend:8080 {
+        import forwarding
+    }
+}
+
+{$ADMIN_HOST} {
+    reverse_proxy admin-web:3000 {
+        import forwarding
+        header_up X-HelloDoctor-Proxy {$WEB_PROXY_SECRET}
+    }
+}
+
+{$DOCTOR_HOST} {
+    reverse_proxy doctor-web:3000 {
+        import forwarding
+        header_up X-HelloDoctor-Proxy {$WEB_PROXY_SECRET}
+    }
+}
+
+# Container-only liveness. Not published on the host.
+http://:8081 {
+    respond /healthz 200
+}

@@ -3,6 +3,9 @@ import '../../core/network/api_client.dart';
 import '../../core/widgets/doctor_widgets.dart';
 import 'articles_repository.dart';
 
+Widget doctorArticleEditor(ApiClient api, DoctorArticle article) =>
+    _ArticleEditor(repo: ArticlesRepository(api), initial: article);
+
 void openDoctorArticleEditor(BuildContext context, ApiClient api) {
   Navigator.push(
       context,

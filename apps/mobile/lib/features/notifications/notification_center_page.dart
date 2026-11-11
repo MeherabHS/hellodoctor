@@ -1,8 +1,8 @@
-import '../doctor/doctor_cubit.dart';
-import '../doctor/doctor_pages.dart';
+import '../../core/l10n/doctor_locale.dart';
+import '../../core/notifications/notification_taps.dart';
+import 'notification_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../app.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/doctor_widgets.dart';
 import 'notification_cubit.dart';
@@ -13,8 +13,12 @@ const _monthNames = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-String _mediumDateTime(DateTime utc) {
+String _mediumDateTime(BuildContext context, DateTime utc) {
   final t = utc.toLocal();
+  if (Localizations.localeOf(context).languageCode == 'sw') {
+    final material = MaterialLocalizations.of(context);
+    return '${material.formatMediumDate(t)} \u00b7 ${material.formatTimeOfDay(TimeOfDay.fromDateTime(t))}';
+  }
   final hour = t.hour % 12 == 0 ? 12 : t.hour % 12;
   final minute = t.minute.toString().padLeft(2, '0');
   final suffix = t.hour >= 12 ? 'PM' : 'AM';
@@ -38,37 +42,24 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
         .addPostFrameCallback((_) => context.read<NotificationCubit>().load());
   }
 
+  final _tapGate = NotificationTapGate();
   Future<void> _handleTap(NotificationDto n) async {
-    final cubit = context.read<NotificationCubit>();
-    await cubit.markRead(n.id);
-    if (!mounted) return;
-    // No dedicated single-appointment detail screen exists today — the only
-    // recognized navigation target is the Schedule tab, for an appointment-
-    // related notification (e.g. a reminder). Anything else is left as a
-    // read-only inbox entry; there is nowhere else to invent a destination.
-    if (n.relatedEntityType == 'CHAT' && n.relatedEntityId != null) {
-      try {
-        final chats = await context.read<DoctorCubit>().repo.allChats();
-        final found = chats.where((c) => c.id == n.relatedEntityId).firstOrNull;
-        if (found != null && mounted) {
-          await Navigator.push(context,
-              MaterialPageRoute(builder: (_) => ChatThreadPage(chat: found)));
-        }
-      } catch (_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content:
-                  Text('Unable to open this conversation. Please retry.')));
-        }
-      }
-    } else if (n.relatedEntityType == 'APPOINTMENT') {
-      Navigator.of(context).popUntil((r) => r.isFirst);
-      DoctorShell.switchTab(context, 3);
-    }
+    try {
+      await openNotificationDestination(
+          context, context.read<NotificationCubit>(), n.id, _tapGate,
+          fromInbox: true);
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _tapGate.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = doctorL10n(context);
     final cubit = context.read<NotificationCubit>();
     final s = context.watch<NotificationCubit>().state;
     final items = [...s.items]
@@ -78,7 +69,8 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
         body: SafeArea(
             bottom: false,
             child: Column(children: [
-              DoctorPageHeader('Notifications', 'Account & activity updates',
+              DoctorPageHeader(
+                  l10n.notificationsTitle, l10n.notificationsSubtitle,
                   onRefresh: cubit.refresh,
                   actions: [
                     if (s.unreadCount > 0)
@@ -90,8 +82,8 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
                                   height: 16,
                                   child:
                                       CircularProgressIndicator(strokeWidth: 2))
-                              : const Text('Mark all read',
-                                  style: TextStyle(fontSize: 12))),
+                              : Text(l10n.notificationsMarkAllRead,
+                                  style: const TextStyle(fontSize: 12))),
                   ]),
               CacheStatusBar(
                   offline: false,
@@ -101,8 +93,7 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
                   child: s.loading && items.isEmpty
                       ? const Center(child: CircularProgressIndicator())
                       : s.error != null && items.isEmpty
-                          ? ErrorPanel(
-                              'Notifications could not be loaded. Please retry.',
+                          ? ErrorPanel(l10n.notificationsLoadError,
                               onRetry: cubit.load)
                           : RefreshIndicator(
                               onRefresh: cubit.refresh,
@@ -112,7 +103,7 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
                                   children: [
                                     if (s.error != null)
                                       InlineError(
-                                          'Notifications could not be refreshed. Please retry.',
+                                          l10n.notificationsRefreshError,
                                           onRetry: cubit.refresh),
                                     if (s.hasOlder)
                                       TextButton(
@@ -120,14 +111,14 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
                                               ? null
                                               : cubit.loadOlder,
                                           child: Text(s.loadingOlder
-                                              ? 'Loading earlier notifications...'
-                                              : 'Load earlier notifications')),
+                                              ? l10n.notificationsLoadingOlder
+                                              : l10n.notificationsLoadOlder)),
                                     if (items.isEmpty)
-                                      const Padding(
-                                          padding: EdgeInsets.all(32),
+                                      Padding(
+                                          padding: const EdgeInsets.all(32),
                                           child: Center(
-                                              child:
-                                                  Text('No notifications yet')))
+                                              child: Text(
+                                                  l10n.notificationsEmpty)))
                                     else
                                       ...items.map((n) => _NotificationTile(
                                           key: ValueKey(n.id),
@@ -187,7 +178,7 @@ class _NotificationTile extends StatelessWidget {
                             color: DoctorTokens.textSub,
                             height: 1.4)),
                     const SizedBox(height: 6),
-                    Text(_mediumDateTime(n.createdAt),
+                    Text(_mediumDateTime(context, n.createdAt),
                         style: const TextStyle(
                             fontSize: 10, color: DoctorTokens.textSub)),
                   ]))

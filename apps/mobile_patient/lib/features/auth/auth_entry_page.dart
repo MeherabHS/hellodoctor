@@ -4,6 +4,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/widgets/patient_widgets.dart';
 import 'auth_cubit.dart';
 import 'email_otp_verify_page.dart';
+import 'forgot_password_page.dart';
 
 class AuthEntryPage extends StatefulWidget {
   const AuthEntryPage({super.key, required this.auth});
@@ -187,11 +188,19 @@ class _AuthEntryPageState extends State<AuthEntryPage> {
                                         hint: 'Enter your password',
                                         obscureText: true),
                                     if (!register)
-                                      const Align(
+                                      Align(
                                           alignment: Alignment.centerRight,
                                           child: TextButton(
-                                              onPressed: null,
-                                              child: Text('Forgot password?'))),
+                                              onPressed: busy
+                                                  ? null
+                                                  : () => Navigator.of(context)
+                                                      .push(MaterialPageRoute(
+                                                          builder: (_) =>
+                                                              ForgotPasswordPage(
+                                                                  auth: widget
+                                                                      .auth))),
+                                              child: const Text(
+                                                  'Forgot password?'))),
                                     if (state is AuthFailure) ...[
                                       const SizedBox(height: 12),
                                       Text(state.message,

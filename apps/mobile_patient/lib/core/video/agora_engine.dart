@@ -63,7 +63,8 @@ class RealAgoraEngine implements AgoraEngineAdapter {
   RtcEngine get _requireEngine {
     final engine = _engine;
     if (engine == null) {
-      throw StateError('AgoraEngineAdapter.initialize() must be awaited before use.');
+      throw StateError(
+          'AgoraEngineAdapter.initialize() must be awaited before use.');
     }
     return engine;
   }

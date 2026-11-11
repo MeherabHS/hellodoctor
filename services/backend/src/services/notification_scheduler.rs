@@ -32,6 +32,12 @@ use uuid::Uuid;
 /// `tokio::spawn`'d task driven off `AppState`'s existing `system_db` pool —
 /// no new connection pool or role is introduced.
 pub fn start(state: AppState) {
+    if state.config.recovery_mode {
+        tracing::warn!(
+            "RECOVERY_MODE=true: notification, campaign, reminder and payment-hold scheduler is disabled"
+        );
+        return;
+    }
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(60));
         loop {
@@ -53,6 +59,34 @@ pub fn start(state: AppState) {
                 Err(_) => {
                     tracing::warn!("article maintenance deferred after its five-second budget")
                 }
+            }
+            // Account-erasure recovery only; delivery and notification state are unchanged.
+            match tokio::time::timeout(
+                Duration::from_secs(5),
+                super::data_rights_service::retry_pending_erasures(&state),
+            )
+            .await
+            {
+                Ok(Ok(_)) => {}
+                _ => {
+                    tracing::warn!("Account erasure recovery deferred; durable jobs remain pending")
+                }
+            }
+            // Remediation E1: copy completed-erasure intent into the
+            // externally-custodied journal. Never runs while RECOVERY_MODE
+            // is true (this entire scheduler already returns early above),
+            // which is correct: no new erasures can be requested in recovery
+            // mode either (see global_guard's recovery allowlist).
+            match tokio::time::timeout(
+                Duration::from_secs(5),
+                super::dr_reconciliation::sync_outbox_to_journal(&state),
+            )
+            .await
+            {
+                Ok(Ok(_)) => {}
+                _ => tracing::warn!(
+                    "Erasure journal sync deferred; durable outbox rows remain pending"
+                ),
             }
             if let Err(error) = super::consultation_trace::maintenance(&state).await {
                 tracing::error!(error = ?error, "consultation trace maintenance failed");
@@ -98,6 +132,22 @@ pub fn start(state: AppState) {
             }
             if let Err(e) = run_push_delivery_pass(&state).await {
                 tracing::error!(error = ?e, "notification scheduler: FCM delivery pass failed");
+            }
+            // Phase 0 email integration: reconciliation only, never a
+            // resend — see `email_delivery::run_email_outbox_expiry_sweep`'s
+            // doc comment for why OTP email delivery is never retried from
+            // here.
+            if let Err(e) = crate::email_delivery::run_email_outbox_expiry_sweep(&state).await {
+                tracing::error!(error = ?e, "notification scheduler: email outbox expiry sweep failed");
+            }
+            // Phase 1B: durable fallback for transactional email — anything
+            // the post-commit `email_dispatch_worker::dispatch_now` fast
+            // path missed (process restart, transient failure now past its
+            // backoff, a stale lease recovered from a crashed attempt).
+            if let Err(e) =
+                super::email_dispatch_worker::run_transactional_email_dispatch_pass(&state).await
+            {
+                tracing::error!(error = ?e, "notification scheduler: transactional email dispatch pass failed");
             }
         }
     });
@@ -238,6 +288,7 @@ async fn run_one_campaign_fanout(
 /// there is nothing to re-check.
 async fn is_still_eligible_for_dispatch(
     state: &AppState,
+    connection: &mut sqlx::PgConnection,
     row: &notification_repo::DueNotification,
 ) -> Result<bool, crate::error::AppError> {
     let Some(appointment_id) = row.related_entity_id else {
@@ -258,7 +309,7 @@ async fn is_still_eligible_for_dispatch(
             .bind(appointment_id)
             .bind(before_mins)
             .bind(after_mins)
-            .fetch_one(&state.system_db)
+            .fetch_one(&mut *connection)
             .await?;
             Ok(eligible)
         }
@@ -270,7 +321,7 @@ async fn is_still_eligible_for_dispatch(
                       AND empty_room_deadline > clock_timestamp())",
             )
             .bind(appointment_id)
-            .fetch_one(&state.system_db)
+            .fetch_one(&mut *connection)
             .await?;
             Ok(eligible)
         }
@@ -290,7 +341,8 @@ async fn is_still_eligible_for_dispatch(
 enum DeliveryGate {
     Allow,
     SuppressPermanently(&'static str),
-    Defer(DateTime<Utc>),
+    Defer(DateTime<Utc>, &'static str),
+    LostClaim,
 }
 
 /// The four recurring "greeting"-style types (Milestones 4/5), gated by the
@@ -314,15 +366,42 @@ const GREETING_TYPES: [&str; 4] = [
 /// are exempt, satisfying requirement 13).
 async fn notification_delivery_gate(
     state: &AppState,
+    connection: &mut sqlx::PgConnection,
     row: &notification_repo::DueNotification,
 ) -> Result<DeliveryGate, crate::error::AppError> {
+    if !is_still_eligible_for_dispatch(state, connection, row).await? {
+        return Ok(DeliveryGate::SuppressPermanently(
+            "Suppressed: no longer eligible at dispatch time",
+        ));
+    }
+    if row.related_entity_type.as_deref() == Some("CAMPAIGN") {
+        let status: Option<String> =
+            sqlx::query_scalar("SELECT status::text FROM campaigns WHERE id=$1")
+                .bind(row.related_entity_id)
+                .fetch_optional(&mut *connection)
+                .await?;
+        match status.as_deref() {
+            Some("PAUSED" | "SCHEDULED") => {
+                return Ok(DeliveryGate::Defer(
+                    Utc::now() + ChronoDuration::seconds(60),
+                    "Deferred: campaign delivery paused",
+                ))
+            }
+            Some("SENDING" | "COMPLETED") => {}
+            _ => {
+                return Ok(DeliveryGate::SuppressPermanently(
+                    "Suppressed: campaign is no longer eligible",
+                ))
+            }
+        }
+    }
     let type_gate =
-        notification_repo::notification_type_gate(&state.system_db, &row.notification_type).await?;
+        notification_repo::notification_type_gate(&mut *connection, &row.notification_type).await?;
     if type_gate.category != "OPERATIONAL" && type_gate.category != "ENGAGEMENT" {
         return Ok(DeliveryGate::Allow);
     }
     let prefs =
-        notification_repo::user_notification_preferences(&state.system_db, row.user_id).await?;
+        notification_repo::user_notification_preferences(&mut *connection, row.user_id).await?;
     let now = Utc::now();
 
     if GREETING_TYPES.contains(&row.notification_type.as_str()) {
@@ -338,7 +417,7 @@ async fn notification_delivery_gate(
             // name or any other signal, never inferred.
             let is_religious = match row.related_entity_id {
                 Some(holiday_id) => {
-                    notification_repo::holiday_is_religious(&state.system_db, holiday_id)
+                    notification_repo::holiday_is_religious(&mut *connection, holiday_id)
                         .await?
                         .unwrap_or(false)
                 }
@@ -384,7 +463,10 @@ async fn notification_delivery_gate(
                 .and_local_timezone(nairobi_offset())
                 .unwrap()
                 .with_timezone(&Utc);
-            return Ok(DeliveryGate::Defer(end_utc));
+            return Ok(DeliveryGate::Defer(
+                end_utc,
+                "Deferred: recipient quiet hours in effect",
+            ));
         }
     }
 
@@ -393,10 +475,12 @@ async fn notification_delivery_gate(
     // reserving yesterday's slot while it waits overnight.
     if !row.frequency_claimed {
         let local_today = nairobi_local_date(now);
-        let ctx = crate::auth_context::AuthContext::system();
-        let mut tx = state
-            .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
-            .await?;
+        let mut tx = sqlx::Connection::begin(&mut *connection).await?;
+        if !notification_repo::renew_delivery_claim(&mut *tx, row.id, row.delivery_claim_token)
+            .await?
+        {
+            return Ok(DeliveryGate::LostClaim);
+        }
         let claimed = notification_repo::claim_frequency_slot(
             &mut *tx,
             row.user_id,
@@ -406,7 +490,8 @@ async fn notification_delivery_gate(
         )
         .await?;
         if claimed {
-            notification_repo::mark_frequency_claimed(&mut *tx, row.id).await?;
+            notification_repo::mark_frequency_claimed(&mut *tx, row.id, row.delivery_claim_token)
+                .await?;
         }
         tx.commit().await?;
         if !claimed {
@@ -418,182 +503,375 @@ async fn notification_delivery_gate(
     Ok(DeliveryGate::Allow)
 }
 
-const PUSH_BATCH: i64 = 50;
 const PUSH_MAX_ATTEMPTS: i32 = 5;
+const PUSH_MAX_ROWS: usize = 200;
+const PUSH_SEND_TIMEOUT: Duration = Duration::from_secs(45);
+const PUSH_HEARTBEAT: Duration = Duration::from_secs(10);
 
-/// Delivers already-created inbox rows through the configured provider. The
-/// inbox remains the source of truth: a provider response can only update
-/// delivery metadata and never changes appointment, consultation or payment
-/// state. In development/test, NoopTransport leaves rows in the inbox without
-/// claiming them, so local behavior remains deterministic.
+enum DispatchResult {
+    Outcome(PushOutcome),
+    Blocked(DeliveryGate),
+    TokenRevoked,
+}
+
+async fn token_still_enabled(
+    connection: &mut sqlx::PgConnection,
+    row: &notification_repo::DueNotification,
+    device_id: Uuid,
+    token: &str,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM notification_device_tokens WHERE user_id=$1 AND device_id=$2 AND push_token=$3 AND enabled)")
+        .bind(row.user_id).bind(device_id).bind(token).fetch_one(connection).await
+}
+
+/// Provider IO owns no database transaction. Heartbeats renew the fenced
+/// claim and recheck live controls; cancellation drops the provider future.
+/// A remote acceptance before cancellation remains fundamentally ambiguous.
+async fn send_with_lease(
+    state: &AppState,
+    connection: &mut sqlx::PgConnection,
+    row: &notification_repo::DueNotification,
+    device_id: Uuid,
+    token: &str,
+) -> Result<DispatchResult, crate::error::AppError> {
+    // M8-G-13: the Doctor and Patient apps register different Android
+    // notification channel sets, so the correct `channel_id` depends on
+    // which app will actually receive this push — resolved from the
+    // recipient's own role, never trusted from anywhere else.
+    let recipient_role: String = sqlx::query_scalar("SELECT role::text FROM users WHERE id=$1")
+        .bind(row.user_id)
+        .fetch_one(&mut *connection)
+        .await?;
+    let options = PushOptions {
+        notification_id: row.id.to_string(),
+        notification_type: row.notification_type.clone(),
+        related_entity_type: row.related_entity_type.clone(),
+        related_entity_id: row.related_entity_id.map(|id| id.to_string()),
+        collapse_key: row.collapse_key.clone(),
+        ttl_seconds: row.ttl_seconds,
+        recipient_role,
+    };
+    let send = state
+        .notification_transport
+        .send_push(token, &row.title, &row.body, &options);
+    tokio::pin!(send);
+    let deadline = tokio::time::sleep(PUSH_SEND_TIMEOUT);
+    tokio::pin!(deadline);
+    let mut heartbeat = tokio::time::interval(PUSH_HEARTBEAT);
+    heartbeat.tick().await;
+    loop {
+        tokio::select! {
+            biased;
+            _ = heartbeat.tick() => {
+                if !notification_repo::renew_delivery_claim(&mut *connection,row.id,row.delivery_claim_token).await? {
+                    return Ok(DispatchResult::Blocked(DeliveryGate::LostClaim));
+                }
+                let gate = notification_delivery_gate(state,connection,row).await?;
+                if !matches!(gate, DeliveryGate::Allow) { return Ok(DispatchResult::Blocked(gate)); }
+                if !token_still_enabled(connection,row,device_id,token).await? { return Ok(DispatchResult::TokenRevoked); }
+            }
+            _ = &mut deadline => return Ok(DispatchResult::Outcome(PushOutcome::Retryable {
+                reason: "Provider acknowledgment timed out; outcome is uncertain".into(),
+            })),
+            outcome = &mut send => return Ok(DispatchResult::Outcome(outcome)),
+        }
+    }
+}
+
+async fn finish_gate(
+    connection: &mut sqlx::PgConnection,
+    row: &notification_repo::DueNotification,
+    gate: DeliveryGate,
+    provider_started: bool,
+) -> Result<(), sqlx::Error> {
+    let exhausted_deferral = provider_started
+        && row.delivery_attempts >= PUSH_MAX_ATTEMPTS
+        && matches!(gate, DeliveryGate::Defer(_, _));
+    let outcome_metric = match &gate {
+        DeliveryGate::Defer(_, _) if exhausted_deferral => {
+            "notification_push_permanent_failure_total"
+        }
+        DeliveryGate::SuppressPermanently(reason) if reason.contains("dispatch time") => {
+            "notification_push_stale_suppressed_total"
+        }
+        DeliveryGate::SuppressPermanently(reason) if reason.contains("campaign") => {
+            "notification_push_campaign_suppressed_total"
+        }
+        DeliveryGate::SuppressPermanently(_) => "notification_push_preference_suppressed_total",
+        DeliveryGate::Defer(_, reason) if reason.contains("quiet hours") => {
+            "notification_push_quiet_hours_deferred_total"
+        }
+        DeliveryGate::Defer(_, _) => "notification_push_campaign_deferred_total",
+        _ => "notification_push_stale_completion_total",
+    };
+    let changed = match gate {
+        DeliveryGate::SuppressPermanently(reason) => {
+            notification_repo::mark_delivery_suppressed(
+                connection,
+                row.id,
+                row.delivery_claim_token,
+                reason,
+            )
+            .await?
+        }
+        DeliveryGate::Defer(_, _) if exhausted_deferral => {
+            notification_repo::mark_delivery_permanent(
+                connection,
+                row.id,
+                row.delivery_claim_token,
+                "Delivery retry budget exhausted while deferring an uncertain provider call",
+            )
+            .await?
+        }
+        DeliveryGate::Defer(next, reason) => {
+            notification_repo::mark_delivery_deferred(
+                connection,
+                row.id,
+                row.delivery_claim_token,
+                next,
+                reason,
+                provider_started,
+            )
+            .await?
+        }
+        DeliveryGate::LostClaim => false,
+        DeliveryGate::Allow => return Ok(()),
+    };
+    if changed {
+        metrics::counter!(outcome_metric).increment(1);
+    } else {
+        metrics::counter!("notification_push_stale_completion_total").increment(1);
+    }
+    Ok(())
+}
+
+async fn deliver_claimed(
+    state: &AppState,
+    claim: &mut notification_repo::DeliveryClaim,
+) -> Result<(), crate::error::AppError> {
+    let mut row = claim.row.clone();
+    let connection = claim.connection();
+    if !notification_repo::renew_delivery_claim(&mut *connection, row.id, row.delivery_claim_token)
+        .await?
+    {
+        return Ok(());
+    }
+    if row.delivery_attempts > PUSH_MAX_ATTEMPTS {
+        notification_repo::mark_delivery_permanent(
+            connection,
+            row.id,
+            row.delivery_claim_token,
+            "Delivery retry budget exhausted after abandoned claim; inspect uncertain outcome flag",
+        )
+        .await?;
+        return Ok(());
+    }
+    let gate = notification_delivery_gate(state, connection, &row).await?;
+    if !matches!(gate, DeliveryGate::Allow) {
+        return Ok(finish_gate(connection, &row, gate, false).await?);
+    }
+    // The first gate has atomically reserved the frequency slot, if applicable.
+    row.frequency_claimed = true;
+    let tokens =
+        notification_repo::device_tokens::find_enabled_for_user(&mut *connection, row.user_id)
+            .await?;
+    let mut sent = false;
+    let mut retryable = tokens.is_empty();
+    let mut provider_message_id = None;
+    let mut uncertain = row.delivery_uncertain;
+    let mut provider_started = false;
+    for (device_id, token) in tokens {
+        if !notification_repo::renew_delivery_claim(
+            &mut *connection,
+            row.id,
+            row.delivery_claim_token,
+        )
+        .await?
+        {
+            return Ok(());
+        }
+        let gate = notification_delivery_gate(state, connection, &row).await?;
+        if !matches!(gate, DeliveryGate::Allow) {
+            if sent {
+                break;
+            }
+            return Ok(finish_gate(connection, &row, gate, provider_started).await?);
+        }
+        if !token_still_enabled(connection, &row, device_id, &token).await? {
+            continue;
+        }
+        if !notification_repo::begin_provider_send(
+            &mut *connection,
+            row.id,
+            row.delivery_claim_token,
+        )
+        .await?
+        {
+            return Ok(());
+        }
+        provider_started = true;
+        let result = send_with_lease(state, connection, &row, device_id, &token).await?;
+        if !notification_repo::renew_delivery_claim(
+            &mut *connection,
+            row.id,
+            row.delivery_claim_token,
+        )
+        .await?
+        {
+            metrics::counter!("notification_push_stale_completion_total").increment(1);
+            return Ok(());
+        }
+        match result {
+            DispatchResult::Blocked(gate) => {
+                if sent && !matches!(gate, DeliveryGate::LostClaim) {
+                    break;
+                }
+                return Ok(finish_gate(connection, &row, gate, provider_started).await?);
+            }
+            DispatchResult::TokenRevoked => {
+                uncertain = true;
+            }
+            DispatchResult::Outcome(PushOutcome::SentToProvider {
+                provider_message_id: id,
+            }) => {
+                sent = true;
+                metrics::counter!("notification_push_sent_total").increment(1);
+                provider_message_id = provider_message_id.or(id);
+            }
+            DispatchResult::Outcome(PushOutcome::Permanent { .. }) => {
+                let mut tx = sqlx::Connection::begin(&mut *connection).await?;
+                // The row lock from renewal fences BOTH token invalidation and
+                // uncertainty accounting from cancellation/ownership changes.
+                if !notification_repo::renew_delivery_claim(
+                    &mut *tx,
+                    row.id,
+                    row.delivery_claim_token,
+                )
+                .await?
+                {
+                    return Ok(());
+                }
+                notification_repo::record_definite_rejection(
+                    &mut *tx,
+                    row.id,
+                    row.delivery_claim_token,
+                    uncertain,
+                )
+                .await?;
+                let disabled = notification_repo::device_tokens::disable_device(
+                    &mut *tx,
+                    row.user_id,
+                    Some(device_id),
+                    Some(&token),
+                )
+                .await?;
+                tx.commit().await?;
+                metrics::counter!("notification_push_invalid_token_total").increment(disabled);
+            }
+            DispatchResult::Outcome(PushOutcome::Retryable { .. }) => {
+                retryable = true;
+                uncertain = true;
+            }
+            DispatchResult::Outcome(PushOutcome::NoProviderConfigured) => {
+                notification_repo::record_definite_rejection(
+                    &mut *connection,
+                    row.id,
+                    row.delivery_claim_token,
+                    uncertain,
+                )
+                .await?;
+                retryable = true;
+            }
+        }
+    }
+    let outcome = if sent {
+        "sent_to_provider"
+    } else if retryable && row.delivery_attempts < PUSH_MAX_ATTEMPTS {
+        "retry"
+    } else {
+        "permanent_failure"
+    };
+    let changed = if sent {
+        notification_repo::mark_delivery_sent(
+            connection,
+            row.id,
+            row.delivery_claim_token,
+            provider_message_id.as_deref(),
+        )
+        .await?
+    } else if retryable && row.delivery_attempts < PUSH_MAX_ATTEMPTS {
+        let exponent = (row.delivery_attempts.max(1) - 1).min(6) as u32;
+        let delay = (30_i64 * 2_i64.pow(exponent)).min(3600);
+        notification_repo::mark_delivery_retry(
+            connection,
+            row.id,
+            row.delivery_claim_token,
+            "FCM provider delivery was temporarily unavailable; inspect uncertain outcome flag",
+            Utc::now() + ChronoDuration::seconds(delay),
+        )
+        .await?
+    } else {
+        notification_repo::mark_delivery_permanent(
+            connection,
+            row.id,
+            row.delivery_claim_token,
+            if retryable {
+                "FCM delivery retry budget exhausted"
+            } else {
+                "No enabled device token accepted the notification"
+            },
+        )
+        .await?
+    };
+    if changed {
+        match outcome {
+            "sent_to_provider" => {
+                metrics::counter!("notification_push_acknowledged_rows_total").increment(1)
+            }
+            "retry" => metrics::counter!("notification_push_retry_total").increment(1),
+            _ => metrics::counter!("notification_push_permanent_failure_total").increment(1),
+        }
+    } else {
+        metrics::counter!("notification_push_stale_completion_total").increment(1);
+    }
+    Ok(())
+}
+
+/// Existing outbox, system-role pool and provider abstraction. Only one row is
+/// leased per worker at a time; no row waits in a preclaimed sequential batch.
+/// SENT_TO_PROVIDER means provider acceptance, never confirmed device delivery.
 pub async fn run_push_delivery_pass(state: &AppState) -> Result<u64, crate::error::AppError> {
     if !state.notification_transport.is_configured() {
         return Ok(0);
     }
-
-    let ctx = crate::auth_context::AuthContext::system();
-    let mut claimed_total = 0u64;
-    for _ in 0..4 {
-        let mut claim_tx = state
-            .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
-            .await?;
-        let rows = notification_repo::claim_due_notifications(&mut *claim_tx, PUSH_BATCH).await?;
-        claim_tx.commit().await?;
-        if rows.is_empty() {
+    let started = std::time::Instant::now();
+    let mut claimed_total = 0;
+    for _ in 0..PUSH_MAX_ROWS {
+        if started.elapsed() > Duration::from_secs(60) {
             break;
         }
-        claimed_total += rows.len() as u64;
-
-        for row in rows {
-            // A short FCM TTL only bounds how long an *undelivered* message is
-            // retained by the provider — it does not stop a message already
-            // queued (e.g. a slow retry) from being sent after the
-            // consultation's authoritative state has since changed (someone
-            // already joined, the grace period already expired/was resolved).
-            // Time-sensitive Ready/Rejoin alerts therefore recheck eligibility
-            // against the live appointment/session row immediately before
-            // dispatch, not merely at the time they were queued. The row
-            // itself is never deleted — a suppressed dispatch still leaves
-            // the in-app inbox entry intact.
-            if !is_still_eligible_for_dispatch(state, &row).await? {
-                let mut suppress_tx = state
-                    .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
-                    .await?;
-                notification_repo::mark_delivery_permanent(
-                    &mut *suppress_tx,
-                    row.id,
-                    "Suppressed: no longer eligible at dispatch time",
-                )
-                .await?;
-                suppress_tx.commit().await?;
-                metrics::counter!("notification_push_stale_suppressed_total").increment(1);
-                continue;
-            }
-            match notification_delivery_gate(state, &row).await? {
-                DeliveryGate::Allow => {}
-                DeliveryGate::SuppressPermanently(reason) => {
-                    let mut suppress_tx = state
-                        .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
-                        .await?;
-                    notification_repo::mark_delivery_permanent(&mut *suppress_tx, row.id, reason)
-                        .await?;
-                    suppress_tx.commit().await?;
-                    metrics::counter!("notification_push_preference_suppressed_total").increment(1);
-                    continue;
-                }
-                DeliveryGate::Defer(next_delivery_at) => {
-                    let mut defer_tx = state
-                        .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
-                        .await?;
-                    notification_repo::mark_delivery_deferred(
-                        &mut *defer_tx,
-                        row.id,
-                        next_delivery_at,
-                    )
-                    .await?;
-                    defer_tx.commit().await?;
-                    metrics::counter!("notification_push_quiet_hours_deferred_total").increment(1);
-                    continue;
-                }
-            }
-            let tokens = notification_repo::device_tokens::find_enabled_for_user(
-                &state.system_db,
-                row.user_id,
-            )
-            .await?;
-            let mut sent = false;
-            let mut retryable = tokens.is_empty();
-            let mut provider_message_id = None;
-
-            for (device_id, token) in tokens {
-                let options = PushOptions {
-                    notification_id: row.id.to_string(),
-                    notification_type: row.notification_type.clone(),
-                    related_entity_type: row.related_entity_type.clone(),
-                    related_entity_id: row.related_entity_id.map(|id| id.to_string()),
-                    collapse_key: row.collapse_key.clone(),
-                    ttl_seconds: row.ttl_seconds,
-                };
-                match state
-                    .notification_transport
-                    .send_push(&token, &row.title, &row.body, &options)
-                    .await
-                {
-                    PushOutcome::SentToProvider {
-                        provider_message_id: message_id,
-                    } => {
-                        sent = true;
-                        provider_message_id = provider_message_id.or(message_id);
-                        metrics::counter!("notification_push_sent_total").increment(1);
-                    }
-                    PushOutcome::Permanent { reason } => {
-                        notification_repo::device_tokens::disable_device(
-                            &state.system_db,
-                            row.user_id,
-                            Some(device_id),
-                            Some(&token),
-                        )
-                        .await?;
-                        metrics::counter!("notification_push_invalid_token_total").increment(1);
-                        tracing::info!(
-                            notification_id = %row.id,
-                            notification_type = %row.notification_type,
-                            "disabled a rejected notification device token: {}",
-                            reason
-                        );
-                    }
-                    PushOutcome::Retryable { reason } => {
-                        retryable = true;
-                        tracing::debug!(
-                            notification_id = %row.id,
-                            notification_type = %row.notification_type,
-                            "provider delivery will be retried: {}",
-                            reason
-                        );
-                    }
-                    PushOutcome::NoProviderConfigured => {}
-                }
-            }
-
-            let mut update_tx = state
-                .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
-                .await?;
-            if sent {
-                notification_repo::mark_delivery_sent(
-                    &mut *update_tx,
-                    row.id,
-                    provider_message_id.as_deref(),
-                )
-                .await?;
-            } else if retryable && row.delivery_attempts < PUSH_MAX_ATTEMPTS {
-                let exponent = (row.delivery_attempts.max(1) - 1).min(6) as u32;
-                let delay = (30_i64 * 2_i64.pow(exponent)).min(3600);
-                notification_repo::mark_delivery_retry(
-                    &mut *update_tx,
-                    row.id,
-                    "FCM provider delivery was temporarily unavailable",
-                    Utc::now() + ChronoDuration::seconds(delay),
-                )
-                .await?;
-                metrics::counter!("notification_push_retry_total").increment(1);
-            } else {
-                notification_repo::mark_delivery_permanent(
-                    &mut *update_tx,
-                    row.id,
-                    if retryable {
-                        "FCM delivery retry budget exhausted"
-                    } else {
-                        "No enabled device token is registered for this account"
-                    },
-                )
-                .await?;
-                metrics::counter!("notification_push_permanent_failure_total").increment(1);
-            }
-            update_tx.commit().await?;
-        }
-        if claimed_total < PUSH_BATCH as u64 {
+        let Some(mut claim) = notification_repo::claim_next_notification(&state.system_db).await?
+        else {
             break;
-        }
+        };
+        claimed_total += 1;
+        deliver_claimed(state, &mut claim).await?;
+        claim.release().await?;
+    }
+    let stats = notification_repo::delivery_queue_stats(&state.system_db).await?;
+    for (status, count) in [
+        ("pending", stats.pending),
+        ("processing", stats.processing),
+        ("retrying", stats.retrying),
+        ("deferred", stats.deferred),
+        ("suppressed", stats.suppressed),
+        ("sent_to_provider", stats.sent_to_provider),
+        ("permanently_failed", stats.permanently_failed),
+        ("uncertain", stats.uncertain),
+        ("confirmed_delivered", stats.confirmed_delivered),
+        ("legacy_read", stats.legacy_read),
+    ] {
+        metrics::gauge!("notification_outbox_rows","status"=>status).set(count as f64);
     }
     Ok(claimed_total)
 }
@@ -730,6 +1008,25 @@ struct HoldNotificationTarget {
     appointment_id: Uuid,
     user_id: UserId,
     hold_expires_at: DateTime<Utc>,
+    // Milestone 8 Phase 6 (2026-11-02): this pass runs every 60s and a hold
+    // lives up to 10 minutes, so the same still-pending appointment was
+    // re-selected on every tick -- confirmed live, 4.6M cumulative
+    // notification-template-lookup calls traced back to exactly this
+    // (docs/MILESTONE_8_PHASE5_EFFICIENCY_INVESTIGATION.md's
+    // notification_templates finding). The unique `dedup_key` already made
+    // re-INSERTing safe (insert_if_new catches 23505 and no-ops), but did
+    // nothing to stop the wasted user_language()/render() work and the
+    // INSERT attempt itself on every tick before that catch. These two
+    // columns are computed once per row, index-backed
+    // (notifications_dedup_key_unique), so the Rust loop below can skip
+    // work it already knows is redundant instead of discovering that after
+    // paying for it. Both default back to `true` (do the work) the instant
+    // the underlying notification row is ever deleted or a prior attempt
+    // failed before insertion -- this is a read of current persisted state
+    // each tick, not a separate "already tried" flag, so genuine failures
+    // still retry on the very next tick with no special-casing needed.
+    needs_hold_created_notification: bool,
+    needs_one_minute_notification: bool,
 }
 
 /// Creates non-clinical Patient inbox notifications. The unique dedup key is
@@ -738,7 +1035,9 @@ pub async fn run_hold_notification_pass(state: &AppState) -> Result<(), sqlx::Er
     let now = Utc::now();
     let active: Vec<HoldNotificationTarget> = sqlx::query_as(
         "SELECT a.id AS appointment_id, COALESCE(p.user_id, g.user_id) AS user_id, \
-                COALESCE(a.hold_expires_at, a.created_at + make_interval(secs => 600)) AS hold_expires_at \
+                COALESCE(a.hold_expires_at, a.created_at + make_interval(secs => 600)) AS hold_expires_at, \
+                NOT EXISTS (SELECT 1 FROM notifications n WHERE n.dedup_key = 'booking-hold-created:' || a.id::text) AS needs_hold_created_notification, \
+                NOT EXISTS (SELECT 1 FROM notifications n WHERE n.dedup_key = 'booking-hold-one-minute:' || a.id::text) AS needs_one_minute_notification \
            FROM appointments a \
            JOIN patient_profiles p ON p.id=a.patient_id \
            LEFT JOIN patient_profiles g ON g.id=p.guardian_patient_id \
@@ -748,8 +1047,12 @@ pub async fn run_hold_notification_pass(state: &AppState) -> Result<(), sqlx::Er
     .fetch_all(&state.system_db)
     .await?;
     for target in active {
-        insert_hold_created_notification(state, &target).await?;
-        if target.hold_expires_at <= now + chrono::Duration::minutes(1) {
+        if target.needs_hold_created_notification {
+            insert_hold_created_notification(state, &target).await?;
+        }
+        if target.needs_one_minute_notification
+            && target.hold_expires_at <= now + chrono::Duration::minutes(1)
+        {
             let one_minute_key = format!("booking-hold-one-minute:{}", target.appointment_id);
             let language = crate::services::NotificationService::user_language(
                 &state.system_db,
@@ -782,13 +1085,27 @@ pub async fn run_hold_notification_pass(state: &AppState) -> Result<(), sqlx::Er
         }
     }
 
+    // Milestone 8 Phase 6: this loop's source rows never go away --
+    // `appointment_expiry_cleanup_jobs` rows are updated in place
+    // (storage-cleanup bookkeeping in appointment_repo.rs), never deleted,
+    // and `a.status='EXPIRED'` is a terminal state that never reverts. Live
+    // data at the time this was found: 16,902 already-expired appointments,
+    // ALL 16,902 already carrying their BOOKING_HOLD_EXPIRED notification --
+    // every one was being re-selected and re-rendered on every single tick,
+    // forever, with the wasted volume growing unbounded as more
+    // appointments expire over the product's lifetime (unlike the
+    // active-holds loop above, which is at least bounded by the 10-minute
+    // hold window). Unlike that loop, nothing else in this function needs
+    // the full historical list, so filtering directly in the WHERE clause
+    // (same index-backed NOT EXISTS) is correct and sufficient here.
     let expired: Vec<(Uuid, UserId)> = sqlx::query_as(
         "SELECT j.appointment_id, COALESCE(p.user_id, g.user_id) \
            FROM appointment_expiry_cleanup_jobs j \
            JOIN appointments a ON a.id=j.appointment_id \
            JOIN patient_profiles p ON p.id=a.patient_id \
            LEFT JOIN patient_profiles g ON g.id=p.guardian_patient_id \
-          WHERE a.status='EXPIRED' AND COALESCE(p.user_id, g.user_id) IS NOT NULL",
+          WHERE a.status='EXPIRED' AND COALESCE(p.user_id, g.user_id) IS NOT NULL \
+            AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.dedup_key = 'booking-hold-expired:' || a.id::text)",
     )
     .fetch_all(&state.system_db)
     .await?;
@@ -1168,12 +1485,48 @@ pub async fn run_greeting_pass(state: &AppState, now: DateTime<Utc>) -> Result<(
     let iso_week = local_now.date_naive().iso_week();
     let week_key = format!("{}-W{:02}", iso_week.year(), iso_week.week());
 
+    // Milestone 8 Phase 6 (2026-11-02): this pass is only meant to greet
+    // once per ISO week, but its day/time gate above ("is it Monday, past
+    // the configured hour") stays open for the rest of that day -- nothing
+    // previously stopped it from re-fetching every verified Doctor/
+    // non-placeholder Patient and re-rendering their greeting on every
+    // single 60-second tick for the remainder of Monday, every week,
+    // forever. Only the terminal `insert_if_new_with_ttl` dedup key
+    // (`greeting:{user_id}:{week_key}`) stopped a duplicate ROW from being
+    // written -- it did nothing to stop the wasted query/render work before
+    // that. Caught live: this was found still firing at ~10,000 calls/tick
+    // while investigating an unrelated scheduler pass, on a real Monday.
+    // Same fix shape as run_hold_notification_pass immediately above: an
+    // index-backed (notifications_dedup_key_unique) NOT EXISTS filter
+    // applied directly in each SELECT, since -- unlike that function -- no
+    // other concern in this pass needs the already-greeted rows once the
+    // week's greeting exists.
+    //
+    // GREETING_PASS_BATCH bounds the *first* eligible tick's own burst too:
+    // measured live at 3,513ms per 1,000 recipients (10,000 recipients ->
+    // 35.1s) once the NOT EXISTS fix above was in place. Every other
+    // scheduler pass (hold notifications, hold-expiry sweep, T-15 reminders)
+    // runs sequentially AFTER this one returns, in the same tokio task --
+    // yielding partway through would not help them run any sooner, since
+    // this function would still have to finish before control returns to
+    // that sequential chain either way. A LIMIT here is what actually fixes
+    // it: it bounds this tick's own share of the 60s budget, and the same
+    // NOT EXISTS filter above means the remaining backlog is picked up
+    // automatically on the next tick (and the one after, etc.) -- a 10,000
+    // backlog clears over roughly ten ticks (~10 minutes) of small, bounded
+    // bursts instead of one 35-second blocking one. No new state/cursor is
+    // needed: "not yet NOT-EXISTS-excluded" already IS the resume position.
+    const GREETING_PASS_BATCH: i64 = 1000;
     let doctors: Vec<GreetingRecipient> = sqlx::query_as(
         "SELECT d.user_id, u.preferred_language AS language FROM doctor_profiles d \
          JOIN users u ON u.id = d.user_id \
          WHERE d.professional_verification_status = 'VERIFIED' \
-           AND u.is_active = TRUE AND u.deleted_at IS NULL",
+           AND u.is_active = TRUE AND u.deleted_at IS NULL \
+           AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.dedup_key = 'greeting:' || d.user_id::text || ':' || $1) \
+         LIMIT $2",
     )
+    .bind(&week_key)
+    .bind(GREETING_PASS_BATCH)
     .fetch_all(&state.system_db)
     .await?;
     for doctor in doctors {
@@ -1211,8 +1564,12 @@ pub async fn run_greeting_pass(state: &AppState, now: DateTime<Utc>) -> Result<(
          JOIN users u ON u.id = p.user_id \
          WHERE p.user_id IS NOT NULL AND u.is_active = TRUE AND u.deleted_at IS NULL \
            AND NOT (p.full_name = 'Patient User' AND p.date_of_birth = DATE '1995-01-01' \
-                    AND p.gender = 'OTHER')",
+                    AND p.gender = 'OTHER') \
+           AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.dedup_key = 'greeting:' || p.user_id::text || ':' || $1) \
+         LIMIT $2",
     )
+    .bind(&week_key)
+    .bind(GREETING_PASS_BATCH)
     .fetch_all(&state.system_db)
     .await?;
     for patient in patients {
@@ -1265,13 +1622,19 @@ pub async fn run_health_education_pass(
     let iso_week = local_now.date_naive().iso_week();
     let week_key = format!("{}-W{:02}", iso_week.year(), iso_week.week());
 
+    // Milestone 8 Phase 6: same bug, same fix shape as run_greeting_pass
+    // immediately above (this pass has the identical "Monday, past a
+    // configured hour" gate that stays open all day) -- an index-backed
+    // NOT EXISTS against this week's dedup key.
     let patients: Vec<GreetingRecipient> = sqlx::query_as(
         "SELECT p.user_id, u.preferred_language AS language FROM patient_profiles p \
          JOIN users u ON u.id = p.user_id \
          WHERE p.user_id IS NOT NULL AND u.is_active = TRUE AND u.deleted_at IS NULL \
            AND NOT (p.full_name = 'Patient User' AND p.date_of_birth = DATE '1995-01-01' \
-                    AND p.gender = 'OTHER')",
+                    AND p.gender = 'OTHER') \
+           AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.dedup_key = 'health-education:' || p.user_id::text || ':' || $1)",
     )
+    .bind(&week_key)
     .fetch_all(&state.system_db)
     .await?;
     for patient in patients {
@@ -1380,14 +1743,25 @@ pub async fn run_holiday_pass(state: &AppState, now: DateTime<Utc>) -> Result<()
     if holidays.is_empty() {
         return Ok(());
     }
-    let recipients: Vec<GreetingRecipient> = sqlx::query_as(
-        "SELECT id AS user_id, preferred_language AS language FROM users \
-          WHERE role IN ('PATIENT', 'DOCTOR') AND is_active = TRUE AND deleted_at IS NULL",
-    )
-    .fetch_all(&state.system_db)
-    .await?;
-
+    // Milestone 8 Phase 6: same bug shape as run_greeting_pass/
+    // run_health_education_pass -- while `today` remains an observed
+    // holiday, this pass's outer gate (`holidays.is_empty()`) stays open for
+    // the whole day, so recipients were re-fetched and re-rendered on every
+    // tick regardless of whether they already had this exact holiday's
+    // notification. Each holiday has its own dedup-key namespace
+    // (`holiday:{holiday_key}:{year}:{user_id}`), so the filter is applied
+    // per holiday inside the loop rather than once outside it -- multiple
+    // holidays observed on the same calendar day is rare, so this adds at
+    // most one extra indexed query per holiday, not per recipient.
     for holiday in &holidays {
+        let recipients: Vec<GreetingRecipient> = sqlx::query_as(
+            "SELECT id AS user_id, preferred_language AS language FROM users \
+              WHERE role IN ('PATIENT', 'DOCTOR') AND is_active = TRUE AND deleted_at IS NULL \
+                AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.dedup_key = $1 || ':' || id::text)",
+        )
+        .bind(format!("holiday:{}:{}", holiday.holiday_key, today.year()))
+        .fetch_all(&state.system_db)
+        .await?;
         for recipient in &recipients {
             let (title, body) = crate::services::NotificationService::render(
                 &state.system_db,

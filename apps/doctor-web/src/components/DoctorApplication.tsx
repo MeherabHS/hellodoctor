@@ -5,7 +5,7 @@ import { ConsultationHistory } from './ConsultationHistory';
 import { isProfessionallyVerified, professionalVerificationLabel } from '../lib/professionalVerification';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, clearRuntime, diagnostic, errorText, request, runtimeGeneration, useResource, setIncidentScreen } from '../lib/client';
-import { Appointment, DoctorNotification, Profile, RecordDto, RxPage } from '../lib/contracts';
+import { Appointment, DoctorNotification, paymentRequiredFromPolicy, Profile, RecordDto, RxPage } from '../lib/contracts';
 import { Prototype, hasClass, id } from './Prototype';
 import { Modal, State } from './Common';
 import { Auth } from './Auth';
@@ -13,7 +13,7 @@ import { ClinicalAction, initials, useAppointments } from './Queue';
 import { Chat } from './Chat';
 import { Rx } from './Rx';
 import { Schedule } from './Schedule';
-import { PayoutSettings, Wallet } from './Wallet';
+import { DeferredFinancialNotice, PayoutSettings, Wallet } from './Wallet';
 import { Statement } from './Statement';
 import { Qna } from './Qna';
 import { Completion, DocumentViewer, Documents, History, Receipt, SlotForm, Summary } from './Clinical';
@@ -41,6 +41,12 @@ function Application({initialPage}:{initialPage:'dashboard'|'chat'}){
   const appointmentPage=['dashboard','appointments','rx','patients','telehealth','schedule','chat'].includes(page);
   const queue=useAppointments(enabled&&appointmentPage,page==='schedule'?'all':'upcoming', ['dashboard','appointments'].includes(page)&&dialog===null&&document===null);
   const unread=useResource<{unread_count:number}>(enabled?'notifications/unread-count':null);
+  // Server-authoritative `FINANCIAL_MODULE_MODE` (`GET /config/booking-policy`).
+  // Defaults to `true` (the safe default) until the server has confirmed the
+  // module is deferred — never hide real financial actions on a transient
+  // failure or before this resolves.
+  const bookingPolicy=useResource<{payment_required:boolean}>(enabled?'config/booking-policy':null);
+  const paymentRequired=paymentRequiredFromPolicy(bookingPolicy.data);
   useEffect(()=>{if(!enabled)return;return startScheduleSync(unread.refresh,{window,document:window.document,online:()=>navigator.onLine,every:(cb,ms)=>window.setInterval(cb,ms),cancel:id=>window.clearInterval(id as number)},60000);},[enabled,unread.refresh]);
   const wipe=useCallback(()=>{epoch.current++;clearRuntime();setProfile(null);setActive(null);setDialog(null);setDocument(null);setPage(window.location.pathname==='/doctor/chats'?'chat':'dashboard');setSearch('');setSettingsSection('profile');Object.values(pagesRef.current).flat().forEach(page=>URL.revokeObjectURL(page.preview));setRx({});setDuty({busy:false,error:''});},[]);
   useEffect(()=>{
@@ -96,13 +102,13 @@ function Application({initialPage}:{initialPage:'dashboard'|'chat'}){
   else if(page==='chat')view=<Chat profile={profile} appointments={queue.data} selectedAppointment={active?.id} focusAppointment={active??undefined} visible={dialog===null&&document===null&&!drawerOpen} action={action} gap={gap}/>;
   else if(page==='rx')view=<Rx profile={profile} appointments={queue.data} appointment={chosen} pages={chosen?rxByAppointment[chosen.id]??[]:[]} setPages={pages=>{if(chosen&&renderGeneration===runtimeGeneration())setRx(previous=>({...previous,[chosen.id]:pages}));}} select={setActive} action={action} complete={()=>setDialog('completion')}/>;
   else if(page==='schedule')view=<Schedule key={revision} appointments={queue.data} action={action} addSlot={()=>setDialog('slot')} gap={gap} initialDate={scheduleDate}/>;
-  else if(page==='wallet')view=<Wallet statement={()=>setDialog('statement')} payout={()=>setDialog('payout')} receipt={row=>{setReceipt(row);setDialog('receipt');}}/>;
+  else if(page==='wallet')view=paymentRequired?<Wallet statement={()=>setDialog('statement')} payout={()=>setDialog('payout')} receipt={row=>{setReceipt(row);setDialog('receipt');}}/>:<DeferredFinancialNotice/>;
   else if(page==='qna')view=<Qna profile={profile} mobile={false} onBack={()=>go('dashboard')}/>;
   else if(page==='appointments')view=<DesktopAppointments queue={queue} action={action} search={search} setSearch={setSearch} addSlot={()=>setDialog('slot')} schedule={()=>go('schedule')} gap={gap}/>;
-  else if(page==='dashboard')view=<Dashboard profile={profile} queue={queue} onAppointments={()=>go('appointments')} earnings={()=>go('wallet')} qna={()=>go('qna')} action={action}/>;
+  else if(page==='dashboard')view=<Dashboard profile={profile} queue={queue} onAppointments={()=>go('appointments')} earnings={()=>go('wallet')} qna={()=>go('qna')} action={action} paymentRequired={paymentRequired}/>;
   else if(page==='consultation-history')view=<ConsultationHistory action={action}/>;
   else if(page==='articles')view=<Articles specialty={profile.primary_specialty}/>;
-  else if(page==='settings')view=<Settings profile={profile} section={settingsSection} onSection={setSettingsSection} onUpdated={setProfile} duty={duty} onDuty={()=>void toggleDuty()} onWallet={()=>go('wallet')} onLogout={()=>void logout()}/>;
+  else if(page==='settings')view=<Settings profile={profile} section={settingsSection} onSection={setSettingsSection} onUpdated={setProfile} duty={duty} onDuty={()=>void toggleDuty()} onWallet={()=>go('wallet')} onLogout={()=>void logout()} paymentRequired={paymentRequired}/>;
   else if(page==='patients')view=<Patients queue={queue} action={action} gap={gap}/>;
   else view=<Telehealth appointment={chosen} profile={profile} action={action} onChat={()=>go('chat')} complete={()=>chosen?setDialog('completion'):gap('Select a consultation before completing it.')} gap={gap}/>;
   if(appointmentPage&&page!=='chat'&&queue.hasMore)view=<>{view}<button className="sheet-btn secondary" disabled={queue.moreBusy} onClick={()=>void queue.loadMore()}>{queue.moreBusy?'Loading consultations...':'Load more consultations'}</button></>;
@@ -131,7 +137,7 @@ function Application({initialPage}:{initialPage:'dashboard'|'chat'}){
     if(hasClass(n,'dw-nav-item')){
       const target=(n.props['data-page']??'settings') as Page;
       const selected=target===page||target==='telehealth'&&page==='rx';
-      const extra=target==='appointments'?<button className={`dw-nav-item ${page==='schedule'?'active':''}`} data-page="schedule" aria-current={page==='schedule'?'page':undefined} onClick={()=>go('schedule')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M12 14v4M10 16h4"/></svg><span>Schedule &amp; Slots</span></button>:target==='telehealth'?<button className={`dw-nav-item ${page==='chat'?'active':''}`} data-page="chat" aria-current={page==='chat'?'page':undefined} onClick={()=>{setActive(null);go('chat');}}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6A8.4 8.4 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/></svg><span>Patient Chats</span></button>:target==='settings'?<button className={`dw-nav-item ${page==='wallet'?'active':''}`} data-page="wallet" aria-current={page==='wallet'?'page':undefined} onClick={()=>go('wallet')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="2" y="5" width="20" height="15" rx="2"/><path d="M2 10h20M16 15h3"/></svg><span>Earnings &amp; Wallet</span></button>:undefined;
+      const extra=target==='appointments'?<button className={`dw-nav-item ${page==='schedule'?'active':''}`} data-page="schedule" aria-current={page==='schedule'?'page':undefined} onClick={()=>go('schedule')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M12 14v4M10 16h4"/></svg><span>Schedule &amp; Slots</span></button>:target==='telehealth'?<button className={`dw-nav-item ${page==='chat'?'active':''}`} data-page="chat" aria-current={page==='chat'?'page':undefined} onClick={()=>{setActive(null);go('chat');}}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6A8.4 8.4 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/></svg><span>Patient Chats</span></button>:target==='settings'&&paymentRequired?<button className={`dw-nav-item ${page==='wallet'?'active':''}`} data-page="wallet" aria-current={page==='wallet'?'page':undefined} onClick={()=>go('wallet')}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="2" y="5" width="20" height="15" rx="2"/><path d="M2 10h20M16 15h3"/></svg><span>Earnings &amp; Wallet</span></button>:undefined;
       return {tag:'button',before:<>{extra}{target==='appointments'&&<button className={`dw-nav-item ${page==='consultation-history'?'active':''}`} aria-current={page==='consultation-history'?'page':undefined} onClick={()=>go('consultation-history')}>Consultation History</button>}{target==='settings'&&<button className={`dw-nav-item ${page==='articles'?'active':''}`} aria-current={page==='articles'?'page':undefined} onClick={()=>go('articles')}>My Articles</button>}</>,props:{className:`dw-nav-item ${selected?'active':''}`,'data-page':target,onClick:()=>go(target),'aria-current':selected?'page':undefined}};
     }
     if(n.tag==='div'&&n.children.some(child=>typeof child==='object'&&child.children.some(text=>typeof text==='string'&&text.includes('Patient Queue ('))))return {omit:true};
@@ -145,8 +151,8 @@ function Application({initialPage}:{initialPage:'dashboard'|'chat'}){
     {dialog==='documents'&&chosen&&<Documents appointment={chosen} onDocument={showDocument} onClose={close}/>}
     {dialog==='completion'&&chosen&&<Completion appointment={chosen} onCompleted={()=>void queue.refresh()}/>}
     {dialog==='slot'&&<SlotForm onClose={close} onCreated={date=>{setScheduleDate(date);setPage('schedule');setRevision(r=>r+1);void queue.refresh();}}/>}
-    {dialog==='statement'&&<Statement profile={profile} onClose={close}/>}
-    {dialog==='payout'&&<PayoutSettings/>}
+    {dialog==='statement'&&(paymentRequired?<Statement profile={profile} onClose={close}/>:<DeferredFinancialNotice/>)}
+    {dialog==='payout'&&(paymentRequired?<PayoutSettings/>:<DeferredFinancialNotice/>)}
     {dialog==='receipt'&&receipt&&<Receipt row={receipt} onClose={close}/>}
     {dialog==='gap'&&<p className="web-gap">{gapMessage}</p>}
   </Modal>}{document&&chosen&&<DocumentViewer current={chosen.id} appointmentId={document.appointmentId} document={document.document} onClose={()=>setDocument(null)}/>}</>;

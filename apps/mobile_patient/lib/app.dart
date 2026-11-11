@@ -1,3 +1,6 @@
+import 'core/notifications/local_notification_service.dart';
+import 'core/notifications/notification_taps.dart';
+import 'features/notifications/notification_navigation.dart';
 // ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables, use_build_context_synchronously
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -118,8 +121,8 @@ class _AppState extends State<HelloDoctorPatientApp>
       ClientErrorReporter.current!.loadBuildMetadata();
       auth = AuthCubit(api!, cache: cache);
       locale = LocaleController(secureStore!)..load();
-      locale!.bindBackendSync(
-          (languageCode) => NotificationRepository(api!).syncLanguage(languageCode));
+      locale!.bindBackendSync((languageCode) =>
+          NotificationRepository(api!).syncLanguage(languageCode));
       _authSubscription = auth!.stream.listen((state) {
         _incidentRetryTimer?.cancel();
         if (state is SignedIn) {
@@ -283,7 +286,24 @@ class _SignedInRootState extends State<_SignedInRoot> {
       repository: _notificationCubit.repo,
       onNotificationReceived: _notificationCubit.load,
     );
-    unawaited(_pushService.initialize());
+    // M8-G-13: sequenced, not two independent `unawaited` calls — Android
+    // notification channels must exist before FCM can be told to target one
+    // (`android.notification.channel_id`), and a background/terminated push
+    // referencing a not-yet-created channel is silently dropped by the OS.
+    // Still a single `unawaited` overall, so this never blocks the first
+    // frame; `_pushService` itself is still constructed synchronously above
+    // since `dispose()` references it unconditionally.
+    unawaited(
+        _initializeLocalNotifications().then((_) => _pushService.initialize()));
+  }
+
+  Future<void> _initializeLocalNotifications() async {
+    try {
+      await LocalNotificationService.init();
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Notifications', operation: 'local_init');
+    }
   }
 
   @override
@@ -293,6 +313,7 @@ class _SignedInRootState extends State<_SignedInRoot> {
     _familyProfilesCubit.close();
     _notificationCubit.close();
     unawaited(_pushService.dispose());
+    NotificationTaps.clear();
     super.dispose();
   }
 
@@ -316,7 +337,8 @@ class _SignedInRootState extends State<_SignedInRoot> {
               onComplete: () => setState(() => _completionHandled = true),
             );
           }
-          return PatientShell(api: widget.api);
+          return NotificationNavigationHost(
+              cubit: _notificationCubit, child: PatientShell(api: widget.api));
         },
       ),
     );

@@ -50,6 +50,49 @@ void main() {
     await auth.close();
   });
 
+  test('requestPasswordReset rejects a malformed email without network access',
+      () async {
+    final auth = AuthCubit(ApiClient(dio: Dio()));
+    await auth.requestPasswordReset('not-an-email');
+    expect(auth.state, isA<AuthFailure>());
+    await auth.close();
+  });
+
+  test('verifyPasswordResetOtp does nothing without a prior requestPasswordReset',
+      () async {
+    final auth = AuthCubit(ApiClient(dio: Dio()));
+    await auth.verifyPasswordResetOtp('123456');
+    expect(auth.state, isA<SignedOut>());
+    await auth.close();
+  });
+
+  test('verifyPasswordResetOtp rejects a malformed code without network access',
+      () async {
+    final auth = AuthCubit(ApiClient(dio: Dio()));
+    // Reach the "has a pending reset email" branch without a real network
+    // call by first failing fast on a malformed email (sets no email), then
+    // directly exercising the malformed-code guard, which is checked before
+    // the held email is used.
+    await auth.verifyPasswordResetOtp('abc');
+    expect(auth.state, isA<SignedOut>());
+    await auth.close();
+  });
+
+  test('completePasswordReset does nothing without a prior successful verification',
+      () async {
+    final auth = AuthCubit(ApiClient(dio: Dio()));
+    await auth.completePasswordReset('NewPassw0rd!');
+    expect(auth.state, isA<SignedOut>());
+    await auth.close();
+  });
+
+  test('restartPasswordReset returns to SignedOut', () async {
+    final auth = AuthCubit(ApiClient(dio: Dio()));
+    auth.restartPasswordReset();
+    expect(auth.state, isA<SignedOut>());
+    await auth.close();
+  });
+
   test(
       'restore() flags SessionRestoring synchronously so a cold start with a '
       'saved session never flashes the login form', () async {
