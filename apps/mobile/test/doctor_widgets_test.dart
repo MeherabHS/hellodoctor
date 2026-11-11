@@ -580,4 +580,21 @@ void main() {
     expect(find.text('Unblock Slot'), findsOneWidget);
     expect(find.text('Block'), findsNothing);
   });
+
+  testWidgets(
+      'deferred financial module notice replaces earnings UI with no fabricated data',
+      (tester) async {
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    await tester.pumpWidget(const MaterialApp(home: DeferredWalletNotice()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Financial module not yet active'), findsOneWidget);
+    expect(find.text('Payment collection is not yet active for this launch.'),
+        findsOneWidget);
+    expect(find.textContaining('Consultations are proceeding without charge'),
+        findsOneWidget);
+    // No earnings/ledger/payout UI must leak through this branch.
+    expect(find.text('Settlement Breakdown'), findsNothing);
+    expect(find.textContaining('KES'), findsNothing);
+  });
 }

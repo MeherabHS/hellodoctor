@@ -33,6 +33,7 @@ class ControlledPayment extends BookingRepository {
       const AppointmentDetailDto(
         id: 'a',
         status: 'PENDING_PAYMENT',
+        paymentPolicy: 'REQUIRED',
         paymentStatus: 'INITIATED',
       );
   @override

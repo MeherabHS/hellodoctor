@@ -44,16 +44,24 @@ mod admin_articles;
 mod admin_bootstrap;
 #[path = "cases/admin_campaigns.rs"]
 mod admin_campaigns;
+#[path = "cases/admin_query_g20_investigation.rs"]
+mod admin_query_g20_investigation;
 #[path = "cases/admin_quizzes.rs"]
 mod admin_quizzes;
 #[path = "cases/admission_capacity_bench.rs"]
 mod admission_capacity_bench;
+#[path = "cases/admission_control_fairness.rs"]
+mod admission_control_fairness;
+#[path = "cases/consultation_live_reservation.rs"]
+mod consultation_live_reservation;
 #[path = "cases/consultation_recovery.rs"]
 mod consultation_recovery;
 #[path = "cases/email_outbox_delivery.rs"]
 mod email_outbox_delivery;
 #[path = "cases/engagement_and_holiday_notifications.rs"]
 mod engagement_and_holiday_notifications;
+#[path = "cases/financial_module_deferment.rs"]
+mod financial_module_deferment;
 #[path = "cases/notification_localization_preferences.rs"]
 mod notification_localization_preferences;
 #[path = "cases/password_reset.rs"]
@@ -66,6 +74,17 @@ mod pool_pressure;
 mod profile_pictures;
 #[path = "cases/push_notification_delivery.rs"]
 mod push_notification_delivery;
+#[path = "cases/remediation_a.rs"]
+mod remediation_a;
+
+#[path = "cases/remediation_d.rs"]
+mod remediation_d;
+
+#[path = "cases/remediation_e1.rs"]
+mod remediation_e1;
+
+#[path = "cases/remediation_c.rs"]
+mod remediation_c;
 #[path = "cases/schedule_exclusivity.rs"]
 mod schedule_exclusivity;
 #[path = "cases/security_acceptance.rs"]
@@ -233,6 +252,7 @@ fn test_config() -> AppConfig {
         azure_storage_use_emulator: false,
         azure_storage_account_key_risk_acknowledged: false,
         public_api_base_url: "http://127.0.0.1:8080".into(),
+        financial_module_mode: hellodoctor_backend::config::FinancialModuleMode::Enabled,
         environment: "development".into(),
         seed_dev_data: false,
         dev_auth_otp_enabled: true,
@@ -9832,6 +9852,7 @@ async fn test_doctor_queue_shows_upcoming_consultations_first(pool: PgPool) {
                 slot_id,
                 modality: Modality::Video,
                 status,
+                payment_policy: PaymentPolicy::Required,
                 consultation_fee: bigdecimal::BigDecimal::from(500),
                 clinical_outcome: None,
                 completed_at: if status == AppointmentStatus::Completed {
@@ -9877,6 +9898,7 @@ async fn test_doctor_queue_shows_upcoming_consultations_first(pool: PgPool) {
                 slot_id,
                 modality: Modality::Video,
                 status: AppointmentStatus::Cancelled,
+                payment_policy: PaymentPolicy::Required,
                 consultation_fee: bigdecimal::BigDecimal::from(500),
                 clinical_outcome: None,
                 completed_at: None,
@@ -10442,6 +10464,7 @@ async fn test_daily_summary_scheduler_is_exactly_once_per_doctor_per_day(pool: P
             slot_id,
             modality: Modality::Video,
             status: AppointmentStatus::Confirmed,
+            payment_policy: PaymentPolicy::Required,
             consultation_fee: bigdecimal::BigDecimal::from(500),
             clinical_outcome: None,
             completed_at: None,
@@ -10789,6 +10812,7 @@ async fn test_daily_summary_excludes_cancelled_appointments_from_count(pool: PgP
                 slot_id,
                 modality: Modality::Video,
                 status: AppointmentStatus::Confirmed,
+                payment_policy: PaymentPolicy::Required,
                 consultation_fee: bigdecimal::BigDecimal::from(500),
                 clinical_outcome: None,
                 completed_at: None,
@@ -10827,6 +10851,7 @@ async fn test_daily_summary_excludes_cancelled_appointments_from_count(pool: PgP
             slot_id: cancelled_slot_id,
             modality: Modality::Video,
             status: AppointmentStatus::Cancelled,
+            payment_policy: PaymentPolicy::Required,
             consultation_fee: bigdecimal::BigDecimal::from(500),
             clinical_outcome: None,
             completed_at: None,
@@ -11942,6 +11967,7 @@ async fn insert_confirmed_appointment_for(
             slot_id,
             modality: Modality::Video,
             status: AppointmentStatus::Confirmed,
+            payment_policy: PaymentPolicy::Required,
             consultation_fee: bigdecimal::BigDecimal::from(500),
             clinical_outcome: None,
             completed_at: None,

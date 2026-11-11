@@ -246,7 +246,7 @@ async fn upload_authorized(
         conversation_id,
         sender_id: ctx.user_id,
         content: String::new(),
-        attachment_bucket: Some("clinical-private".into()),
+        attachment_bucket: Some(state.config.storage_bucket.clone()),
         attachment_object_key: Some(object_key.clone()),
         attachment_mime: Some(mime.into()),
         attachment_size: Some(sanitized.len() as i64),

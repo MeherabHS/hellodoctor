@@ -1,0 +1,7 @@
+﻿queryid,calls,total_exec_time_ms,mean_exec_time_ms,rows,shared_blks_hit,shared_blks_read,shared_blks_dirtied,shared_blks_written,temp_blks_read,temp_blks_written,blk_read_time_ms,blk_write_time_ms,query
+7942167212322379111,297,10.44,0.04,297,891,0,0,0,0,0,0.00,0.00,SELECT preferred_language FROM users WHERE id = $1
+-5166295555693338443,298,6.41,0.02,298,894,0,0,0,0,0,0.00,0.00,SELECT title_template, body_template FROM notification_templates WHERE template_key = $1 AND locale = $2 AND enabled = TRUE
+6650430479887907887,298,0.16,0.00,0,0,0,0,0,0,0,0.00,0.00,BEGIN
+3749380189022910195,298,0.16,0.00,0,0,0,0,0,0,0,0.00,0.00,ROLLBACK
+-6261066899363356102,1,0.11,0.11,1,0,0,0,0,0,0,0.00,0.00,SELECT clock_timestamp()::text,        pid,        COALESCE(state,$1),        COALESCE(wait_event_type,$2),        COALESCE(wait_event,$3),        COALESCE(EXTRACT($4 FROM (clock_timestamp()-query_start)),$5),        REPLACE(LEFT(COALESCE(query,$6),$7), $8, $9) FROM pg_stat_activity WHERE pid<>pg_ba
+-4818329041686550545,1,0.04,0.04,1,1,0,0,0,0,0,0.00,0.00,SELECT xact_commit, xact_rollback, blks_hit, blks_read, temp_files, temp_bytes, deadlocks, conflicts FROM pg_stat_database WHERE datname=$1

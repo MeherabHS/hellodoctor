@@ -69,8 +69,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Five live request-serving pools, one per least-privilege capability role
     // (see migrations/20261003000001_rls_hardening). Never a superuser.
     let max_conn = config.db_pool_max_connections_per_role;
+    // Milestone 8 pool-capacity experiment: ONLY the API role's own pool may
+    // differ from `max_conn`, and only when `DB_POOL_MAX_CONNECTIONS_API_ROLE`
+    // is explicitly set (disposable benchmark stack only -- see this field's
+    // doc comment in config.rs). Auth/Payment/System/Finance always use
+    // `max_conn` unchanged, and `Admission::new`'s lane-sizing math (see
+    // repository/mod.rs) still reads `max_conn` directly, never this
+    // override, so admission concurrency ceilings cannot be silently widened
+    // by this experiment.
+    let max_conn_api = config
+        .db_pool_max_connections_api_role_override
+        .unwrap_or(max_conn);
     let (db, auth_db, payment_db, system_db, finance_db) = tokio::try_join!(
-        connect_role(max_conn, config.api_role_dsn()),
+        connect_role(max_conn_api, config.api_role_dsn()),
         connect_role(max_conn, config.auth_worker_dsn()),
         connect_role(max_conn, config.payment_worker_dsn()),
         connect_role(max_conn, config.system_worker_dsn()),
@@ -97,6 +108,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         redis,
         Arc::new(config.clone()),
     );
+
+    // Remediation E1: disaster-recovery erasure-reconciliation gate. A boot
+    // with RECOVERY_MODE=true durably records that this incident is awaiting
+    // reconciliation; a normal-mode boot refuses to serve ordinary traffic
+    // while any recovery instance remains unresolved. See
+    // `services::dr_reconciliation` module docs for the full design and its
+    // disclosed limitations.
+    if config.recovery_mode {
+        services::dr_reconciliation::mark_recovery_boot(&state)
+            .await
+            .expect("FATAL: failed to record disaster-recovery reconciliation obligation");
+    } else if let Err(reason) = services::dr_reconciliation::enforce_recovery_gate(&state).await {
+        panic!("FATAL: refusing normal-mode startup: {reason}");
+    }
+
     // Doctor Engagement extension's DB-backed due-notification worker (daily
     // consultation-count summary + T-15 reminders) — one background task,
     // same pattern as `system_error::init` above, no new broker/role.
@@ -123,6 +149,12 @@ async fn connect_role(max_connections: u32, dsn: String) -> Result<sqlx::PgPool,
         .max_connections(max_connections)
         .acquire_timeout(std::time::Duration::from_secs(5))
         .idle_timeout(std::time::Duration::from_secs(300))
+        // Milestone 8 hold-duration investigation (2026-11-04): emits sqlx's
+        // own built-in "acquired connection" tracing event on every
+        // successful acquire, captured by `telemetry::SqlxAcquireMetricsLayer`
+        // into `sqlx_pool_acquire_wait_seconds` -- additive-only, changes
+        // nothing about pool behavior, timeouts, or connection handling.
+        .acquire_time_level(log::LevelFilter::Info)
         .connect(&dsn)
         .await
 }

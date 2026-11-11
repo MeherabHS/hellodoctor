@@ -1,9 +1,9 @@
 use crate::{crypto, error::AppError, repository::AppState};
 use object_store::path::Path;
-use object_store::ObjectStoreExt;
+use object_store::{ObjectStore, ObjectStoreExt, PutMode, PutOptions};
 use sha2::{Digest, Sha256};
 
-/// Private S3 objects contain authenticated ciphertext, never clinical plaintext.
+/// Private provider objects contain authenticated ciphertext, never clinical plaintext.
 /// Database metadata remains the authorization authority on every download.
 pub struct DocumentStorageService;
 
@@ -14,12 +14,23 @@ impl DocumentStorageService {
         })?;
         let encrypted = crypto::encrypt_bytes(sanitized, &state.config.storage_encryption_key_b64)?;
         storage
-            .put(&Path::from(key), encrypted.into())
+            .put_opts(
+                &Path::from(key),
+                encrypted.into(),
+                PutOptions {
+                    mode: PutMode::Create,
+                    ..Default::default()
+                },
+            )
             .await
-            .map_err(|_| {
-                AppError::internal(
+            .map_err(|error| match error {
+                object_store::Error::AlreadyExists { .. }
+                | object_store::Error::Precondition { .. } => AppError::Conflict(
+                    "Private document already exists; the upload was not overwritten.".into(),
+                ),
+                _ => AppError::internal(
                     "Private document storage is unavailable; the upload was not confirmed.".into(),
-                )
+                ),
             })?;
         Ok(())
     }

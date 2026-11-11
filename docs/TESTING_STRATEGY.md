@@ -60,7 +60,9 @@
 - **Grievance Refund Payment Disbursal:**
   - Seed transaction in `PAYMENT_HELD`.
   - Execute `POST /api/v1/admin/grievances/{id}/refund`.
-  - Assert transaction updates to `REFUNDED` and patient wallet is credited.
+  - Assert approval remains distinct from completion: grievance `REFUND_APPROVED`, transaction `REFUND_PENDING`, and no claim that provider money moved.
+  - Record an explicitly authorized, provider-confirmed refund completion; verify request `REFUNDED`, transaction `REFUNDED_TO_PATIENT`, grievance `REFUNDED`, reporting, audit and notification outbox agreement.
+  - Verify wallet reversal occurs once, provider failure creates no fictional completion, and a failure at any database step rolls back all related changes.
 - **Payment Adversarial Tests:**
   - Double-submit payments.
   - Webhook replay attacks.
@@ -86,3 +88,23 @@
 - **Grievance & Telemetry Capture:** 95%+ coverage required.
 - **Clinical Services & Prescription-Photo Integrity Pipeline:** 90%+ coverage required.
 - **Client Presentation & UI Blocs:** 85%+ coverage required.
+
+
+## Mandatory cross-module acceptance matrix
+
+For every money, identity, clinical-data or cross-application state change, report:
+
+| Gate | Required evidence |
+|---|---|
+| Local correctness | Changed behavior, input validation and role/resource authorization. |
+| System consistency | Every affected database representation, ledger/accounting effect, service, audit/outbox event and consuming client contract agrees. |
+| Failure recovery | Applicable interruption, retry, timeout, concurrency, restart and partial-failure cases prove atomic rollback or durable, truthful pending recovery. |
+
+Name the affected modules and invariants before writing the regression. Prefer
+real transaction/API integration and focused consuming-client tests over mocks
+that merely echo the implementation. Endpoint success alone is insufficient.
+Run affected regression suites with owned isolated fixtures; coordinate serialized
+backend runs because capability roles are cluster-wide. Record actual counts,
+failed attempts and exact environment/provider/device limitations. Do not count
+unexecuted or source-only checks as passes. Historical data reconciliation is
+a separate reviewed operation. See root `AGENTS.md` and DoD item18.

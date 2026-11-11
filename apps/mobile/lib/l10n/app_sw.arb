@@ -1,0 +1,62 @@
+{
+  "@@locale": "sw",
+  "notificationsTitle": "Arifa",
+  "notificationsSubtitle": "Vikumbusho vya miadi na taarifa muhimu za akaunti.",
+  "notificationsMarkAllRead": "Tia alama zote zimesomwa",
+  "notificationsLoadError": "Arifa hazikuweza kupakiwa. Tafadhali jaribu tena.",
+  "notificationsRefreshError": "Arifa hazikuweza kusasishwa. Tafadhali jaribu tena.",
+  "notificationsEmpty": "Bado hakuna arifa",
+  "notificationsLoadOlder": "Pakia arifa za awali",
+  "notificationsLoadingOlder": "Inapakia arifa za awali...",
+  "notificationDestinationError": "Ukurasa huu haupatikani au huna ruhusa tena. Tafadhali jaribu tena kutoka kwenye arifa zako.",
+  "retryButton": "Jaribu tena",
+  "appointmentTitle": "Miadi",
+  "appointmentReference": "Nambari ya miadi",
+  "refreshButton": "Sasisha",
+  "doctorLabel": "Daktari",
+  "patientLabel": "Mgonjwa",
+  "restoringSession": "Inarejesha kipindi salama cha daktari...",
+  "notificationLanguage": "Lugha ya arifa",
+  "notificationSettingsError": "Imeshindwa kuhifadhi mipangilio ya arifa.",
+  "appointmentStatusPendingPayment": "Inasubiri malipo",
+  "appointmentStatusConfirmed": "Imethibitishwa",
+  "appointmentStatusWaiting": "Inasubiri",
+  "appointmentStatusInConsultation": "Katika ushauri",
+  "appointmentStatusCompleted": "Imekamilika",
+  "appointmentStatusCancelled": "Imeghairiwa",
+  "appointmentStatusExpired": "Muda umeisha",
+  "appointmentStatusRefunded": "Malipo yamerejeshwa",
+  "appointmentStatusDisputed": "Inakaguliwa",
+  "appointmentStatusPrematureTermination": "Imekatizwa",
+  "cacheOffline": "Nje ya mtandao — inaonyesha data iliyohifadhiwa",
+  "cacheLastUpdated": "Ilisasishwa {time}",
+  "@cacheLastUpdated": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "cacheOfflineUpdated": "Nje ya mtandao — inaonyesha data iliyohifadhiwa · Ilisasishwa {time}",
+  "@cacheOfflineUpdated": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTitle": "Mipangilio ya arifa",
+  "settingsLoadError": "Imeshindwa kupakia mipangilio ya arifa.",
+  "settingsGreetings": "Salamu",
+  "settingsGreetingsHelp": "Salamu za asubuhi, siku za kuzaliwa na sikukuu za Kenya",
+  "settingsReligious": "Salamu za sikukuu za kidini",
+  "settingsReligiousHelp": "Salamu za Iddi, Ijumaa Kuu, Pasaka na Krismasi",
+  "settingsRoutine": "Taarifa za kawaida",
+  "settingsRoutineHelp": "Hali ya makala na arifa nyingine za shughuli",
+  "settingsAnnouncements": "Matangazo",
+  "settingsAnnouncementsHelp": "Arifa za hiari za ushiriki na matangazo",
+  "settingsQuietHours": "Saa za utulivu",
+  "settingsQuietHoursHelp": "Subirisha arifa zisizo za dharura katika kipindi hiki. Vikumbusho vya ushauri na arifa za muda maalumu havitacheleweshwa.",
+  "settingsStartsAt": "Huanza saa",
+  "settingsEndsAt": "Huisha saa"
+}

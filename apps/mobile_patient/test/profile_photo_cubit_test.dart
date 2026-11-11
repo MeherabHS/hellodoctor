@@ -14,7 +14,8 @@ import 'package:hellodoctor_mobile_patient/features/patient/profile/profile_repo
 /// Stubs only the methods each test needs, per this project's established
 /// no-mockito convention (see `family_profiles_cubit_test.dart`'s harness).
 class StubProfileRepository extends ProfileRepository {
-  StubProfileRepository() : super(ApiClient(dio: Dio(), tokenStore: _NoopStore()));
+  StubProfileRepository()
+      : super(ApiClient(dio: Dio(), tokenStore: _NoopStore()));
 
   Uint8List? fetchResult;
   Object? fetchError;
@@ -109,7 +110,8 @@ void main() {
   });
 
   group('uploadPhoto', () {
-    test('success sets photoBytes to the freshly-refetched value and returns '
+    test(
+        'success sets photoBytes to the freshly-refetched value and returns '
         'true', () async {
       final refetched = Uint8List.fromList([5, 5, 5]);
       repo.afterUploadBytes = refetched;
@@ -121,7 +123,8 @@ void main() {
       expect(cubit.state.photoSaving, isFalse);
       expect(cubit.state.photoError, isNull);
       expect(repo.uploadCalls, 1);
-      expect(repo.fetchCalls, 1, reason: 'must re-fetch after a successful upload');
+      expect(repo.fetchCalls, 1,
+          reason: 'must re-fetch after a successful upload');
     });
 
     test(
@@ -167,7 +170,8 @@ void main() {
       expect(repo.deleteCalls, 1);
     });
 
-    test('failure sets only photoError and returns false, leaving '
+    test(
+        'failure sets only photoError and returns false, leaving '
         'photoBytes untouched', () async {
       final existing = Uint8List.fromList([4, 4]);
       repo.fetchResult = existing;

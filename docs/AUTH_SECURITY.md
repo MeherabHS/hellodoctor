@@ -82,21 +82,23 @@ sequenceDiagram
 - **Parameters:** Memory: 64 MB (`65536`), Iterations: 3, Parallelism: 4.
 - **Enforcement:** Minimum 12 characters, uppercase, lowercase, numbers, and symbols. Plaintext passwords must never be logged or transmitted in unencrypted protocols.
 
-### 2.4 Administrator TOTP Enrollment & Recovery
-- **Enrollment:** During admin account creation, the server generates a TOTP secret,
-  encrypts it with envelope encryption (KMS), and presents a QR code / otpauth:// URI
-  to the admin's authenticator app. Enrollment is confirmed by submitting a valid code.
-- **Persistence:** TOTP secrets are stored encrypted (NOT hashed) in the
-  `mfa_credentials` table, because the server must verify time-based codes against
-  the underlying secret.
-- **Recovery Codes:** Eight one-time recovery codes are generated at enrollment.
-  Each is hashed with Argon2id and stored. Used codes are permanently removed.
-- **Lost Device:** If all recovery codes are exhausted, a PLATFORM_ADMIN must
-  manually reset the admin's MFA, which requires re-enrollment and generates new codes.
-- **Re-authentication:** Administrative actions on sensitive resources (e.g., initiating
-  disbursement, resetting another admin's MFA) are intended to require recent TOTP
-  re-verification. **STEP_UP_AUTH_REMAINS_OPEN**: current routes use ordinary authorized
-  sessions; this requirement has not been implemented or verified.
+### 2.4 Administrator MFA (historical: TOTP removed)
+Administrator login previously required an enrolled authenticator TOTP as a
+mandatory second factor on top of the emailed OTP below. This was removed:
+no self-service enrollment endpoint for it was ever built (a credential
+could only be provisioned by hand-inserting a `mfa_credentials` row), the
+"lost device"/recovery-code paths described in an earlier version of this
+section were never implemented, and the second factor duplicated protection
+the OTP challenge/attempt-count/`ip_jail` stack already provides for every
+role. Admin login now uses the same single-factor shape documented in
+§2.3/§2.5 for Doctor and Patient: password, then an emailed OTP
+(`AuthService::admin_login_step1`/`admin_verify_otp`, identical in shape to
+`doctor_login_step1`/`doctor_verify_otp_with_device`). The `mfa_credentials`
+table and `mfa_method_enum` type were dropped
+(`20261202000002_remove_admin_totp`). Step-up re-authentication for
+sensitive Admin actions (disbursement initiation, etc.) remains unimplemented
+and unverified, same as before this change — it was never actually wired to
+the TOTP step this section used to describe.
 
 ---
 

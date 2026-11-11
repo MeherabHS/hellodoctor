@@ -18,7 +18,8 @@ class FakeBookingRepository extends BookingRepository {
   Future<AppointmentDetailDto> appointment(String appointmentId) async {
     if (pollError != null) throw pollError!;
     return pollResult ??
-        const AppointmentDetailDto(id: 'apt-1', status: 'PENDING_PAYMENT');
+        const AppointmentDetailDto(
+            id: 'apt-1', status: 'PENDING_PAYMENT', paymentPolicy: 'REQUIRED');
   }
 }
 
@@ -74,8 +75,8 @@ void main() {
     test('updates status and terminal from the server response', () async {
       final cubit = WaitingRoomCubit(repo,
           appointmentId: 'apt-1', initialStatus: 'PENDING_PAYMENT');
-      repo.pollResult =
-          const AppointmentDetailDto(id: 'apt-1', status: 'CONFIRMED');
+      repo.pollResult = const AppointmentDetailDto(
+          id: 'apt-1', status: 'CONFIRMED', paymentPolicy: 'REQUIRED');
       await cubit.poll();
       expect(cubit.state.status, 'CONFIRMED');
       expect(cubit.state.terminal, isFalse);
@@ -85,8 +86,8 @@ void main() {
     test('a terminal status stops being joinable', () async {
       final cubit = WaitingRoomCubit(repo,
           appointmentId: 'apt-1', initialStatus: 'CONFIRMED');
-      repo.pollResult =
-          const AppointmentDetailDto(id: 'apt-1', status: 'COMPLETED');
+      repo.pollResult = const AppointmentDetailDto(
+          id: 'apt-1', status: 'COMPLETED', paymentPolicy: 'REQUIRED');
       await cubit.poll();
       expect(cubit.state.terminal, isTrue);
       cubit.close();
@@ -104,8 +105,8 @@ void main() {
     test('a terminal state is never re-polled', () async {
       final cubit = WaitingRoomCubit(repo,
           appointmentId: 'apt-1', initialStatus: 'CANCELLED');
-      repo.pollResult =
-          const AppointmentDetailDto(id: 'apt-1', status: 'CONFIRMED');
+      repo.pollResult = const AppointmentDetailDto(
+          id: 'apt-1', status: 'CONFIRMED', paymentPolicy: 'REQUIRED');
       await cubit.poll();
       expect(cubit.state.status, 'CANCELLED',
           reason: 'a terminal session must not revive');
@@ -119,6 +120,7 @@ void main() {
       repo.pollResult = const AppointmentDetailDto(
         id: 'apt-1',
         status: 'COMPLETED',
+        paymentPolicy: 'REQUIRED',
         clinicalOutcome: 'COMPLETED_WITH_RX',
         completedAt: '2026-10-10T09:00:00Z',
       );

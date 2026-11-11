@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chatLocked, money, payoutLabel, safeBackendPath, statementLabel, upcomingFirst } from '../src/lib/contracts.ts';
+import { chatLocked, money, payoutLabel, paymentRequiredFromPolicy, safeBackendPath, statementLabel, upcomingFirst } from '../src/lib/contracts.ts';
 import type { Appointment, Conversation } from '../src/lib/contracts.ts';
 
 const appointment=(id:string,status:string,time:string)=>({id,status,doctor_lifecycle:status,start_time:time} as Appointment);
@@ -46,4 +46,17 @@ test('notification BFF admits only own-inbox operations supported by current Rus
   assert.equal(safeBackendPath('notifications','POST'),false);
   assert.equal(safeBackendPath('notifications/devices','POST'),false);
   assert.equal(safeBackendPath(`notifications/${id}/read`,'GET'),false);
+});
+test('BFF admits the server-authoritative booking-policy read only as GET',()=>{
+  assert.equal(safeBackendPath('config/booking-policy','GET'),true);
+  assert.equal(safeBackendPath('config/booking-policy','POST'),false);
+  assert.equal(safeBackendPath('config/booking-policy','PATCH'),false);
+});
+test('FINANCIAL_MODULE_MODE: the Doctor UI fails safe to paymentRequired until the server explicitly defers it',()=>{
+  // Undefined/missing/not-yet-loaded policy must never hide real financial actions.
+  assert.equal(paymentRequiredFromPolicy(undefined),true);
+  assert.equal(paymentRequiredFromPolicy({}),true);
+  assert.equal(paymentRequiredFromPolicy({payment_required:true}),true);
+  // Only an explicit `false` from the server defers the financial module.
+  assert.equal(paymentRequiredFromPolicy({payment_required:false}),false);
 });

@@ -1,0 +1,1 @@
+admission_accepted_total{class="health"} 43

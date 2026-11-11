@@ -38,13 +38,25 @@ not be invented or committed.
 - Device-token revocation (`NotificationRepository.revokeDevice`) is now
   called on logout in both apps, best-effort, so a signed-out device stops
   receiving push for that account.
-- No `onBackgroundMessage` handler exists, deliberately: this app only ever
-  sends a `notification` block (title/body) in its FCM payloads (see
-  `services/backend/src/services/notification_transport.rs`), never a
-  silent/data-only push, so the OS already displays it automatically while
-  backgrounded or terminated with no app code involved. Adding a background
-  isolate entry point would be unused background processing for a
-  notification shape this system doesn't send.
+- No `onBackgroundMessage` handler exists, deliberately: every FCM message
+  this backend sends carries both a `notification` block (title/body) and a
+  small `data` block (`notification_id`, `notification_type`, and, when
+  applicable, `related_entity_type`/`related_entity_id` — opaque IDs only,
+  never PHI, a clinical complaint, or prescription content; see
+  `services/backend/src/services/notification_transport.rs`). Because the
+  `notification` block is always present, the OS already displays the
+  message automatically while backgrounded or terminated with no app code
+  involved — this system never sends a silent/data-only push (a message
+  with a `data` block but no `notification` block), which is the one shape
+  that would actually require a background isolate entry point to be
+  visible at all. The `data` block is read only when the user taps the
+  notification and the app is already running or being opened
+  (`message.data` in `handleOpenedMessage`,
+  `core/notifications/push_notification_service.dart`, both apps) to drive
+  in-app deep-linking to the related appointment/consultation/article; it is
+  not used for background display. Adding a background isolate entry point
+  would be unused background processing for a notification shape this
+  system doesn't send.
 
 ## Android
 

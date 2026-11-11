@@ -51,7 +51,7 @@ pub struct StoredProfilePicture {
 /// derived into the same 64-bit key is astronomically unlikely, and a
 /// spurious shared wait is harmless (it only ever serializes, never
 /// corrupts).
-async fn lock_profile_picture<'e, E: sqlx::PgExecutor<'e>>(
+pub(crate) async fn lock_profile_picture<'e, E: sqlx::PgExecutor<'e>>(
     executor: E,
     id: Uuid,
 ) -> Result<(), AppError> {
@@ -80,6 +80,7 @@ impl ProfilePictureService {
         // PHASE B — short authoritative transaction.
         let mut tx = state.begin_authed(ctx).await?;
         lock_profile_picture(&mut *tx, patient_id.into_inner()).await?;
+        reject_erasure_photo_write(&mut tx, "PATIENT", patient_id.into_inner()).await?;
         let existing = patient_repo::find_profile_picture(&mut *tx, patient_id).await?;
 
         DocumentStorageService::put(state, &object_key, &sanitized).await?;
@@ -185,6 +186,7 @@ impl ProfilePictureService {
         // PHASE B
         let mut tx = state.begin_authed(ctx).await?;
         lock_profile_picture(&mut *tx, doctor_id.into_inner()).await?;
+        reject_erasure_photo_write(&mut tx, "DOCTOR", doctor_id.into_inner()).await?;
         let existing = doctor_repo::find_profile_picture(&mut *tx, doctor_id).await?;
 
         DocumentStorageService::put(state, &object_key, &sanitized).await?;
@@ -320,4 +322,24 @@ impl ProfilePictureService {
             mime_type: mime,
         })
     }
+}
+
+async fn reject_erasure_photo_write(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    kind: &str,
+    id: uuid::Uuid,
+) -> Result<(), AppError> {
+    let frozen: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM account_erasure_jobs WHERE profile_kind=$1 AND profile_id=$2)",
+    )
+    .bind(kind)
+    .bind(id)
+    .fetch_one(&mut **tx)
+    .await?;
+    if frozen {
+        return Err(AppError::Conflict(
+            "Profile erasure has been requested.".into(),
+        ));
+    }
+    Ok(())
 }

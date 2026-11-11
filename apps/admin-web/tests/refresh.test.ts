@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createClient } from 'redis';
 import { createHash } from 'crypto';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {createServer} from 'node:net';
 import { refreshCoordinator } from '../src/lib/refresh.ts';
 import { redisFixtureConfiguration, assertRedisFixtureOwner } from './redis-fixture.ts';
 test('parallel Admin reads rotate one single-use refresh token once',async()=>{
@@ -32,6 +35,43 @@ try {
 } finally {
   if (probe.isOpen) await probe.disconnect();
 }
+
+test('late replica carrying the same old cookie must not rotate it after the leader finishes',async()=>{
+  const a=createClient({url:REDIS_URL}),b=createClient({url:REDIS_URL});await Promise.all([a.connect(),b.connect()]);
+  try {
+    const token=`late-fixture-${Date.now()}-${Math.random()}`;let calls=0;
+    const rotate=async()=>{calls++;return {access_token:'synthetic-access',refresh_token:'synthetic-next'};};
+    assert.equal((await refreshCoordinator(5000,a as never)(token,rotate)).outcome,'rotated');
+    assert.equal((await refreshCoordinator(5000,b as never)(token,rotate)).outcome,'raced');
+    assert.equal(calls,1,'a later replica must not reuse the single-use refresh cookie');
+  } finally {await Promise.all([a.disconnect(),b.disconnect()]);}
+});
+
+test('transient refresh rejection is handled without a detached rejected promise',async()=>{
+  const refresh=refreshCoordinator(1,null);
+  await assert.rejects(refresh('synthetic-unavailable-refresh',async()=>{throw new Error('Synthetic transport unavailable');}),/Synthetic transport unavailable/);
+  await new Promise(resolve=>setTimeout(resolve,10));
+});
+
+test('configured coordination loss fails closed and reconnects after recovery',async()=>{
+  const probe=createServer();await new Promise<void>(resolve=>probe.listen(0,'127.0.0.1',resolve));
+  const port=(probe.address() as {port:number}).port;await new Promise<void>((resolve,reject)=>probe.close(error=>error?reject(error):resolve()));
+  const moduleUrl=new URL('../src/lib/refresh.ts',import.meta.url).href;
+  const script=`
+    const {refreshCoordinator}=await import(${JSON.stringify(moduleUrl)});
+    process.env.REDIS_URL='redis://127.0.0.1:${port}';
+    const run=refreshCoordinator(10);let calls=0,failedClosed=false;
+    const rotate=async()=>{calls++;return {access_token:'synthetic-access',refresh_token:'synthetic-next'};};
+    try {await run('unavailable-'+crypto.randomUUID(),rotate);} catch {failedClosed=true;}
+    if(!failedClosed||calls!==0)process.exit(2);
+    process.env.REDIS_URL=process.env.TEST_REDIS_URL;
+    const result=await run('recovered-'+crypto.randomUUID(),rotate);
+    console.log(JSON.stringify({failedClosed,calls,outcome:result.outcome}));
+    process.exit(result.outcome==='rotated'&&calls===1?0:3);
+  `;
+  const {stdout}=await promisify(execFile)(process.execPath,['--experimental-strip-types','--input-type=module','-e',script],{env:process.env,timeout:15000,maxBuffer:8192});
+  assert.deepEqual(JSON.parse(stdout.trim()),{failedClosed:true,calls:1,outcome:'rotated'});
+});
 
 test('two admin-web instances racing the same refresh token coordinate to exactly one rotate() call, and the loser never attempts its own rotate', async () => {
   const token = `race-token-${Date.now()}-${Math.random()}`;

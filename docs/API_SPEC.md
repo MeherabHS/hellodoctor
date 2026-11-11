@@ -125,11 +125,26 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
   ```
 
 ### `POST /api/v1/auth/admin/login`
-- **Purpose:** Administrator login using Email, Password, and TOTP in a single request.
+- **Purpose:** Initiates admin login. Email + password (Step 1 of MFA). Identical
+  two-step shape to doctor login above — Admin's mandatory TOTP second factor was
+  removed (`20261202000002_remove_admin_totp`; see `AUTH_SECURITY.md` §2.4).
 - **Auth:** Public.
 - **Request Body:**
   ```json
-  { "email": "admin@helodoc.com", "password": "SecurePassword123!", "totp_code": "123456" }
+  { "email": "admin@helodoc.com", "password": "SecurePassword123!" }
+  ```
+- **Response:** `200 OK`
+  ```json
+  { "success": true, "data": { "session_token": "mfa_sess_456", "requires_otp": true } }
+  ```
+
+### `POST /api/v1/auth/admin/verify-otp`
+- **Purpose:** Verifies the emailed OTP for admin login (Step 2 of MFA; no second
+  "totp_code" field — TOTP was removed).
+- **Auth:** Public.
+- **Request Body:**
+  ```json
+  { "session_token": "mfa_sess_456", "otp_code": "913627" }
   ```
 - **Response:** `200 OK`
   ```json
@@ -138,12 +153,10 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
     "data": {
       "access_token": "eyJhbGciOi...",
       "refresh_token": "a8f4c2e1b9d7...",
-      "user": { "id": "adm-1", "role": "PLATFORM_ADMIN" }
+      "user": { "id": "adm-1", "role": "ADMIN" }
     }
   }
   ```
-
-Admin TOTP is backed by the encrypted `mfa_credentials` model in `DATABASE_SCHEMA.md`. Enrollment, recovery, reset, and sensitive admin actions follow the lifecycle in `AUTH_SECURITY.md`.
 
 ### `POST /api/v1/auth/refresh`
 - **Purpose:** Exchanges a valid opaque refresh token for a new access/refresh token pair. Employs token rotation and reuse detection.

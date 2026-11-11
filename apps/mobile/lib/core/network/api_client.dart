@@ -21,6 +21,16 @@ String _generateIdempotencyKey() {
   return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
 }
 
+/// Raw bytes paired with the server's own `Content-Type` header, lower-cased
+/// with any `; charset=...` parameter stripped. `null` means the server sent
+/// no usable content-type; callers must treat that as "unknown", never as a
+/// safe default to render.
+class TypedBytes {
+  const TypedBytes({required this.bytes, required this.contentType});
+  final Uint8List bytes;
+  final String? contentType;
+}
+
 abstract class TokenStore {
   Future<String?> read(String key);
   Future<void> write(String key, String value);
@@ -547,6 +557,31 @@ class ApiClient {
     );
     return response.data as List<int>;
   }
+
+  /// Like [getBytes], but also returns the server's authoritative
+  /// `Content-Type` response header (Remediation E2). Clinical-document
+  /// viewing must decide how to render a file from what the server actually
+  /// served, not only from a possibly-stale `mime_type` value recorded
+  /// earlier in a listing response — this lets a caller cross-check the two.
+  /// [path] may be a full absolute URL (e.g. an already-resolved, single-use
+  /// signed document-download URL): Dio uses an absolute URL as-is rather
+  /// than prefixing it with `baseUrl`.
+  Future<TypedBytes> getBytesWithType(String path,
+      {Map<String, dynamic>? query}) async {
+    final response = await _request(
+      (options) => _dio.get<List<int>>(
+        path,
+        queryParameters: query,
+        options: options.copyWith(responseType: ResponseType.bytes),
+      ),
+    );
+    final contentType = response.headers.value('content-type');
+    return TypedBytes(
+      bytes: Uint8List.fromList(response.data as List<int>),
+      contentType: contentType?.split(';').first.trim().toLowerCase(),
+    );
+  }
+
   Future<Response<dynamic>> _request(
     Future<Response<dynamic>> Function(Options options) call, {
     String? idempotencyKey,

@@ -397,7 +397,8 @@ void main() {
       expect(controller.state, CallScreenState.left);
     });
 
-    test('maps provider connection changes to bounded client telemetry', () async {
+    test('maps provider connection changes to bounded client telemetry',
+        () async {
       final engine = FakeAgoraEngine();
       final events = <Map<String, dynamic>>[];
       final controller = CallController(
@@ -410,12 +411,15 @@ void main() {
       engine.simulateJoinSuccess();
       engine.simulateConnectionState(CallConnectionState.reconnecting);
       await Future<void>.delayed(const Duration(milliseconds: 1100));
-      expect(events.map((event) => event['event_type']), containsAll(<String>[
-        'DOCTOR_JOINED',
-        'DOCTOR_RECONNECTING',
-      ]));
+      expect(
+          events.map((event) => event['event_type']),
+          containsAll(<String>[
+            'DOCTOR_JOINED',
+            'DOCTOR_RECONNECTING',
+          ]));
       await controller.leave();
-      expect(events.map((event) => event['event_type']), contains('DOCTOR_DISCONNECTED'));
+      expect(events.map((event) => event['event_type']),
+          contains('DOCTOR_DISCONNECTED'));
     });
 
     test('leave() is idempotent: calling it twice queues only one DISCONNECTED',
@@ -443,7 +447,8 @@ void main() {
       );
     });
 
-    test('an ordinary uninterrupted join never queues a false reconnect', () async {
+    test('an ordinary uninterrupted join never queues a false reconnect',
+        () async {
       // Real Agora SDKs report onConnectionStateChanged(connected) as a
       // follow-up to the SDK's own onJoinChannelSuccess for the very same
       // join — not just onJoinChannelSuccess alone, which is all the test
@@ -535,7 +540,8 @@ void main() {
       await controller.handleAppBackgrounded();
       await controller.handleAppForegrounded();
       expect(engine.lastVideoMuted, isTrue,
-          reason: 'foregrounding must respect the user\'s own choice, not override it');
+          reason:
+              'foregrounding must respect the user\'s own choice, not override it');
     });
   });
 }

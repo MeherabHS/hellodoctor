@@ -1,0 +1,3 @@
+=== PREFLIGHT FAILED -- aborting before any measurement window ===
+  - ADMIN /api/proxy/admin/overview: expected HTTP 200, got 401 (minted admin token rejected -- auth bypass is broken, not a real backend policy rejection, since this is the admin's own overview endpoint)
+  - DOCTOR /api/proxy/doctor/profile: expected HTTP 200, got 401 (minted doctor token rejected -- auth bypass is broken)

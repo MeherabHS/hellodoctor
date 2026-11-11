@@ -26,6 +26,8 @@ class PublicDoctorDto {
     required this.consultationFeeVideo,
     required this.consultationFeeChat,
     required this.isOnDuty,
+    required this.hasPhoto,
+    required this.photoUpdatedAt,
   });
 
   final String id,
@@ -40,6 +42,13 @@ class PublicDoctorDto {
   final int experienceYears;
   final List<String> qualifications;
   final bool isOnDuty;
+
+  /// Mirrors `profile_picture_size_bytes`/`profile_picture_updated_at` in
+  /// `PublicDoctorProfile` (`services/backend/src/repository/doctor_repo.rs`)
+  /// — a presence + cache-busting signal only; the actual bytes come from
+  /// the separate authenticated `GET /doctors/:id/photo` endpoint.
+  final bool hasPhoto;
+  final DateTime? photoUpdatedAt;
 
   // Matches DoctorQuery: a positive configured fee enables that modality.
   bool get supportsVideo => _positiveFee(consultationFeeVideo);
@@ -82,5 +91,8 @@ class PublicDoctorDto {
         consultationFeeVideo: _textOf(j['consultation_fee_video'], '0'),
         consultationFeeChat: _textOf(j['consultation_fee_chat'], '0'),
         isOnDuty: j['is_on_duty'] == true,
+        hasPhoto: j['profile_picture_size_bytes'] != null,
+        photoUpdatedAt:
+            DateTime.tryParse(_textOf(j['profile_picture_updated_at'], '')),
       );
 }

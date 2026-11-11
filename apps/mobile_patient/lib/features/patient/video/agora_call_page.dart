@@ -45,7 +45,8 @@ class _AgoraCallPageState extends State<AgoraCallPage>
       engine: RealAgoraEngine(),
       mintToken: () => widget.repo.mintRtcToken(widget.appointmentId),
       requestPermissions: _requestPermissions,
-      telemetrySubmit: (events) => widget.repo.submitTelemetryEvents(widget.appointmentId, events),
+      telemetrySubmit: (events) =>
+          widget.repo.submitTelemetryEvents(widget.appointmentId, events),
     )..addListener(_onControllerChanged);
     _controller.start();
   }
@@ -162,7 +163,8 @@ class _AgoraCallPageState extends State<AgoraCallPage>
         );
       case CallScreenState.connected:
       case CallScreenState.reconnecting:
-        return _InCallView(controller: _controller, onLeave: _leaveAndPop, t: t);
+        return _InCallView(
+            controller: _controller, onLeave: _leaveAndPop, t: t);
       case CallScreenState.failed:
         return _CenteredStatus(
           icon: Icons.cloud_off,

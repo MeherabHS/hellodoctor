@@ -224,7 +224,7 @@ void main() {
             .first);
         expect(align.alignment,
             mine ? Alignment.centerRight : Alignment.centerLeft);
-        expect(find.text('03:00'), findsOneWidget);
+        expect(find.text('3:00 AM'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
       }

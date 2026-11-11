@@ -94,4 +94,21 @@ class VaultRepository {
       rethrow;
     }
   }
+
+  /// Remediation E2: mints a fresh, single-use document-download grant via
+  /// [resolveDownloadUrl] and immediately redeems it for the actual bytes,
+  /// in-memory — never via `launchUrl`/an external application. The grant is
+  /// one-time (server-side `GETDEL`), so this must be called again for every
+  /// retry rather than reusing a previously-resolved URL.
+  Future<TypedBytes> fetchDocumentBytes(
+      String appointmentId, String documentId) async {
+    final url = await resolveDownloadUrl(appointmentId, documentId);
+    try {
+      return await api.getBytesWithType(url.toString());
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'HealthVault', operation: 'fetch_document_bytes');
+      rethrow;
+    }
+  }
 }

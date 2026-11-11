@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../../../core/cache/patient_cache_store.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/client_error_reporter.dart';
@@ -97,6 +99,22 @@ class DirectoryRepository {
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'DoctorProfile', operation: 'load');
+      rethrow;
+    }
+  }
+
+  /// Authenticated raw-bytes GET for a verified doctor's public photo
+  /// (`GET /doctors/:id/photo` → `profile_picture_handlers.rs`, served via a
+  /// `SECURITY DEFINER` DB function so any signed-in patient may fetch it).
+  /// A 404 means the doctor genuinely has no photo set, not a transport
+  /// failure — mirrors `ProfileRepository.fetchPhotoBytes`'s own 404-to-null
+  /// handling for the patient's own photo.
+  Future<Uint8List?> fetchDoctorPhotoBytes(String doctorId) async {
+    try {
+      final bytes = await api.getBytes('/doctors/$doctorId/photo');
+      return Uint8List.fromList(bytes);
+    } on ApiException catch (e) {
+      if (e.status == 404) return null;
       rethrow;
     }
   }

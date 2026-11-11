@@ -1,11 +1,9 @@
 import {NextRequest,NextResponse} from 'next/server';
-import {getAccessToken,getRefreshToken,setSessionCookies,clearSessionCookies,backendUrl,backendHeaders} from '@/lib/session';
-import {coordinatedRefresh} from '@/lib/refresh';
+import {withAdminSession,backendUrl,backendHeaders} from '@/lib/session';
 
 // Dedicated bounded binary transport; the existing JSON proxy and campaigns are unchanged.
 async function forward(req:NextRequest,id:string){
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))return NextResponse.json({error:'Invalid article ID.'},{status:400});
-  const token=await getAccessToken();if(!token)return NextResponse.json({error:'Not authenticated.'},{status:401});
   const upload=req.method==='POST';const mime=req.headers.get('content-type')||'';
   let body:Uint8Array|undefined;
   if(upload){
@@ -20,18 +18,7 @@ async function forward(req:NextRequest,id:string){
   const target=`${backendUrl()}/api/v1/admin/articles/${id}/cover${upload?`?version=${version}`:''}`;
   const send=async(access:string)=>fetch(target,{method:req.method,headers:{...(await backendHeaders()),Authorization:`Bearer ${access}`,'X-Client-Type':'ADMIN_WEB','X-Request-Id':crypto.randomUUID(),...(upload?{'Content-Type':mime}:{})},body:body as BodyInit|undefined,cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});
   try{
-    let response=await send(token);
-    if(response.status===401){
-      const refresh=await getRefreshToken();
-      if(refresh){
-        const result=await coordinatedRefresh(refresh,async()=>{
-          const r=await fetch(`${backendUrl()}/api/v1/auth/refresh`,{method:'POST',headers:{...(await backendHeaders()),'Content-Type':'application/json'},body:JSON.stringify({refresh_token:refresh}),cache:'no-store',redirect:'error',signal:AbortSignal.timeout(15000)});
-          const data=await r.json().catch(()=>null);return r.ok&&data?.success?data.data:null;
-        });
-        if(result.outcome==='rotated'){await setSessionCookies(result.tokens.access_token,result.tokens.refresh_token);response=await send(result.tokens.access_token);}
-        else if(result.outcome==='failed')await clearSessionCookies();
-      }
-    }
+    const response=await withAdminSession(send);
     return new NextResponse(await response.arrayBuffer(),{status:response.status,headers:{'Content-Type':response.headers.get('Content-Type')||'application/json','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
   }catch{return NextResponse.json({error:'Article media service unavailable.'},{status:502});}
 }

@@ -191,8 +191,8 @@ export interface TransactionItem {
   platformFeePercent: number;
   platformFeeAmount: number;
   netAmount: number;
-  direction: 'INFLOW' | 'PAYOUT' | 'REFUND';
-  escrowStatus: 'ESCROW_LOCKED' | 'SETTLED' | 'REFUNDED';
+  direction: 'INFLOW' | 'PAYOUT' | 'REFUND' | 'NONE';
+  escrowStatus: 'ESCROW_LOCKED' | 'SETTLED' | 'REFUNDED' | 'UNFUNDED';
   escrowStatusLabel: string;
   statusBadgeCls: string;
   gatewayPayload: Record<string, any>;

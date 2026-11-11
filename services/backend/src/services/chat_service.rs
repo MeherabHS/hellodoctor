@@ -8,6 +8,22 @@ use crate::{
 use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
+
+/// Milestone 8 hold-duration investigation (2026-11-04): additive-only RAII
+/// timer recording total transaction lifetime (begin -> whichever exit path
+/// this function scope takes: commit, rollback, or an early `?`-propagated
+/// error) -- does not read or depend on `conversation_id`/`appointment_id`/
+/// any other identifier, carries no label at all, so there is nothing
+/// sensitive in what it records. Same Drop-based measurement pattern already
+/// established by `admission::Lease`.
+struct TxDurationTimer(std::time::Instant);
+impl Drop for TxDurationTimer {
+    fn drop(&mut self) {
+        metrics::histogram!("chat_send_message_transaction_seconds")
+            .record(self.0.elapsed().as_secs_f64());
+    }
+}
+
 pub struct ChatService;
 impl ChatService {
     pub async fn send_message(
@@ -27,6 +43,7 @@ impl ChatService {
             ctx.verified_doctor_profile_id(state).await?;
         }
         let mut tx = state.begin_authed(ctx).await?;
+        let _tx_duration_timer = TxDurationTimer(std::time::Instant::now());
         let conv = chat_repo::find_conversation(&mut *tx, conversation_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Chat conversation not found.".into()))?;
@@ -37,10 +54,18 @@ impl ChatService {
         let apt = appointment_repo::find_by_id(&mut *tx, conv.appointment_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+        // Milestone 8 hold-duration investigation (2026-11-04): additive-only
+        // timing around just this one statement -- isolates genuine
+        // Postgres-side lock-wait time (confirmed real via pg_stat_activity's
+        // wait_event_type="Lock"/wait_event="advisory" in the pool=14
+        // experiment) from the rest of the transaction's own round-trips.
+        let advisory_lock_start = std::time::Instant::now();
         sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
             .bind(format!("chat-send:{conversation_id}"))
             .execute(&mut *tx)
             .await?;
+        metrics::histogram!("chat_advisory_lock_wait_seconds")
+            .record(advisory_lock_start.elapsed().as_secs_f64());
         let key_hash = key.map(|k| hex::encode(Sha256::digest(k.as_bytes())));
         if let Some(hash) = &key_hash {
             let existing:Option<Uuid>=sqlx::query_scalar("SELECT id FROM chat_messages WHERE conversation_id=$1 AND sender_id=$2 AND idempotency_key_hash=$3").bind(conversation_id).bind(sender_id).bind(hash).fetch_optional(&mut *tx).await?;

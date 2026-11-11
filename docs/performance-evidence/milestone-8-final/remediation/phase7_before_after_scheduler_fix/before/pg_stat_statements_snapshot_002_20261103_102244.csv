@@ -1,0 +1,21 @@
+﻿queryid,calls,total_exec_time_ms,mean_exec_time_ms,rows,shared_blks_hit,shared_blks_read,shared_blks_dirtied,shared_blks_written,temp_blks_read,temp_blks_written,blk_read_time_ms,blk_write_time_ms,query
+7942167212322379111,3623,100.86,0.03,3623,10869,0,0,0,0,0,0.00,0.00,SELECT preferred_language FROM users WHERE id = $1
+-5166295555693338443,3725,58.36,0.02,3725,11175,0,0,0,0,0,0.00,0.00,SELECT title_template, body_template FROM notification_templates WHERE template_key = $1 AND locale = $2 AND enabled = TRUE
+-2567077806241064319,1,34.41,34.41,40,3171,1112,0,0,0,0,2.41,0.00,SELECT a.id, s.end_time FROM appointments a JOIN doctor_schedule_slots s ON s.id = a.slot_id WHERE a.status = 'CONFIRMED' AND a.modality = 'VIDEO' AND clock_timestamp() >= s.start_time - make_interval(mins => $1) AND clock_timestamp() <= s.end_time + make_interval(mins => $2)
+-1567294832419019609,40,4.45,0.11,40,548,52,0,0,0,0,0.29,0.00,SELECT d.user_id, du.preferred_language, COALESCE(p.user_id, g.user_id), COALESCE(pu.preferred_language, gu.preferred_language) FROM appointments a JOIN doctor_profiles d ON d.id = a.doctor_id JOIN users du ON du.id = d.user_id JOIN patient_profiles p ON p.id = a.patient_id LEFT JOIN patient_profile
+3749380189022910195,3725,1.90,0.00,0,0,0,0,0,0,0,0.00,0.00,ROLLBACK
+8158317691789916122,1,1.53,1.53,21,243,13,0,0,0,0,0.03,0.00,SELECT p.id AS patient_id, COALESCE(p.user_id, g.user_id) AS user_id, COALESCE(pu.preferred_language, gu.preferred_language) AS language FROM patient_profiles p LEFT JOIN patient_profiles g ON g.id = p.guardian_patient_id LEFT JOIN users pu ON pu.id = p.user_id AND pu.is_active = TRUE AND pu.deleted
+6650430479887907887,3728,1.24,0.00,0,0,0,0,0,0,0,0.00,0.00,BEGIN
+-6261066899363356102,11,1.15,0.10,1,0,0,0,0,0,0,0.00,0.00,SELECT clock_timestamp()::text,        pid,        COALESCE(state,$1),        COALESCE(wait_event_type,$2),        COALESCE(wait_event,$3),        COALESCE(EXTRACT($4 FROM (clock_timestamp()-query_start)),$5),        REPLACE(LEFT(COALESCE(query,$6),$7), $8, $9) FROM pg_stat_activity WHERE pid<>pg_ba
+-3983160041474389580,42,1.08,0.03,42,168,0,0,0,0,0,0.00,0.00,SELECT EXISTS(SELECT $2 FROM notifications WHERE dedup_key = $1)
+-4818329041686550545,11,0.43,0.04,11,11,0,0,0,0,0,0.00,0.00,SELECT xact_commit, xact_rollback, blks_hit, blks_read, temp_files, temp_bytes, deadlocks, conflicts FROM pg_stat_database WHERE datname=$1
+-5740007350242477213,1,0.11,0.11,42,128,0,0,0,0,0,0.00,0.00,SELECT d.id AS profile_id, d.user_id FROM doctor_profiles d JOIN users u ON u.id = d.user_id WHERE d.professional_verification_status = 'VERIFIED' AND u.is_active = TRUE AND u.deleted_at IS NULL
+-6779122069001304910,1,0.03,0.03,0,0,2,0,0,0,0,0.01,0.00,SELECT a.id AS appointment_id, d.user_id AS doctor_user_id, du.preferred_language AS doctor_language, COALESCE(p.user_id, g.user_id) AS patient_user_id, COALESCE(pu.preferred_language, gu.preferred_language) AS patient_language, s.start_time FROM appointments a JOIN doctor_schedule_slots s ON s.id =
+5843240444178903173,1,0.02,0.02,0,0,1,0,0,0,0,0.00,0.00,SELECT id, title, version, published_at FROM doctor_articles WHERE status = 'PUBLISHED' AND engagement_notified_at IS NULL ORDER BY published_at ASC LIMIT 20 FOR UPDATE SKIP LOCKED
+-6795990713135159542,1,0.02,0.02,0,1,0,0,0,0,0,0.00,0.00,UPDATE campaigns SET status='SENDING',sending_started_at=COALESCE(sending_started_at,NOW()),version=version+1,updated_at=NOW() WHERE status='SCHEDULED' AND scheduled_for<=NOW()
+-7079318682191887760,1,0.02,0.02,0,1,0,0,0,0,0,0.00,0.00,SELECT id FROM campaigns WHERE status='SENDING'
+-1119551585709723109,2,0.01,0.01,2,0,0,0,0,0,0,0.00,0.00,SELECT set_config('app.current_user_id', $1, true), set_config('app.current_role', $2, true)
+4446026652753912327,1,0.01,0.01,0,0,1,0,0,0,0,0.00,0.00,SELECT id, holiday_key, is_religious FROM kenyan_holidays WHERE observed_date = $1
+-8328458567936199827,2,0.01,0.01,2,0,0,0,0,0,0,0.00,0.00,SELECT set_config('app.current_patient_id','',true),set_config('app.current_doctor_id','',true),set_config('app.current_session_id',$1,true),set_config('app.current_request_id',$2,true)
+-5378431905038090156,2,0.01,0.00,2,0,0,0,0,0,0,0.00,0.00,SELECT set_config('app.trace_retention_days',$1,true)
+2064869707185898531,3,0.00,0.00,0,0,0,0,0,0,0,0.00,0.00,COMMIT

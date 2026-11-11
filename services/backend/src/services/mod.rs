@@ -9,6 +9,8 @@ pub mod consultation_presence_service;
 pub mod consultation_service;
 pub mod data_rights_service;
 pub mod disbursement_service;
+pub mod dr_erasure_journal;
+pub mod dr_reconciliation;
 pub mod email_dispatch_worker;
 pub mod email_templates;
 pub mod email_transport;

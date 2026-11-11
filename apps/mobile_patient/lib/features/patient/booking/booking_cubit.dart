@@ -25,8 +25,17 @@ class BookingState {
     this.selectedPaymentMethodId,
     this.addingPaymentMethod = false,
     this.addPaymentMethodError,
+    this.loadingPolicy = true,
+    this.paymentRequired = true,
   });
   final bool loadingSlots, submitting, uploading;
+
+  /// Whether this booking requires payment right now — server-decided
+  /// (`GET /config/booking-policy`), defaulting to `true` (today's existing
+  /// requirement) until the real policy has loaded, so the UI never briefly
+  /// flashes a "no payment needed" state before the server has actually said
+  /// so.
+  final bool loadingPolicy, paymentRequired;
   final String? slotsError, submitError, uploadError, selectedSlotId;
   final List<DoctorSlotDto> slots;
   final DateTime? selectedDate;
@@ -64,14 +73,14 @@ class BookingState {
   /// Real validation the prototype's static demo lacks (plan §4, view-4
   /// row): "Proceed" must stay disabled until both a date and a slot on that
   /// date are actually selected, not merely pre-highlighted by default. Also
-  /// requires a real saved payment method to be selected — the backend
-  /// requires one (`payment_method_id`) for every booking, and a patient
-  /// picking which saved instrument to pay with is the whole point of this
-  /// screen's payment section, not an optional extra.
+  /// requires a real saved payment method to be selected whenever the
+  /// server-decided [paymentRequired] policy says payment is actually
+  /// needed for this booking — when it isn't (deferred mode), a payment
+  /// method is neither shown nor required.
   bool get canProceed =>
       selectedDate != null &&
       selectedSlotId != null &&
-      selectedPaymentMethodId != null &&
+      (!paymentRequired || selectedPaymentMethodId != null) &&
       !loadingSlots &&
       slotsError == null &&
       !submitting &&
@@ -96,6 +105,8 @@ class BookingState {
     Object? selectedPaymentMethodId = _unset,
     bool? addingPaymentMethod,
     Object? addPaymentMethodError = _unset,
+    bool? loadingPolicy,
+    bool? paymentRequired,
   }) =>
       BookingState(
         loadingSlots: loadingSlots ?? this.loadingSlots,
@@ -137,6 +148,8 @@ class BookingState {
         addPaymentMethodError: identical(addPaymentMethodError, _unset)
             ? this.addPaymentMethodError
             : addPaymentMethodError as String?,
+        loadingPolicy: loadingPolicy ?? this.loadingPolicy,
+        paymentRequired: paymentRequired ?? this.paymentRequired,
       );
 }
 
@@ -194,6 +207,26 @@ class BookingCubit extends Cubit<BookingState> {
             ? e.userMessage
             : 'Unable to load available slots.',
       ));
+    }
+  }
+
+  /// Loads the real, server-decided booking policy once per screen — the
+  /// page calls this alongside [loadSlots] before showing any payment UI.
+  /// A transient load failure keeps the safe default (`paymentRequired:
+  /// true`, matching the constructor default) rather than ever assuming
+  /// payment is optional just because this call failed.
+  Future<void> loadBookingPolicy() async {
+    emit(state.copyWith(loadingPolicy: true));
+    try {
+      final policy = await repo.bookingPolicy();
+      if (isClosed) return;
+      emit(state.copyWith(
+        loadingPolicy: false,
+        paymentRequired: policy.paymentRequired,
+      ));
+    } catch (_) {
+      if (isClosed) return;
+      emit(state.copyWith(loadingPolicy: false));
     }
   }
 
@@ -285,7 +318,8 @@ class BookingCubit extends Cubit<BookingState> {
         doctorId: doctorId,
         slotId: state.selectedSlotId!,
         modality: modality,
-        paymentMethodId: state.selectedPaymentMethodId!,
+        paymentMethodId:
+            state.paymentRequired ? state.selectedPaymentMethodId! : null,
         chiefComplaint: state.chiefComplaint,
         profileId: profileId,
       );

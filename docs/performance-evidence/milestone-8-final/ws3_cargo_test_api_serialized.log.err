@@ -1,0 +1,3 @@
+    Finished `release` profile [optimized] target(s) in 1.33s
+     Running tests\api_tests.rs (target\release\deps\api_tests-4ea7c2ca0922c607.exe)
+error: test failed, to rerun pass `--test api_tests`

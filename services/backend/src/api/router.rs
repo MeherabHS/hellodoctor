@@ -8,7 +8,7 @@ use crate::telemetry;
 use axum::{
     error_handling::HandleErrorLayer,
     extract::State,
-    http::{HeaderValue, Method, StatusCode},
+    http::{HeaderMap, HeaderValue, Method, StatusCode},
     middleware::{from_fn, from_fn_with_state},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -278,6 +278,22 @@ async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
     }
 }
 
+/// Recovery operator probe. It deliberately exposes only safe operational
+/// state and is available solely with the separately issued recovery token;
+/// ordinary Patient, Doctor and Admin credentials are not accepted here.
+async fn recovery_status(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if !crate::api::middleware::global_guard::recovery_operator_authenticated(&state, &headers) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
+    Json(serde_json::json!({
+        "recovery_mode": state.config.recovery_mode,
+        "outbound_operations": "disabled",
+        "scheduler": "stopped",
+        "operator_authorization": "verified"
+    }))
+    .into_response()
+}
+
 /// Explicit, auditable allow-list of routes reachable with no bearer token at
 /// all: OTP/password login steps (there is no caller identity yet to
 /// authenticate — that's the whole point), token refresh, and payment
@@ -287,6 +303,7 @@ async fn health_check(State(state): State<AppState>) -> impl IntoResponse {
 /// deliberate, visible choice to make it public, not an accident.
 fn public_routes() -> Router<AppState> {
     Router::new()
+        .route("/recovery/status", get(recovery_status))
         .route(
             "/documents/download",
             get(prescription_handlers::download_document),
@@ -417,6 +434,7 @@ fn protected_routes() -> Router<AppState> {
         .route("/notifications/devices", axum::routing::post(notification_handlers::register_device))
         .route("/notifications/devices/revoke", axum::routing::post(notification_handlers::revoke_device))
         .route("/notifications/preferences", get(notification_handlers::get_preferences).put(notification_handlers::update_preferences))
+        .route("/notifications/:id", get(notification_handlers::detail))
         .route("/doctor/chats", get(doctor_handlers::list_own_chats))
         .route("/doctor/appointments/:current_appointment_id/patient-history", get(doctor_handlers::list_patient_history))
         .route("/doctor/appointments/:current_appointment_id/patient-history/:historical_consultation_id", get(doctor_handlers::get_patient_history_detail))
@@ -445,6 +463,10 @@ fn protected_routes() -> Router<AppState> {
         .route("/patients/me/payment-methods", axum::routing::get(patient_handlers::list_own_payment_methods).post(patient_handlers::save_payment_method))
         .route("/patients/me/payment-methods/:id", axum::routing::delete(patient_handlers::remove_payment_method))
         .route("/patients/me/payment-methods/:id/set-primary", axum::routing::post(patient_handlers::set_primary_payment_method))
+        .route(
+            "/config/booking-policy",
+            get(config_handlers::booking_policy),
+        )
         // Appointments
         .route(
             "/appointments/book",
@@ -673,6 +695,10 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/admin/consultations/:session_id/recovery-resolution",
             axum::routing::post(admin_handlers::resolve_consultation_recovery),
+        )
+        .route(
+            "/admin/consultations/live-reservations/release",
+            axum::routing::post(admin_handlers::release_live_reservation),
         )
         .route(
             "/admin/platform-payment-methods",

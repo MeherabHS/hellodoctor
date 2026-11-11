@@ -22,10 +22,14 @@ pub struct BookAppointmentRequest {
     pub doctor_id: DoctorProfileId,
     pub slot_id: Uuid,
     pub modality: Modality,
-    /// Required only when `payment_method_id` is omitted — selecting a
+    /// Required only when `payment_method_id` is omitted AND payment is
+    /// actually required (`FINANCIAL_MODULE_MODE=enabled`) — selecting a
     /// saved method resolves the gateway from it instead (see
     /// `patient_payment_methods`), so a client that already lets the
-    /// patient pick a saved method never needs to send this too.
+    /// patient pick a saved method never needs to send this too. Omitting
+    /// both is only valid when the backend's effective policy (see
+    /// `GET /config/booking-policy`) says payment isn't required; otherwise
+    /// `AppointmentService::book_appointment` rejects the booking.
     pub gateway: Option<Gateway>,
     /// A previously-saved `patient_payment_methods` row to pay with — the
     /// patient picks it at checkout instead of entering payment details
@@ -69,9 +73,13 @@ pub async fn book_appointment(
     // keeps that service function's own re-validation of ownership/active
     // status as the single authoritative check — this lookup only decides
     // *which* gateway to proceed with, never whether the booking itself is
-    // allowed to use it.
+    // allowed to use it. Neither being present is not rejected here: when
+    // `FINANCIAL_MODULE_MODE=deferred`, `AppointmentService::book_appointment`
+    // itself decides a missing gateway means "no payment needed" rather than
+    // an error — this handler must not duplicate (and risk diverging from)
+    // that one authoritative policy check.
     let gateway = match (payload.gateway, payload.payment_method_id) {
-        (Some(g), _) => g,
+        (Some(g), _) => Some(g),
         (None, Some(method_id)) => {
             // `patient_payment_methods` is RLS-protected by caller identity
             // (`fn_patient_profile_owned_by_caller`), which needs
@@ -87,13 +95,9 @@ pub async fn book_appointment(
                         AppError::NotFound("No saved payment method with that id.".into())
                     })?;
             lookup_tx.commit().await?;
-            method.gateway
+            Some(method.gateway)
         }
-        (None, None) => {
-            return Err(AppError::Validation(
-                "Either gateway or payment_method_id is required.".into(),
-            ))
-        }
+        (None, None) => None,
     };
 
     if let Some(response) = idempotency.replay(&state, &ctx, None).await? {
@@ -122,6 +126,7 @@ pub async fn book_appointment(
                     "appointment_id": res.appointment_id,
                     "appointment_number": res.appointment_number,
                     "status": res.status,
+                    "payment_policy": res.payment_policy,
                     "payment_session_id": res.payment_session_id,
                     "payment_redirect_url": res.payment_redirect_url,
                     "amount": res.amount,

@@ -1,3 +1,4 @@
+import 'notification_taps.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -91,6 +92,7 @@ class LocalNotificationService {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
+  static Future<void>? _initializing;
 
   /// Kenya does not observe daylight saving, so a fixed `Africa/Nairobi`
   /// location (rather than the device's own configured timezone) is
@@ -103,13 +105,29 @@ class LocalNotificationService {
   /// Call once at app startup, before any other method here. Idempotent —
   /// a second call is a no-op, so callers (app init, background isolate
   /// entry point) don't need to coordinate who calls it first.
-  static Future<void> init() async {
-    if (_initialized) return;
+  static Future<void> init() {
+    if (_initialized) return Future<void>.value();
+    return _initializing ??=
+        _initialize().whenComplete(() => _initializing = null);
+  }
+
+  static Future<void> _initialize() async {
     tzdata.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation(_nairobiLocationName));
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidInit);
-    await _plugin.initialize(initSettings);
+    const initSettings = InitializationSettings(
+        android: androidInit,
+        iOS: DarwinInitializationSettings(
+            requestAlertPermission: false,
+            requestBadgePermission: false,
+            requestSoundPermission: false));
+    await _plugin.initialize(initSettings,
+        onDidReceiveNotificationResponse: (response) =>
+            NotificationTaps.receive(response.payload));
+    final launch = await _plugin.getNotificationAppLaunchDetails();
+    if (launch?.didNotificationLaunchApp == true) {
+      NotificationTaps.receive(launch?.notificationResponse?.payload);
+    }
     final androidImpl = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     for (final channel in NotificationChannels.all) {
@@ -163,5 +181,4 @@ class LocalNotificationService {
       payload: payload,
     );
   }
-
 }

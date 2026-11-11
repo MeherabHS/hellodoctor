@@ -6,6 +6,8 @@ export interface Slot { bookable?: boolean; id: string; status: string; start_ti
 export interface Conversation { id: string; appointment_id: string; patient_display_name: string; expires_at: string; is_locked: boolean; last_message_at: string | null; modality?: string; appointment_status?: string }
 export interface Message { id: string; sender_id: string; content: string; sent_at: string; attachment_id?: string; attachment?: {id:string;display_name:string;mime_type:string;size_bytes:number}|null }
 export interface Question { id: string; question_text: string; status: string; category: string | null; created_at: string; answer_text: string | null; answering_doctor: string | null }
+/** `POST /consultations/:id/rtc-token` response (`consultation_handlers::mint_agora_token`) — identical shape for Doctor and Patient callers; role is derived server-side from the authenticated session, never sent here. */
+export interface RtcTokenData { app_id: string; channel_name: string; token: string; uid: number; expires_in: number }
 export interface DoctorNotification { metadata?:{appointment_id?:string}; id:string; notification_type:string; title:string; body:string; related_entity_type:string|null; related_entity_id:string|null; created_at:string; read_at:string|null }
 export interface Statement extends RecordDto { period: string; currency: string; status: string; amount_label: string; gross_earnings: string; platform_charge: string; basis_note: string; adjustments: string; payable: string; payout_status: string; entries: RecordDto[]; next_offset: number | null }
 export interface RxPage { key: string; file: File; preview: string; state: 'LOCAL' | 'UPLOADING' | 'UPLOADED' | 'FAILED'; requestKey: string; documentId?: string; error?: string; uploadNotes?: string; originalBytes?: number; uploadProgress?: number | null }
@@ -49,6 +51,12 @@ export function payoutLabel(status: unknown, provider: unknown): string {
   if (provider === 'DEV_SIMULATED') return `Development simulation · ${String(status ?? 'Not allocated')}`;
   return status === 'PAID' ? 'Paid' : String(status ?? 'Not allocated').replaceAll('_', ' ');
 }
+/** Derives the Doctor UI's financial-visibility gate from `GET /config/booking-policy`.
+ * Defaults to `true` (the safe default — never hide real financial actions) until
+ * the server has explicitly reported the module as deferred. */
+export function paymentRequiredFromPolicy(data: { payment_required?: boolean } | undefined): boolean {
+  return data?.payment_required !== false;
+}
 export function safeBackendPath(path: string, method: string): boolean {
   const id = '[0-9a-fA-F-]{36}';
   const routes: [string, string][] = [
@@ -61,7 +69,8 @@ export function safeBackendPath(path: string, method: string): boolean {
     ['POST', `chat/${id}/attachments`], ['GET', `chat/${id}/messages/${id}/attachment`],
     ['GET|POST', `chat/${id}/messages`], ['POST', `consultations/${id}/(?:complete|complete-no-rx|prescription)`],
     ['POST', `consultations/${id}/(?:rtc-token|telemetry|telemetry/events)`],
-    ['GET', 'notifications(?:/unread-count)?'], ['POST', `notifications/(?:read-all|${id}/read)`]
+    ['GET', 'notifications(?:/unread-count)?'], ['POST', `notifications/(?:read-all|${id}/read)`],
+    ['GET', 'config/booking-policy']
   ];
   return routes.some(([methods, pattern]) => new RegExp(`^(?:${methods})$`).test(method) && new RegExp(`^(?:${pattern})$`).test(path));
 }

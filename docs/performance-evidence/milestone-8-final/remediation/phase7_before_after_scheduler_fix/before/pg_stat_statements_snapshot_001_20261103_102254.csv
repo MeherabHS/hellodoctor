@@ -1,0 +1,3 @@
+﻿queryid,calls,total_exec_time_ms,mean_exec_time_ms,rows,shared_blks_hit,shared_blks_read,shared_blks_dirtied,shared_blks_written,temp_blks_read,temp_blks_written,blk_read_time_ms,blk_write_time_ms,query
+-6261066899363356102,1,0.10,0.10,0,0,0,0,0,0,0,0.00,0.00,SELECT clock_timestamp()::text,        pid,        COALESCE(state,$1),        COALESCE(wait_event_type,$2),        COALESCE(wait_event,$3),        COALESCE(EXTRACT($4 FROM (clock_timestamp()-query_start)),$5),        REPLACE(LEFT(COALESCE(query,$6),$7), $8, $9) FROM pg_stat_activity WHERE pid<>pg_ba
+-4818329041686550545,1,0.05,0.05,1,1,0,0,0,0,0,0.00,0.00,SELECT xact_commit, xact_rollback, blks_hit, blks_read, temp_files, temp_bytes, deadlocks, conflicts FROM pg_stat_database WHERE datname=$1

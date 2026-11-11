@@ -7,129 +7,136 @@ import 'blog_detail_page.dart';
 import 'blogs_models.dart';
 import 'blogs_repository.dart';
 import 'article_content.dart';
+import 'blog_discovery_controller.dart';
 
-/// Existing Blogs tab, backed by the unified published feed. Search remains a
-/// client-side filter over the loaded page; advanced browsing is deferred.
+/// Existing Blogs tab: bounded server search and stable cursor pagination.
 class BlogsPage extends StatefulWidget {
   const BlogsPage({super.key, required this.repo});
   final BlogsRepository repo;
-
   @override
   State<BlogsPage> createState() => _BlogsPageState();
 }
 
 class _BlogsPageState extends State<BlogsPage> {
-  late Future<List<BlogArticleDto>> _future;
-  String _search = '';
-
+  late final BlogDiscoveryController controller;
+  String? _language;
   @override
   void initState() {
     super.initState();
-    _future = widget.repo.feed();
+    controller = BlogDiscoveryController(widget.repo);
   }
 
-  Future<void> _refresh() async {
-    final next = widget.repo.feed();
-    setState(() => _future = next);
-    await next;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final language = Localizations.localeOf(context).languageCode;
+    if (_language != language) {
+      _language = language;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _language == language) controller.setLanguage(language);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final language = Localizations.localeOf(context).languageCode;
     return Scaffold(
-      backgroundColor: PatientTokens.bg,
-      body: SafeArea(
-        child: Column(children: [
-          const PatientPageHeader('Health articles',
-              'Practical guidance from AfyaMkononi physicians and editors'),
+        backgroundColor: PatientTokens.bg,
+        body: SafeArea(
+            child: Column(children: [
+          PatientPageHeader(l10n.blogsHeading, l10n.blogsSubtitle),
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-              decoration: BoxDecoration(
-                color: PatientTokens.surfaceAlt,
-                borderRadius: BorderRadius.circular(PatientTokens.chipRadius),
-                border: Border.all(color: PatientTokens.border),
-              ),
-              child: Row(children: [
-                const Icon(Icons.search,
-                    color: PatientTokens.textSub, size: 18),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    onChanged: (v) => setState(() => _search = v),
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      isDense: true,
-                      hintText: l10n.blogsSearchHint,
-                    ),
-                  ),
-                ),
-              ]),
-            ),
-          ),
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
+              child: TextField(
+                maxLength: 160,
+                onChanged: controller.search,
+                decoration: InputDecoration(
+                    counterText: '',
+                    prefixIcon: const Icon(Icons.search),
+                    hintText: l10n.blogsSearchHint),
+              )),
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: _refresh,
-              child: FutureBuilder<List<BlogArticleDto>>(
-                future: _future,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return ListView(
-                      padding: const EdgeInsets.all(18),
-                      children: const [
-                        SkeletonBlock(height: 90),
-                        SizedBox(height: 10),
-                        SkeletonBlock(height: 90),
-                      ],
-                    );
-                  }
-                  if (snapshot.hasError) {
-                    return ErrorPanel(l10n.blogsLoadError, onRetry: _refresh);
-                  }
-                  final query = _search.trim().toLowerCase();
-                  final articles = (snapshot.data ?? const [])
-                      .where((a) =>
-                          query.isEmpty ||
-                          a.titleFor(language).toLowerCase().contains(query) ||
-                          a.summaryFor(language).toLowerCase().contains(query))
-                      .toList();
-                  if (articles.isEmpty) {
-                    return ListView(children: const [
-                      EmptyState(
-                          icon: Icons.article_outlined,
-                          title: 'No articles yet',
-                          message:
-                              'Published health guides from AfyaMkononi physicians and editors will appear here.'),
-                    ]);
-                  }
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
-                    children: [
-                      for (final article in articles)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _ArticleTile(
-                            article: article,
-                            repo: widget.repo,
-                            onTap: () =>
-                                Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => BlogDetailPage(
-                                  articleId: article.id, repo: widget.repo),
-                            )),
-                          ),
-                        ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ]),
-      ),
-    );
+              child: AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, _) {
+                    final c = controller;
+                    Widget content;
+                    if (c.loading) {
+                      content = ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(18),
+                          children: const [
+                            SkeletonBlock(height: 90),
+                            SizedBox(height: 10),
+                            SkeletonBlock(height: 90)
+                          ]);
+                    } else if (c.failed) {
+                      content = ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            ErrorPanel(l10n.blogsLoadError, onRetry: c.refresh)
+                          ]);
+                    } else if (c.items.isEmpty) {
+                      content = ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            EmptyState(
+                                icon: Icons.article_outlined,
+                                title: c.query.trim().isEmpty
+                                    ? l10n.blogsEmptyTitle
+                                    : l10n.blogsSearchEmptyTitle,
+                                message: c.query.trim().isEmpty
+                                    ? l10n.blogsEmptyMessage
+                                    : l10n.blogsSearchEmptyMessage)
+                          ]);
+                    } else {
+                      content = ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+                          itemCount: c.items.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index == c.items.length) {
+                              return Column(children: [
+                                if (c.pageFailed)
+                                  InlineError(l10n.blogsPageError,
+                                      onRetry: c.loadMore),
+                                if (c.next != null)
+                                  TextButton(
+                                      key: const ValueKey('blogs-load-more'),
+                                      onPressed:
+                                          c.loadingMore ? null : c.loadMore,
+                                      child: Text(c.loadingMore
+                                          ? l10n.blogsLoadingMore
+                                          : l10n.blogsLoadMore))
+                                else
+                                  Text(l10n.blogsEnd),
+                              ]);
+                            }
+                            final article = c.items[index];
+                            return Padding(
+                                key: ValueKey('blog-${article.id}'),
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _ArticleTile(
+                                    article: article,
+                                    repo: widget.repo,
+                                    onTap: () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                            builder: (_) => BlogDetailPage(
+                                                articleId: article.id,
+                                                repo: widget.repo)))));
+                          });
+                    }
+                    return RefreshIndicator(
+                        onRefresh: c.refresh, child: content);
+                  })),
+        ])));
   }
 }
 
@@ -170,7 +177,7 @@ class _ArticleTile extends StatelessWidget {
             Expanded(
               child: Text(
                   article.isAdmin
-                      ? article.authorName
+                      ? l10n.blogsEditorial
                       : l10n.blogsByAuthor(
                           article.authorName, article.specialty),
                   maxLines: 1,

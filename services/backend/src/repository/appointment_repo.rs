@@ -8,8 +8,8 @@ pub async fn insert<'e, E: PgExecutor<'e>>(
     apt: &Appointment,
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
-        "INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, clinical_outcome, completed_at, created_at, updated_at) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+        "INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, completed_at, created_at, updated_at) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
     )
     .bind(apt.id)
     .bind(&apt.appointment_number)
@@ -19,6 +19,7 @@ pub async fn insert<'e, E: PgExecutor<'e>>(
     .bind(apt.modality)
     .bind(apt.status)
     .bind(&apt.consultation_fee)
+    .bind(apt.payment_policy)
     .bind(&apt.clinical_outcome)
     .bind(apt.completed_at)
     .bind(apt.created_at)
@@ -38,8 +39,8 @@ pub async fn insert_pending_hold<'e, E: PgExecutor<'e>>(
     window_secs: i64,
 ) -> Result<(DateTime<Utc>, DateTime<Utc>), sqlx::Error> {
     sqlx::query_as(
-        "INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, clinical_outcome, completed_at, created_at, updated_at, hold_expires_at) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, clock_timestamp() + make_interval(secs => $13)) \
+        "INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, completed_at, created_at, updated_at, hold_expires_at) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, clock_timestamp() + make_interval(secs => $14)) \
          RETURNING hold_expires_at, clock_timestamp() AS server_time",
     )
     .bind(apt.id)
@@ -50,6 +51,7 @@ pub async fn insert_pending_hold<'e, E: PgExecutor<'e>>(
     .bind(apt.modality)
     .bind(apt.status)
     .bind(&apt.consultation_fee)
+    .bind(apt.payment_policy)
     .bind(&apt.clinical_outcome)
     .bind(apt.completed_at)
     .bind(apt.created_at)
@@ -59,12 +61,45 @@ pub async fn insert_pending_hold<'e, E: PgExecutor<'e>>(
     .await
 }
 
+/// Inserts an appointment that is already `CONFIRMED` with no payment hold
+/// at all — the `FinancialModuleMode::Deferred` counterpart to
+/// `insert_pending_hold`. `hold_expires_at` stays NULL: there is no payment
+/// reservation to expire, so nothing should ever try to reclaim this slot
+/// the way `expire_abandoned_hold_for_slot` reclaims an unpaid
+/// `PENDING_PAYMENT` hold. Uses the database clock for `server_time`, same
+/// as every other authoritative timestamp in this module.
+pub async fn insert_confirmed_no_payment<'e, E: PgExecutor<'e>>(
+    executor: E,
+    apt: &Appointment,
+) -> Result<chrono::DateTime<Utc>, sqlx::Error> {
+    sqlx::query_scalar(
+        "INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, completed_at, created_at, updated_at) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) \
+         RETURNING clock_timestamp()",
+    )
+    .bind(apt.id)
+    .bind(&apt.appointment_number)
+    .bind(apt.patient_id)
+    .bind(apt.doctor_id)
+    .bind(apt.slot_id)
+    .bind(apt.modality)
+    .bind(apt.status)
+    .bind(&apt.consultation_fee)
+    .bind(apt.payment_policy)
+    .bind(&apt.clinical_outcome)
+    .bind(apt.completed_at)
+    .bind(apt.created_at)
+    .bind(apt.updated_at)
+    .fetch_one(executor)
+    .await
+}
+
 pub async fn find_by_id<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
 ) -> Result<Option<Appointment>, sqlx::Error> {
     sqlx::query_as::<_, Appointment>(
-        "SELECT id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, clinical_outcome, completed_at, created_at, updated_at \
+        "SELECT id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, completed_at, created_at, updated_at \
          FROM appointments WHERE id = $1",
     )
     .bind(id)
@@ -118,7 +153,7 @@ pub async fn intake_upload_allowed<'e, E: PgExecutor<'e>>(
 
 pub async fn list_all<'e, E: PgExecutor<'e>>(executor: E) -> Result<Vec<Appointment>, sqlx::Error> {
     sqlx::query_as::<_, Appointment>(
-        "SELECT id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, clinical_outcome, completed_at, created_at, updated_at \
+        "SELECT id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, completed_at, created_at, updated_at \
          FROM appointments ORDER BY created_at DESC",
     )
     .fetch_all(executor)
@@ -140,7 +175,7 @@ pub async fn find_by_ids<'e, E: PgExecutor<'e>>(
         return Ok(Vec::new());
     }
     sqlx::query_as::<_, Appointment>(
-        "SELECT id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, clinical_outcome, completed_at, created_at, updated_at \
+        "SELECT id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, completed_at, created_at, updated_at \
          FROM appointments WHERE id = ANY($1)",
     )
     .bind(ids)
@@ -269,6 +304,11 @@ async fn expire_locked_hold(
     .bind(slot_id)
     .execute(&mut **tx)
     .await?;
+    // Only a new, explicitly unsubmitted checkout may be retired. Historical
+    // UNKNOWN rows and provider-started/captured obligations remain unresolved.
+    // The appointment row lock serializes this against authoritative callbacks.
+    sqlx::query("WITH disposed AS (UPDATE transactions t SET payment_status='FAILED' WHERE appointment_id=$1 AND payment_status='INITIATED' AND provider_request_state='NOT_STARTED' AND gateway_reference IS NULL AND NOT EXISTS(SELECT 1 FROM payment_events e WHERE e.transaction_id=t.id) RETURNING id) INSERT INTO audit_events(id,actor_role,action,resource_type,resource_id,result,after_data) SELECT gen_random_uuid(),current_setting('app.current_role')::user_role_enum,'UNPAID_CHECKOUT_EXPIRED','TRANSACTION',id,'SUCCESS',jsonb_build_object('payment_status','FAILED','reason_code','EXPIRED_UNSUBMITTED') FROM disposed")
+        .bind(appointment_id).execute(&mut **tx).await?;
     Ok(true)
 }
 

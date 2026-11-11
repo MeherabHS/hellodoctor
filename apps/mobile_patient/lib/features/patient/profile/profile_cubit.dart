@@ -62,8 +62,9 @@ class ProfileState {
         photoBytes: identical(photoBytes, _unset)
             ? this.photoBytes
             : photoBytes as Uint8List?,
-        photoError:
-            identical(photoError, _unset) ? this.photoError : photoError as String?,
+        photoError: identical(photoError, _unset)
+            ? this.photoError
+            : photoError as String?,
       );
 }
 

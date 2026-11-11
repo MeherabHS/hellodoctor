@@ -3,11 +3,8 @@ import '../../../core/network/client_error_reporter.dart';
 import 'blogs_models.dart';
 import 'quiz_repository.dart';
 
-/// Backs `GET /articles` and `GET /articles/:id` — fully real today, no
-/// backend gap (plan confirms this directly). Plain repository, no cubit:
-/// this is a single fetch-then-browse screen with no cross-screen state to
-/// own, matching the plan's own "Blogs ... single-fetch ... no cubit needed"
-/// architecture note.
+/// Published articles, authenticated covers, and bounded server discovery.
+/// The legacy feed method remains available to existing callers.
 class BlogsRepository {
   BlogsRepository(this.api, {ArticleQuizRepository? quizzes})
       : quizzes = quizzes ?? ArticleQuizRepository(api);
@@ -56,6 +53,37 @@ class BlogsRepository {
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'Blogs', operation: 'load_detail');
+      rethrow;
+    }
+  }
+
+  Future<BlogPage> discover(
+      {String search = '',
+      String language = 'en',
+      BlogCursor? cursor,
+      int limit = 20}) async {
+    try {
+      final response = await api.get('/articles', query: {
+        'limit': limit,
+        'search': search.trim(),
+        'language': language,
+        if (cursor != null) 'before_time': cursor.time,
+        if (cursor != null) 'before_id': cursor.id,
+      });
+      final body = response.data;
+      final rows = _listData(_data(response))
+          .map((e) =>
+              BlogArticleDto.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
+      final rawCursor = body is Map ? body['next_cursor'] : null;
+      return BlogPage(
+          rows,
+          rawCursor is Map
+              ? BlogCursor.fromJson(Map<String, dynamic>.from(rawCursor))
+              : null);
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Blogs', operation: 'discover');
       rethrow;
     }
   }

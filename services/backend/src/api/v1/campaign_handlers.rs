@@ -396,9 +396,9 @@ pub async fn resume(
 /// Cancels a campaign at any non-terminal stage, including mid-flight. A
 /// single notification already handed to the FCM provider (`SENT_TO_PROVIDER`)
 /// is never touched — this schema makes no claim that an accepted FCM message
-/// can be recalled — but every not-yet-sent or still-retrying row for this
-/// campaign is deleted outright, via the narrowly scoped
-/// `notifications_admin_cancel_campaign_delete` RLS policy (only rows linked
+/// can be recalled — but never-attempted rows are removed and attempted pending rows are
+/// terminally suppressed with claim fencing, via the narrowly scoped
+/// campaign-cancellation UPDATE/DELETE RLS policies (only rows linked
 /// to a campaign that is *already* CANCELLED), so the dispatch/delivery
 /// passes can never pick them up again.
 pub async fn cancel(
@@ -421,13 +421,7 @@ pub async fn cancel(
     .rows_affected()
         == 1;
     if changed {
-        sqlx::query(
-            "DELETE FROM notifications WHERE related_entity_type='CAMPAIGN' AND related_entity_id=$1 \
-             AND NOT (delivery_status='SENT_TO_PROVIDER' OR (delivery_status='FAILED' AND next_delivery_at IS NULL))",
-        )
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+        crate::repository::notification_repo::cancel_campaign_deliveries(&mut tx, id).await?;
     }
     finish_mutation(tx, &ctx, id, changed, "CAMPAIGN_CANCEL").await
 }
@@ -459,6 +453,10 @@ pub async fn stats(
         "deferred_by_preference_or_quiet_hours": delivery.deferred_by_preference_or_quiet_hours,
         "retry_pending": delivery.retry_pending,
         "permanently_failed": delivery.permanently_failed,
+        "suppressed": delivery.suppressed,
+        "deferred": delivery.deferred,
+        "processing": delivery.processing,
+        "uncertain": delivery.uncertain,
         "sending_started_at": campaign.sending_started_at,
         "completed_at": campaign.completed_at,
         "cancelled_at": campaign.cancelled_at,

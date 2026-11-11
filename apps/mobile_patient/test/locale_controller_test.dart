@@ -51,13 +51,15 @@ void main() {
     expect(swahili.postConsultHeader, isNot(english.postConsultHeader));
   });
 
-  test('Milestone 3 notification-settings labels are translated in both locales',
+  test(
+      'Milestone 3 notification-settings labels are translated in both locales',
       () {
     final english = lookupAppLocalizations(const Locale('en'));
     final swahili = lookupAppLocalizations(const Locale('sw'));
     expect(english.notificationSettingsPageTitle, 'Notification settings');
     expect(swahili.notificationSettingsPageTitle, 'Mipangilio ya arifa');
-    expect(swahili.notificationSettingsQuietHoursTitle, isNot(english.notificationSettingsQuietHoursTitle));
+    expect(swahili.notificationSettingsQuietHoursTitle,
+        isNot(english.notificationSettingsQuietHoursTitle));
   });
 
   test('setLocale calls the bound backend-sync hook with the new language code',

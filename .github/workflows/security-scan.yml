@@ -43,7 +43,50 @@ jobs:
         # not part of the actual compiled dependency graph. Verified
         # 2026-10-04; re-check if sqlx's `mysql` feature is ever enabled, or
         # if a fixed `rsa` release ships.
-        run: cargo audit --deny warnings --ignore RUSTSEC-2023-0071
+        #
+        # RUSTSEC-2026-0459 (libsqlite3-sys via C SQLite CVE-2026-119375) is
+        # ignored for the same reason and verified the same way: it reaches
+        # Cargo.lock only via sqlx's optional `sqlite` feature (sqlx-sqlite ->
+        # libsqlite3-sys), which this backend does not enable (Cargo.toml only
+        # enables `postgres`; this is a PostgreSQL-only backend per
+        # CLAUDE.md §1.3). Confirmed via `cargo tree -i libsqlite3-sys`
+        # (and again with `--all-features`) returning zero matches — no
+        # SQLite code is compiled into this binary, so there is no actual
+        # exploitable surface here. sqlx-sqlite 0.8.6 itself pins
+        # `libsqlite3-sys = "^0.30.1"`, which caps below the fixed 0.39.0 —
+        # `cargo update -p libsqlite3-sys --precise 0.39.0` fails for exactly
+        # this reason, confirming no newer compatible version can be locked
+        # without an upstream sqlx-sqlite release even if we wanted one.
+        # Verified 2026-11-11; re-check if sqlx's `sqlite` feature is ever
+        # enabled, or once a sqlx-sqlite release ships that itself requires a
+        # patched `libsqlite3-sys`.
+        run: cargo audit --deny warnings --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0459
+
+  flutter-dependency-audit:
+    name: Flutter dependency vulnerability scan (OSV-Scanner)
+    permissions:
+      contents: read
+    # Scans the two committed Flutter pubspec.lock files (apps/mobile — the
+    # Doctor app — and apps/mobile_patient — the Patient app) against the OSV
+    # database. OSV-Scanner natively parses pubspec.lock for the Pub
+    # ecosystem (verified locally: `osv-scanner --lockfile=apps/mobile/pubspec.lock
+    # --lockfile=apps/mobile_patient/pubspec.lock` correctly enumerated 156
+    # and 157 packages respectively). `--recursive ./` is deliberately not
+    # used: the Rust lockfile is already covered by cargo-audit above, and a
+    # repo-wide scan would also pick up Node lockfiles with no established
+    # triage policy here. upload-sarif is off because this repo has not
+    # enabled GitHub code scanning; fail-on-vuln is on so an actionable
+    # advisory fails this job the same way cargo-audit fails on one. A
+    # confirmed, currently-unfixable advisory would be excluded the same way
+    # RUSTSEC-2023-0071 is above: with a dated, linked comment, not a silent
+    # suppression.
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+    with:
+      upload-sarif: false
+      fail-on-vuln: true
+      scan-args: |-
+        --lockfile=apps/mobile/pubspec.lock
+        --lockfile=apps/mobile_patient/pubspec.lock
 
   secret-scan:
     name: Secret scanning (git history + working tree)

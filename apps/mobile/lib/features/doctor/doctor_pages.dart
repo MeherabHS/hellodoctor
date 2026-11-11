@@ -2,6 +2,7 @@ import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'dart:math';
 import 'dart:typed_data';
 import 'clinical_image_viewer.dart';
+import 'clinical_pdf_viewer.dart';
 import 'clinical_message_bubble.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -10,7 +11,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/screen_refresh.dart';
 import '../../core/theme/tokens.dart';
@@ -23,6 +23,7 @@ import '../notifications/notification_center_page.dart';
 import '../notifications/notification_cubit.dart';
 import 'doctor_cubit.dart';
 import 'doctor_models.dart';
+import 'doctor_repository.dart';
 import 'agora_page.dart';
 import 'articles_page.dart';
 import '../../core/video/call_screen_guard.dart';
@@ -318,8 +319,10 @@ class _EncounterHistoryState extends State<EncounterHistoryPage> {
                       child: Text('Clinical attachments and prescriptions')),
                   if (documents.isEmpty)
                     const Text('No clinical documents recorded.'),
-                  ...documents.map((id) => DocumentButton(
-                      appointmentId: widget.appointment.id, documentId: id)),
+                  ...documents.map((doc) => DocumentButton(
+                      appointmentId: widget.appointment.id,
+                      documentId: doc.id,
+                      mimeType: doc.mimeType)),
                 ]);
               })));
 }
@@ -559,9 +562,11 @@ class AppointmentCard extends StatelessWidget {
                               fontWeight: FontWeight.w800)),
                       Text(
                           a.isWaitingForReconnect
-                              ? (a.patientPresent == false && a.doctorPresent == true
+                              ? (a.patientPresent == false &&
+                                      a.doctorPresent == true
                                   ? 'The patient is reconnecting. You can rejoin now.'
-                                  : a.patientPresent == true && a.doctorPresent == false
+                                  : a.patientPresent == true &&
+                                          a.doctorPresent == false
                                       ? 'You are disconnected. Rejoin to continue the consultation.'
                                       : 'The room is empty. Either participant can rejoin now.')
                               : 'The consultation is still active.',
@@ -572,7 +577,7 @@ class AppointmentCard extends StatelessWidget {
                     style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFF16A34A)),
                     onPressed: () => _callScreenGuard.push(
-                        c, (_) => ConsultationPage(appointment: a)),
+                        c, (_) => AgoraPage(appointmentId: a.id)),
                     child: const Text('Rejoin'))
               ])),
         Row(children: [
@@ -668,7 +673,7 @@ class _ConsultationActionsState extends State<ConsultationActions> {
                 : a.isChat
                     ? openChat
                     : () => _callScreenGuard.push(
-                        context, (_) => ConsultationPage(appointment: a)),
+                        context, (_) => AgoraPage(appointmentId: a.id)),
             icon:
                 Icon(a.isChat ? Icons.chat_outlined : Icons.videocam_outlined),
             label: Text(busy ? 'Opening consultation...' : a.startLabel,
@@ -1411,6 +1416,47 @@ String _money(String currency, String? value) {
       _ => (status, DoctorTokens.surfaceSubtle, DoctorTokens.textSub),
     };
 
+/// Replaces the real Earnings & Wallet UI whenever the server-authoritative
+/// `GET /config/booking-policy` reports the financial module as deferred
+/// (`FINANCIAL_MODULE_MODE=deferred`) — see `DoctorState.paymentRequired`.
+/// A standalone widget, rather than inline in [_WalletState.build], so it
+/// can be pumped and tested directly without pulling in `WalletPage`'s own
+/// real `initState` network calls (`repo.ledger()`, etc.).
+class DeferredWalletNotice extends StatelessWidget {
+  const DeferredWalletNotice({super.key, this.actions = const []});
+  final List<Widget> actions;
+  @override
+  Widget build(BuildContext context) => SafeArea(
+      bottom: false,
+      child: Scaffold(
+          backgroundColor: DoctorTokens.bg,
+          body: Column(children: [
+            DoctorPageHeader(
+                'Doctor Earnings & Wallet', 'Financial module not yet active',
+                actions: actions),
+            const Expanded(
+                child: Center(
+                    child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.info_outline,
+                              color: DoctorTokens.textSub, size: 34),
+                          SizedBox(height: 10),
+                          Text(
+                              'Payment collection is not yet active for this launch.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          SizedBox(height: 6),
+                          Text(
+                              'Consultations are proceeding without charge. Earnings and payouts will appear here once the financial module is enabled.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 13, color: DoctorTokens.textSub)),
+                        ])))),
+          ])));
+}
+
 class WalletPage extends StatefulWidget {
   const WalletPage({super.key});
   @override
@@ -1575,6 +1621,9 @@ class _WalletState extends State<WalletPage> {
   @override
   Widget build(BuildContext c) {
     final state = c.watch<DoctorCubit>().state;
+    if (!state.paymentRequired) {
+      return DeferredWalletNotice(actions: _notificationBellActions(c));
+    }
     final w = state.wallet as WalletDto?;
     final currency = w?.currency ?? 'KES';
     // No AppBar here, so without this the custom DoctorPageHeader below
@@ -3166,10 +3215,8 @@ class _ChatTopBar extends StatelessWidget {
                         chat.appointmentId == null ||
                         chat.isClosed
                     ? null
-                    : () => _callScreenGuard.push(
-                        c,
-                        (_) => AgoraPage(
-                            appointmentId: chat.appointmentId!))),
+                    : () => _callScreenGuard.push(c,
+                        (_) => AgoraPage(appointmentId: chat.appointmentId!))),
           const SizedBox(width: 6),
           if (!chat.isClosed)
             _ChatIconBtn(
@@ -4583,11 +4630,12 @@ Future<void> openHistoryDetail(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                     Text(const JsonEncoder.withIndent('  ').convert(detail)),
-                    for (final documentId in documents)
+                    for (final doc in documents)
                       DocumentButton(
                           appointmentId: historicalAppointment,
                           currentAppointmentId: appointment,
-                          documentId: documentId)
+                          documentId: doc.id,
+                          mimeType: doc.mimeType)
                   ]))));
     }
   } catch (e) {
@@ -4620,14 +4668,28 @@ String? findDocumentId(dynamic value) {
   return null;
 }
 
-List<String> findDocumentIds(dynamic value) {
-  final ids = <String>{};
+/// A clinical document's id paired with its backend-declared mime type
+/// (Remediation E2) — carried through so [DocumentButton] can route to a
+/// safe in-app viewer instead of an external application, the same way the
+/// Patient app's Health Vault already routes on its own declared `mimeType`.
+class DocumentRef {
+  const DocumentRef(this.id, this.mimeType);
+  final String id;
+  final String? mimeType;
+}
+
+List<DocumentRef> findDocumentIds(dynamic value) {
+  final seen = <String>{};
+  final refs = <DocumentRef>[];
   void visit(dynamic node) {
     if (node is Map) {
       if (node['id'] != null &&
           node['is_no_rx_required'] != true &&
           (node['mime_type'] != null || node['security_status'] != null)) {
-        ids.add(node['id'].toString());
+        final id = node['id'].toString();
+        if (seen.add(id)) {
+          refs.add(DocumentRef(id, node['mime_type']?.toString()));
+        }
       }
       for (final child in node.values) {
         visit(child);
@@ -4640,7 +4702,7 @@ List<String> findDocumentIds(dynamic value) {
   }
 
   visit(value);
-  return ids.toList();
+  return refs;
 }
 
 class DocumentButton extends StatefulWidget {
@@ -4648,15 +4710,43 @@ class DocumentButton extends StatefulWidget {
       {super.key,
       required this.appointmentId,
       required this.documentId,
-      this.currentAppointmentId});
+      this.currentAppointmentId,
+      this.mimeType});
   final String appointmentId, documentId;
   final String? currentAppointmentId;
+
+  /// The backend-declared mime type for this document (Remediation E2).
+  /// `null` means the backend did not report one — the safe default is to
+  /// refuse to preview rather than guess or fall back to an external
+  /// application.
+  final String? mimeType;
   @override
   State<DocumentButton> createState() => _DocumentButtonState();
 }
 
 class _DocumentButtonState extends State<DocumentButton> {
   bool busy = false;
+
+  /// Fetches the document's bytes and cross-checks the server's own
+  /// authoritative `Content-Type` response header against the mime type
+  /// declared in the document listing. A mismatch means the listing and the
+  /// actual stored object disagree about what this file is — refuse to
+  /// render either way rather than trusting either source alone
+  /// (Remediation E2's "MIME-type validation before choosing a renderer").
+  Future<Uint8List> _loadVerifiedBytes(DoctorRepository repo) async {
+    final result = await repo.fetchDocumentBytes(
+        widget.appointmentId, widget.documentId,
+        currentAppointmentId: widget.currentAppointmentId);
+    final declared = widget.mimeType;
+    if (declared != null &&
+        result.contentType != null &&
+        declared.toLowerCase() != result.contentType) {
+      throw const ApiException(
+          409, 'This document could not be verified and was not opened.');
+    }
+    return result.bytes;
+  }
+
   @override
   Widget build(BuildContext c) => TextButton.icon(
       onPressed: busy
@@ -4664,17 +4754,27 @@ class _DocumentButtonState extends State<DocumentButton> {
           : () async {
               setState(() => busy = true);
               try {
-                final url = await c.read<DoctorCubit>().repo.documentUrl(
-                    widget.appointmentId, widget.documentId,
-                    currentAppointmentId: widget.currentAppointmentId);
-                if (url.isEmpty) {
-                  throw const ApiException(
-                      404, 'This document is unavailable.');
-                }
-                final ok = await launchUrl(Uri.parse(url),
-                    mode: LaunchMode.externalApplication);
-                if (!ok && mounted) {
-                  showMessage(context, 'The document could not be opened.');
+                final repo = c.read<DoctorCubit>().repo;
+                final mime = widget.mimeType?.toLowerCase();
+                if (mime == 'image/jpeg' || mime == 'image/png') {
+                  if (c.mounted) {
+                    await Navigator.push(
+                        c,
+                        MaterialPageRoute(
+                            builder: (_) => ClinicalImageViewer(
+                                load: () => _loadVerifiedBytes(repo))));
+                  }
+                } else if (mime == 'application/pdf') {
+                  if (c.mounted) {
+                    await Navigator.push(
+                        c,
+                        MaterialPageRoute(
+                            builder: (_) => ClinicalPdfViewer(
+                                load: () => _loadVerifiedBytes(repo))));
+                  }
+                } else if (mounted) {
+                  showMessage(
+                      c, 'This document type cannot be previewed in the app.');
                 }
               } catch (e) {
                 if (mounted) showError(context, e);

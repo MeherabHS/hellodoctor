@@ -96,7 +96,35 @@ button:disabled,[aria-disabled="true"] { cursor: not-allowed; opacity: .55; }
 .web-notification-panel { display: flex; flex-direction: column; gap: 14px; }
 .web-notification-card { padding: 14px; border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; gap: 8px; }
 .web-notification-card.unread { background: var(--primary-light); border-color: #10B981; }
-.web-state-spinner { display: inline-block; width: 24px; height: 24px; margin: 0; border-width: 2px; }
+/*
+ * Self-contained on purpose: this used to be layered on top of
+ * prototype.css's .loading-spinner-ring (44px box, 3.5px border, no
+ * `display`), relying on web.css loading after prototype.css for its own
+ * 24px/2px overrides to win. Next.js does not guarantee that cross-file
+ * global-CSS cascade order stays stable across every route/chunk
+ * (https://nextjs.org/docs/messages/css-import-order), so on some pages
+ * prototype.css's rule won outright — and since it never set `display`,
+ * the <span> fell back to its default inline display, under which a
+ * non-replaced inline element's `width`/`height` are simply ignored by the
+ * browser. The box then sized itself to content (none) plus a 3.5px
+ * border, box-sizing it tall and pencil-thin instead of circular: the
+ * reported "vertically stretched" spinner. Every box-model property this
+ * element needs now lives in this one rule so no cascade-order dependency
+ * between files can break it again.
+ */
+.web-state-spinner {
+  display: inline-block;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  aspect-ratio: 1 / 1;
+  margin: 0;
+  border: 2px solid #E2E8F0;
+  border-top-color: #059669;
+  border-radius: 50%;
+  animation: spinRing 0.8s linear infinite;
+}
 @media (prefers-reduced-motion: reduce) { .web-state-spinner { animation: none; } }
 .web-section-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
 .web-section-body label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; }
