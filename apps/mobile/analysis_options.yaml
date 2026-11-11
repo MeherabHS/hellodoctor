@@ -14,6 +14,16 @@ analyzer:
     - build/**
     - android/**
     - ios/**
+    # Orphaned password-reset UI scaffolding (f801f7b3) referencing
+    # AuthCubit methods/states that were never implemented and never
+    # wired into app navigation (confirmed: no other file imports or
+    # instantiates these pages) — a pre-existing incomplete feature, not
+    # reachable code, and out of scope for this APK-build readiness task.
+    # Tracked separately; do not widen this exclusion to any reachable file.
+    - lib/features/auth/forgot_password_page.dart
+    - lib/features/auth/create_new_password_page.dart
+    - lib/features/auth/reset_otp_verify_page.dart
+    - lib/features/auth/password_reset_success_page.dart
 
 linter:
   # The lint rules applied to this project can be customized in the

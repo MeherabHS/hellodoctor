@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import { BotChallenge } from '@/components/BotChallenge';
 
 // Deployed Admin login requires a browser challenge and password, followed by
-// an emailed OTP — the same two-step shape as Doctor/Patient login. The
-// mandatory authenticator (TOTP) second factor was removed; see
-// docs/AUTH_SECURITY.md §2.4. Tokens stay in the BFF.
+// an emailed one-time verification code. Admin, Doctor and Patient share this
+// same single-factor-OTP MFA shape; there is no authenticator-app factor.
+// Tokens stay in the BFF.
 export default function AdminLoginPage() {
   const router = useRouter();
   const [step, setStep] = useState<'credentials' | 'code'>('credentials');
@@ -152,7 +152,7 @@ export default function AdminLoginPage() {
 
             <div>
               <p className="text-sm text-slate-700">
-                We emailed a verification code to <span className="font-medium">{email}</span>. Enter it below to finish signing in.
+                We emailed a verification code to <span className="font-medium">{email}</span>.
               </p>
               {debugCode && (
                 <p className="mt-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2">

@@ -40,6 +40,8 @@ use uuid::Uuid;
 
 #[path = "cases/admin_articles.rs"]
 mod admin_articles;
+#[path = "cases/admin_bootstrap.rs"]
+mod admin_bootstrap;
 #[path = "cases/admin_campaigns.rs"]
 mod admin_campaigns;
 #[path = "cases/admin_query_g20_investigation.rs"]
@@ -6110,6 +6112,12 @@ async fn test_identity_concurrent_http_requests_no_cross_user_pool_bleed(pool: P
                      identity-leak this test exists to catch"
                 );
             }
+        }
+        // Keep the 4-request concurrency shape while allowing the normal lane's
+        // 100-token burst budget to replenish between batches. Admission shedding
+        // remains covered by the dedicated capacity tests.
+        if batch_start + BATCH_SIZE < 128 {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
     }
     assert_eq!(
@@ -13927,6 +13935,10 @@ async fn test_security_idempotency_upload_rechecks_ownership_and_clinical_window
     .execute(&pool)
     .await
     .unwrap();
+    // This is the ninth upload-lane request in the fixture. Let the
+    // eight-token burst budget replenish before asserting the clinical-window
+    // rejection; upload shedding is tested separately.
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     assert_eq!(
         post_idem(&app, &uri, Some(&doctor), &payload, &key)
             .await
@@ -14309,16 +14321,24 @@ async fn test_security_patient_otp_concurrent_consumption_issues_one_session(poo
             second
         };
         let data = json_body(winner).await["data"].clone();
-        assert_eq!(
-            get(
-                &app,
-                "/api/v1/doctors",
-                Some(data["access_token"].as_str().unwrap())
-            )
-            .await
-            .status(),
-            StatusCode::OK
-        );
+        let access_token = data["access_token"].as_str().unwrap();
+        let mut doctors_status = StatusCode::SERVICE_UNAVAILABLE;
+        for _ in 0..3 {
+            let response = get(&app, "/api/v1/doctors", Some(access_token)).await;
+            doctors_status = response.status();
+            if doctors_status != StatusCode::SERVICE_UNAVAILABLE {
+                break;
+            }
+            let retry_after = response
+                .headers()
+                .get("retry-after")
+                .and_then(|value| value.to_str().ok())
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(1)
+                .min(5);
+            tokio::time::sleep(std::time::Duration::from_secs(retry_after)).await;
+        }
+        assert_eq!(doctors_status, StatusCode::OK);
         let counts: (i64, i64) = sqlx::query_as("SELECT (SELECT COUNT(*) FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE u.phone_number=$1),(SELECT COUNT(*) FROM patient_profiles p JOIN users u ON u.id=p.user_id WHERE u.phone_number=$1)")
             .bind(phone).fetch_one(&pool).await.unwrap();
         assert_eq!(counts, (initial_sessions + 1, 1));
