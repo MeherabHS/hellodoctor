@@ -41,8 +41,14 @@ pub async fn list_doctors(
             ));
         }
     }
-    let list = sqlx::query_as::<_, doctor_repo::PublicDoctorProfile>("SELECT * FROM doctor_public_directory WHERE professional_verification_status='VERIFIED' AND ($1::text IS NULL OR ($1='VIDEO' AND consultation_fee_video > 0) OR ($1='CHAT' AND consultation_fee_chat > 0)) AND ($2::text IS NULL OR lower(primary_specialty)=lower($2)) AND ($3::text IS NULL OR full_name ILIKE '%' || $3 || '%' OR current_hospital ILIKE '%' || $3 || '%') ORDER BY full_name")
-        .bind(query.modality).bind(query.specialty).bind(query.search).fetch_all(&state.db).await?;
+    // FINANCIAL_MODULE_MODE=deferred: no fee is ever charged, so an unpriced
+    // (fee = 0) doctor must still be discoverable and bookable for VIDEO —
+    // the backend's deferred booking path (`book_appointment_deferred`)
+    // already accepts fee = 0. CHAT keeps its fee-based offering signal
+    // because the chat booking flow is payment-specific.
+    let fee_not_required = state.config.financial_module_deferred();
+    let list = sqlx::query_as::<_, doctor_repo::PublicDoctorProfile>("SELECT * FROM doctor_public_directory WHERE professional_verification_status='VERIFIED' AND ($1::text IS NULL OR ($1='VIDEO' AND ($4::bool OR consultation_fee_video > 0)) OR ($1='CHAT' AND consultation_fee_chat > 0)) AND ($2::text IS NULL OR lower(primary_specialty)=lower($2)) AND ($3::text IS NULL OR full_name ILIKE '%' || $3 || '%' OR current_hospital ILIKE '%' || $3 || '%') ORDER BY full_name")
+        .bind(query.modality).bind(query.specialty).bind(query.search).bind(fee_not_required).fetch_all(&state.db).await?;
 
     Ok(Json(ApiResponse {
         success: true,
