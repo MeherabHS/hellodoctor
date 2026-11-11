@@ -84,8 +84,8 @@ class AppointmentSummaryDto {
         doctorDisplayName: patientDoctorName(_textOf(j['doctor_display_name'])),
         primarySpecialty: _textOf(j['primary_specialty']),
         hasPhoto: j['profile_picture_size_bytes'] != null,
-        photoUpdatedAt: DateTime.tryParse(
-            _textOf(j['profile_picture_updated_at'], '')),
+        photoUpdatedAt:
+            DateTime.tryParse(_textOf(j['profile_picture_updated_at'], '')),
         modality: _textOf(j['modality']),
         status: _textOf(j['status']),
         fee: _optionalText(j['consultation_fee']),

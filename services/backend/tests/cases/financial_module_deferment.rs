@@ -116,9 +116,21 @@ async fn test_deferred_booking_still_rejects_double_booking_the_same_slot(pool: 
         "slot_id": slot_id,
         "modality": "VIDEO",
     });
-    let first = post(&app, "/api/v1/appointments/book", Some(&patient_token), &payload).await;
+    let first = post(
+        &app,
+        "/api/v1/appointments/book",
+        Some(&patient_token),
+        &payload,
+    )
+    .await;
     assert_eq!(first.status(), StatusCode::CREATED);
-    let second = post(&app, "/api/v1/appointments/book", Some(&patient_token), &payload).await;
+    let second = post(
+        &app,
+        "/api/v1/appointments/book",
+        Some(&patient_token),
+        &payload,
+    )
+    .await;
     assert_eq!(second.status(), StatusCode::CONFLICT);
 }
 

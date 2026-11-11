@@ -45,7 +45,8 @@ class RegistrationSubmitted extends AuthState {
 /// backend never reveals whether [email] actually has an eligible account;
 /// the UI must show the same "check your email" screen either way.
 class PasswordResetOtpSent extends AuthState {
-  const PasswordResetOtpSent({required this.email, required this.expiresInSeconds});
+  const PasswordResetOtpSent(
+      {required this.email, required this.expiresInSeconds});
   final String email;
   final int expiresInSeconds;
 }
@@ -292,7 +293,8 @@ class AuthCubit extends Cubit<AuthState> {
     } on ApiException catch (e) {
       emit(AuthFailure(e.userMessage));
     } catch (_) {
-      emit(const AuthFailure('Unable to request a password reset. Please retry.'));
+      emit(const AuthFailure(
+          'Unable to request a password reset. Please retry.'));
     } finally {
       _busy = false;
     }
@@ -337,7 +339,9 @@ class AuthCubit extends Cubit<AuthState> {
       emit(const PasswordResetCompleted());
     } on ApiException catch (e) {
       emit(AuthFailure(e.status == 422
-          ? e.message.isNotEmpty ? e.message : 'Choose a stronger password.'
+          ? e.message.isNotEmpty
+              ? e.message
+              : 'Choose a stronger password.'
           : e.userMessage));
     } catch (_) {
       emit(const AuthFailure('Unable to reset the password. Please retry.'));

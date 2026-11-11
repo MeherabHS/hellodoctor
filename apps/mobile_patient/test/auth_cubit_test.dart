@@ -46,7 +46,8 @@ class FakeAuthRepository extends AuthRepository {
     required String resetAuthorization,
     required String newPassword,
   }) async {
-    lastResetCompleted = (authorization: resetAuthorization, password: newPassword);
+    lastResetCompleted =
+        (authorization: resetAuthorization, password: newPassword);
     if (resetCompleteError != null) throw resetCompleteError!;
   }
 
@@ -170,27 +171,32 @@ void main() {
   });
 
   group('Phase 2: password reset', () {
-    test('requestPasswordReset normalizes the email and emits PasswordResetOtpSent',
+    test(
+        'requestPasswordReset normalizes the email and emits PasswordResetOtpSent',
         () async {
       await cubit.requestPasswordReset(' Someone@Example.COM ');
       expect(repo.lastResetRequestedEmail, 'someone@example.com');
       expect(cubit.state, isA<PasswordResetOtpSent>());
-      expect((cubit.state as PasswordResetOtpSent).email, 'someone@example.com');
+      expect(
+          (cubit.state as PasswordResetOtpSent).email, 'someone@example.com');
     });
 
-    test('requestPasswordReset rejects a malformed email without a network call',
+    test(
+        'requestPasswordReset rejects a malformed email without a network call',
         () async {
       await cubit.requestPasswordReset('not-an-email');
       expect(cubit.state, isA<AuthFailure>());
       expect(repo.lastResetRequestedEmail, isNull);
     });
 
-    test('verifyPasswordResetOtp does nothing without a prior request', () async {
+    test('verifyPasswordResetOtp does nothing without a prior request',
+        () async {
       await cubit.verifyPasswordResetOtp('123456');
       expect(repo.lastResetVerified, isNull);
     });
 
-    test('verifyPasswordResetOtp transitions to PasswordResetVerified on success',
+    test(
+        'verifyPasswordResetOtp transitions to PasswordResetVerified on success',
         () async {
       repo.resetVerifyResult = const ResetAuthorizationResult(
           resetAuthorization: 'auth-secret', expiresInSeconds: 600);
@@ -207,7 +213,8 @@ void main() {
       expect(repo.lastResetCompleted, isNull);
     });
 
-    test('completePasswordReset sends the held authorization, never the OTP, '
+    test(
+        'completePasswordReset sends the held authorization, never the OTP, '
         'and transitions to PasswordResetCompleted', () async {
       repo.resetVerifyResult = const ResetAuthorizationResult(
           resetAuthorization: 'auth-secret', expiresInSeconds: 600);
@@ -222,7 +229,8 @@ void main() {
     test('a weak-password rejection surfaces as AuthFailure', () async {
       repo.resetVerifyResult = const ResetAuthorizationResult(
           resetAuthorization: 'auth-secret', expiresInSeconds: 600);
-      repo.resetCompleteError = const ApiException(422, 'Choose a stronger password.');
+      repo.resetCompleteError =
+          const ApiException(422, 'Choose a stronger password.');
       await cubit.requestPasswordReset('someone@example.com');
       await cubit.verifyPasswordResetOtp('482913');
       await cubit.completePasswordReset('weak');

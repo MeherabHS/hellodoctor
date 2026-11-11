@@ -49,13 +49,15 @@ void main() {
     }
   });
 
-  test('an unrecognized future document type is rejected by default '
+  test(
+      'an unrecognized future document type is rejected by default '
       '(allow-list, not exclude-list)', () {
     expect(isDoctorApplicableDocumentType('SOME_NEW_PATIENT_FEATURE_CONSENT'),
         isFalse);
   });
 
-  test('the real 9-type production response reduces to exactly 5 '
+  test(
+      'the real 9-type production response reduces to exactly 5 '
       'Doctor-applicable types', () {
     final applicable =
         _nineProductionDocumentTypes.where(isDoctorApplicableDocumentType);

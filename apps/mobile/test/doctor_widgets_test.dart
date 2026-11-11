@@ -585,14 +585,11 @@ void main() {
       'deferred financial module notice replaces earnings UI with no fabricated data',
       (tester) async {
     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-    await tester.pumpWidget(
-        const MaterialApp(home: DeferredWalletNotice()));
+    await tester.pumpWidget(const MaterialApp(home: DeferredWalletNotice()));
     await tester.pumpAndSettle();
 
     expect(find.text('Financial module not yet active'), findsOneWidget);
-    expect(
-        find.text(
-            'Payment collection is not yet active for this launch.'),
+    expect(find.text('Payment collection is not yet active for this launch.'),
         findsOneWidget);
     expect(find.textContaining('Consultations are proceeding without charge'),
         findsOneWidget);

@@ -167,7 +167,8 @@ class _PatientChatPageState extends State<PatientChatPage> {
                 appointmentId: widget.conversation.appointmentId,
                 closed: locked,
                 grievanceRepo: GrievanceRepository(widget.repo.api)),
-            _ExpiryBar(expiresAt: widget.conversation.expiresAt, closed: locked),
+            _ExpiryBar(
+                expiresAt: widget.conversation.expiresAt, closed: locked),
             Expanded(
               child: BlocBuilder<ChatCubit, ChatState>(
                 builder: (context, state) {
@@ -280,10 +281,9 @@ class _PatientChatPageState extends State<PatientChatPage> {
                       const SizedBox(width: 8),
                       IconButton.filled(
                           tooltip: 'Send message',
-                          onPressed:
-                              state.sending || _input.text.trim().isEmpty
-                                  ? null
-                                  : _send,
+                          onPressed: state.sending || _input.text.trim().isEmpty
+                              ? null
+                              : _send,
                           style: IconButton.styleFrom(
                               minimumSize: const Size(48, 48),
                               backgroundColor: PatientTokens.primary,
@@ -363,9 +363,7 @@ class _ChatTopBar extends StatelessWidget {
           alignment: Alignment.center,
           child: Text(initials,
               style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: colors.$2)),
+                  fontWeight: FontWeight.w800, fontSize: 13, color: colors.$2)),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -484,9 +482,8 @@ class _ExpiryBar extends StatelessWidget {
         decoration: BoxDecoration(
             color: closed ? const Color(0xFFFEF2F2) : const Color(0xFFECFDF5),
             border: Border.all(
-                color: closed
-                    ? const Color(0xFFFECACA)
-                    : const Color(0xFFA7F3D0)),
+                color:
+                    closed ? const Color(0xFFFECACA) : const Color(0xFFA7F3D0)),
             borderRadius: BorderRadius.circular(10)),
         child: Row(children: [
           Icon(closed ? Icons.lock_outline : Icons.hourglass_bottom,
@@ -537,7 +534,8 @@ class _ChatBubble extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (message.content.isNotEmpty)
-                Text(message.content, style: TextStyle(color: text, height: 1.45)),
+                Text(message.content,
+                    style: TextStyle(color: text, height: 1.45)),
               if (message.attachmentId != null) ...[
                 Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.description_outlined, color: text, size: 20),
@@ -548,13 +546,13 @@ class _ChatBubble extends StatelessWidget {
                               color: text, fontWeight: FontWeight.w600))),
                 ]),
                 if (message.attachmentSize != null)
-                  Text('${(message.attachmentSize! / 1024).toStringAsFixed(1)} KiB',
+                  Text(
+                      '${(message.attachmentSize! / 1024).toStringAsFixed(1)} KiB',
                       style: TextStyle(color: text)),
                 TextButton(
                     onPressed: onViewAttachment,
                     style: TextButton.styleFrom(
-                        foregroundColor: text,
-                        minimumSize: const Size(48, 48)),
+                        foregroundColor: text, minimumSize: const Size(48, 48)),
                     child: const Text('View image')),
               ],
               const SizedBox(height: 4),

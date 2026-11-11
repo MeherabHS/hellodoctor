@@ -297,8 +297,8 @@ class _LoginState extends State<LoginPage> {
                                                           ForgotPasswordPage(
                                                               auth: widget
                                                                   .auth))),
-                                          child: const Text(
-                                              'Forgot password?'))),
+                                          child:
+                                              const Text('Forgot password?'))),
                                   const SizedBox(height: 4),
                                   _button(
                                       'Continue to MFA',

@@ -205,8 +205,7 @@ void main() {
     });
 
     test('a deferred server response hides financial actions', () async {
-      final repo = StubDoctorRepository()
-        ..bookingPolicyPaymentRequired = false;
+      final repo = StubDoctorRepository()..bookingPolicyPaymentRequired = false;
       final cubit = DoctorCubit(repo);
       await cubit.loadBookingPolicy();
       expect(cubit.state.paymentRequired, isFalse);
@@ -215,16 +214,14 @@ void main() {
 
     test('an enabled server response keeps financial actions visible',
         () async {
-      final repo = StubDoctorRepository()
-        ..bookingPolicyPaymentRequired = true;
+      final repo = StubDoctorRepository()..bookingPolicyPaymentRequired = true;
       final cubit = DoctorCubit(repo);
       await cubit.loadBookingPolicy();
       expect(cubit.state.paymentRequired, isTrue);
       await cubit.close();
     });
 
-    test(
-        'a failed fetch never surfaces an error and keeps the safe default',
+    test('a failed fetch never surfaces an error and keeps the safe default',
         () async {
       final repo = StubDoctorRepository()..failBookingPolicy = true;
       final cubit = DoctorCubit(repo);

@@ -34,8 +34,7 @@ AppointmentSummaryDto _appointment(
     );
 
 void main() {
-  testWidgets(
-      'deferred consultation never shows a fee amount in the chat list',
+  testWidgets('deferred consultation never shows a fee amount in the chat list',
       (tester) async {
     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     final repo = _FixedChatRepository([
