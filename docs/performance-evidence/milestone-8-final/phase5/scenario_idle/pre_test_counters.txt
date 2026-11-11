@@ -1,0 +1,15 @@
+﻿
+admission_accepted_total{class="health"} 3
+admission_accepted_total{class="consultation"} 5
+admission_accepted_total{class="webhook"} 2
+admission_accepted_total{class="normal"} 7
+admission_accepted_total{class="auth"} 20
+admission_accepted_total{class="payment"} 6
+admission_inflight{class="webhook"} 0
+admission_inflight{class="auth"} 0
+admission_inflight{class="consultation"} 0
+admission_inflight{class="payment"} 0
+admission_inflight{class="normal"} 0
+admission_inflight{class="health"} 1
+
+

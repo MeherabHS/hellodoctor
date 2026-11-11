@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../booking/booking_repository.dart';
@@ -155,7 +156,7 @@ class _RxCard extends StatelessWidget {
   String _formatted(DateTime? dt) {
     if (dt == null) return '';
     final local = dt.toLocal();
-    return '${local.day}/${local.month}, ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return '${local.day}/${local.month}, ${formatTime12h(local)}';
   }
 
   @override

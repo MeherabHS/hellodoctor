@@ -1,0 +1,10 @@
+hellodoctor-confa-backend	hellodoctor-confa-backend	Exited (255) 9 hours ago	0.0.0.0:8280->8080/tcp
+hellodoctor-confa-postgres	postgres:16	Exited (255) 9 hours ago	0.0.0.0:5632->5432/tcp
+hellodoctor-confa-redis	redis:7-alpine	Exited (255) 9 hours ago	0.0.0.0:6579->6379/tcp
+hellodoctor-capacity-backend	hellodoctor-capacity-backend	Exited (0) 13 hours ago	
+hellodoctor-test-redis-m8v	redis:7-alpine	Exited (255) 9 hours ago	0.0.0.0:16380->6379/tcp
+hellodoctor-capacity-postgres	postgres:16	Exited (0) 13 hours ago	
+hellodoctor-capacity-redis	redis:7-alpine	Exited (0) 13 hours ago	
+hellodoctor-totp-test-redis	redis:7-alpine	Exited (255) 9 hours ago	0.0.0.0:16381->6379/tcp
+hellodoctor-postgres	postgres:16	Up 10 minutes (healthy)	0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+hellodoctor-redis	redis:7-alpine	Up 10 minutes (healthy)	0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp

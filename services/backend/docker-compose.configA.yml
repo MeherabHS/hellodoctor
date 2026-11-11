@@ -1,0 +1,128 @@
+# Milestone 8 Configuration A — approved single-VM production topology
+# (revised 2026-10-31, supersedes the prior two-pool model below this line
+# in git history). Final decision: the ENTIRE platform — Rust backend,
+# PostgreSQL 16, Redis, in-process background workers, Admin Web, Doctor
+# Web, reverse proxy, and Ubuntu/Docker overhead — runs on ONE Azure VM:
+# 4 vCPU / 8 GiB. There is NO separately allocated or managed PostgreSQL
+# instance. All services compete for the same four cores; nothing gets
+# dedicated/exclusive cores.
+#
+#   docker compose -f docker-compose.configA.yml -p hellodoctor-confa up -d --build
+#   docker compose -f docker-compose.configA.yml -p hellodoctor-confa down -v
+#
+# ONE pool, cpuset "0-3" (all 4 real cores), for every container below —
+# Postgres included. cpu_shares set relative workload priority under
+# contention (not a hard cap; a share only matters when all 4 cores are
+# actually saturated):
+#   backend   cpu_shares 6000 (primary request-serving workload)
+#   postgres  cpu_shares 3000 (real, substantial work — no longer isolated)
+#   redis     cpu_shares  500 (lightest real load observed all session)
+#
+# 8 GiB VM memory budget, now genuinely shared rather than two disjoint
+# pools:
+#   backend   2.0 GiB  (measured peak this session ~40 MB; large headroom
+#                       kept deliberately — not re-measured yet under this
+#                       new shared-CPU topology, see Workstream 2 report)
+#   postgres  4.0 GiB  (unchanged absolute figure from the old "db pool" —
+#                       self-hosted now, no managed-service backup/HA to
+#                       lean on, see docs/MILESTONE_8_SUSTAINED_RELIABILITY.md
+#                       §durability for what that implies)
+#   redis     0.4 GiB  (measured peak this session ~26 MB)
+#   ---------------------------------------------------------------
+#   subtotal  6.4 GiB  actually enforced by the mem_limits below
+#   web-tier reserve   0.9 GiB — Admin Web + Doctor Web + reverse proxy.
+#                       NOT YET CONTAINERIZED (see KNOWN SCOPE LIMITATION
+#                       below) — this is money set aside in the budget math,
+#                       not a cgroup limit on a running container. Real
+#                       measured idle cost of both Next.js apps together is
+#                       ~172 MB (docs/MILESTONE_8_MEMORY_PROFILE.md §9);
+#                       0.9 GiB leaves headroom for loaded behavior and a
+#                       reverse proxy, which remain unmeasured.
+#   OS/Docker reserve  0.7 GiB — Ubuntu + Docker daemon overhead. A
+#                       documented assumption (this project's dev host is
+#                       Windows/WSL2, not the target Ubuntu Azure VM, so
+#                       this has not been independently measured there).
+#   =================================================================
+#   total     8.0 GiB
+#
+# KNOWN SCOPE LIMITATION (disclosed, not silently omitted): Admin Web and
+# Doctor Web still have no Dockerfile in this repo, so they are NOT actually
+# running inside this compose file — only budgeted for above. Milestone 8's
+# bot traffic for all three roles goes directly to the Rust backend (same as
+# `examples/capacity_test.rs`), not through either Next.js BFF. Building and
+# containerizing both apps plus a reverse proxy, then re-verifying this
+# budget against their REAL combined resource use under load, is required
+# before this compose file can be called a complete, verified single-VM
+# model — tracked as open work, not claimed done here.
+name: hellodoctor-confa
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: hellodoctor-confa-postgres
+    # jit=off: same live-confirmed finding as docker-compose.capacity.yml
+    # (RLS's OR'd correlated subquery inflates the planner's cost estimate
+    # past jit_above_cost even though the subplan is short-circuited and
+    # never executed — pure wasted compilation, not a security change).
+    command: postgres -c jit=off -c shared_preload_libraries=pg_stat_statements -c pg_stat_statements.track=all -c pg_stat_statements.max=200
+    environment:
+      POSTGRES_USER: hellodoctor
+      POSTGRES_PASSWORD: hellodoctor_dev_password
+      POSTGRES_DB: hellodoctor
+    ports:
+      - "5632:5432"
+    volumes:
+      - hellodoctor_confa_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hellodoctor -d hellodoctor"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    cpuset: "0-3"
+    cpu_shares: 3000
+    mem_limit: 4g
+
+  redis:
+    image: redis:7-alpine
+    container_name: hellodoctor-confa-redis
+    ports:
+      - "6579:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    cpuset: "0-3"
+    cpu_shares: 500
+    mem_limit: 400m
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hellodoctor-confa-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://hellodoctor:hellodoctor_dev_password@postgres:5432/hellodoctor
+      APP_DB_HOST: postgres
+      REDIS_URL: redis://redis:6379
+      HOST: 0.0.0.0
+      PORT: 8080
+      # Same one documented exception as docker-compose.capacity.yml
+      # (CONSTRAINED_CAPACITY_TEST.md §19): every synthetic request
+      # originates from the one real IP of the load-generator machine.
+      GLOBAL_IP_RATE_LIMIT_PER_MIN: "100000"
+    ports:
+      - "8280:8080"
+    cpuset: "0-3"
+    cpu_shares: 6000
+    mem_limit: 2g
+
+volumes:
+  hellodoctor_confa_pgdata:

@@ -61,3 +61,12 @@ Every feature implemented by Claude Code must satisfy all criteria before being 
   - Sensitive actions (record access, payment, prescription, admin actions) are logged to audit_events table.
 - [ ] **17. PHI Protection:**
   - Push notifications contain no PHI. Error responses contain no internal details. Logs use allow-list field scrubbing.
+- [ ] **18. Mandatory Cross-Module Regression Gate:**
+  - Applies to money, account identity, clinical information and another application's state.
+  - **Local correctness:** the changed operation, validation and authorization pass.
+  - **System consistency:** related records, accounting/ledger effects, services, affected clients, audits and notification outbox agree afterward.
+  - **Failure recovery:** interrupted, retried, timed-out, concurrent and partially completed operations recover truthfully and idempotently.
+  - Map each applicable invariant to actual automated evidence; identify provider/device/runtime limitations explicitly.
+  - An endpoint succeeding, a single-table assertion or a source-only review cannot replace these gates.
+  - Historical inconsistencies are inventoried read-only; data repair requires separate review.
+  - Record actual results and outstanding gaps before declaring acceptance. Current user instructions take precedence over generic checklist items, including Git actions.

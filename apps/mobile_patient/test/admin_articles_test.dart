@@ -82,6 +82,13 @@ class BlogFixture extends BlogsRepository {
   @override
   Future<List<BlogArticleDto>> feed({int? limit, int? offset}) async => rows;
   @override
+  Future<BlogPage> discover(
+          {String search = '',
+          String language = 'en',
+          BlogCursor? cursor,
+          int limit = 20}) async =>
+      BlogPage(rows, null);
+  @override
   Future<BlogArticleDto> detail(String id) async {
     opened.add(id);
     return rows.firstWhere((a) => a.id == id);

@@ -78,6 +78,16 @@ pub struct ArticleQuery {
     pub offset: Option<i64>,
 }
 
+#[derive(Deserialize, Default)]
+pub struct PublishedArticleQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+    pub search: Option<String>,
+    pub language: Option<String>,
+    pub before_time: Option<chrono::DateTime<chrono::Utc>>,
+    pub before_id: Option<Uuid>,
+}
+
 pub async fn list_own(
     State(state): State<AppState>,
     ctx: AuthContext,
@@ -90,18 +100,46 @@ pub async fn list_own(
 pub async fn feed(
     State(state): State<AppState>,
     ctx: AuthContext,
-    Query(query): Query<ArticleQuery>,
+    Query(query): Query<PublishedArticleQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let search = query.search.as_deref().unwrap_or("").trim();
+    let language = query.language.as_deref().unwrap_or("en");
+    if search.chars().count() > 160
+        || search.contains('\0')
+        || !matches!(language, "en" | "sw")
+        || query.before_time.is_some() != query.before_id.is_some()
+        || query.before_time.is_some() && query.offset.unwrap_or(0) != 0
+    {
+        return Err(AppError::Validation(
+            "Invalid article search or pagination parameters.".into(),
+        ));
+    }
+    let limit = query.limit.unwrap_or(20).clamp(1, 50);
     let mut tx = state.begin_authed(&ctx).await?;
-    let rows = admin_article_repo::feed(
+    let mut rows = admin_article_repo::published_page(
         &mut *tx,
-        query.limit.unwrap_or(20).clamp(1, 50),
+        limit + 1,
         query.offset.unwrap_or(0).max(0),
+        search,
+        language,
+        query.before_time,
+        query.before_id,
     )
     .await?;
     tx.commit().await?;
-    Ok(Json(json!({"success":true,"data":rows})))
+    let has_more = rows.len() > limit as usize;
+    rows.truncate(limit as usize);
+    let cursor = if has_more {
+        rows.last()
+            .map(|r| json!({"before_time":r.sort_at,"before_id":r.id}))
+    } else {
+        None
+    };
+    let data: Vec<_> = rows.into_iter().map(|r| r.article).collect();
+    Ok(Json(
+        json!({"success":true,"data":data,"next_cursor":cursor}),
+    ))
 }
 async fn list(
     state: &AppState,

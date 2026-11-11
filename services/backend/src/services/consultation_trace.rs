@@ -95,7 +95,16 @@ pub async fn admin_read(
 pub async fn maintenance(state: &AppState) -> Result<u64, AppError> {
     let ctx = AuthContext::system();
     let mut tx = state.begin_authed_as(&ctx, DbRole::SystemWorker).await?;
-    let expired:Vec<(Uuid,Uuid)>=sqlx::query_as("SELECT id,appointment_id FROM chat_conversations WHERE NOT is_locked AND expires_at<=clock_timestamp() ORDER BY expires_at LIMIT 100 FOR UPDATE SKIP LOCKED")
+    // Milestone 8.0 critical-query audit: `now()` (transaction start time,
+    // STABLE) instead of `clock_timestamp()` (VOLATILE) here lets the
+    // planner fold the comparison to a constant and use real statistics
+    // against the new idx_chat_conversations_expiry_unlocked partial index,
+    // rather than falling back to a generic selectivity guess that forced a
+    // full scan regardless of the index (verified via EXPLAIN: 387 buffers
+    // -> 2 buffers). A conversation that becomes eligible mid-scan is simply
+    // picked up on this job's next 60-second tick; the per-row lock UPDATE
+    // below still uses genuinely-current `clock_timestamp()`.
+    let expired:Vec<(Uuid,Uuid)>=sqlx::query_as("SELECT id,appointment_id FROM chat_conversations WHERE NOT is_locked AND expires_at<=now() ORDER BY expires_at LIMIT 100 FOR UPDATE SKIP LOCKED")
         .fetch_all(&mut *tx).await?;
     for (conversation, appointment) in expired {
         sqlx::query("UPDATE chat_conversations SET is_locked=TRUE,locked_at=clock_timestamp(),lock_reason='WINDOW_EXPIRED' WHERE id=$1 AND NOT is_locked").bind(conversation).execute(&mut *tx).await?;

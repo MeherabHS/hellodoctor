@@ -1,0 +1,65 @@
+{
+    "measured_at_utc":  "2026-11-01T03:43:48.8797571Z",
+    "topology":  "six-service disposable Compose stack; cpuset 0-3; service memory limits from compose.local-verification.yml",
+    "health":  {
+                   "binary_latest_migration":  "20261202000005",
+                   "database":  "ready",
+                   "database_latest_migration":  "20261202000005",
+                   "migrations":  "current",
+                   "redis":  "ready",
+                   "status":  "ready"
+               },
+    "endpoints":  {
+                      "backend_health":  {
+                                             "count":  30,
+                                             "p50":  2.02,
+                                             "p95":  18.51,
+                                             "p99":  20.27,
+                                             "max":  20.53,
+                                             "statuses":  [
+                                                              {
+                                                                  "count":  12,
+                                                                  "status":  "200"
+                                                              },
+                                                              {
+                                                                  "count":  18,
+                                                                  "status":  "0"
+                                                              }
+                                                          ]
+                                         },
+                      "admin_login_page":  {
+                                               "count":  30,
+                                               "p50":  36.33,
+                                               "p95":  41.31,
+                                               "p99":  45.82,
+                                               "max":  50.71,
+                                               "statuses":  [
+                                                                {
+                                                                    "count":  30,
+                                                                    "status":  "200"
+                                                                }
+                                                            ]
+                                           },
+                      "doctor_root":  {
+                                          "count":  30,
+                                          "p50":  58.6,
+                                          "p95":  61.34,
+                                          "p99":  62.03,
+                                          "max":  63.99,
+                                          "statuses":  [
+                                                           {
+                                                               "count":  30,
+                                                               "status":  "200"
+                                                           }
+                                                       ]
+                                      }
+                  },
+    "restart_counts":  {
+                           "hellodoctor-m8-final-local-admin-web-1":  0,
+                           "hellodoctor-m8-final-local-backend-1":  0,
+                           "hellodoctor-m8-final-local-postgres-1":  0,
+                           "hellodoctor-m8-final-local-doctor-web-1":  0,
+                           "hellodoctor-m8-final-local-proxy-1":  0,
+                           "hellodoctor-m8-final-local-redis-1":  0
+                       }
+}

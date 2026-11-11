@@ -1,6 +1,5 @@
-import '../patient/chat/chat_repository.dart';
-import '../patient/chat/patient_chat_page.dart';
-import '../patient/profile/profile_cubit.dart';
+import '../../core/notifications/notification_taps.dart';
+import 'notification_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -15,19 +14,20 @@ const _monthNames = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-String _mediumDateTime(DateTime utc) {
+String _mediumDateTime(BuildContext context, DateTime utc) {
   final t = utc.toLocal();
+  if (Localizations.localeOf(context).languageCode == 'sw') {
+    final material = MaterialLocalizations.of(context);
+    return '${material.formatMediumDate(t)} \u00b7 ${material.formatTimeOfDay(TimeOfDay.fromDateTime(t))}';
+  }
   final hour = t.hour % 12 == 0 ? 12 : t.hour % 12;
   final minute = t.minute.toString().padLeft(2, '0');
   final suffix = t.hour >= 12 ? 'PM' : 'AM';
   return '${_monthNames[t.month - 1]} ${t.day} · $hour:$minute $suffix';
 }
 
-/// Full notification-inbox screen — mirrors `apps/mobile`'s
-/// `NotificationCenterPage` structurally (same loading/empty/error/populated
-/// shape). No dedicated single-appointment detail screen exists for Patient
-/// either, so tapping an appointment-related notification marks it read and
-/// returns to Home rather than inventing a destination.
+/// Owner-scoped inbox. Explicit taps use the same authorization checks as OS
+/// notification taps; receipts alone never navigate or mark notices read.
 class NotificationCenterPage extends StatefulWidget {
   const NotificationCenterPage({super.key, required this.cubit});
   final NotificationCubit cubit;
@@ -43,43 +43,18 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => widget.cubit.load());
   }
 
+  final _tapGate = NotificationTapGate();
   Future<void> _handleTap(NotificationDto n) async {
-    await widget.cubit.markRead(n.id);
-    if (!mounted) return;
-    if (n.relatedEntityType == 'CHAT' && n.relatedEntityId != null) {
-      try {
-        final repo = ChatRepository(widget.cubit.repo.api);
-        final appointments = await repo.consultations();
-        final appointmentId = n.metadata?['appointment_id']?.toString();
-        final appointment =
-            appointments.where((a) => a.id == appointmentId).firstOrNull;
-        if (appointment == null) throw StateError('Consultation unavailable');
-        final conversation =
-            await repo.conversationForAppointment(appointment.id);
-        if (conversation.id != n.relatedEntityId) {
-          throw StateError('Conversation mismatch');
-        }
-        if (mounted) {
-          await Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => PatientChatPage(
-                      conversation: conversation,
-                      doctorDisplayName: appointment.doctorDisplayName,
-                      repo: repo,
-                      myUserId:
-                          context.read<ProfileCubit>().state.profile?.userId)));
-        }
-      } catch (_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content:
-                  Text('Unable to open this conversation. Please retry.')));
-        }
-      }
-    } else if (n.relatedEntityType == 'APPOINTMENT') {
-      Navigator.of(context).popUntil((r) => r.isFirst);
-    }
+    try {
+      await openNotificationDestination(context, widget.cubit, n.id, _tapGate,
+          fromInbox: true);
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _tapGate.dispose();
+    super.dispose();
   }
 
   @override
@@ -139,8 +114,8 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
                                             ? null
                                             : widget.cubit.loadOlder,
                                         child: Text(s.loadingOlder
-                                            ? 'Loading earlier notifications...'
-                                            : 'Load earlier notifications')),
+                                            ? l10n.notificationsLoadingOlder
+                                            : l10n.notificationsLoadOlder)),
                                   if (items.isEmpty)
                                     Padding(
                                       padding: const EdgeInsets.all(32),
@@ -211,7 +186,7 @@ class _NotificationTile extends StatelessWidget {
                   style: const TextStyle(
                       fontSize: 12, color: PatientTokens.textSub, height: 1.4)),
               const SizedBox(height: 6),
-              Text(_mediumDateTime(n.createdAt),
+              Text(_mediumDateTime(context, n.createdAt),
                   style: const TextStyle(
                       fontSize: 10, color: PatientTokens.textSub)),
             ]),

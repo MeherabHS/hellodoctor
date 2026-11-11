@@ -1,0 +1,13 @@
+# Only application build inputs; never local env, tests, credentials or evidence.
+*
+!package.json
+!package-lock.json
+!next.config.js
+!next-env.d.ts
+!tsconfig.json
+!postcss.config.*
+!tailwind.config.*
+!src/
+!src/**
+!public/
+!public/**

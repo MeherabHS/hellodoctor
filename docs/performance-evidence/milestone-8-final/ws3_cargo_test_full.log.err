@@ -1,0 +1,6 @@
+   Compiling hellodoctor-backend v2.4.0 (C:\Users\CUBE\Desktop\helodoc old site\services\backend)
+    Finished `release` profile [optimized] target(s) in 5m 26s
+     Running unittests src\lib.rs (target\release\deps\hellodoctor_backend-fe4c09d9086c19ce.exe)
+     Running unittests src\main.rs (target\release\deps\hellodoctor_backend-0ab92e0e4b9d90ed.exe)
+     Running tests\api_tests.rs (target\release\deps\api_tests-4ea7c2ca0922c607.exe)
+error: test failed, to rerun pass `--test api_tests`

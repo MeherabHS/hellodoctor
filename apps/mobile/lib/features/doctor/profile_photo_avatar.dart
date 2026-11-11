@@ -122,8 +122,8 @@ class _ProfilePhotoAvatarState extends State<ProfilePhotoAvatar> {
             ),
             if (hasPhoto)
               ListTile(
-                leading:
-                    const Icon(Icons.delete_outline, color: DoctorTokens.danger),
+                leading: const Icon(Icons.delete_outline,
+                    color: DoctorTokens.danger),
                 title: const Text('Remove Photo',
                     style: TextStyle(color: DoctorTokens.danger)),
                 onTap: () {
@@ -163,8 +163,8 @@ class _ProfilePhotoAvatarState extends State<ProfilePhotoAvatar> {
                         ? SizedBox(
                             width: iconSize,
                             height: iconSize,
-                            child: const CircularProgressIndicator(
-                                strokeWidth: 2))
+                            child:
+                                const CircularProgressIndicator(strokeWidth: 2))
                         : Icon(Icons.person,
                             size: iconSize, color: DoctorTokens.primaryDark),
               ),

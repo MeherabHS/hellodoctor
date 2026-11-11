@@ -57,14 +57,13 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
         networkChanges: widget.repo.connectivity?.changes,
         hasError: () => error != null,
         enabled: () => !const [
-          'COMPLETED',
-          'CANCELLED',
-          'REFUNDED',
-          'EXPIRED',
-          'PREMATURE_TERMINATION',
-          'DISPUTED',
-        ]
-            .contains(detail?.status ?? widget.appointment.status));
+              'COMPLETED',
+              'CANCELLED',
+              'REFUNDED',
+              'EXPIRED',
+              'PREMATURE_TERMINATION',
+              'DISPUTED',
+            ].contains(detail?.status ?? widget.appointment.status));
   }
 
   Future<void> _ackOpen() async {
@@ -141,9 +140,8 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
       }
       return;
     }
-    final seconds = (baseSeconds - stopwatch.elapsed.inSeconds)
-        .clamp(0, 600)
-        .toInt();
+    final seconds =
+        (baseSeconds - stopwatch.elapsed.inSeconds).clamp(0, 600).toInt();
     if (!mounted || seconds == _remainingHoldSeconds) return;
     setState(() => _remainingHoldSeconds = seconds);
     if (seconds == 0) unawaited(refresh());
@@ -270,7 +268,11 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                         ? 'Chat consultation'
                         : 'Video consultation',
                     style: Theme.of(context).textTheme.titleMedium),
-                if (a.fee != null)
+                if (!a.paymentRequired)
+                  const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text('No payment required'))
+                else if (a.fee != null)
                   Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text('KES ${a.fee}')),
@@ -279,25 +281,25 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                     expired
                         ? 'Reservation expired'
                         : ended
-                        ? 'Consultation ${detail!.status.toLowerCase()}'
-                        : ready
-                            ? 'Consultation confirmed'
-                            : failed
-                                ? 'Payment failed'
-                                : detail == null
-                                    ? 'Checking consultation'
-                                    : 'Payment required',
+                            ? 'Consultation ${detail!.status.toLowerCase()}'
+                            : ready
+                                ? 'Consultation confirmed'
+                                : failed
+                                    ? 'Payment failed'
+                                    : detail == null
+                                        ? 'Checking consultation'
+                                        : 'Payment required',
                     style: const TextStyle(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 Text(expired
                     ? 'The unpaid reservation has expired. Make a new booking and upload your records again.'
                     : ended
-                    ? 'Messaging and calling are unavailable for this booking.'
-                    : ready
-                        ? 'Your consultation is available.'
-                        : failed
-                            ? 'Payment was not completed. You can try again.'
-                            : 'Complete payment to confirm your consultation.'),
+                        ? 'Messaging and calling are unavailable for this booking.'
+                        : ready
+                            ? 'Your consultation is available.'
+                            : failed
+                                ? 'Payment was not completed. You can try again.'
+                                : 'Complete payment to confirm your consultation.'),
               ])),
           const SizedBox(height: 16),
           if (error != null) InlineError(error!, onRetry: refresh),
@@ -308,8 +310,8 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                     style: const TextStyle(color: PatientTokens.danger))),
           if (expired)
             FilledButton(
-                onPressed: () => Navigator.of(context)
-                    .popUntil((route) => route.isFirst),
+                onPressed: () =>
+                    Navigator.of(context).popUntil((route) => route.isFirst),
                 child: const Text('Choose a new booking'))
           else if (ready || ended)
             FilledButton(
@@ -344,14 +346,14 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
             TextButton(onPressed: refresh, child: const Text('Refresh status')),
           if (!expired)
             OutlinedButton(
-              onPressed: () => showModalBottomSheet<void>(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (_) => PreConsultIntakeModal(
-                      doctorName: a.doctorDisplayName,
-                      appointmentId: a.id,
-                      repo: widget.repo)),
-              child: const Text('Attach health records')),
+                onPressed: () => showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => PreConsultIntakeModal(
+                        doctorName: a.doctorDisplayName,
+                        appointmentId: a.id,
+                        repo: widget.repo)),
+                child: const Text('Attach health records')),
           const SizedBox(height: 16),
           Text('Reference: ${a.appointmentNumber}',
               style: const TextStyle(color: PatientTokens.textSub)),

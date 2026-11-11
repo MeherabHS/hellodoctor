@@ -62,6 +62,28 @@ pub async fn list_own_notifications(
     }))
 }
 
+/// GET /api/v1/notifications/:id ? owner-scoped, does not mark read.
+pub async fn detail(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let mut tx = state.begin_authed(&ctx).await?;
+    let notification =
+        crate::repository::notification_repo::find_for_user(&mut *tx, id, ctx.user_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Notification not found.".into()))?;
+    tx.commit().await?;
+    Ok((
+        [(axum::http::header::CACHE_CONTROL, "private, no-store")],
+        Json(ApiResponse {
+            success: true,
+            data: notification,
+        }),
+    ))
+}
+
 /// GET /api/v1/notifications/unread-count
 pub async fn unread_count(
     State(state): State<AppState>,

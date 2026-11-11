@@ -1,0 +1,14 @@
+﻿
+admission_accepted_total{class="health"} 3
+admission_inflight{class="health"} 1
+admission_permit_hold_seconds{class="health",quantile="0"} 0.000934634
+admission_permit_hold_seconds{class="health",quantile="0.5"} 0.0009346858931698241
+admission_permit_hold_seconds{class="health",quantile="0.9"} 0.0009346858931698241
+admission_permit_hold_seconds{class="health",quantile="0.95"} 0.0009346858931698241
+admission_permit_hold_seconds{class="health",quantile="0.99"} 0.0009346858931698241
+admission_permit_hold_seconds{class="health",quantile="0.999"} 0.0009346858931698241
+admission_permit_hold_seconds{class="health",quantile="1"} 0.004189469
+admission_permit_hold_seconds_sum{class="health"} 0.0051241030000000005
+admission_permit_hold_seconds_count{class="health"} 2
+
+

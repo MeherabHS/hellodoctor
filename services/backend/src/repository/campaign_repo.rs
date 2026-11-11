@@ -166,6 +166,10 @@ pub struct CampaignDeliveryStats {
     pub deferred_by_preference_or_quiet_hours: i64,
     pub retry_pending: i64,
     pub permanently_failed: i64,
+    pub suppressed: i64,
+    pub deferred: i64,
+    pub processing: i64,
+    pub uncertain: i64,
 }
 
 pub async fn delivery_stats<'e, E: PgExecutor<'e>>(
@@ -176,9 +180,13 @@ pub async fn delivery_stats<'e, E: PgExecutor<'e>>(
         "SELECT \
            COUNT(*) FILTER (WHERE delivery_status IN ('CREATED','DUE')) AS queued, \
            COUNT(*) FILTER (WHERE delivery_status='SENT_TO_PROVIDER') AS sent_to_provider, \
-           COUNT(*) FILTER (WHERE delivery_status='FAILED' AND (last_delivery_error LIKE 'Deferred:%' OR last_delivery_error LIKE 'Suppressed:%')) AS deferred_by_preference_or_quiet_hours, \
-           COUNT(*) FILTER (WHERE delivery_status='FAILED' AND next_delivery_at IS NOT NULL AND last_delivery_error NOT LIKE 'Deferred:%' AND last_delivery_error NOT LIKE 'Suppressed:%') AS retry_pending, \
-           COUNT(*) FILTER (WHERE delivery_status='FAILED' AND next_delivery_at IS NULL AND last_delivery_error NOT LIKE 'Suppressed:%') AS permanently_failed \
+           COUNT(*) FILTER (WHERE delivery_status='SUPPRESSED' OR delivery_status='FAILED' AND (last_delivery_error LIKE 'Deferred:%' OR last_delivery_error LIKE 'Suppressed:%')) AS deferred_by_preference_or_quiet_hours, \
+           COUNT(*) FILTER (WHERE delivery_status='FAILED' AND next_delivery_at IS NOT NULL AND delivery_attempts<5 AND COALESCE(last_delivery_error,'') NOT LIKE 'Deferred:%' AND COALESCE(last_delivery_error,'') NOT LIKE 'Suppressed:%') AS retry_pending, \
+           COUNT(*) FILTER (WHERE delivery_status='FAILED' AND (next_delivery_at IS NULL OR delivery_attempts>=5) AND COALESCE(last_delivery_error,'') NOT LIKE 'Suppressed:%') AS permanently_failed, \
+           COUNT(*) FILTER (WHERE delivery_status='SUPPRESSED' OR delivery_status='FAILED' AND next_delivery_at IS NULL AND last_delivery_error LIKE 'Suppressed:%') AS suppressed, \
+           COUNT(*) FILTER (WHERE delivery_status='FAILED' AND next_delivery_at IS NOT NULL AND last_delivery_error LIKE 'Deferred:%') AS deferred, \
+           COUNT(*) FILTER (WHERE delivery_status='DUE') AS processing, \
+           COUNT(*) FILTER (WHERE delivery_uncertain) AS uncertain \
          FROM notifications WHERE related_entity_type='CAMPAIGN' AND related_entity_id=$1",
     )
     .bind(campaign_id)

@@ -261,6 +261,63 @@ async fn test_doctor_directory_photo_visible_to_other_patient_with_public_cache_
 }
 
 // ============================================================================
+// 3b. Remediation E4 (Phase 1 finding #1): `doctor_public_photo()` was
+//     created by this same `20261112000001_profile_pictures` migration
+//     still gating its Admin override on the six legacy Admin role names
+//     (PLATFORM_ADMIN/CLINICAL_ADMIN/...) that `20261106000002_single_admin`
+//     had already consolidated into one `ADMIN` role — so a real ADMIN
+//     session was silently treated as an ordinary authenticated caller and
+//     could not see an inactive doctor's photo at all. Fixed by
+//     `20261202000001_fix_stale_admin_role_references`. This test exercises
+//     the real HTTP/DB stack: a Patient (no override) must still 404 for a
+//     deactivated doctor, while an Admin must see it.
+// ============================================================================
+#[sqlx::test(migrations = "./migrations")]
+async fn test_admin_sees_inactive_doctors_photo_patient_does_not(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let doctor_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let upload = upload_doctor_photo(&app, &doctor_token, "image/png", &minimal_png_base64()).await;
+    assert_eq!(upload.status(), StatusCode::OK);
+
+    sqlx::query("UPDATE users SET is_active=false WHERE id=$1")
+        .bind(uid(DOCTOR1_USER_ID))
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let (_viewer_id, patient_token) = new_patient(&pool).await;
+    let patient_view = get(
+        &app,
+        &format!("/api/v1/doctors/{DOCTOR1_PROFILE_ID}/photo"),
+        Some(&patient_token),
+    )
+    .await;
+    assert_eq!(
+        patient_view.status(),
+        StatusCode::NOT_FOUND,
+        "a Patient must not see a deactivated doctor's photo"
+    );
+
+    let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let (admin_status, _headers, admin_bytes) = response_parts(
+        get(
+            &app,
+            &format!("/api/v1/doctors/{DOCTOR1_PROFILE_ID}/photo"),
+            Some(&admin_token),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        admin_status,
+        StatusCode::OK,
+        "ADMIN is the only Admin role that exists since the single_admin \
+         consolidation and must see a deactivated doctor's photo for review"
+    );
+    assert!(image::load_from_memory(&admin_bytes).is_ok());
+}
+
+// ============================================================================
 // 4. Malformed/garbage bytes are rejected; no DB row is updated; a
 //    follow-up GET still shows no photo.
 // ============================================================================

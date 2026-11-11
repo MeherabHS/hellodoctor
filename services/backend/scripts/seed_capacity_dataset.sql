@@ -118,7 +118,12 @@ SELECT gen_random_uuid(), user_id,
        now()
 FROM p;
 
--- Admins, spread across the five admin roles
+-- Admins. Since 20261106000002_single_admin, 'ADMIN' is the only role a
+-- human admin account may hold — the six legacy names below that migration
+-- consolidated (PLATFORM_ADMIN/CLINICAL_ADMIN/FINANCE_ADMIN/SUPPORT/
+-- COMPLIANCE/SECURITY_ADMIN) are now rejected outright at INSERT by the
+-- `canonical_admin_assignment` trigger, so this seed would fail closed
+-- against the current schema if left as originally written.
 WITH a AS (
     SELECT gs AS seq, gen_random_uuid() AS user_id
     FROM generate_series(1, 10) AS gs
@@ -128,7 +133,7 @@ SELECT user_id,
        '+25474' || lpad(seq::text, 7, '0'),
        'admin' || seq || '@capacity-test.local',
        '$argon2id$v=19$m=19456,t=2,p=1$ZGVtb3NhbHQ$ZGVtb2hhc2g',
-       (ARRAY['PLATFORM_ADMIN','CLINICAL_ADMIN','FINANCE_ADMIN','SUPPORT','COMPLIANCE','SECURITY_ADMIN']::user_role_enum[])[1 + (seq % 6)],
+       'ADMIN'::user_role_enum,
        'en', TRUE, TRUE,
        now() - 150 * interval '1 day',
        now()
@@ -303,6 +308,16 @@ INSERT INTO chat_conversations (id, appointment_id, patient_id, doctor_id, expir
 SELECT conv_id, appointment_id, patient_id, doctor_id, start_time + interval '24 hours', TRUE, start_time
 FROM tmp_conv;
 
+-- `chat_mutation_wall_clock` (20261106000003_consultation_trace) rejects
+-- any INSERT into chat_messages whose conversation's expires_at is not
+-- still in the future relative to real clock_timestamp() — correct for the
+-- live application (a clinical chat window that has actually closed must
+-- stay closed), but these conversations are deliberately historical and
+-- already expired by design, which is exactly what this seed needs to
+-- represent. Disabled only around this one bulk INSERT, only in this
+-- disposable capacity-test database, never touching the trigger itself or
+-- any live application code path.
+ALTER TABLE chat_messages DISABLE TRIGGER chat_mutation_wall_clock;
 INSERT INTO chat_messages (id, conversation_id, sender_id, content, is_read, sent_at)
 SELECT gen_random_uuid(), tc.conv_id,
        CASE WHEN m.i % 2 = 0 THEN pu.id ELSE du.id END,
@@ -315,6 +330,7 @@ JOIN users pu ON pu.id = pp.user_id
 JOIN doctor_profiles dp ON dp.id = tc.doctor_id
 JOIN users du ON du.id = dp.user_id
 CROSS JOIN generate_series(0, 2 + (tc.rn % 6)) AS m(i);
+ALTER TABLE chat_messages ENABLE TRIGGER chat_mutation_wall_clock;
 
 -- ============================================================================
 -- 6. Grievances — ~2% of non-cancelled appointments.

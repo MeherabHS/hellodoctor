@@ -308,7 +308,7 @@ async fn test_push_delivery_pass_suppresses_stale_consultation_ready(pool: PgPoo
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(status, "FAILED");
+    assert_eq!(status, "SUPPRESSED");
     assert!(error.unwrap().contains("Suppressed"));
     // The row must still exist for in-app history — it was never deleted.
     let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM notifications WHERE id=$1)")
@@ -376,7 +376,7 @@ async fn test_push_delivery_pass_suppresses_stale_consultation_rejoin(pool: PgPo
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(status, "FAILED");
+    assert_eq!(status, "SUPPRESSED");
     assert!(error.unwrap().contains("Suppressed"));
 }
 

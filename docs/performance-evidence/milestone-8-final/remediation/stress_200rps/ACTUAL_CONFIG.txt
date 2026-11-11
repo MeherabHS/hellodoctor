@@ -1,0 +1,1 @@
+Config at time of this run: DB_POOL_MAX_CONNECTIONS_PER_ROLE=10, Consultation lane=n.min(6) (Stage B kept), pool=10 (Stage A reverted).

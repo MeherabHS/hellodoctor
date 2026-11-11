@@ -32,32 +32,52 @@ class DoctorSlotDto {
 
 /// Result of `POST /appointments/book`
 /// (`appointment_handlers.rs::book_appointment`'s JSON body). `status` is
-/// always `PENDING_PAYMENT` on a fresh booking — the backend only ever
-/// confirms payment via a provider webhook
+/// `PENDING_PAYMENT` on a fresh booking when payment is required — the
+/// backend only ever confirms payment via a provider webhook
 /// (`services/backend/src/api/v1/webhook_handlers.rs`), which this phase
 /// does not implement a real M-Pesa integration for (plan §8, out of scope).
-/// The UI must show this real pending state honestly, not fake a
-/// "Confirmed" result.
+/// When the backend's `FINANCIAL_MODULE_MODE=deferred` policy applies
+/// (`paymentPolicy == 'NOT_REQUIRED'`), `status` is `CONFIRMED` immediately
+/// instead, and `holdExpiresAt`/the payment fields are absent — there is no
+/// payment to await. The UI must show whichever real state this is, never
+/// fake a "Confirmed" result for a policy-REQUIRED booking that hasn't
+/// actually been paid.
 class BookingResultDto {
   const BookingResultDto({
     required this.appointmentId,
     required this.appointmentNumber,
     required this.status,
+    required this.paymentPolicy,
     required this.amount,
     this.holdExpiresAt,
     this.serverTime,
   });
-  final String appointmentId, appointmentNumber, status, amount;
+  final String appointmentId, appointmentNumber, status, paymentPolicy, amount;
   final DateTime? holdExpiresAt, serverTime;
+
+  bool get paymentRequired => paymentPolicy != 'NOT_REQUIRED';
 
   factory BookingResultDto.fromJson(Json j) => BookingResultDto(
         appointmentId: _textOf(j['appointment_id']),
         appointmentNumber: _textOf(j['appointment_number']),
         status: _textOf(j['status']),
+        paymentPolicy: _textOf(j['payment_policy'], 'REQUIRED'),
         amount: _textOf(j['amount'], '0'),
-        holdExpiresAt: DateTime.tryParse(_textOf(j['hold_expires_at']))?.toUtc(),
+        holdExpiresAt:
+            DateTime.tryParse(_textOf(j['hold_expires_at']))?.toUtc(),
         serverTime: DateTime.tryParse(_textOf(j['server_time']))?.toUtc(),
       );
+}
+
+/// Mirrors `GET /config/booking-policy` (`config_handlers::booking_policy`)
+/// — the single server-controlled source of truth for whether booking
+/// requires payment right now. Never decided client-side.
+class BookingPolicyDto {
+  const BookingPolicyDto({required this.paymentRequired});
+  final bool paymentRequired;
+
+  factory BookingPolicyDto.fromJson(Json j) =>
+      BookingPolicyDto(paymentRequired: j['payment_required'] != false);
 }
 
 /// Mirrors `GET /appointments/:id` (`appointment_repo::find_by_id`'s minimal
@@ -71,6 +91,7 @@ class AppointmentDetailDto {
   const AppointmentDetailDto({
     required this.id,
     required this.status,
+    required this.paymentPolicy,
     this.clinicalOutcome,
     this.completedAt,
     this.paymentStatus,
@@ -85,14 +106,17 @@ class AppointmentDetailDto {
         'IN_CONSULTATION',
         'COMPLETED'
       ].contains(status);
-  final String id, status;
+  bool get paymentRequired => paymentPolicy != 'NOT_REQUIRED';
+  final String id, status, paymentPolicy;
   final String? clinicalOutcome, completedAt;
 
   factory AppointmentDetailDto.fromJson(Json j) => AppointmentDetailDto(
         id: _textOf(j['id']),
         status: _textOf(j['status']),
+        paymentPolicy: _textOf(j['payment_policy'], 'REQUIRED'),
         paymentStatus: j['payment_status']?.toString(),
-        holdExpiresAt: DateTime.tryParse(_textOf(j['hold_expires_at']))?.toUtc(),
+        holdExpiresAt:
+            DateTime.tryParse(_textOf(j['hold_expires_at']))?.toUtc(),
         serverTime: DateTime.tryParse(_textOf(j['server_time']))?.toUtc(),
         clinicalOutcome: j['clinical_outcome']?.toString(),
         completedAt: j['completed_at']?.toString(),

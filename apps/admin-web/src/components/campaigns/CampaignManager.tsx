@@ -250,6 +250,39 @@ export function CampaignManager() {
     }
   }
 
+  /// Combined submit→approve→send-now path for an authorized Admin who does
+  /// not need another person's separate approval — campaigns have no
+  /// author-based approval restriction on the backend (unlike sensitive
+  /// articles), so any Admin holding ManageCampaigns may already approve
+  /// their own submission one step at a time; this only collapses that into
+  /// one click instead of three separate round trips. Each step re-reads
+  /// the freshest id/version the previous step returned, since every
+  /// transition is optimistic-concurrency-guarded server-side.
+  async function publishCampaignNow() {
+    if (!selected) return;
+    setBusy(true);
+    setActionError('');
+    try {
+      let updated = await submitCampaign(selected.id, selected.version);
+      updated = await approveCampaign(updated.id, updated.version);
+      updated = await scheduleCampaign(updated.id, updated.version, new Date().toISOString());
+      setSelected(updated);
+      setContent({
+        title_en: updated.title_en,
+        title_sw: updated.title_sw,
+        body_en: updated.body_en,
+        body_sw: updated.body_sw,
+        audience: updated.audience,
+      });
+      await loadList();
+      void loadStats(updated.id);
+    } catch (e) {
+      setActionError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function doSchedule(sendImmediately: boolean) {
     if (!selected) return;
     const scheduledForUtc = sendImmediately
@@ -449,6 +482,11 @@ export function CampaignManager() {
                     {selected && selected.status === 'DRAFT' && (
                       <button className="admin-btn-sec" disabled={busy} onClick={() => void runTransition(submitCampaign)}>
                         Submit for review
+                      </button>
+                    )}
+                    {selected && selected.status === 'DRAFT' && (
+                      <button className="admin-btn-pri" disabled={busy} onClick={() => void publishCampaignNow()}>
+                        Publish now
                       </button>
                     )}
                     {selected && selected.status === 'PENDING_REVIEW' && (

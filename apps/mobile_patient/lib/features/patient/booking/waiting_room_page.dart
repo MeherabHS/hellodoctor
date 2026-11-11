@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../chat/chat_repository.dart';
@@ -454,8 +455,7 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
     final isToday = start.year == today.year &&
         start.month == today.month &&
         start.day == today.day;
-    final time =
-        '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
+    final time = formatTime12h(start);
     return '${isToday ? l10n.todayLabel : '${start.day}/${start.month}'}, $time';
   }
 }

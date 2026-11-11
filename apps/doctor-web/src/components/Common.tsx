@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 export function State({ loading, error, empty, retry }: { loading?: boolean; error?: string; empty?: string; retry?: () => void }) {
   if (!loading && !error && !empty) return null;
   return <div className="web-state" role={error ? 'alert' : 'status'} aria-live="polite">
-    <div aria-hidden="true" style={{ marginBottom: 6 }}>{loading ? <span className="loading-spinner-ring web-state-spinner"/> : error ? <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 3 2 21h20L12 3Z"/><path d="M12 9v5M12 17v1"/></svg> : <span className="web-icon web-icon-calendar"/>}</div>
+    <div aria-hidden="true" style={{ marginBottom: 6 }}>{loading ? <span data-testid="web-state-spinner" className="web-state-spinner"/> : error ? <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 3 2 21h20L12 3Z"/><path d="M12 9v5M12 17v1"/></svg> : <span className="web-icon web-icon-calendar"/>}</div>
     <strong>{loading ? 'Loading…' : error || empty}</strong>
     {error && retry && <button className="slot-btn sec" onClick={retry}>Retry</button>}
   </div>;

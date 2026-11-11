@@ -5,6 +5,13 @@ import { RecordDto, money } from '../lib/contracts';
 import { State } from './Common';
 import { date } from './Queue';
 
+/** Shown in place of real earnings/payout UI whenever the server-authoritative
+ * `GET /config/booking-policy` reports the financial module as deferred
+ * (`FINANCIAL_MODULE_MODE=deferred`). Never shows fabricated earnings. */
+export function DeferredFinancialNotice() {
+  return <section className="dw-section-card"><div className="dw-section-header"><h3 className="dw-section-title">Financial module not yet active</h3></div><div className="web-section-body"><p className="sheet-desc">Payment collection is not yet active for this launch. Consultations are proceeding without charge.</p><p className="sheet-desc">Earnings, settlements and payouts will appear here once the financial module is enabled.</p></div></section>;
+}
+
 export function Wallet({ statement, payout, receipt }: { statement:()=>void; payout:()=>void; receipt:(row:RecordDto)=>void }) {
   const wallet=useResource<RecordDto>('doctor/wallet/summary');
   const ledger=useResource<RecordDto[]>('doctor/wallet/ledger?limit=25&offset=0');

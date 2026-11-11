@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../notifications/notification_center_page.dart';
 import '../../notifications/notification_cubit.dart';
 import '../booking/booking_repository.dart';
 import '../booking/waiting_room_page.dart';
+import '../directory/directory_repository.dart';
+import '../directory/doctor_photo_avatar.dart';
 import '../directory/patient_directory_page.dart';
 import '../chat/patient_chat_list_page.dart';
 import '../profile/add_dependent_sheet.dart';
@@ -154,8 +157,6 @@ class _PatientHomePageState extends State<PatientHomePage> {
                           onAvatarTap: widget.onOpenAccountTab ??
                               () => _comingSoon(l10n.accountLabel),
                         ),
-                        const SizedBox(height: 4),
-                        _SearchPill(onTap: _openDirectory),
                         const SizedBox(height: 14),
                         _CoreServicesGrid(
                             onOpenDirectory: _openDirectory,
@@ -359,38 +360,6 @@ class _Greeting extends StatelessWidget {
   }
 }
 
-class _SearchPill extends StatelessWidget {
-  const _SearchPill({required this.onTap});
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(PatientTokens.chipRadius),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: PatientTokens.surface,
-              borderRadius: BorderRadius.circular(PatientTokens.chipRadius),
-              border: Border.all(color: PatientTokens.border),
-            ),
-            child: Row(children: [
-              const Icon(Icons.search, color: PatientTokens.textSub, size: 18),
-              const SizedBox(width: 8),
-              // Exact prototype copy (`view-0`'s `.search-pill` input
-              // placeholder) — not paraphrased.
-              Expanded(
-                child: Text(AppLocalizations.of(context).homeSearchHint,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: PatientTokens.textSub)),
-              ),
-            ]),
-          ),
-        ),
-      );
-}
 
 class _CoreServiceItem {
   const _CoreServiceItem({
@@ -582,7 +551,9 @@ class _UpcomingConsultationSection extends StatelessWidget {
             )
           else
             _ConsultCard(
-                appointment: state.nextUpcoming!, onOpen: onManage),
+                appointment: state.nextUpcoming!,
+                onOpen: onManage,
+                repo: DirectoryRepository(context.read<HomeCubit>().repo.api)),
         ],
       ),
     );
@@ -590,16 +561,17 @@ class _UpcomingConsultationSection extends StatelessWidget {
 }
 
 class _ConsultCard extends StatelessWidget {
-  const _ConsultCard({required this.appointment, required this.onOpen});
+  const _ConsultCard(
+      {required this.appointment, required this.onOpen, required this.repo});
   final AppointmentSummaryDto appointment;
   final VoidCallback onOpen;
+  final DirectoryRepository repo;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final start = appointment.startTime;
-    final time =
-        '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
+    final time = formatTime12h(start);
     return PatientCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (appointment.hasActiveConsultation)
@@ -625,11 +597,13 @@ class _ConsultCard extends StatelessWidget {
                     child: const Text('Rejoin'))
               ])),
         Row(children: [
-          const CircleAvatar(
+          DoctorPhotoAvatar(
+            doctorId: appointment.doctorId,
+            initials: appointment.doctorInitials,
+            hasPhoto: appointment.hasPhoto,
+            photoUpdatedAt: appointment.photoUpdatedAt,
+            repo: repo,
             radius: 22,
-            backgroundColor: PatientTokens.primaryLight,
-            child:
-                Icon(Icons.medical_services, color: PatientTokens.primaryDark),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -662,9 +636,11 @@ class _ConsultCard extends StatelessWidget {
           Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                  appointment.doctorPresent == false && appointment.patientPresent == true
+                  appointment.doctorPresent == false &&
+                          appointment.patientPresent == true
                       ? 'Doctor is reconnecting. Your consultation remains active.'
-                      : appointment.doctorPresent == true && appointment.patientPresent == false
+                      : appointment.doctorPresent == true &&
+                              appointment.patientPresent == false
                           ? 'You are disconnected. Rejoin to continue the consultation.'
                           : 'The room is empty. Either participant can rejoin now.',
                   style: const TextStyle(

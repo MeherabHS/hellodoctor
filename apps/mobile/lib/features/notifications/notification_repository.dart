@@ -33,6 +33,11 @@ class NotificationRepository {
 
   /// GET /notifications — paginated, newest rows first per the backend's
   /// `list_for_user` ordering.
+  Future<NotificationDto> detail(String id) async {
+    final raw = _mapData(_data(await api.get('/notifications/$id')));
+    return NotificationDto.fromJson(raw);
+  }
+
   Future<List<NotificationDto>> list({int? offset, int? limit}) async {
     try {
       final raw = _listData(_data(await api.get('/notifications', query: {
@@ -122,12 +127,11 @@ class NotificationRepository {
       required String pushToken,
       String? deviceId}) async {
     try {
-      return _mapData(_data(await api.post('/notifications/devices',
-          data: {
-            'platform': platform,
-            'push_token': pushToken,
-            if (deviceId != null) 'device_id': deviceId,
-          })));
+      return _mapData(_data(await api.post('/notifications/devices', data: {
+        'platform': platform,
+        'push_token': pushToken,
+        if (deviceId != null) 'device_id': deviceId,
+      })));
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'Notifications', operation: 'register_device');
@@ -183,17 +187,17 @@ class NotificationRepository {
     String? language,
   }) async {
     try {
-      final raw = _mapData(_data(await api.put('/notifications/preferences',
-          data: {
-            'operational_enabled': operationalEnabled,
-            'engagement_enabled': engagementEnabled,
-            'quiet_hours_enabled': quietHoursEnabled,
-            'quiet_hours_start_local': quietHoursStartLocal,
-            'quiet_hours_end_local': quietHoursEndLocal,
-            'greeting_notifications_enabled': greetingNotificationsEnabled,
-            'religious_greetings_enabled': religiousGreetingsEnabled,
-            if (language != null) 'language': language,
-          })));
+      final raw =
+          _mapData(_data(await api.put('/notifications/preferences', data: {
+        'operational_enabled': operationalEnabled,
+        'engagement_enabled': engagementEnabled,
+        'quiet_hours_enabled': quietHoursEnabled,
+        'quiet_hours_start_local': quietHoursStartLocal,
+        'quiet_hours_end_local': quietHoursEndLocal,
+        'greeting_notifications_enabled': greetingNotificationsEnabled,
+        'religious_greetings_enabled': religiousGreetingsEnabled,
+        if (language != null) 'language': language,
+      })));
       return NotificationPreferencesDto.fromJson(raw);
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
@@ -217,5 +221,4 @@ class NotificationRepository {
     await _deviceIdStore.write(_deviceIdKey, generated);
     return generated;
   }
-
 }

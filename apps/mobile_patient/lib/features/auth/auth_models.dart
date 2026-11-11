@@ -48,6 +48,26 @@ class EmailChallengeResult {
       );
 }
 
+/// Response of `POST /auth/password-reset/verify-otp` (Phase 2: Secure
+/// Email OTP Password Recovery). [resetAuthorization] is a single-use
+/// bearer secret good only for the immediately following
+/// `POST /auth/password-reset/complete` call — never logged, never put in
+/// a URL, and discarded by the cubit the moment that call finishes (success
+/// or failure).
+class ResetAuthorizationResult {
+  const ResetAuthorizationResult({
+    required this.resetAuthorization,
+    required this.expiresInSeconds,
+  });
+  final String resetAuthorization;
+  final int expiresInSeconds;
+  factory ResetAuthorizationResult.fromJson(Map<String, dynamic> json) =>
+      ResetAuthorizationResult(
+        resetAuthorization: json['reset_authorization']?.toString() ?? '',
+        expiresInSeconds: (json['expires_in'] as num?)?.toInt() ?? 0,
+      );
+}
+
 /// `user` object returned by `POST /auth/verify-otp-and-login` — intentionally
 /// minimal (`{id, role, phone_number}` only, confirmed by backend research;
 /// the `POST /auth/refresh` response carries no `user` object at all, so a

@@ -190,6 +190,28 @@ impl ConsultationService {
             ));
         }
 
+        // M8-G-30: at most one live-consultation reservation per user_id,
+        // across all roles. This only prevents a NEW token from being
+        // minted — it is a prospective, mint-time-only control. It does not
+        // and cannot prove or disprove actual RTC participation; see
+        // docs/MILESTONE_8_SINGLE_LIVE_CONSULTATION_DESIGN.md for the full,
+        // explicitly scoped set of guarantees (and non-guarantees) this
+        // provides on its own, before the Agora provider webhook is
+        // configured.
+        if !consultation_repo::acquire_live_reservation(
+            &mut *tx,
+            user_id.into(),
+            appointment_id,
+            session.id,
+            consultation_repo::RESERVATION_PENDING_GRACE_SECS,
+        )
+        .await?
+        {
+            return Err(AppError::Conflict(
+                "You are already live in another consultation.".into(),
+            ));
+        }
+
         tx.commit().await?;
 
         // Bound the token's real cryptographic expiry (and every privilege it

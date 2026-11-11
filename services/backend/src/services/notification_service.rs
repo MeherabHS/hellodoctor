@@ -268,6 +268,7 @@ impl NotificationService {
         push_token: &str,
     ) -> Result<(), AppError> {
         let mut tx = state.begin_authed(ctx).await?;
+        super::data_rights_service::guard_device_registration(&mut tx, ctx.user_id).await?;
         notification_repo::device_tokens::upsert(
             &mut tx,
             device_id,

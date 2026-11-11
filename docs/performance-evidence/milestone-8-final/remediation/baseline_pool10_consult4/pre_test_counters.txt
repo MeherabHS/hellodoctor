@@ -1,0 +1,13 @@
+# TYPE admission_rejected_total counter
+admission_rejected_total{class="expensive",reason="lane_concurrency"} 5486
+admission_rejected_total{class="payment",reason="lane_concurrency"} 2043
+admission_rejected_total{class="webhook",reason="lane_concurrency"} 8132
+admission_rejected_total{class="payment",reason="dependency_pressure"} 138
+admission_rejected_total{class="normal",reason="account_budget"} 1
+admission_rejected_total{class="expensive",reason="dependency_pressure"} 1574
+admission_rejected_total{class="normal",reason="limiter_unavailable"} 8
+admission_rejected_total{class="normal",reason="lane_concurrency"} 16482
+admission_rejected_total{class="normal",reason="dependency_pressure"} 43650
+admission_rejected_total{class="consultation",reason="limiter_unavailable"} 1
+admission_rejected_total{class="consultation",reason="dependency_pressure"} 8108
+admission_rejected_total{class="consultation",reason="lane_concurrency"} 31687

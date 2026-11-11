@@ -12,7 +12,23 @@
 #   docker buildx imagetools inspect debian:bookworm-slim
 
 FROM rust:1-bookworm@sha256:c9155318d07341301a78b45ecdd81af2e43b8b297d64e8fd4c5e80d7735607c3 AS builder
-ARG TARGETARCH=amd64
+# Bare redeclaration, no default: `TARGETARCH` is one of buildx's automatic
+# platform build args, populated globally from `--platform` — but only
+# *implicitly available inside a build stage* once redeclared here. Giving
+# it a hardcoded default (the previous `ARG TARGETARCH=amd64`) does the
+# opposite of what it looks like it does: it defines a new, stage-scoped arg
+# that is NOT fed by buildx's automatic value unless `--build-arg
+# TARGETARCH=...` is also passed on the command line — confirmed live: a
+# real `docker buildx build --platform linux/arm64 --load ...` build (no
+# extra `--build-arg`), run under QEMU emulation against an aarch64
+# builder, produced `TARGETARCH=amd64` here and tripped the very check this
+# arg exists for ("unexpected Rust host aarch64-unknown-linux-gnu for
+# TARGETARCH=amd64"). The exact same invocation (no extra `--build-arg`) is
+# what `.github/workflows/arm64-compatibility.yml`'s `rust-backend-arm64`
+# job uses, so this was a real, reproducible gap in the ARM64 build path,
+# not an environment-specific fluke. Removing the default makes this
+# correctly inherit buildx's real per-platform value instead.
+ARG TARGETARCH
 WORKDIR /app
 
 # Fail the build if an ARM64 build accidentally uses a host/toolchain for a

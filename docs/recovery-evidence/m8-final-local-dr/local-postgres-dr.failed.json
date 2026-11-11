@@ -1,0 +1,8 @@
+{
+    "fixture":  "hellodoctor-m8-final-dr",
+    "generated_at_utc":  "2026-11-01T03:22:53.6858743Z",
+    "checks":  {
+                   "physical_backup":  "GREEN: pg_basebackup completed and pg_verifybackup accepted the manifest"
+               },
+    "failure":  "No archived WAL segments found"
+}

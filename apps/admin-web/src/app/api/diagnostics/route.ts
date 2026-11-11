@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync } from 'node:fs';
-import { getAccessToken, backendUrl, backendHeaders } from '@/lib/session';
+import { withAdminSession, backendUrl, backendHeaders } from '@/lib/session';
 import { safeIncident, sanitizedStack } from '@/lib/client-incidents';
 import packageInfo from '../../../../package.json';
 
@@ -28,9 +28,6 @@ const ALLOWED = ['client', 'error_type', 'message', 'stack_trace', 'screen', 'op
 
 export async function POST(req: NextRequest) {
   if (!sameOrigin(req)) return failure(403, 'Request origin is not permitted.');
-  const accessToken = await getAccessToken();
-  if (!accessToken) return failure(401, 'Admin session required.');
-
   let data: unknown;
   try { data = await req.json(); } catch { return failure(422, 'A valid incident is required.'); }
   if (!data || typeof data !== 'object' || Array.isArray(data) || Object.keys(data).some((k) => !ALLOWED.includes(k))) {
@@ -50,11 +47,11 @@ export async function POST(req: NextRequest) {
 
   let res: Response;
   try {
-    res = await fetch(`${backendUrl()}/api/v1/client-errors`, {
+    res = await withAdminSession(async accessToken=>fetch(`${backendUrl()}/api/v1/client-errors`, {
       method: 'POST', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(2500),
       headers: { ...(await backendHeaders()), 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify(payload),
-    });
+    }));
   } catch {
     return failure(503, 'Incident delivery unavailable.');
   }

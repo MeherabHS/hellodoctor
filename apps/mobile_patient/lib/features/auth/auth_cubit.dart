@@ -62,6 +62,30 @@ class AuthFailure extends AuthState {
   final String message;
 }
 
+/// Phase 2: Secure Email OTP Password Recovery — step 1 complete. The
+/// backend never reveals whether [email] actually has an eligible account;
+/// the UI must show the same "check your email" screen either way.
+class PasswordResetOtpSent extends AuthState {
+  const PasswordResetOtpSent({required this.email, required this.expiresInSeconds});
+  final String email;
+  final int expiresInSeconds;
+}
+
+/// Step 2 complete: the OTP was correct. [resetAuthorization] is held only
+/// in the cubit's private field, never exposed on this state, so no widget
+/// can accidentally log or display it.
+class PasswordResetVerified extends AuthState {
+  const PasswordResetVerified();
+}
+
+/// Step 3 complete. Deliberately carries no session — every existing
+/// session for the account was revoked by the backend as part of
+/// completing the reset, so the only correct next screen is an ordinary
+/// sign-in form, never an auto-login.
+class PasswordResetCompleted extends AuthState {
+  const PasswordResetCompleted();
+}
+
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit(this.api, {this.cache, AuthRepository? repository})
       : repository = repository ?? AuthRepository(api),
@@ -229,6 +253,92 @@ class AuthCubit extends Cubit<AuthState> {
   void restartLogin() {
     if (_busy) return;
     _phoneNumber = null;
+    emit(const SignedOut());
+  }
+
+  // ---------------- Phase 2: Secure Email OTP Password Recovery ----------------
+
+  String? _resetEmail;
+  String? _resetAuthorization;
+
+  Future<void> requestPasswordReset(String email) async {
+    if (_busy) return;
+    final trimmed = email.trim().toLowerCase();
+    if (trimmed.isEmpty || !trimmed.contains('@')) {
+      emit(const AuthFailure('Enter a valid email address.'));
+      return;
+    }
+    _busy = true;
+    emit(const AuthBusy());
+    try {
+      await repository.requestPasswordReset(email: trimmed);
+      _resetEmail = trimmed;
+      // The backend's request-reset response carries no expiry field (it
+      // never varies by account existence, so there is nothing
+      // account-specific to report back) — 300s mirrors the backend's own
+      // `PASSWORD_RESET_OTP_TTL_SECONDS` default, shown only as a countdown
+      // convenience, never relied on for correctness.
+      emit(PasswordResetOtpSent(email: trimmed, expiresInSeconds: 300));
+    } on ApiException catch (e) {
+      emit(AuthFailure(e.userMessage));
+    } catch (_) {
+      emit(const AuthFailure('Unable to request a password reset. Please retry.'));
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> verifyPasswordResetOtp(String otpCode) async {
+    if (_busy || _resetEmail == null) return;
+    if (otpCode.trim().length != 6 || int.tryParse(otpCode.trim()) == null) {
+      emit(const AuthFailure('Enter the 6-digit verification code.'));
+      return;
+    }
+    _busy = true;
+    emit(const AuthBusy());
+    try {
+      final result = await repository.verifyPasswordResetOtp(
+          email: _resetEmail!, otpCode: otpCode.trim());
+      _resetAuthorization = result.resetAuthorization;
+      emit(const PasswordResetVerified());
+    } on ApiException catch (e) {
+      emit(AuthFailure(e.status == 401
+          ? 'The verification code is invalid or has expired.'
+          : e.userMessage));
+    } catch (_) {
+      emit(const AuthFailure('Unable to verify this code. Please retry.'));
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> completePasswordReset(String newPassword) async {
+    if (_busy || _resetAuthorization == null) return;
+    _busy = true;
+    emit(const AuthBusy());
+    try {
+      await repository.completePasswordReset(
+          resetAuthorization: _resetAuthorization!, newPassword: newPassword);
+      _resetAuthorization = null;
+      _resetEmail = null;
+      emit(const PasswordResetCompleted());
+    } on ApiException catch (e) {
+      emit(AuthFailure(e.status == 422
+          ? e.message.isNotEmpty ? e.message : 'Choose a stronger password.'
+          : e.userMessage));
+    } catch (_) {
+      emit(const AuthFailure('Unable to reset the password. Please retry.'));
+    } finally {
+      _busy = false;
+    }
+  }
+
+  /// Abandons an in-progress reset (e.g. the user backs out) and returns to
+  /// the ordinary sign-in screen.
+  void restartPasswordReset() {
+    if (_busy) return;
+    _resetEmail = null;
+    _resetAuthorization = null;
     emit(const SignedOut());
   }
 

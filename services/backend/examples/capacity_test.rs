@@ -33,6 +33,41 @@
 //! cardinality (how many patients exist in the dataset) and active-session
 //! count (how many of them are simulated as concurrently "logged in and
 //! doing things" right now) are reported separately, never conflated.
+//!
+//! Milestone 8.0 session-ramp remediation (2026-10-31): the original
+//! sessions mode started every one of `CAPACITY_ACTIVE_SESSIONS` tasks, and
+//! had each dispatch its first action, at the same instant (t=0) — a real,
+//! measured thundering-herd artifact (hundreds of 5xx in the first 10s
+//! bucket alone, varying run to run) that is a property of this test
+//! harness's startup, not of organic Patient/Doctor ramp-up, and inflated
+//! headline error-rate figures in a way unrelated to whatever the run was
+//! actually trying to measure. `CAPACITY_RAMP_SECS` (default 0, preserving
+//! the exact original immediate-start behavior) spreads each session's
+//! first start uniformly across a `[0, CAPACITY_RAMP_SECS]` window instead.
+//! Two explicitly named profiles:
+//!   REALISTIC_RAMP (sessions introduced gradually, realistic ongoing use):
+//!     CAPACITY_MODE=sessions CAPACITY_PROFILE=REALISTIC_RAMP \
+//!     CAPACITY_ACTIVE_SESSIONS=1200 CAPACITY_RAMP_SECS=120 \
+//!     CAPACITY_THINK_MIN_SECS=5 CAPACITY_THINK_MAX_SECS=20 \
+//!     CAPACITY_DURATION_SECS=300 cargo run --release --example capacity_test
+//!   SIMULTANEOUS_BURST (explicit stress test — the original behavior, now
+//!   named rather than silently the only option):
+//!     CAPACITY_MODE=sessions CAPACITY_PROFILE=SIMULTANEOUS_BURST \
+//!     CAPACITY_ACTIVE_SESSIONS=1200 CAPACITY_RAMP_SECS=0 \
+//!     CAPACITY_THINK_MIN_SECS=5 CAPACITY_THINK_MAX_SECS=20 \
+//!     CAPACITY_DURATION_SECS=300 cargo run --release --example capacity_test
+//! A `SESSION_START` marker sample is recorded the instant each session
+//! actually begins dispatching (after its ramp delay, if any), reusing the
+//! existing sample/time-series plumbing rather than a parallel mechanism —
+//! the printed time series's `sessions_active` column and the final
+//! `sessions_started`/`sessions_never_started` line are both derived from
+//! these markers, so "how many sessions were really concurrently active,
+//! and when" is reported directly from observed events, never assumed equal
+//! to `CAPACITY_ACTIVE_SESSIONS` or to the registered-patient count. A
+//! session whose ramp-assigned start time falls after `CAPACITY_DURATION_SECS`
+//! (only possible if `CAPACITY_RAMP_SECS` > `CAPACITY_DURATION_SECS`) never
+//! starts at all and is counted in `sessions_never_started`, not silently
+//! dropped.
 
 use chrono::Utc;
 use hellodoctor_backend::crypto::create_access_token;
@@ -44,7 +79,7 @@ use std::env;
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex, RwLock};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -89,12 +124,16 @@ struct Fixtures {
     base_url: String,
     client: reqwest::Client,
     pg: sqlx::PgPool,
-    patient_tokens: Vec<String>,
+    patient_tokens: Vec<RwLock<(String, Instant)>>,
+    patient_user_ids: Vec<Uuid>,
     patient_consultation_ids: Vec<Option<Uuid>>, // one pre-existing historical consultation per patient, for grievances
     patient_state: Vec<Mutex<PatientRuntimeState>>,
     booking_attempts: Vec<AtomicU32>, // per-patient-index counter, gates well under the real 10/hour limit
-    doctor_tokens: Vec<String>,
-    admin_tokens: Vec<String>,
+    doctor_tokens: Vec<RwLock<(String, Instant)>>,
+    doctor_user_ids: Vec<Uuid>,
+    admin_tokens: Vec<RwLock<(String, Instant)>>,
+    admin_user_ids: Vec<Uuid>,
+    jwt_private_key: String,
     available_slots: Mutex<Vec<(Uuid, Uuid)>>, // (slot_id, doctor_id), consumed front-to-back
     slot_cursor: AtomicUsize,
     rr_patient: AtomicUsize,
@@ -104,6 +143,105 @@ struct Fixtures {
 }
 
 const MAX_BOOKING_ATTEMPTS_PER_PATIENT: u32 = 8;
+
+// Milestone 8 Workstream 2 fix: the real backend's access-token TTL
+// (hellodoctor_backend::crypto::ACCESS_TOKEN_TTL_SECONDS, private to that
+// module -- this is this file's own mirror, keep in sync if that ever
+// changes) is a genuine 15 minutes, correctly enforced. This harness
+// previously minted every identity's token ONCE at startup into a plain
+// immutable Vec<String> and never renewed it; `refresh_action` read a
+// `patient_state.refresh_token` field that was NEVER SET anywhere (always
+// None), so it silently fell back to a filler GET every single time and
+// never actually exercised `/api/v1/auth/refresh`. Confirmed via a 40-minute
+// run: ~15 minutes in, every token expired near-simultaneously and the
+// backend correctly started returning real 401s for the rest of the run --
+// a benchmark-tooling defect, not a backend one.
+//
+// Fix: re-mint locally via the same signing key this harness already
+// legitimately holds (the same bypass already used for *initial*
+// authentication, for the same reason -- this is a load generator, not a
+// test of the login/argon2id path), proactively before the real TTL
+// elapses, per identity, with a small index-derived jitter so ~2,000
+// sessions minted at nearly the same instant don't all re-check in the
+// exact same tick. This does NOT touch the backend's real TTL, the real
+// `/api/v1/auth/refresh` endpoint's reuse-detection/device-proof rotation
+// logic, or any production authentication code -- it only fixes the
+// harness's own failure to ever renew what it hands to the backend.
+// Deliberately NOT implemented: replicating the real refresh-token
+// rotation protocol (crypto::hash_code-based, with family reuse detection
+// and device-proof binding -- see src/services/auth_service.rs) would be
+// real additional backend-security-sensitive surface to get exactly right
+// under 2,000-way concurrency, and getting it subtly wrong would itself be
+// a new failure mode. This harness still never exercises
+// `/api/v1/auth/refresh` under load -- a disclosed, deliberate limitation,
+// not a silent gap.
+const ACCESS_TOKEN_TTL_SECS_MIRROR: u64 = 15 * 60;
+const TOKEN_REFRESH_MARGIN_SECS: u64 = 180;
+
+async fn fresh_token(
+    pool: &[RwLock<(String, Instant)>],
+    user_ids: &[Uuid],
+    role: &str,
+    jwt_private_key: &str,
+    idx: usize,
+) -> String {
+    if pool.is_empty() {
+        return String::new();
+    }
+    let i = idx % pool.len();
+    // Deterministic per-identity jitter (0-119s) so a pool minted together
+    // doesn't all cross its refresh threshold in the same instant.
+    let jitter_secs = (i as u64 * 37) % 120;
+    let refresh_at_elapsed = ACCESS_TOKEN_TTL_SECS_MIRROR
+        .saturating_sub(TOKEN_REFRESH_MARGIN_SECS)
+        .saturating_sub(jitter_secs);
+    {
+        let guard = pool[i].read().await;
+        if guard.1.elapsed().as_secs() < refresh_at_elapsed {
+            return guard.0.clone();
+        }
+    }
+    let mut guard = pool[i].write().await;
+    // Re-check: another task may have already refreshed while we waited.
+    if guard.1.elapsed().as_secs() < refresh_at_elapsed {
+        return guard.0.clone();
+    }
+    let new_token = create_access_token(user_ids[i], role, user_ids[i], jwt_private_key)
+        .expect("re-mint access token");
+    *guard = (new_token.clone(), Instant::now());
+    new_token
+}
+
+async fn patient_token(f: &Fixtures, idx: usize) -> String {
+    fresh_token(
+        &f.patient_tokens,
+        &f.patient_user_ids,
+        "PATIENT",
+        &f.jwt_private_key,
+        idx,
+    )
+    .await
+}
+async fn doctor_token(f: &Fixtures, idx: usize) -> String {
+    fresh_token(
+        &f.doctor_tokens,
+        &f.doctor_user_ids,
+        "DOCTOR",
+        &f.jwt_private_key,
+        idx,
+    )
+    .await
+}
+async fn admin_token(f: &Fixtures, idx: usize) -> String {
+    fresh_token(
+        &f.admin_tokens,
+        &f.admin_user_ids,
+        "ADMIN",
+        &f.jwt_private_key,
+        idx,
+    )
+    .await
+}
 
 #[tokio::main]
 async fn main() {
@@ -131,6 +269,17 @@ async fn main() {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(20);
+    let ramp_secs: u64 = env::var("CAPACITY_RAMP_SECS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let profile = env::var("CAPACITY_PROFILE").unwrap_or_else(|_| {
+        if ramp_secs > 0 {
+            "REALISTIC_RAMP".to_string()
+        } else {
+            "SIMULTANEOUS_BURST".to_string()
+        }
+    });
     let database_url = env::var("CAPACITY_DATABASE_URL").unwrap_or_else(|_| {
         "postgres://hellodoctor:hellodoctor_dev_password@localhost:5532/hellodoctor".to_string()
     });
@@ -139,7 +288,24 @@ async fn main() {
     let webhook_secret = env::var("WEBHOOK_HMAC_SECRET").unwrap_or_default();
 
     println!("=== HelloDoctor Constrained-VPS Capacity Test (open-loop) ===");
-    println!("target={base_url} target_rps={target_rps} duration={duration_secs}s\n");
+    println!("target={base_url} target_rps={target_rps} duration={duration_secs}s");
+    if mode == "sessions" {
+        if profile == "SIMULTANEOUS_BURST" {
+            println!(
+                "PROFILE={profile} (ramp_secs={ramp_secs}) -- THIS IS A STRESS/BURST TEST: \
+                 every session starts at the same instant. Not representative of organic \
+                 Patient/Doctor ramp-up; use REALISTIC_RAMP (CAPACITY_RAMP_SECS > 0) for a \
+                 steady-state capacity conclusion.\n"
+            );
+        } else {
+            println!(
+                "PROFILE={profile} (ramp_secs={ramp_secs}) -- sessions are introduced \
+                 gradually and uniformly over the ramp window.\n"
+            );
+        }
+    } else {
+        println!();
+    }
 
     let pg = PgPoolOptions::new()
         .max_connections(10)
@@ -173,10 +339,26 @@ async fn main() {
     .await
     .expect("load capacity-test admins");
 
+    // Milestone 8 benchmark-methodology correction (2026-11-04): a fixed-dump
+    // restore's doctor_schedule_slots.start_time values were real future times
+    // AT SEED TIME, but every day that passes after the dump is captured turns
+    // more of its earliest AVAILABLE slots into the past relative to "now" at
+    // restore time. This query used to have no time filter at all, so
+    // next_slot()'s front-to-back cursor (ordered by start_time ASC) always
+    // drained those stale slots first; the real booking lock (doctor_repo.rs's
+    // `UPDATE ... WHERE id=$1 AND start_time > clock_timestamp()`) then
+    // silently affects 0 rows for each one, surfacing as a business rejection
+    // -- confirmed live: 0/29 (0%) booking success one day after the dump was
+    // captured, purely this artifact, not a capacity signal. Fixed by matching
+    // the same `start_time > clock_timestamp()` filter production code already
+    // uses correctly for this exact purpose (see doctor_repo.rs's own
+    // available-slots query) -- zero data mutation required, and correct no
+    // matter how much time has elapsed since the dump was captured.
     let available_slots: Vec<(Uuid, Uuid)> = sqlx::query(
         "SELECT s.id, s.doctor_id FROM doctor_schedule_slots s \
          JOIN doctor_profiles dp ON dp.id = s.doctor_id \
-         WHERE s.status = 'AVAILABLE' AND dp.license_number LIKE 'SYNTH-KE-CAP-%' \
+         WHERE s.status = 'AVAILABLE' AND s.start_time > clock_timestamp() \
+         AND dp.license_number LIKE 'SYNTH-KE-CAP-%' \
          ORDER BY s.start_time",
     )
     .fetch_all(&pg)
@@ -223,35 +405,69 @@ async fn main() {
 
     sqlx::query("INSERT INTO auth_sessions(id,user_id,token_family_id,refresh_token_hash,created_at,last_used_at,expires_at) SELECT gen_random_uuid(),id,id,'capacity-fixture-session-'||id::text,NOW(),NOW(),NOW()+INTERVAL '7 days' FROM users WHERE phone_number LIKE '+25471%' OR phone_number LIKE '+25472%' OR phone_number LIKE '+25473%' OR phone_number LIKE '+25474%' ON CONFLICT DO NOTHING")
         .execute(&pg).await.expect("synthetic capacity-test sessions");
-    let patient_tokens: Vec<String> = patient_rows
+    let patient_user_ids: Vec<Uuid> = patient_rows.iter().map(|(uid, _)| *uid).collect();
+    let now = Instant::now();
+    let patient_tokens: Vec<RwLock<(String, Instant)>> = patient_user_ids
         .iter()
-        .map(|(uid, _)| create_access_token(*uid, "PATIENT", *uid, &jwt_private_key).unwrap())
+        .map(|uid| {
+            RwLock::new((
+                create_access_token(*uid, "PATIENT", *uid, &jwt_private_key).unwrap(),
+                now,
+            ))
+        })
         .collect();
-    let doctor_tokens: Vec<String> = doctor_user_ids
+    let doctor_tokens: Vec<RwLock<(String, Instant)>> = doctor_user_ids
         .iter()
-        .map(|uid| create_access_token(*uid, "DOCTOR", *uid, &jwt_private_key).unwrap())
+        .map(|uid| {
+            RwLock::new((
+                create_access_token(*uid, "DOCTOR", *uid, &jwt_private_key).unwrap(),
+                now,
+            ))
+        })
         .collect();
-    let admin_tokens: Vec<String> = admin_user_ids
+    let admin_tokens: Vec<RwLock<(String, Instant)>> = admin_user_ids
         .iter()
-        .map(|uid| create_access_token(*uid, "PLATFORM_ADMIN", *uid, &jwt_private_key).unwrap())
+        .map(|uid| {
+            RwLock::new((
+                create_access_token(*uid, "ADMIN", *uid, &jwt_private_key).unwrap(),
+                now,
+            ))
+        })
         .collect();
 
     let patient_count = patient_tokens.len();
+    // M8 six-service benchmark: when CAPACITY_BASE_URL points at a reverse
+    // proxy by IP:port (e.g. Caddy) rather than directly at the backend, the
+    // proxy's Host-based vhost routing needs an explicit Host header — the
+    // IP:port alone never matches a named `http://api.localhost { ... }`
+    // site block. Optional and unused by the existing direct-to-backend
+    // invocations (CAPACITY_HOST_HEADER unset leaves behavior unchanged).
+    let mut client_builder = reqwest::Client::builder().timeout(Duration::from_secs(10));
+    if let Ok(host_header) = env::var("CAPACITY_HOST_HEADER") {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            reqwest::header::HOST,
+            reqwest::header::HeaderValue::from_str(&host_header)
+                .expect("CAPACITY_HOST_HEADER must be a valid header value"),
+        );
+        client_builder = client_builder.default_headers(headers);
+    }
     let fixtures = Arc::new(Fixtures {
         base_url,
-        client: reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()
-            .unwrap(),
+        client: client_builder.build().unwrap(),
         pg: pg.clone(),
         patient_tokens,
+        patient_user_ids,
         patient_consultation_ids,
         patient_state: (0..patient_count)
             .map(|_| Mutex::new(PatientRuntimeState::default()))
             .collect(),
         booking_attempts: (0..patient_count).map(|_| AtomicU32::new(0)).collect(),
         doctor_tokens,
+        doctor_user_ids,
         admin_tokens,
+        admin_user_ids,
+        jwt_private_key: jwt_private_key.clone(),
         available_slots: Mutex::new(available_slots),
         slot_cursor: AtomicUsize::new(0),
         rr_patient: AtomicUsize::new(0),
@@ -275,7 +491,7 @@ async fn main() {
     let requested_count: u64 = if mode == "sessions" {
         // ---- Active-session (think-time) dispatch — §6 ----
         println!(
-            "registered_patients={} active_sessions={active_sessions} think_time_secs=[{think_min_secs},{think_max_secs}]\n",
+            "registered_patients={} active_sessions_target={active_sessions} ramp_secs={ramp_secs} think_time_secs=[{think_min_secs},{think_max_secs}]\n",
             patient_count
         );
         let mut handles = Vec::new();
@@ -283,7 +499,37 @@ async fn main() {
             let f = fixtures.clone();
             let tx = tx.clone();
             let patient_idx = session_idx % patient_count.max(1);
+            // Milestone 8.0 session-ramp remediation: spread each session's
+            // first start uniformly across [0, ramp_secs] instead of every
+            // session starting at the same instant. ramp_secs=0 (the
+            // SIMULTANEOUS_BURST default) reduces this to the original,
+            // unchanged immediate-start behavior exactly (start_delay is
+            // always zero).
+            let start_delay = if ramp_secs > 0 {
+                Duration::from_secs_f64(
+                    ramp_secs as f64 * session_idx as f64 / active_sessions.max(1) as f64,
+                )
+            } else {
+                Duration::ZERO
+            };
             handles.push(tokio::spawn(async move {
+                if !start_delay.is_zero() {
+                    tokio::time::sleep(start_delay).await;
+                }
+                // A session whose ramp-assigned start lands at/after the
+                // deadline (only possible when ramp_secs > duration_secs)
+                // never dispatches anything — counted via the complete
+                // absence of its SESSION_START marker, never silently
+                // treated as having run.
+                if Instant::now() >= deadline {
+                    return;
+                }
+                let _ = tx.send(Sample {
+                    label: "SESSION_START",
+                    elapsed: Duration::ZERO,
+                    status: 0,
+                    sent_at: Instant::now(),
+                });
                 loop {
                     if Instant::now() >= deadline {
                         break;
@@ -326,14 +572,31 @@ async fn main() {
     drop(tx);
     let samples = collector.await.unwrap();
 
-    let achieved_rps = samples.len() as f64 / duration_secs as f64;
+    // SESSION_START markers are bookkeeping, not real dispatched requests —
+    // excluded here so achieved_rps reflects actual traffic, not the ramp.
+    let real_sample_count = samples
+        .iter()
+        .filter(|s| !is_session_start_marker(s))
+        .count();
+    let achieved_rps = real_sample_count as f64 / duration_secs as f64;
     println!(
-        "requested_rps={target_rps:.1} requested_count={requested_count} achieved_rps={achieved_rps:.1} achieved_count={}\n",
-        samples.len()
+        "configured_target_rps={target_rps:.1} requested_count={requested_count} achieved_response_rps={achieved_rps:.1} achieved_count={}\n",
+        real_sample_count
     );
 
     report_time_series(&samples, test_start, duration_secs);
-    report(&samples, duration_secs, target_rps, requested_count);
+    let active_sessions_target = if mode == "sessions" {
+        active_sessions
+    } else {
+        0
+    };
+    report(
+        &samples,
+        duration_secs,
+        target_rps,
+        requested_count,
+        active_sessions_target,
+    );
 }
 
 /// Same weighted action mix as `dispatch_one`, but bound to a fixed
@@ -346,11 +609,53 @@ async fn dispatch_one_for_session(
     tx: &mpsc::UnboundedSender<Sample>,
     patient_idx: usize,
 ) {
+    // Milestone 8 Workstream 1 isolated-profile addition: when set, every
+    // session dispatches ONLY this one action instead of the normal weighted
+    // mix below, so a profile's memory/CPU footprint can be measured without
+    // the other endpoints' traffic diluting it. Unset (the default) preserves
+    // the original weighted-mix behavior exactly, so existing REALISTIC_RAMP/
+    // SIMULTANEOUS_BURST runs and their recorded baselines are unaffected.
+    if let Ok(isolated) = env::var("CAPACITY_ISOLATED_ACTION") {
+        match isolated.as_str() {
+            "booking_payment" => {
+                booking_action(f, tx, patient_idx).await;
+                return;
+            }
+            "chat" => {
+                // chat_action requires a conversation, which only exists
+                // after a successful booking_action (it reads
+                // patient_state.booked_appointment's conv_id, populated at
+                // the end of booking_action). An isolated chat-only run
+                // never calls booking_action otherwise, so every session
+                // would fall through to chat_action's own "no conversation"
+                // fallback (a GET /doctors) for its entire lifetime and
+                // measure nothing but that — confirmed happened on the first
+                // attempt (2,079/2,079 samples were "GET /doctors", zero
+                // "POST chat message"). Book once per session, then chat
+                // repeatedly once a conversation exists.
+                let has_booking = f.patient_state[patient_idx]
+                    .lock()
+                    .await
+                    .booked_appointment
+                    .is_some();
+                if has_booking {
+                    chat_action(f, tx, patient_idx).await;
+                } else {
+                    booking_action(f, tx, patient_idx).await;
+                }
+                return;
+            }
+            other => panic!(
+                "Unknown CAPACITY_ISOLATED_ACTION={other}; expected \"booking_payment\" or \"chat\""
+            ),
+        }
+    }
+
     let roll: f64 = {
         use rand::Rng;
         rand::thread_rng().gen::<f64>()
     };
-    let token = &f.patient_tokens[patient_idx % f.patient_tokens.len()];
+    let token = &patient_token(f, patient_idx).await;
 
     if roll < 0.33 {
         send_sample(
@@ -373,14 +678,33 @@ async fn dispatch_one_for_session(
     } else if roll < 0.71 {
         rtc_token_action(f, tx, patient_idx).await;
     } else if roll < 0.79 {
-        booking_action(f, tx, patient_idx).await;
+        // A virtual patient may create one new booking during a run. Once the
+        // booking exists, keep the session on read/consultation traffic rather
+        // than repeatedly creating fresh appointments for the same identity;
+        // repeated bookings were a synthetic burst source that overwhelmed
+        // Payment's bounded 20/s token bucket at the 250-RPS preparation run.
+        let already_booked = f.patient_state[patient_idx]
+            .lock()
+            .await
+            .booked_appointment
+            .is_some();
+        if already_booked {
+            chat_action(f, tx, patient_idx).await;
+        } else {
+            booking_action(f, tx, patient_idx).await;
+        }
     } else if roll < 0.86 {
         let idx = f.rr_doctor.fetch_add(1, Ordering::Relaxed) % f.doctor_tokens.len().max(1);
         send_sample(
             f,
             tx,
             "GET wallet summary",
-            timed_get(f, "/api/v1/doctor/wallet/summary", &f.doctor_tokens[idx]).await,
+            timed_get(
+                f,
+                "/api/v1/doctor/wallet/summary",
+                &doctor_token(f, idx).await,
+            )
+            .await,
         );
     } else if roll < 0.91 {
         telemetry_action(f, tx, patient_idx).await;
@@ -390,7 +714,12 @@ async fn dispatch_one_for_session(
             f,
             tx,
             "GET admin telemetry",
-            timed_get(f, "/api/v1/admin/command/telemetry", &f.admin_tokens[idx]).await,
+            timed_get(
+                f,
+                "/api/v1/admin/command/telemetry",
+                &admin_token(f, idx).await,
+            )
+            .await,
         );
     } else if roll < 0.98 {
         refresh_action(f, tx, patient_idx).await;
@@ -402,13 +731,36 @@ async fn dispatch_one_for_session(
 /// Section 11's explicit requirement: capture requested-vs-achieved RPS and
 /// latency every 10 seconds, so queue growth/saturation shows up as a trend,
 /// not just a single end-of-run average that could hide a mid-run collapse.
+/// `SESSION_START` is a bookkeeping marker (§ module doc), never a real
+/// request/response — it must never be counted as throughput, latency, or
+/// (status=0, which `Outcome::classify` maps to `SystemError`) a failure.
+fn is_session_start_marker(s: &Sample) -> bool {
+    s.label == "SESSION_START"
+}
+
 fn report_time_series(samples: &[Sample], test_start: Instant, duration_secs: u64) {
     const BUCKET_SECS: u64 = 10;
     let num_buckets = duration_secs.div_ceil(BUCKET_SECS).max(1) as usize;
     let mut buckets: Vec<Vec<Duration>> = vec![Vec::new(); num_buckets];
     let mut error_buckets: Vec<usize> = vec![0; num_buckets];
+    // Milestone 8.0 session-ramp remediation: how many sessions had actually
+    // started (sent their SESSION_START marker) by the END of each bucket —
+    // the real, observed concurrent-activity curve, never assumed to equal
+    // CAPACITY_ACTIVE_SESSIONS before the ramp window completes.
+    let mut sessions_started_by_bucket_end: Vec<usize> = vec![0; num_buckets];
+    let mut sessions_started_so_far = 0usize;
+    let mut session_start_offsets: Vec<u64> = samples
+        .iter()
+        .filter(|s| is_session_start_marker(s))
+        .map(|s| s.sent_at.saturating_duration_since(test_start).as_secs())
+        .collect();
+    session_start_offsets.sort_unstable();
+    let mut start_cursor = 0usize;
 
     for s in samples {
+        if is_session_start_marker(s) {
+            continue;
+        }
         let offset_secs = s.sent_at.saturating_duration_since(test_start).as_secs();
         let idx = ((offset_secs / BUCKET_SECS) as usize).min(num_buckets - 1);
         buckets[idx].push(s.elapsed);
@@ -416,11 +768,21 @@ fn report_time_series(samples: &[Sample], test_start: Instant, duration_secs: u6
             error_buckets[idx] += 1;
         }
     }
+    for (i, slot) in sessions_started_by_bucket_end.iter_mut().enumerate() {
+        let bucket_end_secs = (i as u64 + 1) * BUCKET_SECS;
+        while start_cursor < session_start_offsets.len()
+            && session_start_offsets[start_cursor] < bucket_end_secs
+        {
+            sessions_started_so_far += 1;
+            start_cursor += 1;
+        }
+        *slot = sessions_started_so_far;
+    }
 
     println!("--- Time series (10s buckets) ---");
     println!(
-        "{:>10} {:>12} {:>8} {:>8} {:>8} {:>8}",
-        "window_s", "achieved_rps", "p50_ms", "p95_ms", "p99_ms", "5xx"
+        "{:>10} {:>12} {:>8} {:>8} {:>8} {:>8} {:>15}",
+        "window_s", "achieved_rps", "p50_ms", "p95_ms", "p99_ms", "5xx", "sessions_active"
     );
     for (i, durs) in buckets.iter().enumerate() {
         let mut durs = durs.clone();
@@ -437,7 +799,7 @@ fn report_time_series(samples: &[Sample], test_start: Instant, duration_secs: u6
             )
         };
         println!(
-            "{:>10} {:>12.1} {:>8} {:>8} {:>8} {:>8}",
+            "{:>10} {:>12.1} {:>8} {:>8} {:>8} {:>8} {:>15}",
             format!(
                 "{}-{}",
                 i as u64 * BUCKET_SECS,
@@ -447,7 +809,8 @@ fn report_time_series(samples: &[Sample], test_start: Instant, duration_secs: u6
             p50,
             p95,
             p99,
-            error_buckets[i]
+            error_buckets[i],
+            sessions_started_by_bucket_end[i]
         );
     }
     println!();
@@ -465,7 +828,7 @@ async fn dispatch_one(f: &Fixtures, tx: mpsc::UnboundedSender<Sample>) {
             f,
             &tx,
             "GET /doctors",
-            timed_get(f, "/api/v1/doctors", &f.patient_tokens[idx]).await,
+            timed_get(f, "/api/v1/doctors", &patient_token(f, idx).await).await,
         );
     } else if roll < 0.53 {
         let idx = f.rr_patient.fetch_add(1, Ordering::Relaxed) % f.patient_tokens.len();
@@ -478,7 +841,7 @@ async fn dispatch_one(f: &Fixtures, tx: mpsc::UnboundedSender<Sample>) {
             timed_get(
                 f,
                 &format!("/api/v1/doctors/{doctor_id}/slots"),
-                &f.patient_tokens[idx],
+                &patient_token(f, idx).await,
             )
             .await,
         );
@@ -497,7 +860,12 @@ async fn dispatch_one(f: &Fixtures, tx: mpsc::UnboundedSender<Sample>) {
             f,
             &tx,
             "GET wallet summary",
-            timed_get(f, "/api/v1/doctor/wallet/summary", &f.doctor_tokens[idx]).await,
+            timed_get(
+                f,
+                "/api/v1/doctor/wallet/summary",
+                &doctor_token(f, idx).await,
+            )
+            .await,
         );
     } else if roll < 0.91 {
         let idx = f.rr_patient.fetch_add(1, Ordering::Relaxed) % f.patient_tokens.len();
@@ -508,7 +876,12 @@ async fn dispatch_one(f: &Fixtures, tx: mpsc::UnboundedSender<Sample>) {
             f,
             &tx,
             "GET admin telemetry",
-            timed_get(f, "/api/v1/admin/command/telemetry", &f.admin_tokens[idx]).await,
+            timed_get(
+                f,
+                "/api/v1/admin/command/telemetry",
+                &admin_token(f, idx).await,
+            )
+            .await,
         );
     } else if roll < 0.98 {
         let idx = f.rr_patient.fetch_add(1, Ordering::Relaxed) % f.patient_tokens.len();
@@ -555,7 +928,7 @@ async fn booking_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, patien
             f,
             tx,
             "GET /doctors",
-            timed_get(f, "/api/v1/doctors", &f.patient_tokens[patient_idx]).await,
+            timed_get(f, "/api/v1/doctors", &patient_token(f, patient_idx).await).await,
         );
         return;
     }
@@ -564,11 +937,11 @@ async fn booking_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, patien
             f,
             tx,
             "GET /doctors",
-            timed_get(f, "/api/v1/doctors", &f.patient_tokens[patient_idx]).await,
+            timed_get(f, "/api/v1/doctors", &patient_token(f, patient_idx).await).await,
         );
         return;
     };
-    let token = f.patient_tokens[patient_idx].clone();
+    let token = patient_token(f, patient_idx).await;
 
     let start = Instant::now();
     let Ok(res) = f
@@ -614,6 +987,14 @@ async fn booking_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, patien
     let Some(payment_session_id) = body["data"]["payment_session_id"].as_str() else {
         return;
     };
+
+    // Reserve this patient's single booking slot before the webhook call. If
+    // the provider confirmation is shed or fails, the run records that honest
+    // payment outcome instead of issuing a second booking for the same user.
+    {
+        let mut state = f.patient_state[patient_idx].lock().await;
+        state.booked_appointment = Some((appointment_id, Uuid::nil()));
+    }
 
     let webhook_body = json!({
         "payment_session_id": payment_session_id,
@@ -672,7 +1053,7 @@ async fn chat_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, patient_i
             f,
             tx,
             "GET /doctors",
-            timed_get(f, "/api/v1/doctors", &f.patient_tokens[patient_idx]).await,
+            timed_get(f, "/api/v1/doctors", &patient_token(f, patient_idx).await).await,
         );
         return;
     };
@@ -681,7 +1062,7 @@ async fn chat_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, patient_i
             f,
             tx,
             "GET /doctors",
-            timed_get(f, "/api/v1/doctors", &f.patient_tokens[patient_idx]).await,
+            timed_get(f, "/api/v1/doctors", &patient_token(f, patient_idx).await).await,
         );
         return;
     }
@@ -692,7 +1073,7 @@ async fn chat_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, patient_i
         timed_post(
             f,
             &format!("/api/v1/chat/{conv_id}/messages"),
-            &f.patient_tokens[patient_idx],
+            &patient_token(f, patient_idx).await,
             &json!({ "content": "Capacity-test message" }),
         )
         .await,
@@ -706,7 +1087,7 @@ async fn rtc_token_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, pati
             f,
             tx,
             "GET /doctors",
-            timed_get(f, "/api/v1/doctors", &f.patient_tokens[patient_idx]).await,
+            timed_get(f, "/api/v1/doctors", &patient_token(f, patient_idx).await).await,
         );
         return;
     };
@@ -717,7 +1098,7 @@ async fn rtc_token_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, pati
         timed_post(
             f,
             &format!("/api/v1/consultations/{apt_id}/rtc-token"),
-            &f.patient_tokens[patient_idx],
+            &patient_token(f, patient_idx).await,
             &json!({}),
         )
         .await,
@@ -731,7 +1112,7 @@ async fn telemetry_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, pati
             f,
             tx,
             "GET /doctors",
-            timed_get(f, "/api/v1/doctors", &f.patient_tokens[patient_idx]).await,
+            timed_get(f, "/api/v1/doctors", &patient_token(f, patient_idx).await).await,
         );
         return;
     };
@@ -742,7 +1123,7 @@ async fn telemetry_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, pati
         timed_post(
             f,
             &format!("/api/v1/consultations/{apt_id}/telemetry"),
-            &f.patient_tokens[patient_idx],
+            &patient_token(f, patient_idx).await,
             &json!({ "call_duration_seconds": 300, "connection_state": "CONNECTED", "prescription_issued": false }),
         )
         .await,
@@ -762,7 +1143,7 @@ async fn refresh_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, patien
             f,
             tx,
             "GET /doctors",
-            timed_get(f, "/api/v1/doctors", &f.patient_tokens[patient_idx]).await,
+            timed_get(f, "/api/v1/doctors", &patient_token(f, patient_idx).await).await,
         );
         return;
     };
@@ -786,7 +1167,7 @@ async fn grievance_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, pati
             f,
             tx,
             "GET /doctors",
-            timed_get(f, "/api/v1/doctors", &f.patient_tokens[patient_idx]).await,
+            timed_get(f, "/api/v1/doctors", &patient_token(f, patient_idx).await).await,
         );
         return;
     };
@@ -797,7 +1178,7 @@ async fn grievance_action(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>, pati
         timed_post(
             f,
             "/api/v1/grievances",
-            &f.patient_tokens[patient_idx],
+            &patient_token(f, patient_idx).await,
             &json!({
                 "consultation_id": consultation_id, "target": "SYSTEM",
                 "category": "SERVICE_QUALITY", "claim_summary": "Capacity-test synthetic grievance"
@@ -860,22 +1241,49 @@ struct EndpointAgg {
     latencies: Vec<Duration>,
 }
 
-fn report(samples: &[Sample], duration_secs: u64, target_rps: f64, requested_count: u64) {
-    let _ = (duration_secs, target_rps, requested_count);
+fn report(
+    samples: &[Sample],
+    duration_secs: u64,
+    target_rps: f64,
+    requested_count: u64,
+    active_sessions_target: usize,
+) {
+    let _ = requested_count;
+    let sessions_started = samples
+        .iter()
+        .filter(|s| is_session_start_marker(s))
+        .count();
+    if active_sessions_target > 0 {
+        println!(
+            "SESSIONS: target={active_sessions_target} started={sessions_started} never_started={} \
+             -- \"started\" means this session actually began dispatching real requests before the \
+             test deadline; never_started > 0 only happens when CAPACITY_RAMP_SECS exceeds \
+             CAPACITY_DURATION_SECS (the ramp window outlived the test). Registered-account count is \
+             reported separately above and must never be read as this number.\n",
+            active_sessions_target.saturating_sub(sessions_started)
+        );
+    }
     let mut by_label: HashMap<&str, EndpointAgg> = HashMap::new();
     let mut total_business_reject = 0usize;
     let mut total_auth_reject = 0usize;
     let mut total_rate_limited = 0usize;
     let mut total_system_error = 0usize;
-    let total = samples.len();
+    let mut total_success = 0usize;
+    let total = samples.len() - sessions_started;
 
     for s in samples {
+        if is_session_start_marker(s) {
+            continue;
+        }
         let outcome = Outcome::classify(s.status);
         let agg = by_label.entry(s.label).or_default();
         agg.total += 1;
         agg.latencies.push(s.elapsed);
         match outcome {
-            Outcome::Success => agg.success += 1,
+            Outcome::Success => {
+                agg.success += 1;
+                total_success += 1;
+            }
             Outcome::BusinessReject => {
                 agg.business_reject += 1;
                 total_business_reject += 1;
@@ -894,6 +1302,12 @@ fn report(samples: &[Sample], duration_secs: u64, target_rps: f64, requested_cou
             }
         }
     }
+
+    let observed_rps = total as f64 / duration_secs.max(1) as f64;
+    let successful_rps = total_success as f64 / duration_secs.max(1) as f64;
+    println!(
+        "LOAD_ACCOUNTING: configured_target_rps={target_rps:.1} observed_offered_rps={observed_rps:.3} achieved_response_rps={observed_rps:.3} successful_response_rps={successful_rps:.3} total_requests={total} successful_requests={total_success}\n"
+    );
 
     println!(
         "BUSINESS_REJECTION_RATE={:.3}%  TRUE_SYSTEM_ERROR_RATE={:.4}%  auth_reject={:.3}%  rate_limited={:.3}%\n",
@@ -947,6 +1361,24 @@ fn report(samples: &[Sample], duration_secs: u64, target_rps: f64, requested_cou
             p95,
             p99,
             max
+        );
+    }
+    // Milestone 8.0: the clearest "successful end-to-end business outcome"
+    // for the booking flow, not just a per-step status code. `booking_action`
+    // only ever sends a "POST webhook confirm" sample for an attempt whose
+    // preceding "POST /appointments/book" already succeeded, so this success
+    // count already IS the number of fully completed book+pay flows — no
+    // separate correlation tracking needed.
+    if let Some(booking) = by_label.get("POST /appointments/book") {
+        let completed = by_label
+            .get("POST webhook confirm")
+            .map(|a| a.success)
+            .unwrap_or(0);
+        println!(
+            "\nEND_TO_END_BOOKING_SUCCESS: {completed} of {} booking attempts fully completed \
+             (booked AND payment confirmed) -- {:.1}%",
+            booking.total,
+            completed as f64 / booking.total.max(1) as f64 * 100.0
         );
     }
     let _ = Utc::now();

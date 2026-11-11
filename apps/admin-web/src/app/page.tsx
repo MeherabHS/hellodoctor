@@ -1,8 +1,10 @@
 ﻿'use client';
+import { dataRightsNotice } from '../lib/dataRightsOutcome';
 
 import { GrievanceInvestigation } from '@/components/GrievanceInvestigation';
 import { CampaignManager } from '@/components/campaigns/CampaignManager';
 import { BlogManager } from '@/components/blogs/BlogManager';
+import {NavigationGuard,useAdminNavigation} from '@/components/navigation/NavigationGuard';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useBackendSync, ModalitySplit } from '@/lib/useBackendSync';
@@ -43,6 +45,7 @@ import {
   FinancialRefundRequest,
   toggleSlot,
 } from '@/lib/api';
+import { paymentRequiredFromPolicy } from '@/lib/bookingPolicy';
 import {
   DoctorHistoryItem,
   PatientRecordItem,
@@ -73,7 +76,27 @@ interface ToastNotice {
   type: 'success' | 'urgent' | 'warning' | 'info';
 }
 
-export default function AdminPortalPage() {
+// Shown in place of real earnings/payout UI whenever the server-authoritative
+// `GET /config/booking-policy` reports the financial module as deferred
+// (`FINANCIAL_MODULE_MODE=deferred`). Distinct wording from the existing
+// 'Unavailable' used elsewhere for missing/not-yet-loaded data (e.g. the
+// Physician Directory payout columns below) — this must never read as a
+// payment-provider failure.
+function DeferredFinancialNotice() {
+  return (
+    <div className="admin-card" style={{ textAlign: 'center', padding: '32px 20px' }} role="status">
+      <span className="admin-nav-badge" style={{ background: '#E2E8F0', color: '#475569', fontWeight: 800, display: 'inline-block', marginBottom: '10px' }}>Financial Module Deferred · Read-Only</span>
+      <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>Financial module not yet active</div>
+      <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '6px', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
+        Payment collection is not yet active for this launch. Consultations are proceeding without charge. This section is read-only — historical records (if any) remain visible, but no financial action can be taken while FINANCIAL_MODULE_MODE=deferred. Earnings, settlements and payouts will appear here once the financial module is enabled.
+      </div>
+    </div>
+  );
+}
+
+export default function AdminPortalPage(){return <NavigationGuard><AdminPortalContent/></NavigationGuard>;}
+
+function AdminPortalContent() {
   const [simulationsAllowed, setSimulationsAllowed] = useState(false);
   useEffect(() => {
     let active = true;
@@ -83,6 +106,8 @@ export default function AdminPortalPage() {
   }, []);
   // Navigation State
   const [activeAdminPage, setActiveAdminPage] = useState<AdminPageId>('doctors');
+  const {requestNavigation}=useAdminNavigation();
+  function navigateAdmin(page:AdminPageId){if(page!==activeAdminPage)requestNavigation(()=>setActiveAdminPage(page));}
 
   // Interactive Data Stores
   const [doctorStore, setDoctorStore] = useState<Record<string, DoctorHistoryItem>>({});
@@ -93,6 +118,10 @@ export default function AdminPortalPage() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [financeSummary, setFinanceSummary] = useState<FinanceSummary | null>(null);
   const [commandTelemetry, setCommandTelemetry] = useState<CommandTelemetry | null>(null);
+  // Server-authoritative `FINANCIAL_MODULE_MODE` (`GET /config/booking-policy`,
+  // via useBackendSync's unconditional job below). Defaults to `true` (the
+  // safe default) until the server has explicitly confirmed deferred mode.
+  const [paymentRequired, setPaymentRequired] = useState(true);
   const [commandNeedsReviewOnly, setCommandNeedsReviewOnly] = useState(false);
   const [recoveryResolutionBusy, setRecoveryResolutionBusy] = useState<string | null>(null);
 
@@ -243,6 +272,7 @@ export default function AdminPortalPage() {
     onModalitySplitUpdate: setModalitySplit,
     onComplianceAlertsUpdate: setComplianceAlerts,
     onRefundRequestsUpdate: setRefundRequests,
+    onBookingPolicyUpdate: (policy) => setPaymentRequired(paymentRequiredFromPolicy(policy)),
   }, financeMonth, activeAdminPage, selectedDoctorKey, selectedPatientKey);
 
   // Formats a numeric-string amount from the backend as "KES  12,345".
@@ -614,16 +644,11 @@ export default function AdminPortalPage() {
     setDataRightsBusy(patientId);
     try {
       const result = await executePatientDataRights(patientId, trimmed);
-      await refreshBackend();
+      let refreshed = true;
+      try { await refreshBackend(); } catch { refreshed = false; }
       setSelectedPatientKey(null);
-      showToast(
-        result.outcome === 'HARD_DELETED' ? 'Patient Data Erased' : 'Patient Data Anonymized',
-        result.outcome === 'HARD_DELETED'
-          ? 'No retained history — the profile was permanently deleted.'
-          : 'Retained clinical/financial history — personal fields were scrubbed, the record stays on file.',
-        '🗑️',
-        'success'
-      );
+      const notice = dataRightsNotice(result, 'Patient', refreshed);
+      showToast(notice.title, notice.message, notice.icon, notice.level);
     } catch (error) {
       showToast('Request Failed', error instanceof Error ? error.message : 'The backend rejected this request.', '⚠️', 'warning');
     } finally {
@@ -646,16 +671,11 @@ export default function AdminPortalPage() {
     setDataRightsBusy(doctorId);
     try {
       const result = await executeDoctorDataRights(doctorId, trimmed);
-      await refreshBackend();
+      let refreshed = true;
+      try { await refreshBackend(); } catch { refreshed = false; }
       setSelectedDoctorKey(null);
-      showToast(
-        result.outcome === 'HARD_DELETED' ? 'Doctor Data Erased' : 'Doctor Data Anonymized',
-        result.outcome === 'HARD_DELETED'
-          ? 'No retained history — the profile was permanently deleted.'
-          : 'Retained consultation/payout history — personal fields were scrubbed, the record stays on file.',
-        '🗑️',
-        'success'
-      );
+      const notice = dataRightsNotice(result, 'Doctor', refreshed);
+      showToast(notice.title, notice.message, notice.icon, notice.level);
     } catch (error) {
       showToast('Request Failed', error instanceof Error ? error.message : 'The backend rejected this request.', '⚠️', 'warning');
     } finally {
@@ -857,11 +877,13 @@ export default function AdminPortalPage() {
           <div
             className={`admin-nav-item ${activeAdminPage === 'doctors' ? 'active' : ''}`}
             id="adminNav-doctors"
-            onClick={() => setActiveAdminPage('doctors')}
+            onClick={() => navigateAdmin('doctors')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
             <span>Settlements &amp; Payouts</span>
-            {doctorsAwaitingCount > 0 ? (
+            {!paymentRequired ? (
+              <span className="admin-nav-badge" style={{ background: '#E2E8F0', color: '#475569', fontWeight: 800 }} title="FINANCIAL_MODULE_MODE=deferred — read-only">Deferred</span>
+            ) : doctorsAwaitingCount > 0 ? (
               <span className="admin-nav-badge amber">{doctorsAwaitingCount} Pending</span>
             ) : (
               <span className="admin-nav-badge green" style={{ background: '#DCFCE7', color: '#166534' }}>Settled</span>
@@ -871,17 +893,21 @@ export default function AdminPortalPage() {
           <div
             className={`admin-nav-item ${activeAdminPage === 'finance' ? 'active' : ''}`}
             id="adminNav-finance"
-            onClick={() => setActiveAdminPage('finance')}
+            onClick={() => navigateAdmin('finance')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
             <span>All Payments &amp; Escrow</span>
-            <span className="admin-nav-badge green" style={{ background: '#DCFCE7', color: '#166534', fontWeight: 800 }}>Ledger</span>
+            {!paymentRequired ? (
+              <span className="admin-nav-badge" style={{ background: '#E2E8F0', color: '#475569', fontWeight: 800 }} title="FINANCIAL_MODULE_MODE=deferred — read-only">Deferred</span>
+            ) : (
+              <span className="admin-nav-badge green" style={{ background: '#DCFCE7', color: '#166534', fontWeight: 800 }}>Ledger</span>
+            )}
           </div>
 
           <div
             className={`admin-nav-item ${activeAdminPage === 'command' ? 'active' : ''}`}
             id="adminNav-command"
-            onClick={() => setActiveAdminPage('command')}
+            onClick={() => navigateAdmin('command')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             <span>Command Center</span>
@@ -891,7 +917,7 @@ export default function AdminPortalPage() {
           <div
             className={`admin-nav-item ${activeAdminPage === 'slots' ? 'active' : ''}`}
             id="adminNav-slots"
-            onClick={() => setActiveAdminPage('slots')}
+            onClick={() => navigateAdmin('slots')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             <span>Slot Matrix &amp; Locks</span>
@@ -900,7 +926,7 @@ export default function AdminPortalPage() {
           <div
             className={`admin-nav-item ${activeAdminPage === 'patients' ? 'active' : ''}`}
             id="adminNav-patients"
-            onClick={() => setActiveAdminPage('patients')}
+            onClick={() => navigateAdmin('patients')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <span>Patients Directory</span>
@@ -909,7 +935,7 @@ export default function AdminPortalPage() {
           <div
             className={`admin-nav-item ${activeAdminPage === 'verification' ? 'active' : ''}`}
             id="adminNav-verification"
-            onClick={() => setActiveAdminPage('verification')}
+            onClick={() => navigateAdmin('verification')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
             <span>Doctor Verification</span>
@@ -919,7 +945,7 @@ export default function AdminPortalPage() {
           <div
             className={`admin-nav-item ${activeAdminPage === 'compliance' ? 'active' : ''}`}
             id="adminNav-compliance"
-            onClick={() => setActiveAdminPage('compliance')}
+            onClick={() => navigateAdmin('compliance')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             <span>Rx &amp; Q&amp;A Audit</span>
@@ -928,7 +954,7 @@ export default function AdminPortalPage() {
           <div
             className={`admin-nav-item ${activeAdminPage === 'logs' ? 'active' : ''}`}
             id="adminNav-logs"
-            onClick={() => setActiveAdminPage('logs')}
+            onClick={() => navigateAdmin('logs')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             <span>App Error &amp; Incident Logs</span>
@@ -940,7 +966,7 @@ export default function AdminPortalPage() {
           <div
             className={`admin-nav-item ${activeAdminPage === 'grievances' ? 'active' : ''}`}
             id="adminNav-grievances"
-            onClick={() => setActiveAdminPage('grievances')}
+            onClick={() => navigateAdmin('grievances')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <span>Consultation Grievances</span>
@@ -952,22 +978,25 @@ export default function AdminPortalPage() {
           <div
             className={`admin-nav-item ${activeAdminPage === 'campaigns' ? 'active' : ''}`}
             id="adminNav-campaigns"
-            onClick={() => setActiveAdminPage('campaigns')}
+            onClick={() => navigateAdmin('campaigns')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/></svg>
             <span>Campaigns</span>
           </div>
-          <button type="button" className={`admin-nav-item ${activeAdminPage === 'blogs' ? 'active' : ''}`} id="adminNav-blogs" onClick={()=>setActiveAdminPage('blogs')}>
+          <button type="button" className={`admin-nav-item ${activeAdminPage === 'blogs' ? 'active' : ''}`} id="adminNav-blogs" onClick={()=>navigateAdmin('blogs')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/></svg><span>Blog Manager</span>
           </button>
 
           <div
             className={`admin-nav-item ${activeAdminPage === 'settings' ? 'active' : ''}`}
             id="adminNav-settings"
-            onClick={() => setActiveAdminPage('settings')}
+            onClick={() => navigateAdmin('settings')}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
             <span>Payment Settings</span>
+            {!paymentRequired && (
+              <span className="admin-nav-badge" style={{ background: '#E2E8F0', color: '#475569', fontWeight: 800 }} title="FINANCIAL_MODULE_MODE=deferred — read-only">Deferred</span>
+            )}
           </div>
         </nav>
 
@@ -1026,7 +1055,7 @@ export default function AdminPortalPage() {
                   showToast('Central Notifications', 'No professional registration applications are pending review.', '🔔', 'info');
                 } else {
                   showToast('Central Notifications', `${verificationQueue.length} professional registration application${verificationQueue.length === 1 ? '' : 's'} pending review.`, '🔔', 'info');
-                  setActiveAdminPage('verification');
+                  navigateAdmin('verification');
                 }
               }}
             >
@@ -1045,7 +1074,7 @@ export default function AdminPortalPage() {
             <div
               className="admin-top-icon-btn"
               title="Sign out"
-              onClick={async () => {
+              onClick={() => requestNavigation(async () => {
                 try {
                   clearAdminRuntime();
                   const result = await fetch('/api/logout', { method: 'POST' });
@@ -1053,7 +1082,7 @@ export default function AdminPortalPage() {
                 } catch { window.alert('Unable to reach the server. Server sign-out could not be confirmed.'); }
                 // A full document navigation discards the authenticated runtime.
                 window.location.assign(new URL('/login', window.location.origin).href);
-              }}
+              })}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </div>
@@ -1076,10 +1105,11 @@ export default function AdminPortalPage() {
                   </div>
                 </div>
 
+                {paymentRequired && (
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   <button
                     className="admin-action-btn"
-                    onClick={() => setActiveAdminPage('finance')}
+                    onClick={() => navigateAdmin('finance')}
                     style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#1E293B', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '9px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginRight: '8px' }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
@@ -1096,8 +1126,11 @@ export default function AdminPortalPage() {
                     <span>Prepare Batch</span>
                   </button>
                 </div>
+                )}
               </div>
 
+              {!paymentRequired && <DeferredFinancialNotice/>}
+              {paymentRequired && <>
               {/* 4 Metric Cards — all computed from live backend data */}
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
@@ -1183,6 +1216,7 @@ export default function AdminPortalPage() {
                 <span>ℹ️</span>
                 <span>Total calculation is based including the platform charge 20%.</span>
               </div>
+              </>}
 
               {/* Pending Doctor Payout Disbursements Table */}
               <div className="admin-card">
@@ -1253,17 +1287,25 @@ export default function AdminPortalPage() {
                             <td><span className="badge badge-slate" style={{ fontWeight: 750 }}>{doc.registrationNumber}</span><div>{doc.professionalVerificationStatus}</div></td>
                             <td><b>{doc.kpiVisits}</b></td>
                             <td>{doc.kpiChats}</td>
-                            <td>{doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.gross || 0).toLocaleString()}` : 'Unavailable'}</td>
-                            <td style={{ color: '#64748B' }}>{doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.platformCharge || 0).toLocaleString()}` : 'Unavailable'}</td>
-                            <td style={{ fontWeight: 850, color: '#059669' }}>{doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.finalPayable).toLocaleString()}` : 'Unavailable'}</td>
+                            <td>{!paymentRequired ? 'Deferred' : doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.gross || 0).toLocaleString()}` : 'Unavailable'}</td>
+                            <td style={{ color: '#64748B' }}>{!paymentRequired ? 'Deferred' : doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.platformCharge || 0).toLocaleString()}` : 'Unavailable'}</td>
+                            <td style={{ fontWeight: 850, color: '#059669' }}>{!paymentRequired ? 'Deferred' : doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.finalPayable).toLocaleString()}` : 'Unavailable'}</td>
                             <td>
+                              {!paymentRequired ? (
+                                <span className="payout-method-badge bank">Financial module deferred</span>
+                              ) : (
                               <span className="payout-method-badge bank">
                                 {doc.payoutRouting?.provider
                                   ? `${doc.payoutRouting.provider} ${doc.payoutRouting.maskedDestination || ''}`
                                   : 'Payout setup required'}
                               </span>
+                              )}
                             </td>
                             <td>
+                              {!paymentRequired ? (
+                                <span className="badge badge-slate doc-payout-status">Deferred</span>
+                              ) : (
+                              <>
                               {/* The backend's `readiness` field is never literally the
                                   string 'ACTIVE' — it's 'DEV_SIMULATED', 'ASSIGNED', the
                                   destination's real verification_status, or
@@ -1278,6 +1320,8 @@ export default function AdminPortalPage() {
                                 {doc.payoutRouting?.disbursementStatus || doc.payoutRouting?.readiness || 'Payout setup required'}
                               </span>
                               <div style={{ fontSize: '10px' }}>{doc.payoutRouting?.statementStatus || 'Not loaded'} · {doc.payoutRouting?.readiness || 'Unknown'}</div>
+                              </>
+                              )}
                             </td>
                             <td>
                               <button
@@ -2078,12 +2122,15 @@ export default function AdminPortalPage() {
                     How the platform itself collects payment (M-Pesa, card, or any future provider) — separate from a patient&apos;s saved payment method or a doctor&apos;s payout destination. Credentials are encrypted at rest and never returned by the API.
                   </div>
                 </div>
+                {paymentRequired && (
                 <button className="admin-btn-pri" onClick={() => setAddPaymentMethodModalOpen(true)} style={{ padding: '7px 14px', fontSize: '11.5px' }}>
                   + Add Payment Method
                 </button>
+                )}
               </div>
 
-              <div className="admin-table-card">
+              {!paymentRequired && <DeferredFinancialNotice/>}
+              {paymentRequired && <div className="admin-table-card">
                 <table className="admin-table">
                   <thead>
                     <tr>
@@ -2123,7 +2170,7 @@ export default function AdminPortalPage() {
                     )}
                   </tbody>
                 </table>
-              </div>
+              </div>}
             </div>
           )}
 
@@ -2137,19 +2184,23 @@ export default function AdminPortalPage() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button className="admin-action-btn" onClick={() => setActiveAdminPage('doctors')} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#334155', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <button className="admin-action-btn" onClick={() => navigateAdmin('doctors')} style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', color: '#334155', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
                     <span>Doctor Payouts Hub →</span>
                   </button>
+                  {paymentRequired && (<>
                   <button className="admin-action-btn" onClick={() => showToast('Not Yet Available', 'Automated MFS webhook reconciliation is not implemented yet — no backend reconciliation service exists to check against.', 'ℹ️', 'info')} style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#64748B', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <span>Reconcile MFS Webhooks</span>
                   </button>
                   <button className="admin-action-btn" onClick={handleExportLedgerCsv} style={{ background: '#0F172A', border: '1px solid #0F172A', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
                     <span>Export Ledger CSV</span>
                   </button>
+                  </>)}
                 </div>
               </div>
 
+              {!paymentRequired && <DeferredFinancialNotice/>}
+              {paymentRequired && <>
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
@@ -2355,6 +2406,7 @@ export default function AdminPortalPage() {
                   </table>
                 </div>
               </div>
+              </>}
             </div>
           )}
 
@@ -2407,20 +2459,20 @@ export default function AdminPortalPage() {
               </div>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
                 <div style={{ fontSize: '10.5px', color: '#64748B' }}>Total Gross Revenue</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>{selectedDocObj.kpiGross}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>{paymentRequired ? selectedDocObj.kpiGross : 'Deferred'}</div>
               </div>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
                 <div style={{ fontSize: '10.5px', color: '#64748B' }}>Net Payouts Disbursed</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#047857', marginTop: '2px' }}>{selectedDocObj.kpiDisbursed}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#047857', marginTop: '2px' }}>{paymentRequired ? selectedDocObj.kpiDisbursed : 'Deferred'}</div>
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: '#64748B', padding: '8px 16px 0' }}>
+            {paymentRequired && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: '#64748B', padding: '8px 16px 0' }}>
               <span>ℹ️</span>
               <span>Total calculation is based including the platform charge 20%.</span>
-            </div>
+            </div>}
 
             <div style={{ padding: '18px 22px', overflowY: 'auto', flex: 1 }}>
-              {selectedDocObj.payoutRouting?.disbursementItemId && selectedDocObj.payoutRouting.disbursementStatus === 'PENDING_APPROVAL' && (
+              {paymentRequired && selectedDocObj.payoutRouting?.disbursementItemId && selectedDocObj.payoutRouting.disbursementStatus === 'PENDING_APPROVAL' && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', marginBottom: '16px', border: '1px solid #FCD34D', borderRadius: '10px', background: '#FFFBEB' }}>
                   <div>
                     <strong style={{ fontSize: '12px', color: '#92400E' }}>KES disbursement awaiting Finance approval</strong>
@@ -2461,7 +2513,8 @@ export default function AdminPortalPage() {
 
               <div style={{ marginTop: '20px' }}>
                 <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>Recent Financial Wallet Disbursements (20% Platform Fee Enforced)</strong>
-                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {!paymentRequired && <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '8px' }}>Financial module not yet active — no disbursements are created for deferred consultations.</div>}
+                {paymentRequired && <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {selectedDocObj.disbursements.map((dsb, idx) => (
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '11.5px' }}>
                       <div>
@@ -2471,7 +2524,7 @@ export default function AdminPortalPage() {
                       <span className="badge badge-green">{dsb.status}</span>
                     </div>
                   ))}
-                </div>
+                </div>}
               </div>
             </div>
 

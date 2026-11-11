@@ -1,0 +1,8 @@
+﻿   ?column?    | count 
+---------------+-------
+ appointments  | 13465
+ chat_messages | 73934
+ notifications |   210
+ transactions  | 13465
+(4 rows)
+

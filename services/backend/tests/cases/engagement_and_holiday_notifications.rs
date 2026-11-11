@@ -241,7 +241,7 @@ async fn test_greeting_defaults_doctor_on_patient_off_and_weekly_dedup(pool: PgP
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(patient_status, "FAILED");
+    assert_eq!(patient_status, "SUPPRESSED");
     assert!(
         patient_error.unwrap().contains("greeting"),
         "Patients default to greetings off"
@@ -467,7 +467,7 @@ async fn test_holiday_pass_exact_date_and_religious_opt_in(pool: PgPool) {
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(eid_status, "FAILED");
+    assert_eq!(eid_status, "SUPPRESSED");
     assert!(
         eid_error.unwrap().contains("religious"),
         "a religious holiday must require the separate opt-in"

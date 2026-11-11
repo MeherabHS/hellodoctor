@@ -13,7 +13,7 @@
          app is next opened manually. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <application
-        android:label="AfyaMkononi"
+        android:label="AfyaMkononi Doctor"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"

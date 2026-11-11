@@ -167,40 +167,41 @@ pub async fn count_unread<'e, E: PgExecutor<'e>>(
     Ok(count)
 }
 
-/// Scoped by `user_id` as well as `id` — RLS already enforces this at the
-/// database layer (see the migration's `notifications_owner_mark_read`
-/// policy), but binding it explicitly here too means a caller reading this
-/// function can see the ownership boundary without having to go look at the
-/// policy, and the query degenerates safely (0 rows affected) if the two
-/// layers ever disagree rather than silently relying on just one of them.
+/// Reading an inbox message cancels a pending push, preserving the previous
+/// behavior, but never replaces a real provider/terminal outcome with READ.
+/// Claim fencing and read_at commit atomically under the owner's RLS policy.
 pub async fn mark_read<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
     user_id: UserId,
 ) -> Result<bool, sqlx::Error> {
-    let result = sqlx::query(
-        "UPDATE notifications SET read_at = now(), delivery_status = 'READ' \
-         WHERE id = $1 AND user_id = $2 AND read_at IS NULL",
-    )
-    .bind(id)
-    .bind(user_id)
-    .execute(executor)
-    .await?;
-    Ok(result.rows_affected() > 0)
+    Ok(mark_owned_read(executor, user_id, Some(id)).await? > 0)
 }
 
 pub async fn mark_all_read<'e, E: PgExecutor<'e>>(
     executor: E,
     user_id: UserId,
 ) -> Result<u64, sqlx::Error> {
-    let result = sqlx::query(
-        "UPDATE notifications SET read_at = now(), delivery_status = 'READ' \
-         WHERE user_id = $1 AND read_at IS NULL",
-    )
-    .bind(user_id)
-    .execute(executor)
-    .await?;
-    Ok(result.rows_affected())
+    mark_owned_read(executor, user_id, None).await
+}
+
+async fn mark_owned_read<'e, E: PgExecutor<'e>>(
+    executor: E,
+    user_id: UserId,
+    id: Option<Uuid>,
+) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "WITH targets AS MATERIALIZED ( \
+           SELECT id,(delivery_status IN ('CREATED','DUE') OR delivery_status='FAILED' AND next_delivery_at IS NOT NULL) AS pending \
+           FROM notifications WHERE user_id=$1 AND read_at IS NULL AND ($2::uuid IS NULL OR id=$2) FOR UPDATE \
+         ) UPDATE notifications n SET read_at=clock_timestamp(), \
+           delivery_status=CASE WHEN t.pending THEN 'SUPPRESSED' ELSE n.delivery_status END, \
+           last_delivery_error=CASE WHEN t.pending THEN 'Suppressed: inbox notification already read' ELSE n.last_delivery_error END, \
+           next_delivery_at=CASE WHEN t.pending THEN NULL ELSE n.next_delivery_at END, \
+           delivery_claim_token=CASE WHEN t.pending THEN NULL ELSE n.delivery_claim_token END, \
+           delivery_lease_until=CASE WHEN t.pending THEN NULL ELSE n.delivery_lease_until END \
+         FROM targets t WHERE n.id=t.id",
+    ).bind(user_id).bind(id).execute(executor).await?.rows_affected())
 }
 
 /// True only if a `CREATED`/`DUE` (i.e. not yet delivered/read) reminder
@@ -242,10 +243,34 @@ pub async fn cancel_pending_reminders_for_appointment<'e, E: PgExecutor<'e>>(
     Ok(result.rows_affected())
 }
 
-/// A bounded, claimed notification ready for provider delivery. Claiming and
-/// incrementing `delivery_attempts` happen in one worker transaction so two
-/// backend instances cannot send the same due row concurrently.
-#[derive(Debug, sqlx::FromRow)]
+/// Called only after the campaign has atomically moved to CANCELLED. Preserve
+/// attempted outcomes and fence their claims; keep existing removal semantics
+/// for inbox entries which were never attempted. RLS is scoped to that campaign.
+pub async fn cancel_campaign_deliveries(
+    tx: &mut sqlx::Transaction<'_, Postgres>,
+    id: Uuid,
+) -> Result<(), sqlx::Error> {
+    // Preserve attempted rows (and any uncertain provider outcome), while
+    // fencing in-flight/stale worker completions. Never erase send history.
+    sqlx::query(
+            "UPDATE notifications SET delivery_status='SUPPRESSED', \
+                last_delivery_error='Suppressed: campaign cancelled',next_delivery_at=NULL, \
+                delivery_claim_token=NULL,delivery_lease_until=NULL \
+             WHERE related_entity_type='CAMPAIGN' AND related_entity_id=$1 \
+               AND (delivery_status='DUE' OR delivery_status='FAILED' AND next_delivery_at IS NOT NULL)",
+        ).bind(id).execute(&mut **tx).await?;
+    sqlx::query(
+        "DELETE FROM notifications WHERE related_entity_type='CAMPAIGN' AND related_entity_id=$1 \
+             AND delivery_status='CREATED'",
+    )
+    .bind(id)
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// Private worker data. Claim tokens are never part of the inbox DTO.
+#[derive(Debug, Clone, sqlx::FromRow)]
 pub struct DueNotification {
     pub id: Uuid,
     pub user_id: UserId,
@@ -260,131 +285,268 @@ pub struct DueNotification {
     pub collapse_key: Option<String>,
     pub ttl_seconds: Option<i32>,
     pub frequency_claimed: bool,
+    pub delivery_claim_token: Uuid,
+    pub delivery_uncertain: bool,
 }
 
-/// Claims at most `limit` due rows. `scheduled_for` is nullable for events
-/// that are immediately eligible; `next_delivery_at` is the durable retry
-/// gate, and this claim itself now also uses it as a short processing
-/// lease (`clock_timestamp() + 2 minutes`) — found necessary (not assumed)
-/// via a genuine concurrent-worker test: the claiming transaction commits
-/// immediately (releasing `FOR UPDATE`'s row lock) while the row sits in
-/// `DUE` for the whole rest of this row's processing (frequency-cap claim,
-/// provider dispatch, final status write), and `DUE` was itself one of the
-/// statuses this same query re-claims — so two genuinely concurrent
-/// `run_push_delivery_pass` calls could both claim and independently
-/// process the identical row before either finished, each separately
-/// consuming a daily frequency-cap slot and racing on which one's final
-/// status write won. The lease closes that window while preserving the
-/// original crash-recovery intent (a worker that actually dies mid-
-/// processing still leaves the row reclaimable, just after the lease
-/// expires rather than immediately).
-pub async fn claim_due_notifications<'e, E: PgExecutor<'e>>(
-    executor: E,
-    limit: i64,
-) -> Result<Vec<DueNotification>, sqlx::Error> {
-    sqlx::query_as::<_, DueNotification>(
-        "WITH due AS ( \
+/// A session advisory lock spans provider IO, NOT a database transaction.
+/// Every DB operation uses this same system-role connection, so a worker does
+/// not reserve one connection and then deadlock waiting for a second pool slot.
+/// Cancellation/panic closes the connection rather than returning a locked
+/// session to the pool. Normal release unlocks before recycling the connection.
+pub struct DeliveryClaim {
+    pub row: DueNotification,
+    connection: DeliveryConnection,
+}
+
+struct DeliveryConnection(Option<sqlx::pool::PoolConnection<Postgres>>);
+
+impl Drop for DeliveryConnection {
+    fn drop(&mut self) {
+        if let Some(connection) = self.0.as_mut() {
+            connection.close_on_drop();
+        }
+    }
+}
+
+impl DeliveryClaim {
+    pub fn connection(&mut self) -> &mut sqlx::PgConnection {
+        self.connection
+            .0
+            .as_mut()
+            .expect("live delivery connection")
+    }
+
+    pub async fn release(mut self) -> Result<(), sqlx::Error> {
+        let id = self.row.id;
+        let unlocked: bool =
+            sqlx::query_scalar("SELECT pg_advisory_unlock(hashtextextended($1::text, 7314961))")
+                .bind(id)
+                .fetch_one(self.connection())
+                .await?;
+        if !unlocked {
+            return Err(sqlx::Error::Protocol(
+                "Notification delivery lock was lost".into(),
+            ));
+        }
+        // Only an acknowledged unlock permits session reuse.
+        drop(self.connection.0.take());
+        Ok(())
+    }
+}
+
+/// Claim just-in-time, never lease a sequential batch in advance. The
+/// MATERIALIZED single-candidate CTE bounds session lock acquisition to one
+/// row. A live worker retains exclusivity even if its durable lease expires.
+/// FAILED + NULL retry time is terminal, including historical suppressed rows.
+/// Expired DUE at the retry limit is reclaimed only to record terminal failure.
+pub async fn claim_next_notification(
+    pool: &sqlx::PgPool,
+) -> Result<Option<DeliveryClaim>, sqlx::Error> {
+    let connection = tokio::time::timeout(std::time::Duration::from_millis(250), pool.acquire())
+        .await
+        .map_err(|_| sqlx::Error::PoolTimedOut)??;
+    let mut guard = DeliveryConnection(Some(connection));
+    let token = Uuid::new_v4();
+    let row = sqlx::query_as::<_, DueNotification>(
+        "WITH due AS MATERIALIZED ( \
             SELECT id FROM notifications \
-             WHERE delivery_status IN ('CREATED','DUE','FAILED') \
-               AND (scheduled_for IS NULL OR scheduled_for <= clock_timestamp()) \
-               AND (next_delivery_at IS NULL OR next_delivery_at <= clock_timestamp()) \
-               AND delivery_attempts < 5 \
-             ORDER BY COALESCE(scheduled_for, created_at), created_at, id \
-             FOR UPDATE SKIP LOCKED \
-             LIMIT $1 \
+             WHERE (delivery_status='CREATED' AND delivery_attempts<5 \
+                    OR delivery_status='FAILED' AND next_delivery_at IS NOT NULL AND delivery_attempts<5 \
+                    OR delivery_status='DUE') \
+               AND (scheduled_for IS NULL OR scheduled_for<=clock_timestamp()) \
+               AND (CASE WHEN delivery_status='DUE' THEN COALESCE(delivery_lease_until,next_delivery_at) \
+                         ELSE next_delivery_at END IS NULL \
+                    OR CASE WHEN delivery_status='DUE' THEN COALESCE(delivery_lease_until,next_delivery_at) \
+                            ELSE next_delivery_at END<=clock_timestamp()) \
+             ORDER BY COALESCE(scheduled_for,created_at),created_at,id \
+             FOR UPDATE SKIP LOCKED LIMIT 1 \
+        ), owned AS MATERIALIZED ( \
+            SELECT id FROM due WHERE pg_try_advisory_lock(hashtextextended(id::text,7314961)) \
         ) \
-        UPDATE notifications n \
-           SET delivery_status = 'DUE', \
-               delivery_attempts = n.delivery_attempts + 1, \
-               last_delivery_error = NULL, \
-               next_delivery_at = clock_timestamp() + interval '2 minutes' \
-          FROM due \
-         WHERE n.id = due.id \
-        RETURNING n.id, n.user_id, n.type, n.title, n.body, \
-                  n.related_entity_type, n.related_entity_id, n.dedup_key, \
-                  n.delivery_attempts, n.collapse_key, n.ttl_seconds, n.frequency_claimed",
+        UPDATE notifications n SET delivery_status='DUE', \
+            delivery_attempts=n.delivery_attempts+1, delivery_claim_token=$1, \
+            delivery_lease_until=clock_timestamp()+interval '2 minutes', next_delivery_at=NULL \
+         FROM owned WHERE n.id=owned.id \
+         RETURNING n.id,n.user_id,n.type,n.title,n.body,n.related_entity_type,n.related_entity_id, \
+                   n.dedup_key,n.delivery_attempts,n.collapse_key,n.ttl_seconds,n.frequency_claimed, \
+                   n.delivery_claim_token,n.delivery_uncertain",
     )
-    .bind(limit.clamp(1, 100))
-    .fetch_all(executor)
-    .await
+    .bind(token)
+    .fetch_optional(&mut **guard.0.as_mut().expect("live delivery connection"))
+    .await?;
+    match row {
+        Some(row) => Ok(Some(DeliveryClaim {
+            row,
+            connection: guard,
+        })),
+        None => {
+            drop(guard.0.take());
+            Ok(None)
+        }
+    }
+}
+
+/// An expired lease can be renewed only by the session still holding its
+/// advisory lock; another connection cannot revive an abandoned claim.
+pub async fn renew_delivery_claim<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    token: Uuid,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE notifications SET delivery_lease_until=clock_timestamp()+interval '2 minutes' \
+         WHERE id=$1 AND delivery_status='DUE' AND delivery_claim_token=$2 \
+           AND (delivery_lease_until>clock_timestamp() OR EXISTS ( \
+             SELECT 1 FROM pg_locks l WHERE l.locktype='advisory' AND l.pid=pg_backend_pid() AND l.granted \
+               AND l.objsubid=1 \
+               AND l.classid=((hashtextextended($1::text,7314961)>>32)&4294967295)::oid \
+               AND l.objid=(hashtextextended($1::text,7314961)&4294967295)::oid))",
+    )
+    .bind(id)
+    .bind(token)
+    .execute(executor)
+    .await?
+    .rows_affected()
+        == 1)
+}
+
+/// Durable uncertainty marker BEFORE contacting the provider. A crash, timeout,
+/// or lost connection cannot be mistaken for a definitely unsent notification.
+pub async fn begin_provider_send<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    token: Uuid,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE notifications SET delivery_uncertain=TRUE WHERE id=$1 \
+         AND delivery_status='DUE' AND delivery_claim_token=$2 AND delivery_lease_until>clock_timestamp()",
+    ).bind(id).bind(token).execute(executor).await?.rows_affected()==1)
+}
+
+pub async fn record_definite_rejection<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    token: Uuid,
+    previously_uncertain: bool,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE notifications SET delivery_uncertain=$3 WHERE id=$1 \
+         AND delivery_status='DUE' AND delivery_claim_token=$2 AND delivery_lease_until>clock_timestamp()",
+    ).bind(id).bind(token).bind(previously_uncertain).execute(executor).await?.rows_affected()==1)
 }
 
 pub async fn mark_delivery_sent<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
+    token: Uuid,
     provider_message_id: Option<&str>,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query(
         "UPDATE notifications SET delivery_status='SENT_TO_PROVIDER', \
-                delivered_at=clock_timestamp(), provider_message_id=$2, \
-                next_delivery_at=NULL, last_delivery_error=NULL \
-           WHERE id=$1 AND delivery_status='DUE'",
-    )
-    .bind(id)
-    .bind(provider_message_id)
-    .execute(executor)
-    .await?;
-    Ok(())
+                delivered_at=clock_timestamp(),provider_message_id=$3, \
+                next_delivery_at=NULL,last_delivery_error=NULL,delivery_claim_token=NULL, \
+                delivery_lease_until=NULL,delivery_uncertain=FALSE \
+         WHERE id=$1 AND delivery_status='DUE' AND delivery_claim_token=$2 AND delivery_lease_until>clock_timestamp()",
+    ).bind(id).bind(token).bind(provider_message_id).execute(executor).await?.rows_affected()==1)
 }
 
 pub async fn mark_delivery_retry<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
+    token: Uuid,
     error: &str,
     next_delivery_at: DateTime<Utc>,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE notifications SET delivery_status='FAILED', \
-                last_delivery_error=$2, next_delivery_at=$3 \
-           WHERE id=$1 AND delivery_status='DUE'",
-    )
-    .bind(id)
-    .bind(error.chars().take(500).collect::<String>())
-    .bind(next_delivery_at)
-    .execute(executor)
-    .await?;
-    Ok(())
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE notifications SET delivery_status='FAILED',last_delivery_error=$3,next_delivery_at=$4, \
+            delivery_claim_token=NULL,delivery_lease_until=NULL \
+         WHERE id=$1 AND delivery_status='DUE' AND delivery_claim_token=$2 AND delivery_lease_until>clock_timestamp()",
+    ).bind(id).bind(token).bind(error.chars().take(500).collect::<String>()).bind(next_delivery_at)
+        .execute(executor).await?.rows_affected()==1)
 }
 
 pub async fn mark_delivery_permanent<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
+    token: Uuid,
     error: &str,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE notifications SET delivery_status='FAILED', \
-                last_delivery_error=$2, next_delivery_at=NULL \
-           WHERE id=$1 AND delivery_status='DUE'",
-    )
-    .bind(id)
-    .bind(error.chars().take(500).collect::<String>())
-    .execute(executor)
-    .await?;
-    Ok(())
+) -> Result<bool, sqlx::Error> {
+    finish_without_send(executor, id, token, "FAILED", error).await
 }
 
-/// Defers a quiet-hours-eligible row to the end of the recipient's quiet
-/// window, rather than failing it. Shares `mark_delivery_retry`'s
-/// re-claimable `FAILED`/`next_delivery_at` shape (deliberately — a deferred
-/// row is not a provider failure and must not be double-counted against
-/// `notification_push_retry_total`/`_permanent_failure_total`), but is kept
-/// as its own function so a deferred dispatch is distinguishable in logs.
+pub async fn mark_delivery_suppressed<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    token: Uuid,
+    reason: &str,
+) -> Result<bool, sqlx::Error> {
+    finish_without_send(executor, id, token, "SUPPRESSED", reason).await
+}
+
+async fn finish_without_send<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    token: Uuid,
+    status: &str,
+    reason: &str,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE notifications SET delivery_status=$3,last_delivery_error=$4,next_delivery_at=NULL, \
+            delivery_claim_token=NULL,delivery_lease_until=NULL \
+         WHERE id=$1 AND delivery_status='DUE' AND delivery_claim_token=$2 AND delivery_lease_until>clock_timestamp()",
+    ).bind(id).bind(token).bind(status).bind(reason.chars().take(500).collect::<String>())
+        .execute(executor).await?.rows_affected()==1)
+}
+
+/// Deferral before provider IO consumes no attempt. An interrupted in-flight
+/// request retains its attempt and uncertainty, so deferral cannot reset retries.
 pub async fn mark_delivery_deferred<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
+    token: Uuid,
     next_delivery_at: DateTime<Utc>,
-) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        "UPDATE notifications SET delivery_status='FAILED', \
-                last_delivery_error='Deferred: recipient quiet hours in effect', \
-                next_delivery_at=$2 \
-           WHERE id=$1 AND delivery_status='DUE'",
-    )
-    .bind(id)
-    .bind(next_delivery_at)
-    .execute(executor)
-    .await?;
-    Ok(())
+    reason: &str,
+    provider_started: bool,
+) -> Result<bool, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE notifications SET delivery_status='FAILED',last_delivery_error=$4,next_delivery_at=$3, \
+            delivery_attempts=GREATEST(delivery_attempts-CASE WHEN $5 THEN 0 ELSE 1 END,0),delivery_claim_token=NULL,delivery_lease_until=NULL \
+         WHERE id=$1 AND delivery_status='DUE' AND delivery_claim_token=$2 AND delivery_lease_until>clock_timestamp()",
+    ).bind(id).bind(token).bind(next_delivery_at).bind(reason).bind(provider_started)
+        .execute(executor).await?.rows_affected()==1)
+}
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct DeliveryQueueStats {
+    pub pending: i64,
+    pub processing: i64,
+    pub retrying: i64,
+    pub deferred: i64,
+    pub suppressed: i64,
+    pub sent_to_provider: i64,
+    pub permanently_failed: i64,
+    pub uncertain: i64,
+    pub confirmed_delivered: i64,
+    pub legacy_read: i64,
+}
+
+pub async fn delivery_queue_stats<'e, E: PgExecutor<'e>>(
+    executor: E,
+) -> Result<DeliveryQueueStats, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT \
+          COUNT(*) FILTER(WHERE delivery_status='CREATED') pending, \
+          COUNT(*) FILTER(WHERE delivery_status='DUE') processing, \
+          COUNT(*) FILTER(WHERE delivery_status='FAILED' AND next_delivery_at IS NOT NULL AND delivery_attempts<5 AND COALESCE(last_delivery_error,'') NOT LIKE 'Deferred:%') retrying, \
+          COUNT(*) FILTER(WHERE delivery_status='FAILED' AND next_delivery_at IS NOT NULL AND delivery_attempts<5 AND last_delivery_error LIKE 'Deferred:%') deferred, \
+          COUNT(*) FILTER(WHERE delivery_status='SUPPRESSED' OR delivery_status='FAILED' AND next_delivery_at IS NULL AND last_delivery_error LIKE 'Suppressed:%') suppressed, \
+          COUNT(*) FILTER(WHERE delivery_status='SENT_TO_PROVIDER') sent_to_provider, \
+          COUNT(*) FILTER(WHERE delivery_status='FAILED' AND (next_delivery_at IS NULL OR delivery_attempts>=5) AND COALESCE(last_delivery_error,'') NOT LIKE 'Suppressed:%') permanently_failed, \
+          COUNT(*) FILTER(WHERE delivery_status='DELIVERED') confirmed_delivered, \
+          COUNT(*) FILTER(WHERE delivery_status='READ') legacy_read, \
+          COUNT(*) FILTER(WHERE delivery_uncertain) uncertain FROM notifications",
+    ).fetch_one(executor).await
 }
 
 /// The gating facts for one notification type — `category` distinguishes
@@ -582,9 +744,11 @@ pub async fn claim_frequency_slot<'e, E: PgExecutor<'e>>(
 pub async fn mark_frequency_claimed<'e, E: PgExecutor<'e>>(
     executor: E,
     id: Uuid,
+    token: Uuid,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE notifications SET frequency_claimed = TRUE WHERE id = $1")
+    sqlx::query("UPDATE notifications SET frequency_claimed=TRUE WHERE id=$1 AND delivery_claim_token=$2 AND delivery_status='DUE' AND delivery_lease_until>clock_timestamp()")
         .bind(id)
+        .bind(token)
         .execute(executor)
         .await?;
     Ok(())
@@ -759,5 +923,19 @@ pub async fn list_cursor<'e, E: PgExecutor<'e>>(
         .bind(time)
         .bind(id)
         .fetch_all(executor)
+        .await
+}
+
+/// Navigation resolves only the authenticated recipient's own inbox row.
+/// The typed DTO excludes claim/lease/provider internals from serialization.
+pub async fn find_for_user<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    user_id: UserId,
+) -> Result<Option<Notification>, sqlx::Error> {
+    sqlx::query_as("SELECT * FROM notifications WHERE id=$1 AND user_id=$2")
+        .bind(id)
+        .bind(user_id)
+        .fetch_optional(executor)
         .await
 }

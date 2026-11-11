@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 536 280" width="536" height="280" role="img" aria-label="Simple checkmark illustration representing a payment confirmation">
+  <rect width="536" height="280" fill="#EAE7FA"/>
+  <circle cx="440" cy="210" r="76" fill="#DDF5EE" opacity="0.8"/>
+  <circle cx="90" cy="60" r="50" fill="#F3A58E" opacity="0.25"/>
+  <!-- receipt card -->
+  <rect x="203" y="64" width="130" height="150" rx="10" fill="#FFFFFF"/>
+  <rect x="221" y="88" width="94" height="8" rx="4" fill="#DDF5EE"/>
+  <rect x="221" y="106" width="94" height="8" rx="4" fill="#DDF5EE"/>
+  <rect x="221" y="124" width="60" height="8" rx="4" fill="#DDF5EE"/>
+  <path d="M203 190 l16 -10 l16 10 l16 -10 l16 10 l16 -10 l16 10 l16 -10 l16 10" stroke="#EAE7FA" stroke-width="4" fill="none"/>
+  <!-- checkmark badge -->
+  <circle cx="268" cy="178" r="30" fill="#087F8C"/>
+  <path d="M255 178 l10 10 l20 -22" stroke="#FFFFFF" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

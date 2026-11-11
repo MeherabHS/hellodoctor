@@ -39,8 +39,11 @@ void main() {
         platform: 'ANDROID', pushToken: 'placeholder-abc', deviceId: 'd-1');
     expect(requests.single.method, 'POST');
     expect(requests.single.path, '/notifications/devices');
-    expect(requests.single.data,
-        {'platform': 'ANDROID', 'push_token': 'placeholder-abc', 'device_id': 'd-1'});
+    expect(requests.single.data, {
+      'platform': 'ANDROID',
+      'push_token': 'placeholder-abc',
+      'device_id': 'd-1'
+    });
     expect(result['push_provider'], 'NOOP_DEVELOPMENT');
     api.dispose();
   });
@@ -126,7 +129,8 @@ void main() {
         'preferred_language': language,
       };
 
-  test('getPreferences() requests GET /notifications/preferences and parses fields',
+  test(
+      'getPreferences() requests GET /notifications/preferences and parses fields',
       () async {
     final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/v1'));
     final requests = <RequestOptions>[];
@@ -147,7 +151,8 @@ void main() {
     api.dispose();
   });
 
-  test('updatePreferences() PUTs the full payload including language when given',
+  test(
+      'updatePreferences() PUTs the full payload including language when given',
       () async {
     final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/v1'));
     final requests = <RequestOptions>[];

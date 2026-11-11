@@ -413,9 +413,11 @@ pub async fn list_own_appointments(
     // booked appointment is actually returned, not just by code review.
     let rows = sqlx::query(
         "SELECT a.id, a.appointment_number, a.doctor_id, a.modality::text AS modality, \
-                a.status::text AS status, a.consultation_fee, a.clinical_outcome, \
+                a.status::text AS status, a.consultation_fee, a.payment_policy::text AS payment_policy, a.clinical_outcome, \
                 a.completed_at, s.start_time, s.end_time, \
-                d.full_name AS doctor_display_name, d.primary_specialty, c.expires_at AS chat_expires_at, c.is_locked AS chat_locked, \
+                d.full_name AS doctor_display_name, d.primary_specialty, \
+                d.profile_picture_size_bytes, d.profile_picture_updated_at, \
+                c.expires_at AS chat_expires_at, c.is_locked AS chat_locked, \
                 cs.status::text AS consultation_session_status, cs.recovery_state AS consultation_recovery_state, \
                 cs.empty_room_deadline, cs.patient_present, cs.doctor_present \
          FROM appointments a \
@@ -449,9 +451,12 @@ pub async fn list_own_appointments(
                 "doctor_id": r.get::<uuid::Uuid, _>("doctor_id"),
                 "doctor_display_name": r.get::<String, _>("doctor_display_name"),
                 "primary_specialty": r.get::<String, _>("primary_specialty"),
+                "profile_picture_size_bytes": r.get::<Option<i32>, _>("profile_picture_size_bytes"),
+                "profile_picture_updated_at": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("profile_picture_updated_at"),
                 "modality": r.get::<String, _>("modality"),
                 "status": r.get::<String, _>("status"),
                 "consultation_fee": r.get::<bigdecimal::BigDecimal, _>("consultation_fee"),
+                "payment_policy": r.get::<String, _>("payment_policy"),
                 "chat_expires_at": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("chat_expires_at"),
                 "chat_locked": r.get::<Option<bool>, _>("chat_locked"),
                 "clinical_outcome": r.get::<Option<String>, _>("clinical_outcome"),

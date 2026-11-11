@@ -1,3 +1,7 @@
+import 'core/notifications/notification_taps.dart';
+import 'features/notifications/notification_navigation.dart';
+import 'core/l10n/doctor_locale.dart';
+import 'l10n/app_localizations.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,6 +17,7 @@ import 'core/theme/tokens.dart';
 import 'core/validation/kenya_phone.dart';
 import 'core/widgets/startup_error_page.dart';
 import 'features/auth/auth_cubit.dart';
+import 'features/auth/forgot_password_page.dart';
 import 'features/auth/legal_consent_page.dart';
 import 'features/doctor/doctor_cubit.dart';
 import 'features/doctor/doctor_pages.dart';
@@ -38,6 +43,7 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
   // the exception propagate out of initState — is what keeps a startup
   // failure from rendering as an unexplained blank screen on a real device.
   Object? _startupError;
+  DoctorLocaleController? locale;
   Timer? _incidentRetryTimer;
   StreamSubscription<AuthState>? _authSubscription;
   StreamSubscription<NetworkStatus>? _networkSubscription;
@@ -81,6 +87,7 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
     auth?.close();
     api?.dispose();
     connectivity?.dispose();
+    locale?.dispose();
     super.dispose();
   }
 
@@ -102,6 +109,7 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
       ClientErrorReporter.current = ClientErrorReporter(api!,
           authenticated: () => auth?.state is SignedIn);
       ClientErrorReporter.current!.loadBuildMetadata();
+      locale ??= DoctorLocaleController(secureStore!)..load();
       auth = AuthCubit(api!, cache: cache);
       _authSubscription = auth!.stream.listen((state) {
         _incidentRetryTimer?.cancel();
@@ -136,32 +144,47 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
       return StartupErrorPage(
           error: startupError, onRetry: () => setState(_initializeServices));
     }
-    return BlocProvider.value(
-        value: auth!,
-        child: BlocBuilder<AuthCubit, AuthState>(builder: (_, state) {
-          Widget application(Widget home) => MaterialApp(
-              navigatorObservers: [screenRouteObserver],
-              debugShowCheckedModeBanner: false,
-              theme: DoctorTokens.theme(),
-              home: home);
-          if (state is SignedIn) {
-            // Scope both the Navigator and all routed subflows to this account.
-            // Removing these providers on logout also disposes their route
-            // stack and, for NotificationCubit, any in-flight requests.
-            return MultiBlocProvider(providers: [
-              BlocProvider<DoctorCubit>(
-                  create: (_) => DoctorCubit(DoctorRepository(api!,
-                      cache: cache, connectivity: connectivity!))),
-              BlocProvider<NotificationCubit>(
-                  create: (_) =>
-                      NotificationCubit(NotificationRepository(api!))
-                        ..startPolling(interval: const Duration(minutes: 1))),
-            ], child: application(const DoctorShell()));
-          }
-          return application(state is SessionRestoring
-              ? const _SplashPage()
-              : LoginPage(auth: auth!));
-        }));
+    return DoctorLocaleScope(
+        controller: locale!,
+        child: ListenableBuilder(
+            listenable: locale!,
+            builder: (context, _) => BlocProvider.value(
+                value: auth!,
+                child: BlocBuilder<AuthCubit, AuthState>(builder: (_, state) {
+                  Widget application(Widget home) => MaterialApp(
+                      key: ValueKey(state is SignedIn),
+                      locale: locale!.locale,
+                      localizationsDelegates:
+                          AppLocalizations.localizationsDelegates,
+                      supportedLocales: AppLocalizations.supportedLocales,
+                      navigatorObservers: [screenRouteObserver],
+                      debugShowCheckedModeBanner: false,
+                      theme: DoctorTokens.theme(),
+                      home: home);
+                  if (state is SignedIn) {
+                    // Scope both the Navigator and all routed subflows to this account.
+                    // Removing these providers on logout also disposes their route
+                    // stack and, for NotificationCubit, any in-flight requests.
+                    return MultiBlocProvider(
+                        providers: [
+                          BlocProvider<DoctorCubit>(
+                              create: (_) => DoctorCubit(DoctorRepository(api!,
+                                  cache: cache, connectivity: connectivity!))),
+                          BlocProvider<NotificationCubit>(
+                              create: (_) => NotificationCubit(
+                                  NotificationRepository(api!))
+                                ..startPolling(
+                                    interval: const Duration(minutes: 1))),
+                        ],
+                        child: application(Builder(
+                            builder: (context) => NotificationNavigationHost(
+                                cubit: context.read<NotificationCubit>(),
+                                child: const DoctorShell()))));
+                  }
+                  return application(state is SessionRestoring
+                      ? const _SplashPage()
+                      : LoginPage(auth: auth!));
+                }))));
   }
 }
 
@@ -262,7 +285,21 @@ class _LoginState extends State<LoginPage> {
                                       obscureText: true,
                                       decoration: const InputDecoration(
                                           labelText: 'Password')),
-                                  const SizedBox(height: 18),
+                                  Align(
+                                      alignment: Alignment.centerRight,
+                                      child: TextButton(
+                                          onPressed: s is AuthBusy
+                                              ? null
+                                              : () => Navigator.push(
+                                                  c,
+                                                  MaterialPageRoute(
+                                                      builder: (_) =>
+                                                          ForgotPasswordPage(
+                                                              auth: widget
+                                                                  .auth))),
+                                          child: const Text(
+                                              'Forgot password?'))),
+                                  const SizedBox(height: 4),
                                   _button(
                                       'Continue to MFA',
                                       s is AuthBusy,
@@ -566,6 +603,7 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
     _queueRefresh.dispose();
     _queueNoticeSubscription?.cancel();
     unawaited(_pushService?.dispose());
+    NotificationTaps.clear();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -605,9 +643,16 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<DoctorCubit>().loadAll();
+      unawaited(context.read<DoctorCubit>().loadBookingPolicy());
       context.read<NotificationCubit>().load();
-      unawaited(_registerDeviceBestEffort());
-      unawaited(_initLocalNotificationDelivery());
+      // M8-G-13: sequenced, not two independent `unawaited` calls — Android
+      // notification channels must exist before FCM can be told to target
+      // one (`android.notification.channel_id`), and a background/terminated
+      // push referencing a not-yet-created channel is silently dropped by
+      // the OS. Still a single `unawaited` overall, so this never blocks
+      // the first frame.
+      unawaited(_initLocalNotificationDelivery()
+          .then((_) => _registerDeviceBestEffort()));
     });
   }
 
@@ -645,6 +690,16 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
         onNotificationReceived: cubit.load,
       );
       await _pushService!.initialize();
+      if (mounted) {
+        final controller = DoctorLocaleScope.maybeOf(context);
+        final revision = controller?.revision;
+        final preferences = await cubit.repo.getPreferences();
+        if (mounted) {
+          await DoctorLocaleScope.maybeOf(context)?.setLanguage(
+              preferences.preferredLanguage,
+              expectedRevision: revision);
+        }
+      }
     } catch (_) {
       // Best-effort: never block the shell or surface an error for this.
     }

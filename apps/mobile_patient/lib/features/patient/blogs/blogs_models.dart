@@ -2,6 +2,27 @@ import 'quiz_models.dart';
 
 typedef Json = Map<String, dynamic>;
 
+class BlogCursor {
+  const BlogCursor(this.time, this.id);
+  final String time, id;
+  factory BlogCursor.fromJson(Json json) {
+    final time = json['before_time']?.toString() ?? '';
+    final id = json['before_id']?.toString() ?? '';
+    if (DateTime.tryParse(time) == null ||
+        !RegExp(r'^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$')
+            .hasMatch(id)) {
+      throw const FormatException('Invalid article cursor.');
+    }
+    return BlogCursor(time, id);
+  }
+}
+
+class BlogPage {
+  const BlogPage(this.items, this.next);
+  final List<BlogArticleDto> items;
+  final BlogCursor? next;
+}
+
 String _textOf(dynamic value, [String fallback = '']) =>
     value == null ? fallback : value.toString();
 

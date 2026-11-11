@@ -1207,7 +1207,7 @@ async fn test_campaign_delivery_respects_engagement_optout_and_quiet_hours(pool:
     .fetch_one(&pool)
     .await
     .unwrap();
-    assert_eq!(optout_status, "FAILED");
+    assert_eq!(optout_status, "SUPPRESSED");
     assert!(optout_error.unwrap().starts_with("Suppressed:"));
 
     let (quiet_status, quiet_next): (String, Option<DateTime<Utc>>) = sqlx::query_as(

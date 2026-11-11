@@ -1,0 +1,29 @@
+{
+  "_comment": "Expected state after restoring canonical_baseline.dump + Redis FLUSHDB + backend restart. Consumed by services/backend/scripts/restore_canonical_benchmark_baseline.ps1 to verify a restore before any benchmark run is allowed to proceed. Re-verified independently 2026-11-04 (re-derived by cleanup+reseed from scratch, counts matched this manifest exactly except doctor_schedule_slots, which depends on whether the optional sustained-run slot top-up was applied -- canonical baseline intentionally does NOT include that top-up).",
+  "dump_file": "canonical_baseline.dump",
+  "dump_sha256": "e456bebae5632dcffe657b3c9ffaaf92bbc5a78ac7e34279bd303b646ba5fd0d",
+  "schema_migration_version": "20261204000004",
+  "expected_row_counts": {
+    "users": 10054,
+    "doctor_profiles": 42,
+    "patient_profiles": 10001,
+    "appointments": 13440,
+    "transactions": 13440,
+    "chat_conversations": 13440,
+    "doctor_schedule_slots": 62405,
+    "notifications": 81
+  },
+  "expected_capability_roles": [
+    "hellodoctor_api",
+    "hellodoctor_auth_worker",
+    "hellodoctor_finance_worker",
+    "hellodoctor_payment_worker",
+    "hellodoctor_system_worker"
+  ],
+  "rls_forced_tables": [
+    "appointments",
+    "chat_conversations",
+    "chat_messages",
+    "consultation_sessions"
+  ]
+}

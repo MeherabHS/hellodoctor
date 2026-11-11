@@ -58,20 +58,13 @@ This document defines the domain entities reverse-engineered from the HelloDocto
 
 ---
 
-### 2.2a `MfaCredential`
-- **Purpose:** Persistent administrator MFA enrollment and recovery state.
-- **Fields:**
-  - `id`: `UUID` (Primary Key)
-  - `user_id`: `UUID` (Foreign Key -> `User.id`, Required)
-  - `method`: `MfaMethod` (`TOTP`, `PASSKEY`)
-  - `totp_secret_encrypted`: `Bytes` (KMS envelope-encrypted; never logged)
-  - `recovery_codes_hash`: `Vec<String>` (Array of Argon2id hashed one-time recovery codes)
-  - `is_enabled`: `Boolean` (Default: `false`)
-  - `enabled_at`: `DateTime<Utc>` (Optional until enrollment confirmation)
-  - `last_verified_at`: `DateTime<Utc>` (Optional)
-  - `revoked_at`: `DateTime<Utc>` (Optional)
-  - `created_at`: `DateTime<Utc>`
-- **Sensitivity:** `IDENTITY` / Authentication secret.
+### 2.2a `MfaCredential` — REMOVED
+Administrator TOTP (this entity) was removed
+(`20261202000002_remove_admin_totp`): no self-service enrollment endpoint
+for it was ever built, and it duplicated protection the OTP
+challenge/attempt-count/`ip_jail` stack already provides. Admin login now
+uses the same single-factor (password + emailed OTP) model as `Doctor` and
+`Patient` — see `AUTH_SECURITY.md` §2.4.
 
 ---
 

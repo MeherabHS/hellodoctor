@@ -49,7 +49,8 @@ class CallController extends ChangeNotifier {
   /// so tests can simulate grant/deny without touching the OS permission
   /// dialog.
   final Future<bool> Function() requestPermissions;
-  final Future<void> Function(List<Map<String, dynamic>> events)? telemetrySubmit;
+  final Future<void> Function(List<Map<String, dynamic>> events)?
+      telemetrySubmit;
   final String telemetryPerspective;
 
   CallScreenState state = CallScreenState.requestingPermissions;

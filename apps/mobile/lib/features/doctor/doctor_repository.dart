@@ -538,6 +538,22 @@ class DoctorRepository {
     }
   }
 
+  /// `GET /config/booking-policy` — the server-authoritative financial-
+  /// module mode. Fails safe to `paymentRequired: true` (the full-earnings
+  /// UI) on any error, since hiding real financial actions in enabled mode
+  /// is worse than briefly showing them during a transient failure.
+  Future<BookingPolicyDto> bookingPolicy() async {
+    try {
+      requireOnline();
+      final raw = mapData(data(await api.get('/config/booking-policy')));
+      return BookingPolicyDto.fromJson(raw);
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Wallet', operation: 'load_booking_policy');
+      rethrow;
+    }
+  }
+
   Future<Json> updateProfile(String name) async {
     try {
       requireOnline();
@@ -917,6 +933,27 @@ class DoctorRepository {
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'SmartRx', operation: 'load_document');
+      rethrow;
+    }
+  }
+
+  /// Remediation E2: mints a fresh, single-use document-download grant via
+  /// [documentUrl] and immediately redeems it for the actual bytes, in-memory
+  /// — never via `launchUrl`/an external application. The grant is one-time
+  /// (server-side `GETDEL`), so this must be called again for every retry
+  /// rather than reusing a previously-resolved URL.
+  Future<TypedBytes> fetchDocumentBytes(String appointmentId, String documentId,
+      {String? currentAppointmentId}) async {
+    final url = await documentUrl(appointmentId, documentId,
+        currentAppointmentId: currentAppointmentId);
+    if (url.isEmpty) {
+      throw const ApiException(404, 'This document is unavailable.');
+    }
+    try {
+      return await api.getBytesWithType(url);
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'SmartRx', operation: 'fetch_document_bytes');
       rethrow;
     }
   }

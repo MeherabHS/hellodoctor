@@ -219,7 +219,7 @@ pub async fn finalize_financial_period(
     } else {
         NaiveDate::from_ymd_opt(payload.year, payload.month + 1, 1).unwrap()
     };
-    let pending_payments: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM transactions WHERE currency='KES' AND created_at >= $1::date AND created_at < $2::date AND payment_status IN ('INITIATED','PAYMENT_HELD'))")
+    let pending_payments: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM transactions WHERE currency='KES' AND created_at >= $1::date AND created_at < $2::date AND (payment_status IN ('INITIATED','PAYMENT_HELD','REFUND_PENDING') OR reconciliation_required))")
         .bind(start).bind(end).fetch_one(&mut *tx).await?;
     if pending_payments {
         return Err(AppError::Conflict("This period still has unconfirmed payments or unsettled consultations. Resolve them before accounting close.".into()));
@@ -397,13 +397,7 @@ pub async fn get_admin_overview(
 
     let active_consultations = consultation_repo::list_active(&mut *tx).await?.len();
 
-    let txs = transaction_repo::list_all(&mut *tx).await?;
-    let mut gross_volume = BigDecimal::from(0);
-    let mut platform_fees = BigDecimal::from(0);
-    for tx_row in &txs {
-        gross_volume += &tx_row.gross_amount;
-        platform_fees += &tx_row.platform_fee_amount;
-    }
+    let (gross_volume, platform_fees) = transaction_repo::funded_volume_totals(&mut *tx).await?;
 
     // "Unpaid" is derived from finalized statements / in-flight disbursement
     // items, not `doctor_wallets.pending_disbursement` (that column only ever
@@ -424,7 +418,16 @@ pub async fn get_admin_overview(
     let total_patients = patient_repo::list(&mut *tx).await?.len();
     let unresolved_traces = audit_repo::count_unresolved(&mut *tx).await?;
     let active_users = crate::repository::user_repo::count_active(&mut *tx).await?;
-    let (video_count,chat_count,video_value,chat_value):(i64,i64,BigDecimal,BigDecimal)=sqlx::query_as("SELECT COUNT(*) FILTER(WHERE a.modality='VIDEO'),COUNT(*) FILTER(WHERE a.modality='CHAT'),COALESCE(SUM(a.consultation_fee) FILTER(WHERE a.modality='VIDEO'),0),COALESCE(SUM(a.consultation_fee) FILTER(WHERE a.modality='CHAT'),0) FROM appointments a JOIN doctor_profiles d ON d.id=a.doctor_id WHERE d.deleted_at IS NULL").fetch_one(&mut *tx).await?;
+    // Counts remain booking counts. Revenue requires a confirmed, non-refunded
+    // obligation; EXISTS prevents failed checkout history multiplying bookings.
+    let (video_count,chat_count,video_value,chat_value):(i64,i64,BigDecimal,BigDecimal)=sqlx::query_as(
+        "SELECT COUNT(*) FILTER(WHERE a.modality='VIDEO'),COUNT(*) FILTER(WHERE a.modality='CHAT'),
+         COALESCE(SUM(a.consultation_fee) FILTER(WHERE a.modality='VIDEO' AND EXISTS(
+           SELECT 1 FROM transactions t WHERE t.appointment_id=a.id AND t.payment_status IN ('PAYMENT_HELD','SETTLED_TO_DOCTOR','DISBURSED','REFUND_PENDING'))),0),
+         COALESCE(SUM(a.consultation_fee) FILTER(WHERE a.modality='CHAT' AND EXISTS(
+           SELECT 1 FROM transactions t WHERE t.appointment_id=a.id AND t.payment_status IN ('PAYMENT_HELD','SETTLED_TO_DOCTOR','DISBURSED','REFUND_PENDING'))),0)
+         FROM appointments a JOIN doctor_profiles d ON d.id=a.doctor_id WHERE d.deleted_at IS NULL"
+    ).fetch_one(&mut *tx).await?;
     tx.commit().await?;
 
     Ok(Json(ApiResponse {
@@ -459,7 +462,13 @@ pub async fn list_admin_doctors(
     let mut tx = state.begin_authed(&ctx).await?;
 
     let docs = doctor_repo::list(&mut *tx).await?;
-    let appts = crate::repository::appointment_repo::list_all(&mut *tx).await?;
+    // M8-G-20: was `appointment_repo::list_all()` + three
+    // `Vec::iter().filter().count()` passes per doctor — measured at ~147ms
+    // just to deserialize 10,000 appointment rows before any counting began.
+    // A single `GROUP BY doctor_id` aggregate (one row per doctor) measured
+    // ~2.6ms for the identical result. See
+    // docs/MILESTONE_8_G20_ADMIN_QUERY_VERIFICATION.md.
+    let appt_counts_by_doctor = doctor_repo::count_appointments_by_doctor(&mut *tx).await?;
     // One query for every doctor's wallet instead of one query per doctor —
     // the N+1 that was here before.
     let wallet_by_doctor: HashMap<DoctorProfileId, DoctorWallet> = wallet_repo::list_all(&mut *tx)
@@ -482,10 +491,10 @@ pub async fn list_admin_doctors(
             .get(&doc.id)
             .cloned()
             .unwrap_or_else(|| BigDecimal::from(0));
-        let consult_count = appts
-            .iter()
-            .filter(|a| a.doctor_id == doc.id && a.status == AppointmentStatus::Completed)
-            .count();
+        let (completed_count, video_count, chat_count) = appt_counts_by_doctor
+            .get(&doc.id)
+            .copied()
+            .unwrap_or((0, 0, 0));
 
         list.push(serde_json::json!({
             "id": doc.id,
@@ -505,9 +514,9 @@ pub async fn list_admin_doctors(
             "is_on_duty": doc.is_on_duty,
             "is_verified": doc.is_professionally_verified(),
             "professional_verification_status": doc.professional_verification_status,
-            "consultations_count": consult_count,
-            "video_count":appts.iter().filter(|a|a.doctor_id==doc.id&&a.modality==Modality::Video).count(),
-            "chat_count":appts.iter().filter(|a|a.doctor_id==doc.id&&a.modality==Modality::Chat).count(),
+            "consultations_count": completed_count,
+            "video_count": video_count,
+            "chat_count": chat_count,
             "lifetime_gross": wallet.lifetime_gross.to_string(),
             "lifetime_fee_withheld": wallet.lifetime_fee_withheld.to_string(),
             "lifetime_net": wallet.lifetime_net.to_string(),
@@ -715,6 +724,7 @@ pub async fn get_doctor_dossier(
             "modality": a.modality,
             "status": a.status,
             "consultation_fee": a.consultation_fee.to_string(),
+            "payment_policy": a.payment_policy,
             "created_at": a.created_at,
             "clinical_outcome": a.clinical_outcome,
         }));
@@ -904,15 +914,28 @@ pub async fn list_admin_transactions(
     let range = parse_optional_month(&query.month)?;
     let mut tx = state.begin_authed(&ctx).await?;
 
-    let mut txs = transaction_repo::list_all(&mut *tx).await?;
-    if let Some((start, end)) = range {
-        txs.retain(|t| t.created_at.date_naive() >= start && t.created_at.date_naive() < end);
-    }
-    // Four whole-table fetches total instead of two per-row queries per
-    // transaction (the N+1 that was here before: find_by_id on appointments,
-    // then patient_repo/doctor_repo find_by_id for each one).
+    // M8-G-20: a `?month=` filter previously still fetched and deserialized
+    // every transaction ever created (`list_all`), then discarded everything
+    // outside the requested month via `Vec::retain` — measured at ~190ms of
+    // pure deserialization cost under a 10,000-row fixture before the filter
+    // ever ran. Pushing the identical filter into SQL (`list_in_range`)
+    // measured ~1ms for the equivalent, already-filtered result set. The
+    // unfiltered case (`range` is `None`) is unchanged — the admin explicitly
+    // asked for full history, which has no cheaper SQL equivalent without
+    // adding pagination (out of scope for this fix; see
+    // docs/MILESTONE_8_G20_ADMIN_QUERY_VERIFICATION.md).
+    let txs = match range {
+        Some((start, end)) => transaction_repo::list_in_range(&mut *tx, start, end).await?,
+        None => transaction_repo::list_all(&mut *tx).await?,
+    };
+    // M8-G-20: was `appointment_repo::list_all()` (every appointment ever
+    // created) just to resolve the handful of appointments actually
+    // referenced by `txs` above. Scoped to exactly those ids instead —
+    // `find_by_ids` already existed for this reason
+    // (`appointment_repo.rs`'s own doc comment) but was not used here.
+    let referenced_appointment_ids: Vec<Uuid> = txs.iter().map(|t| t.appointment_id).collect();
     let appt_by_id: HashMap<Uuid, Appointment> =
-        crate::repository::appointment_repo::list_all(&mut *tx)
+        crate::repository::appointment_repo::find_by_ids(&mut *tx, &referenced_appointment_ids)
             .await?
             .into_iter()
             .map(|a| (a.id, a))
@@ -953,6 +976,7 @@ pub async fn list_admin_transactions(
             "platform_fee_amount": t.platform_fee_amount.to_string(),
             "net_amount": t.net_amount.to_string(),
             "payment_status": t.payment_status,
+            "reconciliation_required": t.reconciliation_required,
             "currency": t.currency,
             "created_at": t.created_at,
             "settled_at": t.settled_at,
@@ -976,38 +1000,27 @@ pub async fn get_finance_summary(
     let range = parse_optional_month(&query.month)?;
     let mut tx = state.begin_authed(&ctx).await?;
 
-    let mut txs = transaction_repo::list_all(&mut *tx).await?;
-    if let Some((start, end)) = range {
-        txs.retain(|t| t.created_at.date_naive() >= start && t.created_at.date_naive() < end);
-    }
-    let mut total_gross = BigDecimal::from(0);
-    let mut total_platform_fee = BigDecimal::from(0);
-    let mut total_net = BigDecimal::from(0);
-
-    // This deployment is Kenya/KES-only. `card_vol`/`mpesa_vol` are the only
-    // live gateways; BKASH/NAGAD transactions can still exist as historical
-    // (pre-cutover) rows — `transactions.gateway` keeps them readable here in
-    // `total_gross`/`total_platform_fee`/`total_net` — but they are
-    // deliberately excluded from `gateway_volume`, which is presented as this
-    // deployment's live gateway breakdown and must not show a Bangladesh
-    // bucket on a Kenya Finance dashboard. See
+    // Milestone 8 Phase 7 Finance SQL remediation (2026-11-03): this handler
+    // only ever returns aggregate totals, never individual transaction rows,
+    // but previously called `list_all()` unconditionally (even when `range`
+    // was `Some`, ignoring the already-existing `list_in_range` the sibling
+    // transactions-list handler uses) and filtered/summed in Rust after a
+    // full-table fetch. Replaced with one SQL aggregate query — no rows
+    // fetched, no `ORDER BY`, no sort, eliminating the ~20MB/call temp-file
+    // spill `EXPLAIN (ANALYZE, BUFFERS)` confirmed against the real
+    // `hellodoctor_api` role. `range=None` (no `?month=`) still computes the
+    // same lifetime totals as before — "Kenya/KES-only; `card_volume`/
+    // `mpesa_volume` are the only live gateways, BKASH/NAGAD (historical,
+    // pre-cutover rows) deliberately excluded from `gateway_volume`" per
     // docs/audit/DOCTOR_BACKEND_CONTRACT_AUDIT.md §6 /
-    // docs/audit/DOCTOR_BUSINESS_LOGIC_GAP_AUDIT.md GAP-C05.
-    let mut card_vol = BigDecimal::from(0);
-    let mut mpesa_vol = BigDecimal::from(0);
-
-    for t in &txs {
-        total_gross += &t.gross_amount;
-        total_platform_fee += &t.platform_fee_amount;
-        total_net += &t.net_amount;
-
-        match t.gateway {
-            Gateway::Card => card_vol += &t.gross_amount,
-            Gateway::Mpesa => mpesa_vol += &t.gross_amount,
-            Gateway::BankTransfer => card_vol += &t.gross_amount,
-            Gateway::Bkash | Gateway::Nagad => {}
-        }
-    }
+    // docs/audit/DOCTOR_BUSINESS_LOGIC_GAP_AUDIT.md GAP-C05 is now enforced
+    // inside the SQL itself (see `finance_summary_totals`), not in Rust.
+    let totals = transaction_repo::finance_summary_totals(&mut *tx, range).await?;
+    let total_gross = totals.total_gross;
+    let total_platform_fee = totals.total_platform_fee;
+    let total_net = totals.total_net;
+    let card_vol = totals.card_volume;
+    let mpesa_vol = totals.mpesa_volume;
 
     // See GAP-C01 (wallet_repo::list_true_unpaid_totals doc comment).
     let unpaid_by_doctor = wallet_repo::list_true_unpaid_totals(&mut *tx).await?;
@@ -1370,6 +1383,7 @@ pub async fn get_patient_dossier(
             "modality": a.modality,
             "status": a.status,
             "fee": a.consultation_fee.to_string(),
+            "payment_policy": a.payment_policy,
             "created_at": a.created_at,
             "clinical_outcome": a.clinical_outcome,
         }));
@@ -1422,10 +1436,17 @@ pub async fn execute_patient_data_rights(
         reason,
     )
     .await?;
-    Ok(Json(ApiResponse {
-        success: true,
-        data: serde_json::json!({ "outcome": outcome.outcome }),
-    }))
+    Ok((
+        if outcome.outcome == "PENDING" {
+            axum::http::StatusCode::ACCEPTED
+        } else {
+            axum::http::StatusCode::OK
+        },
+        Json(ApiResponse {
+            success: true,
+            data: serde_json::json!({ "outcome": outcome.outcome, "job_id":outcome.job_id }),
+        }),
+    ))
 }
 
 /// POST /api/v1/admin/doctors/:id/data-rights/erase — doctor-side mirror of
@@ -1444,10 +1465,17 @@ pub async fn execute_doctor_data_rights(
         reason,
     )
     .await?;
-    Ok(Json(ApiResponse {
-        success: true,
-        data: serde_json::json!({ "outcome": outcome.outcome }),
-    }))
+    Ok((
+        if outcome.outcome == "PENDING" {
+            axum::http::StatusCode::ACCEPTED
+        } else {
+            axum::http::StatusCode::OK
+        },
+        Json(ApiResponse {
+            success: true,
+            data: serde_json::json!({ "outcome": outcome.outcome, "job_id":outcome.job_id }),
+        }),
+    ))
 }
 
 /// GET /api/v1/admin/doctors/pending-verification
@@ -1515,6 +1543,15 @@ async fn review_doctor_professional_registration(
     let doc = doctor_repo::find_by_id(&mut *tx, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Doctor profile not found.".into()))?;
+    // `DoctorProfile` carries no email column; only `users` does. Read
+    // while the transaction is open (cheap, no network I/O) so the value is
+    // ready for the post-commit, fire-and-forget email send below.
+    // `find_email_by_id`, never `find_by_id` — this transaction runs under
+    // the ordinary Admin/Api role, which has no column grant on
+    // `password_hash` at all; `find_by_id` selects it unconditionally and
+    // fails the whole query with "permission denied for table users".
+    let doctor_email =
+        crate::repository::user_repo::find_email_by_id(&mut *tx, doc.user_id).await?;
     if !doctor_repo::review_professional_registration(
         &mut *tx,
         id,
@@ -1559,7 +1596,52 @@ async fn review_doctor_professional_registration(
             .with_before(serde_json::json!({"professional_verification_status": doc.professional_verification_status}))
             .with_after(serde_json::json!({"professional_verification_status": status})),
     ).await?;
+
+    // Phase 1B: atomic creation of the email intent alongside the business
+    // event, on this same transaction — see
+    // `email_outbox_repo::enqueue_transactional`'s doc comment. Content is
+    // rendered later, at dispatch time, from the doctor_profiles row just
+    // updated above.
+    let review_outbox_id = if let Some(email) = doctor_email.as_deref() {
+        let (email_type, dedup_key) = if verified {
+            (
+                "DOCTOR_APPROVED",
+                format!("doctor-approved:{}", id.into_inner()),
+            )
+        } else {
+            (
+                "DOCTOR_REJECTED",
+                format!("doctor-rejected:{}", id.into_inner()),
+            )
+        };
+        let outbox_id = Uuid::new_v4();
+        crate::repository::email_outbox_repo::enqueue_transactional(
+            &mut *tx,
+            outbox_id,
+            email_type,
+            email,
+            &dedup_key,
+            "DOCTOR_PROFILE",
+            id.into_inner(),
+            crate::repository::email_outbox_repo::transactional_email_expiry(),
+        )
+        .await?;
+        Some(outbox_id)
+    } else {
+        None
+    };
     tx.commit().await?;
+
+    // Fire-and-forget, after commit (never awaited — must not delay this
+    // already-committed response). The durable fallback is the periodic
+    // scheduler pass.
+    if let Some(outbox_id) = review_outbox_id {
+        let state = state.clone();
+        tokio::spawn(async move {
+            crate::services::email_dispatch_worker::dispatch_now(&state, outbox_id).await;
+        });
+    }
+
     Ok(Json(ApiResponse {
         success: true,
         data: serde_json::json!({"doctor_id": id, "professional_verification_status": status, "is_verified": verified, "status": status}),
@@ -1997,30 +2079,47 @@ pub async fn list_admin_grievances(
     let mut tx = state.begin_authed(&ctx).await?;
 
     let grievances = grievance_repo::list_all(&mut *tx).await?;
-    // Batch related evidence; never perform an evidence query per grievance.
-    let patient_name_by_id: HashMap<PatientProfileId, String> = patient_repo::list(&mut *tx)
-        .await?
-        .into_iter()
-        .map(|p| (p.id, p.full_name))
-        .collect();
-    let session_by_id: HashMap<Uuid, ConsultationSession> = consultation_repo::list_all(&mut *tx)
-        .await?
-        .into_iter()
-        .map(|s| (s.id, s))
-        .collect();
+    // M8-G-20: every one of the four lookups below previously whole-table-
+    // fetched (`patient_repo::list`/`consultation_repo::list_all`/
+    // `appointment_repo::list_all`/`doctor_repo::list`) just to resolve
+    // evidence for the (typically far smaller) set of grievances actually
+    // being displayed — measured at well over 100ms combined under a
+    // 10,000-appointment/10,000-session fixture. Each is now scoped to only
+    // the ids this grievance list actually references, via the already-
+    // established `find_by_ids` pattern (three of the four functions already
+    // existed for exactly this reason; `doctor_repo`/`consultation_repo`
+    // gained the same scoped function here). Batch related evidence; never
+    // perform an evidence query per grievance.
+    let patient_ids: Vec<PatientProfileId> = grievances.iter().map(|g| g.patient_id).collect();
+    let patient_name_by_id: HashMap<PatientProfileId, String> =
+        patient_repo::find_by_ids(&mut *tx, &patient_ids)
+            .await?
+            .into_iter()
+            .map(|p| (p.id, p.full_name))
+            .collect();
+    let session_ids: Vec<Uuid> = grievances.iter().map(|g| g.consultation_id).collect();
+    let session_by_id: HashMap<Uuid, ConsultationSession> =
+        consultation_repo::find_by_ids(&mut *tx, &session_ids)
+            .await?
+            .into_iter()
+            .map(|s| (s.id, s))
+            .collect();
+    let appointment_ids: Vec<Uuid> = session_by_id.values().map(|s| s.appointment_id).collect();
     let appt_by_id: HashMap<Uuid, Appointment> =
-        crate::repository::appointment_repo::list_all(&mut *tx)
+        crate::repository::appointment_repo::find_by_ids(&mut *tx, &appointment_ids)
             .await?
             .into_iter()
             .map(|a| (a.id, a))
             .collect();
-    let doctor_by_id: HashMap<DoctorProfileId, DoctorProfile> = doctor_repo::list(&mut *tx)
-        .await?
-        .into_iter()
-        .map(|d| (d.id, d))
-        .collect();
+    let doctor_ids: Vec<DoctorProfileId> = appt_by_id.values().map(|a| a.doctor_id).collect();
+    let doctor_by_id: HashMap<DoctorProfileId, DoctorProfile> =
+        doctor_repo::find_by_ids(&mut *tx, &doctor_ids)
+            .await?
+            .into_iter()
+            .map(|d| (d.id, d))
+            .collect();
     let telemetry_by_session: HashMap<Uuid, ConsultationTelemetry> =
-        consultation_repo::list_all_telemetry(&mut *tx)
+        consultation_repo::list_telemetry_by_session_ids(&mut *tx, &session_ids)
             .await?
             .into_iter()
             .map(|t| (t.session_id, t))
@@ -2064,6 +2163,7 @@ pub async fn list_admin_grievances(
             "appointment_id": appointment.map(|a|a.id),
             "modality": appointment.map(|a|a.modality),
             "consultation_fee": appointment.map(|a|&a.consultation_fee),
+            "appointment_payment_policy": appointment.map(|a|a.payment_policy),
             "target_type": g.target_type,
             "category": g.category,
             "claim_summary": g.claim_summary,
@@ -2198,6 +2298,88 @@ pub async fn resolve_consultation_recovery(
     Ok(Json(ApiResponse {
         success: true,
         data: serde_json::json!({"resolution_id": result.0, "result": result.1}),
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReleaseLiveReservationRequest {
+    pub user_id: Uuid,
+    pub reason: String,
+}
+
+/// POST /api/v1/admin/consultations/live-reservations/release
+///
+/// M8-G-30 manual recovery path: deletes one user's stuck
+/// `consultation_live_reservations` row (e.g. after a lost Agora Left
+/// webhook left it CONFIRMED with no further event before the emergency
+/// backstop). This never touches appointment, consultation session, or
+/// financial state — see docs/MILESTONE_8_SINGLE_LIVE_CONSULTATION_DESIGN.md
+/// §7.3. Releasing a reservation is not, and must never be read as, proof
+/// that the user actually disconnected from Agora.
+pub async fn release_live_reservation(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Json(body): Json<ReleaseLiveReservationRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ViewConsultationTimeline)?;
+    let reason = crate::domain::validation::validate_text_field(&body.reason, "Reason", 1000)?;
+    if reason.chars().count() < 8 {
+        return Err(AppError::Validation(
+            "A release reason of at least 8 characters is required.".into(),
+        ));
+    }
+    let mut tx = state.begin_authed(&ctx).await?;
+    let result = sqlx::query_as::<_, (bool, String, Option<Uuid>, Option<Uuid>)>(
+        "SELECT released, result, released_appointment_id, released_session_id \
+         FROM admin_release_live_reservation($1,$2,$3)",
+    )
+    .bind(body.user_id)
+    .bind(&reason)
+    .bind(ctx.user_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|error| {
+        let code = error
+            .as_database_error()
+            .and_then(|database| database.code())
+            .map(|value| value.to_string());
+        match code.as_deref() {
+            Some("42501") => AppError::Forbidden("Admin role required.".into()),
+            Some("22023") => {
+                AppError::Validation("A release reason of 8-1000 characters is required.".into())
+            }
+            _ => AppError::Database(error),
+        }
+    })?;
+    let (released, outcome, released_appointment_id, released_session_id) = result;
+    AuditService::log_in_tx(
+        &mut *tx,
+        AuditLogEntry::new(
+            Some(ctx.user_id),
+            ctx.role,
+            "LIVE_RESERVATION_MANUALLY_RELEASED",
+            "CONSULTATION_SESSION",
+            released_session_id,
+            if released {
+                "SUCCESS"
+            } else {
+                "NO_RESERVATION"
+            },
+        )
+        .with_reason(Some(reason))
+        .with_after(serde_json::json!({
+            "target_user_id": body.user_id,
+            "released": released,
+            "released_appointment_id": released_appointment_id,
+            "consultation_or_financial_state_unchanged": true,
+        })),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({"released": released, "result": outcome}),
     }))
 }
 

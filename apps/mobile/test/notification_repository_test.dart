@@ -130,10 +130,7 @@ void main() {
       requests.add(request);
       handler.resolve(Response(requestOptions: request, data: {
         'success': true,
-        'data': {
-          'status': 'REGISTERED',
-          'push_provider': 'NOOP_DEVELOPMENT'
-        }
+        'data': {'status': 'REGISTERED', 'push_provider': 'NOOP_DEVELOPMENT'}
       }));
     }));
     final api = ApiClient(dio: dio, tokenStore: _Store());
@@ -234,7 +231,8 @@ void main() {
         'preferred_language': language,
       };
 
-  test('getPreferences() requests GET /notifications/preferences and parses fields',
+  test(
+      'getPreferences() requests GET /notifications/preferences and parses fields',
       () async {
     final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/v1'));
     final requests = <RequestOptions>[];
@@ -259,7 +257,8 @@ void main() {
     api.dispose();
   });
 
-  test('updatePreferences() PUTs the full payload including language when given',
+  test(
+      'updatePreferences() PUTs the full payload including language when given',
       () async {
     final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api/v1'));
     final requests = <RequestOptions>[];
