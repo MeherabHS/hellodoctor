@@ -3,7 +3,7 @@ import { isProfessionallyVerified, professionalVerificationLabel } from '../lib/
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, errorText, runtimeGeneration, useResource } from '../lib/client';
 import { startScheduleSync } from '../lib/schedule-sync';
-import { Appointment, Profile, upcomingFirst, consultationAction, consultationActionLabel } from '../lib/contracts';
+import { Appointment, Profile, upcomingFirst, consultationAction, consultationIntent, consultationActionLabel } from '../lib/contracts';
 import { Prototype, hasClass, id, text } from './Prototype';
 import { State } from './Common';
 
@@ -76,7 +76,7 @@ export function QueueCard({ appointment: a, nextId, action }: { appointment: App
     <div className="web-action-row">
       <button className="dw-btn-primary" disabled={!primary} onClick={()=>primary&&action(primary,a)}>{consultationActionLabel(a)}</button>
       {a.modality==='VIDEO'&&<button className="dw-btn-outline-sm" onClick={()=>action('chat',a)}>Follow-up messages</button>}
-      {primary&&<button className="dw-btn-outline-sm" onClick={()=>action('rx',a)}>Write prescription</button>}
+      {consultationIntent(a)&&<button className="dw-btn-outline-sm" onClick={()=>action('rx',a)}>Write prescription</button>}
     </div>
   </article>;
 }

@@ -1,7 +1,9 @@
 // Current Rust DTO fields; no financial or authorization decisions are made here.
+import { joinGate, lockedMessage, type JoinInfo } from './join-window.ts';
+export type { JoinInfo } from './join-window.ts';
 export type RecordDto = Record<string, unknown>;
 export interface Profile { id: string; user_id: string; full_name: string; license_number: string; license_authority: string; current_hospital: string; primary_specialty: string; is_verified: boolean; professional_verification_status: 'PENDING' | 'VERIFIED' | 'REJECTED'; license_country: string; professional_verification_note?: string | null; qualifications: string[] }
-export interface Appointment { queue_actionable?: boolean; id: string; appointment_number: string; patient_id: string; patient_display_name: string; modality: string; status: string; doctor_lifecycle: string; start_time: string; end_time: string; history_access_from: string; history_access_until: string | null; history_access_active: boolean; clinical_outcome: string | null; conversation_id?: string | null; chat_expires_at?: string | null; chat_locked?: boolean | null }
+export interface Appointment { /** Server-derived join eligibility (authoritative policy). */ join?: JoinInfo; queue_actionable?: boolean; id: string; appointment_number: string; patient_id: string; patient_display_name: string; modality: string; status: string; doctor_lifecycle: string; start_time: string; end_time: string; history_access_from: string; history_access_until: string | null; history_access_active: boolean; clinical_outcome: string | null; conversation_id?: string | null; chat_expires_at?: string | null; chat_locked?: boolean | null }
 export interface Slot { bookable?: boolean; id: string; status: string; start_time: string; end_time: string; appointment_id: string | null; patient_display_name: string | null }
 export interface Conversation { id: string; appointment_id: string; patient_display_name: string; expires_at: string; is_locked: boolean; last_message_at: string | null; modality?: string; appointment_status?: string }
 export interface Message { id: string; sender_id: string; content: string; sent_at: string; attachment_id?: string; attachment?: {id:string;display_name:string;mime_type:string;size_bytes:number}|null }
@@ -21,15 +23,34 @@ export function upcomingFirst(appointments: Appointment[]): Appointment[] {
   const terminal = (a: Appointment) => ['COMPLETED', 'CANCELLED', 'EXPIRED', 'PREMATURE_TERMINATION', 'DISPUTED', 'REFUNDED'].includes(a.status) || a.doctor_lifecycle === 'DONE';
   return [...appointments].sort((a, b) => Number(terminal(a)) - Number(terminal(b)) || (terminal(a) ? Date.parse(b.start_time) - Date.parse(a.start_time) : Date.parse(a.start_time) - Date.parse(b.start_time)) || a.id.localeCompare(b.id));
 }
-export function consultationAction(a: Pick<Appointment,'modality'|'status'|'chat_expires_at'|'chat_locked'> & {queue_actionable?:boolean}, now=Date.now()): 'chat'|'call'|null {
+type ActionInput = Pick<Appointment,'modality'|'status'|'chat_expires_at'|'chat_locked'> & {queue_actionable?:boolean; join?:JoinInfo};
+/** Which consultation mode this appointment is in *intent* — ignores the join
+ * window. Used for actions that must stay available regardless of whether the
+ * room is currently joinable (e.g. writing a prescription, completing). */
+export function consultationIntent(a: ActionInput, now=Date.now()): 'chat'|'call'|null {
   if (a.queue_actionable===false || !['CONFIRMED','WAITING','IN_CONSULTATION'].includes(a.status)) return null;
   if (a.modality==='VIDEO' && a.status==='WAITING') return null;
   if (a.modality==='CHAT' && (a.chat_locked || (a.chat_expires_at && Date.parse(a.chat_expires_at)<=now))) return null;
   return a.modality === 'CHAT' ? 'chat' : a.modality === 'VIDEO' ? 'call' : null;
 }
-export function consultationActionLabel(a: Pick<Appointment,'modality'|'status'|'chat_expires_at'|'chat_locked'>): string {
-  const action = consultationAction(a);
-  return action === 'chat' ? 'Start chat consultation' : action === 'call' ? 'Start video consultation' : 'Consultation unavailable';
+/** The Start/Join action. A video room is offered only inside the
+ * server-authorized join window (opening/closing decided by the backend);
+ * outside it there is no active Join/Start/Retry at all. */
+export function consultationAction(a: ActionInput, now=Date.now()): 'chat'|'call'|null {
+  const intent = consultationIntent(a, now);
+  if (intent === 'call' && joinGate(a.join, now).state !== 'open') return null;
+  return intent;
+}
+export function consultationActionLabel(a: ActionInput, now=Date.now()): string {
+  const action = consultationAction(a, now);
+  if (action === 'chat') return 'Start chat consultation';
+  if (action === 'call') return 'Start video consultation';
+  if (a.modality === 'VIDEO' && a.join) {
+    const gate = joinGate(a.join, now);
+    if (gate.state === 'locked') return lockedMessage(gate, now) ?? 'Consultation unavailable';
+    if (gate.state === 'closed') return 'Joining window closed';
+  }
+  return 'Consultation unavailable';
 }
 export function chatActionLabel(c: Conversation, now=Date.now()): string {
   return chatLocked(c,now) ? 'View consultation history' : c.modality==='CHAT' && !c.last_message_at ? 'Start chat consultation' : 'Open chat';
@@ -69,6 +90,7 @@ export function safeBackendPath(path: string, method: string): boolean {
     ['POST', `chat/${id}/attachments`], ['GET', `chat/${id}/messages/${id}/attachment`],
     ['GET|POST', `chat/${id}/messages`], ['POST', `consultations/${id}/(?:complete|complete-no-rx|prescription)`],
     ['POST', `consultations/${id}/(?:rtc-token|telemetry|telemetry/events)`],
+    ['GET', `consultations/${id}/join-eligibility`],
     ['GET', 'notifications(?:/unread-count)?'], ['POST', `notifications/(?:read-all|${id}/read)`],
     ['GET', 'config/booking-policy']
   ];
