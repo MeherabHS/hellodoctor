@@ -515,7 +515,7 @@ class _SlotGrid extends StatelessWidget {
   String _format(DateTime t) {
     final hour12 = t.hour % 12 == 0 ? 12 : t.hour % 12;
     final suffix = t.hour >= 12 ? 'PM' : 'AM';
-    return '${hour12.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')} $suffix';
+    return '${hour12.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')} $suffix EAT';
   }
 }
 

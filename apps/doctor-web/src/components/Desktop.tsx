@@ -8,6 +8,7 @@ import { Prototype, hasClass, id, text } from './Prototype';
 import { State } from './Common';
 import { ClinicalAction, QueueState, date, dayKey, initials, statusLabel, time } from './Queue';
 import { useAgoraCall } from '../lib/useAgoraCall';
+import { eatTime } from '../lib/eat';
 import { callStatusText, callStatusTone } from '../lib/call-status';
 
 export function DesktopAppointments({queue,action,addSlot,search,setSearch,schedule,gap}:{queue:QueueState;action:ClinicalAction;addSlot:()=>void;search:string;setSearch:(value:string)=>void;schedule:()=>void;gap:(message:string)=>void}) {
@@ -66,7 +67,7 @@ export function Telehealth({appointment:a,profile,action,onChat,complete,gap}:{a
   const eligible=a!==null&&consultationAction(a)==='call';
   const call=useAgoraCall(eligible?a!.id:null);
   const callActive=['connecting','waiting-for-remote','connected','reconnecting'].includes(call.state.phase);
-  const labels:Record<string,React.ReactNode>={dwMeetRoomCode:'Consultation workspace',dwMeetCornerPtName:a?.patient_display_name??'No active consultation',dwMeetClock:time(new Date().toISOString()),dwMeetSessionTag:a?.appointment_number??'No appointment selected',dwHistPtAvatar:a?initials(a.patient_display_name):'👤',dwHistPtName:a?.patient_display_name??'No appointment selected',dwHistPtId:a?.appointment_number??'—',dwHistPtBlood:'—',dwHistPtMeta:'Records require current consultation authorization',dwHistVitBp:'—',dwHistVitPulse:'—',dwHistVitTemp:'—',dwHistVitSpo2:'—',dwHistEncCount:'—',dwChatPtSubheader:a?.patient_display_name??'No consultation selected'};
+  const labels:Record<string,React.ReactNode>={dwMeetRoomCode:'Consultation workspace',dwMeetCornerPtName:a?.patient_display_name??'No active consultation',dwMeetClock:eatTime(new Date().toISOString()),dwMeetSessionTag:a?.appointment_number??'No appointment selected',dwHistPtAvatar:a?initials(a.patient_display_name):'👤',dwHistPtName:a?.patient_display_name??'No appointment selected',dwHistPtId:a?.appointment_number??'—',dwHistPtBlood:'—',dwHistPtMeta:'Records require current consultation authorization',dwHistVitBp:'—',dwHistVitPulse:'—',dwHistVitTemp:'—',dwHistVitSpo2:'—',dwHistEncCount:'—',dwChatPtSubheader:a?.patient_display_name??'No consultation selected'};
   return <Prototype name="dwPage_telehealth" action={handler=>{
     if(handler.includes('toggleDoctorWebMic'))call.toggleMic();
     else if(handler.includes('toggleDoctorWebCamera'))call.toggleCamera();

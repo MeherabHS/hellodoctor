@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/l10n/kenya_time.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
@@ -155,8 +156,8 @@ class _RxCard extends StatelessWidget {
 
   String _formatted(DateTime? dt) {
     if (dt == null) return '';
-    final local = dt.toLocal();
-    return '${local.day}/${local.month}, ${formatTime12h(local)}';
+    final local = kenyaTime(dt);
+    return '${local.day}/${local.month}, ${formatTimeEat(dt)}';
   }
 
   @override

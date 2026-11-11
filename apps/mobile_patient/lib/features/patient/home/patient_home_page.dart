@@ -570,7 +570,7 @@ class _ConsultCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final start = appointment.startTime;
-    final time = formatTime12h(start);
+    final time = formatTimeEat(start);
     return PatientCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (appointment.hasActiveConsultation)
