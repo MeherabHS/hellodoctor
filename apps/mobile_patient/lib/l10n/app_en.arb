@@ -228,6 +228,38 @@
   "@bookingTimesEat": {
     "description": "Patient interface: bookingTimesEat"
   },
+  "bookingFormatTitle": "Scheduled Video Consultation",
+  "@bookingFormatTitle": {
+    "description": "Patient interface: bookingFormatTitle"
+  },
+  "bookingFormatSubtitle": "10-minute slot • Doctor calls you directly at scheduled time",
+  "@bookingFormatSubtitle": {
+    "description": "Patient interface: bookingFormatSubtitle"
+  },
+  "bookingChatRow": "24-Hour Dedicated Chat",
+  "@bookingChatRow": {
+    "description": "Patient interface: bookingChatRow"
+  },
+  "bookingIncludedFree": "Included Free",
+  "@bookingIncludedFree": {
+    "description": "Patient interface: bookingIncludedFree"
+  },
+  "bookingChatIncludedLabel": "24-Hour Chat Included:",
+  "@bookingChatIncludedLabel": {
+    "description": "Patient interface: bookingChatIncludedLabel"
+  },
+  "bookingChatIncludedBody": "Your video consultation automatically includes 24 hours of direct specialist chat for pre-visit history and post-visit follow-up.",
+  "@bookingChatIncludedBody": {
+    "description": "Patient interface: bookingChatIncludedBody"
+  },
+  "bookingPayableNow": "Payable now",
+  "@bookingPayableNow": {
+    "description": "Patient interface: bookingPayableNow"
+  },
+  "bookingPaymentDeferred": "Payment deferred",
+  "@bookingPaymentDeferred": {
+    "description": "Patient interface: bookingPaymentDeferred"
+  },
   "bookingAvailableSlots": "Available Slots",
   "@bookingAvailableSlots": {
     "description": "Booking screen slot-grid section header."

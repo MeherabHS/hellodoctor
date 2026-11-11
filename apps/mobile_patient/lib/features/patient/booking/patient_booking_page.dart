@@ -156,6 +156,12 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                     return ListView(
                       padding: const EdgeInsets.fromLTRB(18, 10, 18, 110),
                       children: [
+                        const _StepIndicator(),
+                        if (widget.modality == 'VIDEO') ...[
+                          const SizedBox(height: 10),
+                          const _FormatBanner(),
+                        ],
+                        const SizedBox(height: 10),
                         _BookingForBar(cubit: widget.familyProfilesCubit),
                         const SizedBox(height: 14),
                         if (state.loadingSlots)
@@ -205,9 +211,18 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                           ),
                         ),
                         const SizedBox(height: 10),
+                        // Same booking steps in both modes. Only the payment itself
+                        // (method picker, charge) is switched off by the server's
+                        // booking policy.
+                        _FeeSummary(
+                            doctor: widget.doctor,
+                            modality: widget.modality,
+                            paymentRequired: state.paymentRequired),
+                        if (widget.modality == 'VIDEO') ...[
+                          const SizedBox(height: 10),
+                          const _ChatIncludedCallout(),
+                        ],
                         if (state.paymentRequired) ...[
-                          _FeeSummary(
-                              doctor: widget.doctor, modality: widget.modality),
                           const SizedBox(height: 14),
                           _PaymentMethodPicker(
                             state: state,
@@ -215,20 +230,7 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                             profileId: widget
                                 .familyProfilesCubit.state.activeProfileId,
                           ),
-                        ] else
-                          PatientCard(
-                            child: Row(children: [
-                              const Icon(Icons.check_circle_outline,
-                                  color: PatientTokens.primary, size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                  child: Text(
-                                      l10n.bookingNoPaymentRequiredNotice,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: PatientTokens.text))),
-                            ]),
-                          ),
+                        ],
                         if (state.submitError != null) ...[
                           const SizedBox(height: 6),
                           InlineError(state.submitError!),
@@ -523,10 +525,122 @@ class _SlotGrid extends StatelessWidget {
   }
 }
 
+/// Prototype `view-4` progress indicator: step 1 done, step 2 active, step 3 next.
+class _StepIndicator extends StatelessWidget {
+  const _StepIndicator();
+  Widget _dot(String label, {bool done = false, bool active = false}) =>
+      Container(
+        width: 26,
+        height: 26,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: done ? PatientTokens.primary : PatientTokens.surface,
+            border: Border.all(
+                color: done || active
+                    ? PatientTokens.primary
+                    : PatientTokens.border,
+                width: 2)),
+        child: done
+            ? const Icon(Icons.check, size: 15, color: Colors.white)
+            : Text(label,
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: active
+                        ? PatientTokens.primary
+                        : PatientTokens.textSub)),
+      );
+  Widget _line(bool done) => Expanded(
+      child: Container(
+          height: 2,
+          color: done ? PatientTokens.primary : PatientTokens.border));
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        _dot('1', done: true),
+        _line(true),
+        _dot('2', active: true),
+        _line(false),
+        _dot('3'),
+      ]);
+}
+
+/// Prototype `view-4` "Scheduled Video Consultation" format banner.
+class _FormatBanner extends StatelessWidget {
+  const _FormatBanner();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+          color: PatientTokens.primaryLight,
+          borderRadius: BorderRadius.circular(12)),
+      child: Row(children: [
+        Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+                color: Colors.white, borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.videocam_outlined,
+                size: 18, color: PatientTokens.primaryDark)),
+        const SizedBox(width: 10),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(l10n.bookingFormatTitle,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  color: PatientTokens.primaryDark)),
+          Text(l10n.bookingFormatSubtitle,
+              style: const TextStyle(
+                  fontSize: 10.5, color: PatientTokens.primaryDark)),
+        ])),
+      ]),
+    );
+  }
+}
+
+/// Prototype `view-4` "24-Hour Chat Included" callout.
+class _ChatIncludedCallout extends StatelessWidget {
+  const _ChatIncludedCallout();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+          color: const Color(0xFFECFDF5),
+          border: Border.all(color: const Color(0xFFA7F3D0)),
+          borderRadius: BorderRadius.circular(10)),
+      child: Row(children: [
+        const Icon(Icons.chat_bubble_outline,
+            size: 16, color: Color(0xFF065F46)),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text.rich(
+                TextSpan(children: [
+                  TextSpan(
+                      text: '${l10n.bookingChatIncludedLabel} ',
+                      style: const TextStyle(fontWeight: FontWeight.w800)),
+                  TextSpan(text: l10n.bookingChatIncludedBody),
+                ]),
+                style:
+                    const TextStyle(fontSize: 11, color: Color(0xFF065F46)))),
+      ]),
+    );
+  }
+}
+
 class _FeeSummary extends StatelessWidget {
-  const _FeeSummary({required this.doctor, required this.modality});
+  const _FeeSummary(
+      {required this.doctor,
+      required this.modality,
+      required this.paymentRequired});
   final PublicDoctorDto doctor;
   final String modality;
+  final bool paymentRequired;
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -551,16 +665,48 @@ class _FeeSummary extends StatelessWidget {
               style: const TextStyle(
                   color: PatientTokens.primary, fontWeight: FontWeight.w700)),
         ]),
+        if (modality == 'VIDEO') ...[
+          const SizedBox(height: 6),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Flexible(
+                child: Text(l10n.bookingChatRow,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: PatientTokens.primary,
+                        fontWeight: FontWeight.w700))),
+            Text(l10n.bookingIncludedFree,
+                style: const TextStyle(
+                    color: PatientTokens.primary, fontWeight: FontWeight.w700)),
+          ]),
+        ],
         const Divider(height: 20),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(l10n.bookingTotalPayable,
+          Text(
+              paymentRequired
+                  ? l10n.bookingTotalPayable
+                  : l10n.bookingPayableNow,
               style: const TextStyle(fontWeight: FontWeight.w800)),
-          Text(l10n.bookingFeeAmount(fee),
-              style: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  color: PatientTokens.primary,
-                  fontSize: 16)),
+          Flexible(
+              child: Text(
+                  paymentRequired
+                      ? l10n.bookingFeeAmount(fee)
+                      : l10n.bookingFeeAmount('0'),
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: PatientTokens.primary,
+                      fontSize: 16))),
         ]),
+        if (!paymentRequired) ...[
+          const SizedBox(height: 2),
+          Align(
+              alignment: Alignment.centerRight,
+              child: Text(l10n.bookingPaymentDeferred,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: PatientTokens.textSub))),
+        ],
       ]),
     );
   }
