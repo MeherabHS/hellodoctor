@@ -111,7 +111,8 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     final supportsChat = doctor.supportsChat;
     if (!supportsVideo && !supportsChat) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(AppLocalizations.of(context).doctorBookingUnavailable)));
+          content:
+              Text(AppLocalizations.of(context).doctorBookingUnavailable)));
       return;
     }
     if (supportsVideo && supportsChat) {
@@ -260,7 +261,8 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
 }
 
 class DoctorProfileSummary extends StatelessWidget {
-  const DoctorProfileSummary({super.key, required this.doctor, required this.repo});
+  const DoctorProfileSummary(
+      {super.key, required this.doctor, required this.repo});
   final PublicDoctorDto doctor;
   final DirectoryRepository repo;
   @override

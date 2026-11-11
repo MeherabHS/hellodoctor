@@ -1431,31 +1431,29 @@ class DeferredWalletNotice extends StatelessWidget {
       child: Scaffold(
           backgroundColor: DoctorTokens.bg,
           body: Column(children: [
-            DoctorPageHeader('Doctor Earnings & Wallet',
-                'Financial module not yet active',
+            DoctorPageHeader(
+                'Doctor Earnings & Wallet', 'Financial module not yet active',
                 actions: actions),
             const Expanded(
                 child: Center(
                     child: Padding(
                         padding: EdgeInsets.all(24),
-                        child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.info_outline,
-                                  color: DoctorTokens.textSub, size: 34),
-                              SizedBox(height: 10),
-                              Text(
-                                  'Payment collection is not yet active for this launch.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontWeight: FontWeight.w600)),
-                              SizedBox(height: 6),
-                              Text(
-                                  'Consultations are proceeding without charge. Earnings and payouts will appear here once the financial module is enabled.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: DoctorTokens.textSub)),
-                            ])))),
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.info_outline,
+                              color: DoctorTokens.textSub, size: 34),
+                          SizedBox(height: 10),
+                          Text(
+                              'Payment collection is not yet active for this launch.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          SizedBox(height: 6),
+                          Text(
+                              'Consultations are proceeding without charge. Earnings and payouts will appear here once the financial module is enabled.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 13, color: DoctorTokens.textSub)),
+                        ])))),
           ])));
 }
 

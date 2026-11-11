@@ -40,8 +40,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 navigated = true;
                 Navigator.of(context)
                     .push(MaterialPageRoute(
-                        builder: (_) =>
-                            ResetOtpVerifyPage(auth: widget.auth, challenge: state)))
+                        builder: (_) => ResetOtpVerifyPage(
+                            auth: widget.auth, challenge: state)))
                     .then((_) => navigated = false);
               }
             },
@@ -75,7 +75,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         child: FilledButton(
                             onPressed: busy
                                 ? null
-                                : () => widget.auth.requestPasswordReset(email.text),
+                                : () => widget.auth
+                                    .requestPasswordReset(email.text),
                             child: busy
                                 ? const SizedBox(
                                     width: 19,
@@ -86,7 +87,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     const SizedBox(height: 16),
                     Center(
                       child: TextButton(
-                        onPressed: busy ? null : () => Navigator.of(context).pop(),
+                        onPressed:
+                            busy ? null : () => Navigator.of(context).pop(),
                         child: const Text('Back to sign in'),
                       ),
                     ),

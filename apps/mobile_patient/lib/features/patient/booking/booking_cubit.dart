@@ -29,6 +29,7 @@ class BookingState {
     this.paymentRequired = true,
   });
   final bool loadingSlots, submitting, uploading;
+
   /// Whether this booking requires payment right now — server-decided
   /// (`GET /config/booking-policy`), defaulting to `true` (today's existing
   /// requirement) until the real policy has loaded, so the UI never briefly

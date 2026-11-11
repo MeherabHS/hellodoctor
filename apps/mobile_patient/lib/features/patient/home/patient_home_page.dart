@@ -360,7 +360,6 @@ class _Greeting extends StatelessWidget {
   }
 }
 
-
 class _CoreServiceItem {
   const _CoreServiceItem({
     required this.icon,

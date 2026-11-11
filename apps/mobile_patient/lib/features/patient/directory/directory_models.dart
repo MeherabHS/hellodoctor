@@ -92,7 +92,7 @@ class PublicDoctorDto {
         consultationFeeChat: _textOf(j['consultation_fee_chat'], '0'),
         isOnDuty: j['is_on_duty'] == true,
         hasPhoto: j['profile_picture_size_bytes'] != null,
-        photoUpdatedAt: DateTime.tryParse(
-            _textOf(j['profile_picture_updated_at'], '')),
+        photoUpdatedAt:
+            DateTime.tryParse(_textOf(j['profile_picture_updated_at'], '')),
       );
 }

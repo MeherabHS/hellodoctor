@@ -436,8 +436,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.chevron_right).first);
     await tester.pumpAndSettle();
-    expect(
-        find.text("This doctor hasn't set up consultation booking yet."),
+    expect(find.text("This doctor hasn't set up consultation booking yet."),
         findsOneWidget);
   });
   testWidgets('neither mode offers profile without fake booking',

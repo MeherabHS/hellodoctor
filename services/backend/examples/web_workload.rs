@@ -60,8 +60,8 @@
 //! so a partial/broken run can never be mistaken for a complete one by
 //! anything that scripts around this binary's exit code.
 
-use serde_json::Value;
 use parking_lot::Mutex as SyncMutex;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::env;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -230,9 +230,7 @@ async fn refresh_loop(
                     println!("{role} session refreshed (proactive, before TTL expiry)");
                 }
                 Err(reason) => {
-                    eprintln!(
-                        "{role} session refresh FAILED, will retry next cycle: {reason}"
-                    );
+                    eprintln!("{role} session refresh FAILED, will retry next cycle: {reason}");
                     // Deliberately do not advance `last_refresh` -- retry
                     // sooner rather than waiting a full cycle again, but
                     // still bounded by the sleep below so this can't spin.
@@ -300,7 +298,10 @@ async fn authenticate_with_otp(
 ) -> (String, String) {
     let (login_path, verify_path) = match role {
         "ADMIN" => ("/api/v1/auth/admin/login", "/api/v1/auth/admin/verify-otp"),
-        "DOCTOR" => ("/api/v1/auth/doctor/login", "/api/v1/auth/doctor/verify-otp"),
+        "DOCTOR" => (
+            "/api/v1/auth/doctor/login",
+            "/api/v1/auth/doctor/verify-otp",
+        ),
         _ => panic!("unsupported web workload role: {role}"),
     };
     let login = client
@@ -461,7 +462,9 @@ async fn preflight(
         }
         std::process::exit(2);
     }
-    println!("=== PREFLIGHT PASSED: routing + real Admin/Doctor auth confirmed for both apps ===\n");
+    println!(
+        "=== PREFLIGHT PASSED: routing + real Admin/Doctor auth confirmed for both apps ===\n"
+    );
 }
 
 async fn admin_worker(

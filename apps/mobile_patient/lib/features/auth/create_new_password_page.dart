@@ -52,7 +52,8 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
                 navigated = true;
                 Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(
-                        builder: (_) => PasswordResetSuccessPage(auth: widget.auth)),
+                        builder: (_) =>
+                            PasswordResetSuccessPage(auth: widget.auth)),
                     (route) => false);
               }
             },

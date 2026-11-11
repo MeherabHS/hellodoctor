@@ -104,15 +104,13 @@ class _CreateNewPasswordPageState extends State<CreateNewPasswordPage> {
                                   _button('Reset password', busy, submit),
                                   if (localError != null)
                                     Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 14),
+                                        padding: const EdgeInsets.only(top: 14),
                                         child: Text(localError!,
                                             style: const TextStyle(
                                                 color: DoctorTokens.danger))),
                                   if (s is AuthFailure)
                                     Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 14),
+                                        padding: const EdgeInsets.only(top: 14),
                                         child: Text(s.message,
                                             style: const TextStyle(
                                                 color: DoctorTokens.danger))),

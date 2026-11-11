@@ -338,10 +338,7 @@ pub enum Modality {
 /// `AppointmentService::book_appointment` runs in `FinancialModuleMode::Deferred`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-#[sqlx(
-    type_name = "payment_policy_enum",
-    rename_all = "SCREAMING_SNAKE_CASE"
-)]
+#[sqlx(type_name = "payment_policy_enum", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PaymentPolicy {
     Required,
     NotRequired,

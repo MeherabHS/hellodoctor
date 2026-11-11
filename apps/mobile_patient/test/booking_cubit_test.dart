@@ -46,6 +46,7 @@ class FakeBookingRepository extends BookingRepository {
     if (bookingPolicyError != null) throw bookingPolicyError!;
     return bookingPolicyResult;
   }
+
   Object? uploadError;
   List<PatientPaymentMethodDto>? paymentMethodsResult;
   Object? paymentMethodsError;

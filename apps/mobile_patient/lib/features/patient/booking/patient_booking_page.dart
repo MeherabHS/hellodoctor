@@ -203,8 +203,7 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                         const SizedBox(height: 10),
                         if (state.paymentRequired) ...[
                           _FeeSummary(
-                              doctor: widget.doctor,
-                              modality: widget.modality),
+                              doctor: widget.doctor, modality: widget.modality),
                           const SizedBox(height: 14),
                           _PaymentMethodPicker(
                             state: state,

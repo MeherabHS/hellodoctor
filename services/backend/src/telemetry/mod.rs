@@ -38,7 +38,12 @@ impl<S: tracing::Subscriber> Layer<S> for SqlxAcquireMetricsLayer {
                     self.0 = Some(value);
                 }
             }
-            fn record_debug(&mut self, _field: &tracing::field::Field, _value: &dyn std::fmt::Debug) {}
+            fn record_debug(
+                &mut self,
+                _field: &tracing::field::Field,
+                _value: &dyn std::fmt::Debug,
+            ) {
+            }
         }
         let mut visitor = SecsVisitor(None);
         event.record(&mut visitor);

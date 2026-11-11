@@ -58,7 +58,8 @@ void main() {
     await auth.close();
   });
 
-  test('verifyPasswordResetOtp does nothing without a prior requestPasswordReset',
+  test(
+      'verifyPasswordResetOtp does nothing without a prior requestPasswordReset',
       () async {
     final auth = AuthCubit(ApiClient(dio: Dio()));
     await auth.verifyPasswordResetOtp('123456');
@@ -78,7 +79,8 @@ void main() {
     await auth.close();
   });
 
-  test('completePasswordReset does nothing without a prior successful verification',
+  test(
+      'completePasswordReset does nothing without a prior successful verification',
       () async {
     final auth = AuthCubit(ApiClient(dio: Dio()));
     await auth.completePasswordReset('NewPassw0rd!');

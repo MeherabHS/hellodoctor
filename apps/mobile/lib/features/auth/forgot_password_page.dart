@@ -67,8 +67,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                             return Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                      'Forgot your password?',
+                                  const Text('Forgot your password?',
                                       style: TextStyle(
                                           fontSize: 22,
                                           fontWeight: FontWeight.w800,
@@ -103,8 +102,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                               const Text('Back to sign in'))),
                                   if (s is AuthFailure)
                                     Padding(
-                                        padding:
-                                            const EdgeInsets.only(top: 14),
+                                        padding: const EdgeInsets.only(top: 14),
                                         child: Text(s.message,
                                             style: const TextStyle(
                                                 color: DoctorTokens.danger))),
