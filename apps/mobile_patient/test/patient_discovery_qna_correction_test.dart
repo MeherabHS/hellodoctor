@@ -439,6 +439,125 @@ void main() {
     expect(find.text("This doctor hasn't set up consultation booking yet."),
         findsOneWidget);
   });
+  // P0 regression: Patient could see a verified doctor's slots but every tap
+  // showed "This doctor hasn't set up consultation booking yet." because the
+  // doctor_profile_page guard required a positive consultation fee, and
+  // self-registered doctors have fee 0 (auth_handlers.rs). In
+  // FINANCIAL_MODULE_MODE=deferred (policy payment_required:false) no fee is
+  // charged, so an unpriced doctor must be bookable.
+  Future<void> pumpProfileWithPolicy(WidgetTester tester,
+      {required Map<String, dynamic>? policy,
+      Map<String, dynamic> doctor = const {
+        'consultation_fee_video': '0',
+        'consultation_fee_chat': '0'
+      }}) async {
+    await viewport(tester, 320);
+    final connectivity = ConnectivityService();
+    addTearDown(connectivity.dispose);
+    final dio = Dio();
+    final api = ApiClient(dio: dio, tokenStore: MemoryTokens());
+    addTearDown(api.dispose);
+    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
+      if (o.path.endsWith('/config/booking-policy')) {
+        if (policy == null) {
+          h.reject(DioException(
+              requestOptions: o, type: DioExceptionType.connectionError));
+          return;
+        }
+        h.resolve(Response(
+            requestOptions: o,
+            statusCode: 200,
+            data: {'success': true, 'data': policy}));
+        return;
+      }
+      final dynamic data = o.path.endsWith('/slots')
+          ? [
+              {
+                'id': 'slot-1',
+                'doctor_id': 'doctor-test',
+                'start_time': '2099-10-14T09:00:00Z',
+                'end_time': '2099-10-14T09:30:00Z',
+              }
+            ]
+          : {...doctorJson, ...doctor};
+      h.resolve(Response(
+          requestOptions: o,
+          statusCode: 200,
+          data: {'success': true, 'data': data}));
+    }));
+    final family = FamilyProfilesCubit(FamilyProfilesRepository(api));
+    addTearDown(family.close);
+    await tester.pumpWidget(host(DoctorProfilePage(
+        doctorId: 'doctor-test',
+        api: api,
+        cache: null,
+        connectivity: connectivity,
+        familyProfilesCubit: family)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Availability'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.chevron_right).first);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets(
+      'deferred mode: slot tap on an unpriced doctor opens the booking flow',
+      (tester) async {
+    await pumpProfileWithPolicy(tester, policy: {'payment_required': false});
+    expect(find.text("This doctor hasn't set up consultation booking yet."),
+        findsNothing);
+    expect(find.text('Book Video Consultation'), findsOneWidget);
+  });
+  testWidgets(
+      'paid mode: slot tap on an unpriced doctor still reports booking unavailable',
+      (tester) async {
+    await pumpProfileWithPolicy(tester, policy: {'payment_required': true});
+    expect(find.text("This doctor hasn't set up consultation booking yet."),
+        findsOneWidget);
+    expect(find.text('Book Video Consultation'), findsNothing);
+  });
+  testWidgets(
+      'unreachable booking policy is reported as such, not as a doctor setup problem',
+      (tester) async {
+    await pumpProfileWithPolicy(tester, policy: null);
+    expect(find.text("This doctor hasn't set up consultation booking yet."),
+        findsNothing);
+    expect(
+        find.text(
+            "Couldn't check booking availability. Check your connection and try again."),
+        findsOneWidget);
+  });
+  test('videoBookable follows the server policy, fee only in paid mode', () {
+    final unpriced = PublicDoctorDto.fromJson({
+      ...doctorJson,
+      'consultation_fee_video': '0',
+      'consultation_fee_chat': '0'
+    });
+    expect(unpriced.videoBookable(paymentRequired: false), true);
+    expect(unpriced.videoBookable(paymentRequired: true), false);
+    expect(unpriced.supportsChat, false);
+  });
+  testWidgets('deferred mode: unpriced doctor card offers video booking',
+      (tester) async {
+    await viewport(tester, 320);
+    final d = PublicDoctorDto.fromJson({
+      ...doctorJson,
+      'consultation_fee_video': '0',
+      'consultation_fee_chat': '0'
+    });
+    String? booked;
+    await tester.pumpWidget(host(Scaffold(
+        body: PatientDoctorCard(
+            doctor: d,
+            repo: fakeDirectoryRepo(),
+            paymentRequired: false,
+            onProfile: () {},
+            onBook: (m) => booked = m))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Book video'));
+    expect(booked, 'VIDEO');
+    expect(find.textContaining('KES'), findsNothing);
+  });
   testWidgets('neither mode offers profile without fake booking',
       (tester) async {
     await viewport(tester, 320);

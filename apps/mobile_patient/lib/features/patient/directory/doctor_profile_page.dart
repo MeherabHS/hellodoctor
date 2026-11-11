@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../core/network/availability_refresh.dart';
 // ignore_for_file: prefer_const_constructors, prefer_const_literals_to_create_immutables, use_build_context_synchronously
 import 'package:flutter/material.dart';
@@ -58,6 +60,24 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   bool _favorited = false;
   late final AvailabilityRefresh _availabilityRefresh;
 
+  /// Server-controlled booking policy (`GET /config/booking-policy`);
+  /// `null` until known. Never inferred from a doctor's fee.
+  bool? _paymentRequired;
+
+  /// Resolves the policy, retrying a failed earlier load. Returns `null` only
+  /// when the policy genuinely cannot be fetched right now.
+  Future<bool?> _resolvePaymentRequired() async {
+    final known = _paymentRequired;
+    if (known != null) return known;
+    try {
+      final policy = await _bookingRepo.bookingPolicy();
+      if (mounted) setState(() => _paymentRequired = policy.paymentRequired);
+      return policy.paymentRequired;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void dispose() {
     _availabilityRefresh.dispose();
@@ -72,6 +92,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
     _bookingRepo =
         BookingRepository(widget.api, connectivity: widget.connectivity);
     _future = _repo.doctor(widget.doctorId);
+    unawaited(_resolvePaymentRequired());
     _availabilityRefresh = AvailabilityRefresh(() {
       if (mounted && _tab == 'availability') {
         setState(() => _slotsFuture = _bookingRepo.slots(widget.doctorId));
@@ -107,7 +128,18 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
   /// fee is configured, there is genuinely nothing to book yet, so this says
   /// so explicitly instead of opening a flow that would fail.
   Future<void> _handleSlotTap(PublicDoctorDto doctor) async {
-    final supportsVideo = doctor.supportsVideo;
+    final paymentRequired = await _resolvePaymentRequired();
+    if (!mounted) return;
+    if (paymentRequired == null) {
+      // Policy unreachable: say so, instead of mislabeling a network problem
+      // as "this doctor hasn't set up booking".
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text(AppLocalizations.of(context).bookingPolicyUnavailable)));
+      return;
+    }
+    final supportsVideo =
+        doctor.videoBookable(paymentRequired: paymentRequired);
     final supportsChat = doctor.supportsChat;
     if (!supportsVideo && !supportsChat) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -228,9 +260,11 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                           future: _slotsFuture!,
                           onSelectSlot: () => _handleSlotTap(doctor)),
                     const SizedBox(height: 16),
-                    if (doctor.supportsVideo) ...[
-                      Text(
-                          '${AppLocalizations.of(context).consultVideo} - KES ${doctor.consultationFeeVideo}'),
+                    if (doctor.videoBookable(
+                        paymentRequired: _paymentRequired ?? true)) ...[
+                      Text(doctor.supportsVideo
+                          ? '${AppLocalizations.of(context).consultVideo} - KES ${doctor.consultationFeeVideo}'
+                          : AppLocalizations.of(context).consultVideo),
                       const SizedBox(height: 8),
                       FilledButton(
                           onPressed: () => _openBooking(doctor, 'VIDEO'),
