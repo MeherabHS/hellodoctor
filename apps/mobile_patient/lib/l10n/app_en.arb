@@ -260,6 +260,36 @@
   "@bookingPaymentDeferred": {
     "description": "Patient interface: bookingPaymentDeferred"
   },
+  "waitingRoomOpensAt": "Your consultation room opens at {time}",
+  "@waitingRoomOpensAt": {
+    "description": "Patient interface: waitingRoomOpensAt",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "waitingRoomOpensIn": "opens in {countdown}",
+  "@waitingRoomOpensIn": {
+    "description": "Patient interface: waitingRoomOpensIn",
+    "placeholders": {
+      "countdown": {
+        "type": "String"
+      }
+    }
+  },
+  "waitingRoomWindowClosed": "The joining window for this consultation has closed.",
+  "@waitingRoomWindowClosed": {
+    "description": "Patient interface: waitingRoomWindowClosed"
+  },
+  "waitingRoomJoinUnavailable": "This appointment can no longer be joined.",
+  "@waitingRoomJoinUnavailable": {
+    "description": "Patient interface: waitingRoomJoinUnavailable"
+  },
+  "waitingRoomNeedsReview": "This consultation needs review before it can be rejoined.",
+  "@waitingRoomNeedsReview": {
+    "description": "Patient interface: waitingRoomNeedsReview"
+  },
   "bookingAvailableSlots": "Available Slots",
   "@bookingAvailableSlots": {
     "description": "Booking screen slot-grid section header."
