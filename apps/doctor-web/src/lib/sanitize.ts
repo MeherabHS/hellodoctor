@@ -35,7 +35,8 @@ export function sanitize(value: unknown): unknown {
 // only to a successful response of that exact endpoint, and it rebuilds the
 // payload from an allow-list of five fields with strict types, so nothing else
 // from the upstream body (including any other token-like key) passes through.
-const RTC_TOKEN_PATH = /^consultations\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/rtc-token$/i;
+const HEX = '[0-9a-fA-F]';
+const RTC_TOKEN_PATH = new RegExp(`^consultations/${HEX}{8}-${HEX}{4}-${HEX}{4}-${HEX}{4}-${HEX}{12}/rtc-token$`);
 
 export function isRtcTokenMint(path: string, method: string): boolean {
   return method.toUpperCase() === 'POST' && RTC_TOKEN_PATH.test(path);
