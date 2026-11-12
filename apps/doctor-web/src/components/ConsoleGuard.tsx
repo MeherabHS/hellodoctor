@@ -11,6 +11,15 @@ import { useEffect } from 'react';
 // pollution vector introduced by something *other* than a JSON request body
 // (a crafted query string parsed client-side, a vulnerable dependency,
 // etc.) — never a substitute for either server-side check.
+//
+// This component deliberately does NOT freeze `Object.prototype`. A frozen
+// Object.prototype makes `toString`/`valueOf`/... read-only, and in strict
+// mode any library doing `this.toString = ...` throws "Cannot assign to read
+// only property 'toString'". The Agora Web SDK does exactly that while its
+// module evaluates, which surfaced in production as the generic
+// "stage=sdk_load name=TypeError" on Doctor Web. Prototype pollution is
+// already rejected server-side (sideDoorGuard.ts), so the freeze bought
+// little and broke video calls.
 export function ConsoleGuard() {
   useEffect(() => {
     try {
@@ -22,12 +31,6 @@ export function ConsoleGuard() {
       // framed by something CSP should already have refused to load. Hide
       // the content rather than risk rendering inside an attacker's frame.
       document.body.style.display = 'none';
-    }
-    try {
-      Object.freeze(Object.prototype);
-    } catch {
-      // Already frozen (e.g. a second mount in dev's StrictMode double-
-      // invoke) or the runtime disallows it — nothing further to do either way.
     }
   }, []);
   return null;
