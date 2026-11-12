@@ -410,3 +410,78 @@ pub async fn insert_slot<'e, E: PgExecutor<'e>>(
     .await?;
     Ok(())
 }
+
+/// Doctor encounter queue/schedule/history rows (`GET /doctor/appointments`).
+///
+/// Moved here verbatim from the handler with ONE change: every `clock_timestamp()` is
+/// now the bound `$7` (`as_of`), so "today in Africa/Nairobi" can be evaluated at a
+/// chosen instant. Production passes `Utc::now()`; semantics are unchanged:
+/// * `view=upcoming`  — IN_CONSULTATION work, then *today's* (Nairobi calendar day)
+///   remaining actionable consultations; terminal records and tomorrow's are absent.
+/// * `view=schedule`  — CONFIRMED/WAITING on a later Nairobi calendar day.
+/// * `view=history`   — terminal/elapsed encounters.
+/// * `view=all`       — everything (the master Schedule data source).
+///
+/// See docs/DOCTOR_QUEUE_AND_HISTORY_VERIFICATION.md.
+#[allow(clippy::too_many_arguments)]
+pub async fn list_appointments_as_of<'e, E: PgExecutor<'e>>(
+    executor: E,
+    doctor_profile_id: DoctorProfileId,
+    user_id: UserId,
+    status: Option<String>,
+    view: String,
+    limit: i64,
+    offset: i64,
+    as_of: chrono::DateTime<chrono::Utc>,
+) -> Result<Vec<sqlx::postgres::PgRow>, sqlx::Error> {
+    sqlx::query(r#"
+      WITH encounters AS (
+        SELECT a.id,a.appointment_number,a.patient_id,a.doctor_id,a.slot_id,
+          a.modality::text AS modality,a.status::text AS status,a.consultation_fee,
+          a.payment_policy::text AS payment_policy,
+          a.clinical_outcome,a.completed_at,a.created_at,a.updated_at,
+          s.start_time,s.end_time,c.id AS conversation_id,c.is_locked AS chat_locked,c.expires_at AS chat_expires_at,
+          cs.status::text AS consultation_session_status,cs.recovery_state AS consultation_recovery_state,
+          cs.empty_room_deadline,cs.patient_present,cs.doctor_present,
+          s.start_time-INTERVAL '15 minutes' AS history_access_from,
+          CASE WHEN a.status='COMPLETED' THEN COALESCE(cs.ended_at,a.completed_at)+INTERVAL '24 hours' END AS history_access_until,
+          CASE WHEN a.status='COMPLETED' AND (COALESCE(cs.ended_at,a.completed_at) IS NULL OR $7::timestamptz>=COALESCE(cs.ended_at,a.completed_at)+INTERVAL '24 hours') THEN 'DONE' ELSE a.status::text END AS doctor_lifecycle,
+          (a.status='IN_CONSULTATION' OR (
+            a.status IN ('CONFIRMED','WAITING')
+            AND (s.start_time AT TIME ZONE 'Africa/Nairobi')::date=($7::timestamptz AT TIME ZONE 'Africa/Nairobi')::date
+            AND ((a.modality='VIDEO' AND s.end_time>$7::timestamptz) OR
+              (a.modality='CHAT' AND COALESCE(NOT c.is_locked AND c.expires_at>$7::timestamptz,false)))
+          )) AS queue_actionable
+        FROM appointments a JOIN doctor_schedule_slots s ON s.id=a.slot_id
+        LEFT JOIN consultation_sessions cs ON cs.appointment_id=a.id
+        LEFT JOIN chat_conversations c ON c.appointment_id=a.id
+        WHERE a.doctor_id=$1 AND ($4::text IS NULL OR a.status::text=$4)
+      ),
+      paginated AS (
+        SELECT * FROM encounters WHERE
+          ($6::text<>'upcoming' OR queue_actionable)
+          AND ($6::text<>'schedule' OR (status IN ('CONFIRMED','WAITING') AND
+            (start_time AT TIME ZONE 'Africa/Nairobi')::date>($7::timestamptz AT TIME ZONE 'Africa/Nairobi')::date))
+          AND ($6::text<>'history' OR status IN ('COMPLETED','CANCELLED','REFUNDED','EXPIRED','PREMATURE_TERMINATION','DISPUTED') OR
+            (NOT queue_actionable AND (end_time<=$7::timestamptz OR (modality='CHAT' AND (chat_locked OR chat_expires_at<=$7::timestamptz)))))
+        ORDER BY CASE WHEN status='IN_CONSULTATION' THEN 0 WHEN queue_actionable THEN 1
+            WHEN status IN ('CONFIRMED','WAITING') AND start_time>$7::timestamptz THEN 2 ELSE 3 END,
+          CASE WHEN queue_actionable OR (status IN ('CONFIRMED','WAITING') AND start_time>$7::timestamptz) THEN start_time END ASC,
+          CASE WHEN NOT queue_actionable AND NOT(status IN ('CONFIRMED','WAITING') AND start_time>$7::timestamptz) THEN start_time END DESC,id ASC
+        LIMIT $2 OFFSET $3
+      )
+      SELECT paginated.*,
+        doctor_history_context_allowed(paginated.id,$5) AS history_access_active,
+        COALESCE(p.full_name,doctor_encounter_patient_name(paginated.id),'Patient') AS patient_display_name
+      FROM paginated LEFT JOIN patient_profiles p ON p.id=paginated.patient_id
+    "#)
+        .bind(doctor_profile_id)
+        .bind(limit)
+        .bind(offset)
+        .bind(status)
+        .bind(user_id)
+        .bind(view)
+        .bind(as_of)
+        .fetch_all(executor)
+        .await
+}

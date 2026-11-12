@@ -1,5 +1,7 @@
 import '../../../core/network/screen_refresh.dart';
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -19,6 +21,7 @@ import '../home/home_models.dart';
 import '../profile/family_profiles_cubit.dart';
 import '../video/agora_call_page.dart';
 import 'booking_repository.dart';
+import 'join_eligibility.dart';
 import 'waiting_room_cubit.dart';
 
 /// `prototype/index.html` view-10 — "Scheduled Consultation" / Waiting Room.
@@ -63,6 +66,8 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
   bool _checkingPermissions = false;
   Map<Permission, PermissionStatus>? _permissionResult;
   bool _openingChat = false;
+  Timer? _ticker;
+  bool _wasLocked = false;
 
   @override
   void initState() {
@@ -71,7 +76,23 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
       widget.repo,
       appointmentId: widget.appointment.id,
       initialStatus: widget.appointment.status,
+      initialJoin: widget.appointment.join,
+      trackJoin: widget.appointment.modality == 'VIDEO',
     );
+    // Drives the countdown and, the moment the window opens, re-validates with
+    // the server instead of trusting the local clock alone.
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      final join = _cubit.state.join;
+      if (!mounted || join == null) return;
+      final locked = join.gate() == JoinGateState.locked;
+      if (locked) {
+        setState(() {});
+      } else if (_wasLocked) {
+        setState(() {});
+        unawaited(_cubit.poll());
+      }
+      _wasLocked = locked;
+    });
     _chatRepo =
         ChatRepository(widget.repo.api, connectivity: widget.repo.connectivity);
     _grievanceRepo = GrievanceRepository(widget.repo.api);
@@ -92,6 +113,7 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
 
   @override
   void dispose() {
+    _ticker?.cancel();
     _screenRefresh.dispose();
     _cubit.close();
     super.dispose();
@@ -347,10 +369,14 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
                           ]),
                         ),
                         const SizedBox(height: 14),
+                        if (isVideo && state.join != null)
+                          _JoinGateNotice(join: state.join!, l10n: l10n),
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
-                            onPressed: isVideo ? _joinCall : _openChat,
+                            onPressed: isVideo
+                                ? (joinIsOpen(state.join) ? _joinCall : null)
+                                : _openChat,
                             style: FilledButton.styleFrom(
                                 backgroundColor: PatientTokens.primary,
                                 padding:
@@ -497,6 +523,53 @@ class _PermissionSummary extends StatelessWidget {
           ),
         ),
       ]),
+    );
+  }
+}
+
+/// Why Join is (not) available, straight from the server-derived eligibility:
+/// "Your consultation room opens at [time] EAT" with a countdown, instead of a
+/// generic connection error after tapping a button that could never work.
+class _JoinGateNotice extends StatelessWidget {
+  const _JoinGateNotice({required this.join, required this.l10n});
+  final JoinEligibility join;
+  final AppLocalizations l10n;
+
+  @override
+  Widget build(BuildContext context) {
+    final gate = join.gate();
+    if (gate == JoinGateState.open) return const SizedBox.shrink();
+    final String text;
+    switch (gate) {
+      case JoinGateState.locked:
+        text =
+            '${l10n.waitingRoomOpensAt(formatEatDateTime(join.joinOpenAt))} · ${l10n.waitingRoomOpensIn(formatCountdown(join.untilOpen()))}';
+      case JoinGateState.closed:
+        text = l10n.waitingRoomWindowClosed;
+      default:
+        text = join.reason == 'NEEDS_REVIEW'
+            ? l10n.waitingRoomNeedsReview
+            : l10n.waitingRoomJoinUnavailable;
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        key: const Key('join-gate-notice'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+            color: PatientTokens.surface,
+            borderRadius: BorderRadius.circular(PatientTokens.cardRadius),
+            border: Border.all(color: PatientTokens.border)),
+        child: Row(children: [
+          const Icon(Icons.lock_clock, size: 18, color: PatientTokens.textSub),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(text,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700))),
+        ]),
+      ),
     );
   }
 }

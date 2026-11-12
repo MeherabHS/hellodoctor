@@ -52,10 +52,14 @@ mod admin_quizzes;
 mod admission_capacity_bench;
 #[path = "cases/admission_control_fairness.rs"]
 mod admission_control_fairness;
+#[path = "cases/consultation_join_window.rs"]
+mod consultation_join_window;
 #[path = "cases/consultation_live_reservation.rs"]
 mod consultation_live_reservation;
 #[path = "cases/consultation_recovery.rs"]
 mod consultation_recovery;
+#[path = "cases/doctor_queue_nairobi_day.rs"]
+mod doctor_queue_nairobi_day;
 #[path = "cases/email_outbox_delivery.rs"]
 mod email_outbox_delivery;
 #[path = "cases/engagement_and_holiday_notifications.rs"]
@@ -9734,8 +9738,21 @@ async fn test_doctor_lists_include_patient_display_name(pool: PgPool) {
             .await
             .unwrap();
 
-    let appointments =
-        json_body(get(&app, "/api/v1/doctor/appointments", Some(&doctor_token)).await).await;
+    // `view=all` deliberately (same convention as the queue/identity test below): this
+    // test verifies the patient display name is attached to the doctor's own
+    // appointment rows, not the default `upcoming` queue's same-Nairobi-day filter
+    // (covered deterministically in cases/doctor_queue_nairobi_day.rs). The seeded slot
+    // sits at now+1h, which falls on the NEXT Nairobi day when the suite runs after
+    // 23:00 EAT, so the default view made this test pass or fail by wall-clock time.
+    let appointments = json_body(
+        get(
+            &app,
+            "/api/v1/doctor/appointments?view=all&limit=100",
+            Some(&doctor_token),
+        )
+        .await,
+    )
+    .await;
     let appt_row = appointments["data"]
         .as_array()
         .unwrap()
@@ -17824,8 +17841,19 @@ async fn test_consultation_chat_booking_payment_shared_history_and_ownership(poo
         .await;
         assert_eq!(same["data"]["id"], conv);
     }
-    let queue =
-        json_body(get(&app, "/api/v1/doctor/appointments?limit=100", Some(&doctor)).await).await;
+    // `view=all` deliberately: this test verifies the CHAT booking's identity and
+    // ownership, not the `upcoming` queue's same-Nairobi-day filter (see
+    // cases/doctor_queue_nairobi_day.rs). A slot at now+1h is on the next Nairobi day
+    // when the suite runs after 23:00 EAT.
+    let queue = json_body(
+        get(
+            &app,
+            "/api/v1/doctor/appointments?limit=100&view=all",
+            Some(&doctor),
+        )
+        .await,
+    )
+    .await;
     let item = queue["data"]
         .as_array()
         .unwrap()

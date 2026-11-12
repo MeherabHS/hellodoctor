@@ -54,10 +54,15 @@ class SecureTokenStore implements TokenStore {
 }
 
 class ApiException implements Exception {
-  const ApiException(this.status, this.message, {this.requestId});
+  const ApiException(this.status, this.message, {this.requestId, this.code});
   final int? status;
   final String message;
   final String? requestId;
+
+  /// The backend's stable machine-readable error code (e.g. `NOT_YET_OPEN`),
+  /// when the response carried one. Decide behaviour from this, never from
+  /// the human `message`.
+  final String? code;
   String get userMessage {
     if (status != null && status! >= 500) {
       return 'A temporary service error occurred. Please retry.';
@@ -625,7 +630,11 @@ class ApiClient {
     final requestId = body is Map && body['meta'] is Map
         ? body['meta']['request_id']?.toString()
         : null;
-    return ApiException(e.response?.statusCode, message, requestId: requestId);
+    final code = body is Map && body['error'] is Map
+        ? body['error']['code']?.toString()
+        : null;
+    return ApiException(e.response?.statusCode, message,
+        requestId: requestId, code: code);
   }
 
   Future<void> saveTokens(String access, String refresh) async {

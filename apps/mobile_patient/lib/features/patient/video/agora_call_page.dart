@@ -5,7 +5,10 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/video/agora_engine.dart';
 import '../../../core/video/call_controller.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/network/api_client.dart';
+import '../booking/booking_models.dart';
 import '../booking/booking_repository.dart';
+import 'mint_failure.dart';
 
 /// Real Agora RTC consultation call screen. Reuses the existing server
 /// contract (`POST /consultations/:id/rtc-token`) exclusively — this screen
@@ -43,12 +46,36 @@ class _AgoraCallPageState extends State<AgoraCallPage>
     WidgetsBinding.instance.addObserver(this);
     _controller = CallController(
       engine: RealAgoraEngine(),
-      mintToken: () => widget.repo.mintRtcToken(widget.appointmentId),
+      mintToken: _mintToken,
       requestPermissions: _requestPermissions,
       telemetrySubmit: (events) =>
           widget.repo.submitTelemetryEvents(widget.appointmentId, events),
     )..addListener(_onControllerChanged);
     _controller.start();
+  }
+
+  /// Mints the RTC token and translates a backend refusal into a typed,
+  /// actionable failure using the backend's stable error `code` (not its
+  /// text). The Agora engine is never touched on a refusal.
+  Future<RtcSessionDto> _mintToken() async {
+    try {
+      return await widget.repo.mintRtcToken(widget.appointmentId);
+    } on ApiException catch (e) {
+      throw await _authorizationFailure(e);
+    }
+  }
+
+  Future<CallAuthorizationException> _authorizationFailure(
+      ApiException e) async {
+    DateTime? opensAt;
+    if (e.code == 'NOT_YET_OPEN') {
+      // Word it with the real open time when the server will tell us.
+      try {
+        opensAt = (await widget.repo.joinEligibility(widget.appointmentId))
+            .joinOpenAt;
+      } catch (_) {}
+    }
+    return mapMintFailure(e, opensAt: opensAt);
   }
 
   Future<bool> _requestPermissions() async {
@@ -168,9 +195,10 @@ class _AgoraCallPageState extends State<AgoraCallPage>
       case CallScreenState.failed:
         return _CenteredStatus(
           icon: Icons.cloud_off,
-          message: _controller.errorMessage ?? t.callConnectionLost,
-          actionLabel: t.retryButton,
-          onAction: _controller.retry,
+          message:
+              '${_controller.errorMessage ?? t.callConnectionLost}${_controller.diagnostic == null ? '' : '\n\n[${_controller.diagnostic}]'}',
+          actionLabel: _controller.retryable ? t.retryButton : null,
+          onAction: _controller.retryable ? _controller.retry : null,
         );
       case CallScreenState.left:
         return _CenteredStatus(icon: Icons.call_end, message: t.callEnded);

@@ -3,6 +3,7 @@ import '../../../core/network/client_error_reporter.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/validation/upload_validation.dart';
 import 'booking_models.dart';
+import 'join_eligibility.dart';
 
 /// Backs `GET /doctors/:id/slots`, `POST /appointments/book`, and
 /// `POST /appointments/:id/prescriptions` (patient intake upload) — all
@@ -232,6 +233,26 @@ class BookingRepository {
       ClientErrorReporter.observe(error, stack,
           screen: 'Telehealth', operation: 'call_telemetry');
       // Intentionally swallowed, not rethrown — see doc comment above.
+    }
+  }
+
+  /// `GET /consultations/:id/join-eligibility` — the server's authoritative,
+  /// read-only answer to "may I enter this room now?" (same policy and
+  /// authorization as the token mint; issues no token, creates no session).
+  Future<JoinEligibility> joinEligibility(String appointmentId) async {
+    try {
+      requireOnline();
+      final raw = _data(
+          await api.get('/consultations/$appointmentId/join-eligibility'));
+      final parsed = JoinEligibility.tryParse(raw);
+      if (parsed == null) {
+        throw const FormatException('Unexpected response shape.');
+      }
+      return parsed;
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'WaitingRoom', operation: 'join_eligibility');
+      rethrow;
     }
   }
 
