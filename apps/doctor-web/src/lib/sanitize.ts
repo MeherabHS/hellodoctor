@@ -26,3 +26,27 @@ export function sanitize(value: unknown): unknown {
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([key]) => !isSensitiveKey(key)).map(([key, item]) => [key, sanitize(item)]));
   return value;
 }
+
+// The ONE place a credential-shaped key must reach the browser: the Agora RTC
+// join token minted by `POST consultations/:id/rtc-token`. The generic
+// `sanitize()` above strips every `token` key, which silently removed this
+// field, so the Agora SDK received `undefined` and rejected client.join()
+// with INVALID_PARAMS. This is deliberately NOT a general exemption: it applies
+// only to a successful response of that exact endpoint, and it rebuilds the
+// payload from an allow-list of five fields with strict types, so nothing else
+// from the upstream body (including any other token-like key) passes through.
+const HEX = '[0-9a-fA-F]';
+const RTC_TOKEN_PATH = new RegExp(`^consultations/${HEX}{8}-${HEX}{4}-${HEX}{4}-${HEX}{4}-${HEX}{12}/rtc-token$`);
+
+export function isRtcTokenMint(path: string, method: string): boolean {
+  return method.toUpperCase() === 'POST' && RTC_TOKEN_PATH.test(path);
+}
+
+export function sanitizeRtcTokenResponse(value: unknown): unknown {
+  const body = value as { success?: unknown; data?: Record<string, unknown> } | null;
+  if (!body || body.success !== true || !body.data || typeof body.data !== 'object') return sanitize(value);
+  const d = body.data;
+  if (typeof d.app_id !== 'string' || typeof d.channel_name !== 'string' || typeof d.token !== 'string'
+    || typeof d.uid !== 'number' || typeof d.expires_in !== 'number') return sanitize(value);
+  return { success: true, data: { app_id: d.app_id, channel_name: d.channel_name, token: d.token, uid: d.uid, expires_in: d.expires_in } };
+}
