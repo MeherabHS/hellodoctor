@@ -359,50 +359,21 @@ pub async fn list_own_appointments(
     // scenario. See docs/MILESTONE_8_SIX_SERVICE_PERFORMANCE_REMEDIATION.md
     // Phase 3 for the full evidence; neither fn_doctor_treats_patient nor
     // doctor_history_context_allowed's own internal logic was touched.
-    let rows = sqlx::query(r#"
-      WITH encounters AS (
-        SELECT a.id,a.appointment_number,a.patient_id,a.doctor_id,a.slot_id,
-          a.modality::text AS modality,a.status::text AS status,a.consultation_fee,
-          a.payment_policy::text AS payment_policy,
-          a.clinical_outcome,a.completed_at,a.created_at,a.updated_at,
-          s.start_time,s.end_time,c.id AS conversation_id,c.is_locked AS chat_locked,c.expires_at AS chat_expires_at,
-          cs.status::text AS consultation_session_status,cs.recovery_state AS consultation_recovery_state,
-          cs.empty_room_deadline,cs.patient_present,cs.doctor_present,
-          s.start_time-INTERVAL '15 minutes' AS history_access_from,
-          CASE WHEN a.status='COMPLETED' THEN COALESCE(cs.ended_at,a.completed_at)+INTERVAL '24 hours' END AS history_access_until,
-          CASE WHEN a.status='COMPLETED' AND (COALESCE(cs.ended_at,a.completed_at) IS NULL OR clock_timestamp()>=COALESCE(cs.ended_at,a.completed_at)+INTERVAL '24 hours') THEN 'DONE' ELSE a.status::text END AS doctor_lifecycle,
-          (a.status='IN_CONSULTATION' OR (
-            a.status IN ('CONFIRMED','WAITING')
-            AND (s.start_time AT TIME ZONE 'Africa/Nairobi')::date=(clock_timestamp() AT TIME ZONE 'Africa/Nairobi')::date
-            AND ((a.modality='VIDEO' AND s.end_time>clock_timestamp()) OR
-              (a.modality='CHAT' AND COALESCE(NOT c.is_locked AND c.expires_at>clock_timestamp(),false)))
-          )) AS queue_actionable
-        FROM appointments a JOIN doctor_schedule_slots s ON s.id=a.slot_id
-        LEFT JOIN consultation_sessions cs ON cs.appointment_id=a.id
-        LEFT JOIN chat_conversations c ON c.appointment_id=a.id
-        WHERE a.doctor_id=$1 AND ($4::text IS NULL OR a.status::text=$4)
-      ),
-      paginated AS (
-        SELECT * FROM encounters WHERE
-          ($6::text<>'upcoming' OR queue_actionable)
-          AND ($6::text<>'schedule' OR (status IN ('CONFIRMED','WAITING') AND
-            (start_time AT TIME ZONE 'Africa/Nairobi')::date>(clock_timestamp() AT TIME ZONE 'Africa/Nairobi')::date))
-          AND ($6::text<>'history' OR status IN ('COMPLETED','CANCELLED','REFUNDED','EXPIRED','PREMATURE_TERMINATION','DISPUTED') OR
-            (NOT queue_actionable AND (end_time<=clock_timestamp() OR (modality='CHAT' AND (chat_locked OR chat_expires_at<=clock_timestamp())))))
-        ORDER BY CASE WHEN status='IN_CONSULTATION' THEN 0 WHEN queue_actionable THEN 1
-            WHEN status IN ('CONFIRMED','WAITING') AND start_time>clock_timestamp() THEN 2 ELSE 3 END,
-          CASE WHEN queue_actionable OR (status IN ('CONFIRMED','WAITING') AND start_time>clock_timestamp()) THEN start_time END ASC,
-          CASE WHEN NOT queue_actionable AND NOT(status IN ('CONFIRMED','WAITING') AND start_time>clock_timestamp()) THEN start_time END DESC,id ASC
-        LIMIT $2 OFFSET $3
-      )
-      SELECT paginated.*,
-        doctor_history_context_allowed(paginated.id,$5) AS history_access_active,
-        COALESCE(p.full_name,doctor_encounter_patient_name(paginated.id),'Patient') AS patient_display_name
-      FROM paginated LEFT JOIN patient_profiles p ON p.id=paginated.patient_id
-    "#)
-        .bind(id).bind(limit).bind(offset).bind(q.status).bind(ctx.user_id).bind(q.view.unwrap_or_else(||"upcoming".into())).fetch_all(&mut *tx).await?;
+    // "Now" is a bound parameter (as_of) so the Nairobi-day logic can be exercised at any
+    // instant in tests; production always passes the real request time.
+    let rows = doctor_repo::list_appointments_as_of(
+        &mut *tx,
+        id,
+        ctx.user_id,
+        q.status,
+        q.view.unwrap_or_else(|| "upcoming".into()),
+        limit,
+        offset,
+        Utc::now(),
+    )
+    .await?;
     tx.commit().await?;
-    let data: Vec<_> = rows.into_iter().map(|r| json!({"queue_actionable":r.get::<bool,_>("queue_actionable"), "id": r.get::<Uuid,_>("id"), "appointment_number": r.get::<String,_>("appointment_number"), "patient_id": r.get::<Uuid,_>("patient_id"), "patient_display_name": r.get::<String,_>("patient_display_name"), "conversation_id":r.get::<Option<Uuid>,_>("conversation_id"), "chat_locked":r.get::<Option<bool>,_>("chat_locked"), "chat_expires_at":r.get::<Option<DateTime<Utc>>,_>("chat_expires_at"), "modality": r.get::<String,_>("modality"), "status": r.get::<String,_>("status"), "doctor_lifecycle": r.get::<String,_>("doctor_lifecycle"), "history_access_from": r.get::<DateTime<Utc>,_>("history_access_from"), "history_access_until": r.get::<Option<DateTime<Utc>>,_>("history_access_until"), "history_access_active": r.get::<bool,_>("history_access_active"), "consultation_fee": r.get::<bigdecimal::BigDecimal,_>("consultation_fee"), "payment_policy": r.get::<String,_>("payment_policy"), "clinical_outcome": r.get::<Option<String>,_>("clinical_outcome"), "completed_at": r.get::<Option<DateTime<Utc>>,_>("completed_at"), "start_time": r.get::<DateTime<Utc>,_>("start_time"), "end_time": r.get::<DateTime<Utc>,_>("end_time"), "consultation_session_status": r.get::<Option<String>,_>("consultation_session_status"), "consultation_recovery_state": r.get::<Option<String>,_>("consultation_recovery_state"), "empty_room_deadline": r.get::<Option<DateTime<Utc>>,_>("empty_room_deadline"), "patient_present": r.get::<Option<bool>,_>("patient_present"), "doctor_present": r.get::<Option<bool>,_>("doctor_present")})).collect();
+    let data: Vec<_> = rows.into_iter().map(|r| json!({"join": crate::domain::join_window::evaluate(&r.get::<String,_>("status"), &r.get::<String,_>("modality"), r.get::<DateTime<Utc>,_>("start_time"), r.get::<DateTime<Utc>,_>("end_time"), Utc::now(), state.config.agora_token_window_before_mins, state.config.agora_token_window_after_mins).with_recovery_state(r.get::<Option<String>,_>("consultation_recovery_state").as_deref()).to_json(), "queue_actionable":r.get::<bool,_>("queue_actionable"), "id": r.get::<Uuid,_>("id"), "appointment_number": r.get::<String,_>("appointment_number"), "patient_id": r.get::<Uuid,_>("patient_id"), "patient_display_name": r.get::<String,_>("patient_display_name"), "conversation_id":r.get::<Option<Uuid>,_>("conversation_id"), "chat_locked":r.get::<Option<bool>,_>("chat_locked"), "chat_expires_at":r.get::<Option<DateTime<Utc>>,_>("chat_expires_at"), "modality": r.get::<String,_>("modality"), "status": r.get::<String,_>("status"), "doctor_lifecycle": r.get::<String,_>("doctor_lifecycle"), "history_access_from": r.get::<DateTime<Utc>,_>("history_access_from"), "history_access_until": r.get::<Option<DateTime<Utc>>,_>("history_access_until"), "history_access_active": r.get::<bool,_>("history_access_active"), "consultation_fee": r.get::<bigdecimal::BigDecimal,_>("consultation_fee"), "payment_policy": r.get::<String,_>("payment_policy"), "clinical_outcome": r.get::<Option<String>,_>("clinical_outcome"), "completed_at": r.get::<Option<DateTime<Utc>>,_>("completed_at"), "start_time": r.get::<DateTime<Utc>,_>("start_time"), "end_time": r.get::<DateTime<Utc>,_>("end_time"), "consultation_session_status": r.get::<Option<String>,_>("consultation_session_status"), "consultation_recovery_state": r.get::<Option<String>,_>("consultation_recovery_state"), "empty_room_deadline": r.get::<Option<DateTime<Utc>>,_>("empty_room_deadline"), "patient_present": r.get::<Option<bool>,_>("patient_present"), "doctor_present": r.get::<Option<bool>,_>("doctor_present")})).collect();
     Ok(Json(ApiResponse {
         success: true,
         data,

@@ -80,6 +80,17 @@ pub enum AppError {
     #[error("Payment required: {0}")]
     PaymentRequired(String),
 
+    /// Consultation room join denied by the authoritative join-window policy
+    /// (`domain::join_window`). `reason` is a stable machine-readable code
+    /// returned as the error `code`, so Doctor Web and the Patient app can
+    /// tell "too early" from "expired" from "invalid state" without
+    /// string-matching the message.
+    #[error("Consultation join denied ({reason}): {message}")]
+    JoinDenied {
+        reason: &'static str,
+        message: String,
+    },
+
     #[error("Capacity limit reached: {0}")]
     CapacityLimitReached(String),
 
@@ -242,6 +253,15 @@ impl IntoResponse for AppError {
                 "UNPROCESSABLE_ENTITY",
                 msg.clone(),
             ),
+            AppError::JoinDenied { reason, message } => {
+                // Too early / window closed are authorization-in-time (403);
+                // wrong state / needs-review are conflicts (409).
+                let status = match *reason {
+                    "NOT_YET_OPEN" | "WINDOW_CLOSED" | "NOT_VIDEO" => StatusCode::FORBIDDEN,
+                    _ => StatusCode::CONFLICT,
+                };
+                (status, *reason, message.clone())
+            }
             AppError::PaymentRequired(msg) => (
                 StatusCode::PAYMENT_REQUIRED,
                 "PAYMENT_REQUIRED",

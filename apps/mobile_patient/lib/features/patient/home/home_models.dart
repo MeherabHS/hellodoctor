@@ -1,4 +1,5 @@
 import '../../../core/l10n/patient_display.dart';
+import '../booking/join_eligibility.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -32,6 +33,7 @@ class AppointmentSummaryDto {
     this.emptyRoomDeadline,
     this.patientPresent,
     this.doctorPresent,
+    this.join,
   });
 
   final String id,
@@ -47,6 +49,10 @@ class AppointmentSummaryDto {
   final String? consultationSessionStatus, consultationRecoveryState;
   final DateTime? emptyRoomDeadline;
   final bool? patientPresent, doctorPresent;
+
+  /// Server-derived join eligibility (authoritative policy); `null` from an
+  /// older backend.
+  final JoinEligibility? join;
   final bool hasPhoto;
   final DateTime? photoUpdatedAt;
 
@@ -100,6 +106,7 @@ class AppointmentSummaryDto {
             DateTime.tryParse(_textOf(j['empty_room_deadline']))?.toLocal(),
         patientPresent: j['patient_present'] as bool?,
         doctorPresent: j['doctor_present'] as bool?,
+        join: JoinEligibility.tryParse(j['join']),
         startTime: DateTime.tryParse(_textOf(j['start_time']))?.toLocal() ??
             DateTime.fromMillisecondsSinceEpoch(0),
         endTime: DateTime.tryParse(_textOf(j['end_time']))?.toLocal() ??

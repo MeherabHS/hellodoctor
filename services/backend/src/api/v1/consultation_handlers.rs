@@ -73,6 +73,24 @@ pub async fn mint_agora_token(
     }))
 }
 
+/// `GET /consultations/:appointment_id/join-eligibility` — read-only. The
+/// server-derived answer to "may I enter this room now?" (same policy and
+/// authorization as the RTC-token mint), with the open/close instants and the
+/// server clock so clients can show a locked state/countdown and correct skew.
+/// Issues no token and creates no session.
+pub async fn join_eligibility(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(appointment_id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let eligibility = ConsultationService::join_eligibility(&state, &ctx, appointment_id).await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: eligibility,
+    }))
+}
+
 pub async fn submit_telemetry(
     State(state): State<AppState>,
     ctx: AuthContext,

@@ -5,6 +5,7 @@ import '../../core/network/client_error_reporter.dart';
 import '../../core/network/api_client.dart';
 import '../../core/cache/doctor_cache_store.dart';
 import '../../core/network/connectivity_service.dart';
+import '../../core/video/join_eligibility.dart';
 import 'doctor_models.dart';
 
 class CachedDoctorSnapshot {
@@ -869,6 +870,25 @@ class DoctorRepository {
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'SmartRx', operation: 'complete_consultation');
+      rethrow;
+    }
+  }
+
+  /// `GET /consultations/:id/join-eligibility` — the server's authoritative,
+  /// read-only answer to "may I enter this room now?" (same policy and
+  /// authorization as the token mint; issues no token, creates no session).
+  Future<JoinEligibility> joinEligibility(String id) async {
+    try {
+      requireOnline();
+      final raw = data(await api.get('/consultations/$id/join-eligibility'));
+      final parsed = JoinEligibility.tryParse(raw);
+      if (parsed == null) {
+        throw const FormatException('Unexpected response shape.');
+      }
+      return parsed;
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Telehealth', operation: 'join_eligibility');
       rethrow;
     }
   }

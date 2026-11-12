@@ -1,5 +1,5 @@
 'use client';
-import { consultationAction, consultationActionLabel } from '../lib/contracts';
+import { consultationAction, consultationActionLabel, consultationIntent } from '../lib/contracts';
 import { useEffect, useState } from 'react';
 import { ChatThread } from './Chat';
 import { useResource } from '../lib/client';
@@ -10,6 +10,7 @@ import { ClinicalAction, QueueState, date, dayKey, initials, statusLabel, time }
 import { useAgoraCall } from '../lib/useAgoraCall';
 import { eatTime } from '../lib/eat';
 import { callStatusText, callStatusTone } from '../lib/call-status';
+import { joinGate, lockedMessage, formatCountdown, eatDateTime, type JoinInfo } from '../lib/join-window';
 
 export function DesktopAppointments({queue,action,addSlot,search,setSearch,schedule,gap}:{queue:QueueState;action:ClinicalAction;addSlot:()=>void;search:string;setSearch:(value:string)=>void;schedule:()=>void;gap:(message:string)=>void}) {
   const [filter,setFilter]=useState('upcoming');const [visible,setVisible]=useState(25);
@@ -61,11 +62,38 @@ export function Patients({queue,action,gap}:{queue:QueueState;action:ClinicalAct
 }
 export function Telehealth({appointment:a,profile,action,onChat,complete,gap}:{appointment:Appointment|null;profile:Profile;action:ClinicalAction;onChat:()=>void;complete:()=>void;gap:(message:string)=>void}) {
   const [drawer,setDrawer]=useState('history');const [tab,setTab]=useState('encounters');const [full,setFull]=useState(false);
-  const history=useResource<RecordDto[]>(a&&drawer==='history'&&!full?`doctor/appointments/${a.id}/patient-history?limit=25&offset=0`:null);
+  // Server-derived join eligibility. The list row's `join` is the first answer; a fresh
+  // `GET consultations/:id/join-eligibility` wins and is re-fetched on focus, tab
+  // visibility, a 30 s poll and the moment the countdown reaches zero, so a
+  // server-side state change is picked up. The clock is corrected with the
+  // server's own time inside joinGate(), so a wrong device clock/timezone is harmless.
+  const eligibilityRes=useResource<JoinInfo>(a&&a.modality==='VIDEO'?`consultations/${a.id}/join-eligibility`:null);
+  const joinInfo=eligibilityRes.data??a?.join;
+  const [now,setNow]=useState(()=>Date.now());
+  const gate=a&&a.modality==='VIDEO'?joinGate(joinInfo,now):null;
+  const gateState=gate?.state;
+  const apptId=a?.id,apptVideo=a?.modality==='VIDEO';
+  const refreshEligibility=eligibilityRes.refresh;
+  useEffect(()=>{
+    if(!apptId||!apptVideo)return;
+    const tick=setInterval(()=>setNow(Date.now()),1000);
+    const revalidate=()=>{if(document.visibilityState==='visible')void refreshEligibility();};
+    const poll=setInterval(revalidate,30000);
+    document.addEventListener('visibilitychange',revalidate);window.addEventListener('focus',revalidate);
+    return()=>{clearInterval(tick);clearInterval(poll);document.removeEventListener('visibilitychange',revalidate);window.removeEventListener('focus',revalidate);};
+  },[apptId,apptVideo,refreshEligibility]);
+  useEffect(()=>{if(gateState==='open')void refreshEligibility();},[gateState,refreshEligibility]);
+  // No consultation session exists until the room has opened, and patient history is
+  // authorized only for an encounter with a session — so before that the records are
+  // "not open yet", not a missing record. Authorization is NOT bypassed; we just
+  // don't ask the backend a question it can only answer with a 404.
+  const recordsLocked=gateState==='locked';
+  const lockText=a&&gate&&gate.state!=='open'&&consultationIntent(a,now)==='call'?lockedMessage(gate,now):null;
+  const history=useResource<RecordDto[]>(a&&drawer==='history'&&!full&&!recordsLocked?`doctor/appointments/${a.id}/patient-history?limit=25&offset=0`:null);
   const chats=useResource<Conversation[]>(a&&drawer==='chat'&&!full?'doctor/chats?limit=100&offset=0':null);
   const chat=chats.data?.find(row=>row.appointment_id===a?.id);
-  const eligible=a!==null&&consultationAction(a)==='call';
-  const call=useAgoraCall(eligible?a!.id:null);
+  const eligible=a!==null&&consultationAction({...a,join:joinInfo},now)==='call';
+  const call=useAgoraCall(eligible?a!.id:null,gate?.opensAt);
   const callActive=['connecting','waiting-for-remote','connected','reconnecting'].includes(call.state.phase);
   const labels:Record<string,React.ReactNode>={dwMeetRoomCode:'Consultation workspace',dwMeetCornerPtName:a?.patient_display_name??'No active consultation',dwMeetClock:eatTime(new Date().toISOString()),dwMeetSessionTag:a?.appointment_number??'No appointment selected',dwHistPtAvatar:a?initials(a.patient_display_name):'👤',dwHistPtName:a?.patient_display_name??'No appointment selected',dwHistPtId:a?.appointment_number??'—',dwHistPtBlood:'—',dwHistPtMeta:'Records require current consultation authorization',dwHistVitBp:'—',dwHistVitPulse:'—',dwHistVitTemp:'—',dwHistVitSpo2:'—',dwHistEncCount:'—',dwChatPtSubheader:a?.patient_display_name??'No consultation selected'};
   return <Prototype name="dwPage_telehealth" action={handler=>{
@@ -89,18 +117,18 @@ export function Telehealth({appointment:a,profile,action,onChat,complete,gap}:{a
     if(id(n)==='dwRemoteAvatar')return {children:a?initials(a.patient_display_name):'👤'};
     if(id(n)==='dwVideoPtNameLarge')return {children:a?.patient_display_name??'Select a consultation'};
     if(hasClass(n,'dw-meet-canvas'))return {before:call.state.phase==='connected'&&call.state.remotePresent?<div key="remote-video" ref={call.remoteVideoRef} style={{position:'absolute',inset:0,zIndex:5}}/>:null};
-    if(hasClass(n,'dw-meet-status-badge'))return eligible&&(call.state.phase==='idle'||call.state.phase==='failed')
-      ?{children:<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>{call.state.error&&<span style={{color:'#B91C1C',fontSize:10.5,fontWeight:600}}>{call.state.error}</span>}<button className="dw-btn-primary" style={{padding:'4px 16px',fontSize:11.5}} onClick={call.join}>{call.state.phase==='failed'?'Retry joining':'Join Video Consultation'}</button></div>}
+    if(hasClass(n,'dw-meet-status-badge'))return lockText&&gate?{children:<div data-testid="join-locked" style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2}}><strong>{lockText}</strong>{gate.state==='locked'&&<span style={{fontSize:10.5}}>Opens in {formatCountdown(gate.msUntilOpen??0)}</span>}</div>}:eligible&&(call.state.phase==='idle'||call.state.phase==='failed')
+      ?{children:<div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>{call.state.error&&<span style={{color:'#B91C1C',fontSize:10.5,fontWeight:600}}>{call.state.error}</span>}{call.state.diagnostic&&<span data-testid="call-diagnostic" style={{color:'#6B7280',fontSize:9.5}}>Diagnostic: {call.state.diagnostic}</span>}<button className="dw-btn-primary" style={{padding:'4px 16px',fontSize:11.5}} onClick={call.join}>{call.state.phase==='failed'?'Retry joining':'Join Video Consultation'}</button></div>}
       :{children:<span id="dwVideoPtMetaLine">{callStatusText(a,eligible,call.state.phase,call.state.remotePresent)}</span>};
     if(hasClass(n,'dw-meet-pip-avatar'))return {children:callActive?<div ref={call.localVideoRef} style={{width:'100%',height:'100%',borderRadius:'50%',overflow:'hidden',transform:'scaleX(-1)'}}/>:initials(profile.full_name)};
     if(hasClass(n,'dw-meet-pip-meta'))return {children:`${profile.full_name} (You)`};
-    if(hasClass(n,'dw-meet-room-tag'))return {children:<><span>Consultation workspace</span><span className={`badge badge-${callStatusTone(call.state.phase,eligible)}`}>{callStatusText(a,eligible,call.state.phase,call.state.remotePresent)}</span></>};
+    if(hasClass(n,'dw-meet-room-tag'))return {children:<><span>Consultation workspace</span><span className={`badge badge-${callStatusTone(call.state.phase,eligible)}`}>{lockText??callStatusText(a,eligible,call.state.phase,call.state.remotePresent)}</span></>};
     if(hasClass(n,'badge')&&n.line===9116)return {children:'Idle'};
     if(id(n)==='dwHistAllergyAlert')return {omit:true};
     if(id(n)==='dwMeetSideDrawer')return {props:{className:`dw-meet-side-panel ${!drawer||full?'collapsed':''}`}};
     if(id(n)==='dwMeetHistView')return {props:{className:`dw-swap-view ${drawer==='history'?'active':''}`,style:{display:drawer==='history'?'flex':'none'}}};
     if(id(n)==='dwMeetChatView')return {props:{className:`dw-swap-view ${drawer==='chat'?'active':''}`,style:{display:drawer==='chat'?'flex':'none'}},children:chat?<ChatThread chat={chat} profile={profile} appointment={a??undefined} onBack={()=>setDrawer('history')} action={action} gap={gap}/>:<div className="web-section-body"><State loading={chats.loading} error={chats.error} retry={()=>void chats.refresh()}/><strong>{a?.patient_display_name??'Consultation conversations'}</strong><p className="sheet-desc">Open your authorized consultation chats.</p><button className="dw-btn-primary" onClick={()=>a?action('chat',a):onChat()}>Open Consultation Chats</button></div>};
-    if(id(n)==='dwHistScrollContent')return {children:<><State loading={history.loading} error={history.error} empty={!a?'Select a consultation to view authorized records':!history.loading&&!history.error&&history.data?.length===0?'No previous encounters':undefined} retry={()=>void history.refresh()}/>{tab==='encounters'?history.data?.map(row=><article className="dw-hist-card" key={String(row.historical_appointment_id)}><div className="dw-hist-enc-header"><div><div className="dw-hist-enc-date">{date(row.date as string)}</div><div className="dw-hist-enc-type">{String(row.doctor_name)} &middot; {String(row.specialty??'')}</div></div><span className="badge badge-green">{String(row.status)}</span></div><p className="dw-hist-field-row"><b>Chief Complaints:</b> {String(row.presenting_problem??'No presenting problem supplied')}</p><div className="dw-hist-outcome-box">{String(row.document_count??0)} authorized encounter documents</div>{a&&<button className="dw-btn-mini" onClick={()=>action('history',a)}>View historical episode &rarr;</button>}</article>):a&&<article className="dw-hist-card"><div className="dw-hist-enc-date">{tab==='meds'?'Handwritten Prescription Archive':tab==='labs'?'Diagnostics & Labs':'Physician Notes'}</div><p className="dw-hist-field-row">{tab==='meds'?'Prescription images remain available through authorized encounter documents.':tab==='labs'?'Open authorized clinical documents. Structured lab panels and lab ordering are unavailable.':'Clinical notes remain attached to their authorized consultation episode.'}</p><button className="dw-btn-mini" onClick={()=>action(tab==='labs'?'documents':'history',a)}>Open authorized records &rarr;</button>{tab==='meds'&&<button className="dw-btn-mini" onClick={()=>action('rx',a)}>Write handwritten Rx</button>}</article>}</>};
+    if(id(n)==='dwHistScrollContent')return {children:<><State loading={history.loading} error={history.error} empty={!a?'Select a consultation to view authorized records':recordsLocked&&gate?.opensAt?`Patient records open when the consultation room opens (${eatDateTime(gate.opensAt,now)}).`:!history.loading&&!history.error&&history.data?.length===0?'No previous encounters':undefined} retry={()=>void history.refresh()}/>{tab==='encounters'?history.data?.map(row=><article className="dw-hist-card" key={String(row.historical_appointment_id)}><div className="dw-hist-enc-header"><div><div className="dw-hist-enc-date">{date(row.date as string)}</div><div className="dw-hist-enc-type">{String(row.doctor_name)} &middot; {String(row.specialty??'')}</div></div><span className="badge badge-green">{String(row.status)}</span></div><p className="dw-hist-field-row"><b>Chief Complaints:</b> {String(row.presenting_problem??'No presenting problem supplied')}</p><div className="dw-hist-outcome-box">{String(row.document_count??0)} authorized encounter documents</div>{a&&<button className="dw-btn-mini" onClick={()=>action('history',a)}>View historical episode &rarr;</button>}</article>):a&&<article className="dw-hist-card"><div className="dw-hist-enc-date">{tab==='meds'?'Handwritten Prescription Archive':tab==='labs'?'Diagnostics & Labs':'Physician Notes'}</div><p className="dw-hist-field-row">{tab==='meds'?'Prescription images remain available through authorized encounter documents.':tab==='labs'?'Open authorized clinical documents. Structured lab panels and lab ordering are unavailable.':'Clinical notes remain attached to their authorized consultation episode.'}</p><button className="dw-btn-mini" onClick={()=>action(tab==='labs'?'documents':'history',a)}>Open authorized records &rarr;</button>{tab==='meds'&&<button className="dw-btn-mini" onClick={()=>action('rx',a)}>Write handwritten Rx</button>}</article>}</>};
     if(hasClass(n,'dw-meet-badge-count'))return {omit:true};
     if(hasClass(n,'end-call'))return {props:{onClick:()=>{call.leave();complete();},disabled:!a},children:'Complete consultation'};
     if(['dwMeetMicBtn','dwMeetCamBtn'].includes(id(n))){const on=id(n)==='dwMeetMicBtn'?call.state.micEnabled:call.state.cameraEnabled;return {props:{disabled:!callActive,'aria-pressed':!on,title:`${on?'Turn off':'Turn on'} ${id(n)==='dwMeetMicBtn'?'microphone':'camera'}`}};}

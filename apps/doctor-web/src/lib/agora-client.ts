@@ -15,8 +15,8 @@ import type {
   ILocalVideoTrack,
   IMicrophoneAudioTrack,
 } from 'agora-rtc-sdk-ng';
-import { ApiError, api, errorText, recordCallTelemetry } from './client';
-import { classifyAgoraErrorCode } from './agora-errors';
+import { api, recordCallTelemetry } from './client';
+import { callFailureDiagnostic, describeCallFailure, type CallStage } from './call-failure';
 import type { RtcTokenData } from './contracts';
 
 export type CallPhase = 'connecting' | 'waiting-for-remote' | 'connected' | 'reconnecting' | 'failed' | 'ended';
@@ -28,14 +28,20 @@ export interface AgoraCallHandlers {
   onCameraStateChange: (enabled: boolean) => void;
   onScreenShareChange: (active: boolean) => void;
   onError: (message: string) => void;
+  /** Sanitized stage/code line (never tokens or clinical data) for support. */
+  onDiagnostic?: (diagnostic: string) => void;
 }
 
-function describeError(error: unknown): string {
-  const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : '';
-  const classified = classifyAgoraErrorCode(code);
-  if (classified) return classified;
-  if (error instanceof ApiError) return errorText(error);
-  return 'Unable to connect. Check your network and retry.';
+/** The SDK's join can hang forever when its gateway requests are blocked (CSP,
+ * extensions, firewall). Bound it so the user gets an actionable failure and a
+ * working Retry instead of an endless "connecting". */
+const JOIN_TIMEOUT_MS = 20000;
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error('join timed out'), { code: 'JOIN_TIMEOUT', name: 'JoinTimeout' })), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** One call's full lifecycle for one appointment. Never reused across a
@@ -55,6 +61,8 @@ export class AgoraCallSession {
   private joined = false;
   private destroyed = false;
   private renewing = false;
+  /** Server-supplied room-open instant, used only to word a too-early denial. */
+  opensAt: string | undefined;
 
   constructor(private readonly appointmentId: string, private readonly handlers: AgoraCallHandlers) {}
 
@@ -74,20 +82,34 @@ export class AgoraCallSession {
   async join(): Promise<void> {
     if (this.joining || this.joined || this.destroyed) return;
     this.joining = true;
+    let stage: CallStage = 'token';
     try {
-      const { default: AgoraRTC } = await import('agora-rtc-sdk-ng');
+      // 1. Server authorization FIRST. If the room is not open (or the
+      //    appointment/session is not joinable) the backend refuses here with a
+      //    stable code and the Agora SDK is never loaded or initialised.
       const session = await this.mintToken();
       if (this.destroyed) return;
-      const client = this.client ?? AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+      stage = 'sdk_load';
+      const { default: AgoraRTC } = await import('agora-rtc-sdk-ng');
+      if (this.destroyed) return;
+      // A retry starts from a clean client so handlers are never doubled up.
+      if (this.client) {
+        try { this.client.removeAllListeners(); await this.client.leave(); } catch { /* best-effort */ }
+        this.client = null;
+      }
+      const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
       this.client = client;
       this.registerClientHandlers(client);
-      await client.join(session.app_id, session.channel_name, session.token, session.uid);
+      stage = 'client_join';
+      await withTimeout(client.join(session.app_id, session.channel_name, session.token, session.uid), JOIN_TIMEOUT_MS);
       if (this.destroyed) { await client.leave().catch(() => undefined); return; }
+      stage = 'media_devices';
       const [micTrack, cameraTrack] = await AgoraRTC.createMicrophoneAndCameraTracks();
       if (this.destroyed) { micTrack.close(); cameraTrack.close(); await client.leave().catch(() => undefined); return; }
       this.micTrack = micTrack;
       this.cameraTrack = cameraTrack;
       if (this.localVideoEl) cameraTrack.play(this.localVideoEl);
+      stage = 'publish';
       await client.publish([micTrack, cameraTrack]);
       this.joined = true;
       this.handlers.onMicStateChange(true);
@@ -96,8 +118,13 @@ export class AgoraCallSession {
       void recordCallTelemetry(this.appointmentId, 'CALL_INITIATED');
     } catch (error) {
       await this.releaseLocalTracks();
+      const diagnostic = callFailureDiagnostic(stage, error);
+      // Sanitized: stage + short code only. Visible in the console and the UI.
+      console.warn('[doctor-web:call]', diagnostic);
+      if (stage === 'client_join' && this.client) { try { await this.client.leave(); } catch { /* best-effort */ } }
       this.handlers.onPhaseChange('failed');
-      this.handlers.onError(describeError(error));
+      this.handlers.onError(describeCallFailure(stage, error, this.opensAt));
+      this.handlers.onDiagnostic?.(diagnostic);
     } finally {
       this.joining = false;
     }
@@ -186,7 +213,7 @@ export class AgoraCallSession {
       this.screenSharing = true;
       this.handlers.onScreenShareChange(true);
     } catch (error) {
-      this.handlers.onError(describeError(error));
+      this.handlers.onError(describeCallFailure('publish', error));
     }
   }
 

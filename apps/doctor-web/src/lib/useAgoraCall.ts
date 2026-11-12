@@ -8,20 +8,24 @@ export interface AgoraCallState {
   screenSharing: boolean;
   remotePresent: boolean;
   error: string;
+  /** Sanitized stage/code line for support; never contains tokens or clinical data. */
+  diagnostic: string;
 }
 
 /** One call session per `appointmentId`: switching to a different
  * appointment (or to none) tears down the previous session before anything
  * else happens, so a Doctor can never end up publishing into, or still
  * listening on, the wrong appointment's channel. */
-export function useAgoraCall(appointmentId: string | null) {
-  const [state, setState] = useState<AgoraCallState>({ phase: 'idle', micEnabled: true, cameraEnabled: true, screenSharing: false, remotePresent: false, error: '' });
+export function useAgoraCall(appointmentId: string | null, opensAt?: string) {
+  const [state, setState] = useState<AgoraCallState>({ phase: 'idle', micEnabled: true, cameraEnabled: true, screenSharing: false, remotePresent: false, error: '', diagnostic: '' });
+  const opensAtRef = useRef<string | undefined>(opensAt);
+  opensAtRef.current = opensAt;
   const sessionRef = useRef<AgoraCallSession | null>(null);
   const localVideoRef = useRef<HTMLDivElement | null>(null);
   const remoteVideoRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setState({ phase: 'idle', micEnabled: true, cameraEnabled: true, screenSharing: false, remotePresent: false, error: '' });
+    setState({ phase: 'idle', micEnabled: true, cameraEnabled: true, screenSharing: false, remotePresent: false, error: '', diagnostic: '' });
     return () => { void sessionRef.current?.leave(); sessionRef.current = null; };
   }, [appointmentId]);
 
@@ -35,6 +39,7 @@ export function useAgoraCall(appointmentId: string | null) {
       onCameraStateChange: enabled => setState(previous => ({ ...previous, cameraEnabled: enabled })),
       onScreenShareChange: active => setState(previous => ({ ...previous, screenSharing: active })),
       onError: message => setState(previous => ({ ...previous, error: message })),
+      onDiagnostic: diagnostic => setState(previous => ({ ...previous, diagnostic })),
     });
     sessionRef.current = session;
     if (localVideoRef.current) session.setLocalVideoElement(localVideoRef.current);
@@ -45,7 +50,8 @@ export function useAgoraCall(appointmentId: string | null) {
   const join = useCallback(() => {
     const session = ensureSession();
     if (!session) return;
-    setState(previous => ({ ...previous, phase: 'connecting', error: '' }));
+    session.opensAt = opensAtRef.current;
+    setState(previous => ({ ...previous, phase: 'connecting', error: '', diagnostic: '' }));
     void session.join();
   }, [ensureSession]);
 
