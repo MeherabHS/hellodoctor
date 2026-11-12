@@ -3,7 +3,7 @@ import { exposureHeaders, developmentOtpAllowed } from './exposure';
 import { NextRequest, NextResponse } from 'next/server';
 import { safeBackendPath, allowedProxyQuery } from './contracts';
 import { safeIncident, sanitizedStack } from './client-incidents';
-import { sanitize } from './sanitize';
+import { isRtcTokenMint, sanitize, sanitizeRtcTokenResponse } from './sanitize';
 import { verifyChallenge, readAuthBody, AuthBodyError } from './turnstile';
 import { validateAcceptedDocumentsShape } from './legalConsent';
 import packageInfo from '../../package.json';
@@ -109,7 +109,7 @@ export async function handleDiagnostics(req: NextRequest) {
     return failure(503,'INCIDENT_UNAVAILABLE','Incident delivery unavailable.');
   }
 }
-async function responseFor(res: Response) {
+async function responseFor(res: Response, rtcMint = false) {
   const raw = await res.text();
   let data;
   try { data = JSON.parse(raw); } catch {
@@ -136,7 +136,7 @@ async function responseFor(res: Response) {
     const status = res.status;
     return failure(status, data.error?.code ?? `HTTP_${status}`, status >= 500 ? (status === 503 ? (String(data.error?.message).includes('STORAGE_UNAVAILABLE') ? 'STORAGE_UNAVAILABLE' : 'Service temporarily unavailable. Please retry.') : 'Unable to complete this request. Use the reference ID when contacting support.') : data.error?.message ?? 'Request could not be completed.', data.meta?.request_id);
   }
-  return NextResponse.json(sanitize(data), { status: res.status, headers: { 'Cache-Control': 'private, no-store', 'X-Request-Id':res.headers.get('X-Request-Id')||'' } });
+  return NextResponse.json(rtcMint ? sanitizeRtcTokenResponse(data) : sanitize(data), { status: res.status, headers: { 'Cache-Control': 'private, no-store', 'X-Request-Id':res.headers.get('X-Request-Id')||'' } });
 }
 async function access() {
   const scope = (await cookies()).get(SCOPE)?.value;
@@ -265,7 +265,7 @@ export async function handleProxy(req: NextRequest, segments: string[]) {
       res = await upstream(path + query, req.method, body, session.token, requestKey);
     }
     if (isRevoked(session.scope)) return failure(401, 'SESSION_EXPIRED', 'Please sign in again.');
-    const response = await responseFor(res);
+    const response = await responseFor(res, isRtcTokenMint(path, req.method));
     response.headers.set('X-Doctor-Scope', session.scope);
     return response;
   } catch (error) { if (error instanceof PayloadLimit) return failure(413, 'PAYLOAD_TOO_LARGE', 'Prescription page is too large.'); return failure(503, 'BACKEND_UNAVAILABLE', 'Unable to reach the service. Please retry.'); }
