@@ -119,3 +119,23 @@ test('real SDK: the production-shaped payload passes the SDK\'s argument validat
   const result = await outcome(realClient().join(data.app_id, data.channel_name, data.token, data.uid));
   assert.notEqual(result, 'INVALID_PARAMS');
 });
+
+test('no path variation, method or unsuccessful response bypasses token redaction', async () => {
+  const { safeBackendPath } = await import('../src/lib/contracts.ts');
+  const U = APPOINTMENT;
+  // Every variant that is NOT exactly the mint endpoint must be non-exempt.
+  for (const p of [`${PATH}/`, `${PATH}/.`, `${PATH}/..`, `${PATH}\n`, `${PATH}%0A`, `${PATH}%2F`, `${PATH}?x=1`, ` ${PATH}`,
+    `${PATH} `, `consultations/${U}/../${U}/rtc-token`, `consultations//${U}/rtc-token`, `consultations/${U}/rtc-token/extra`,
+    `consultations/${U}/RTC-TOKEN`, `consultations/${U}x/rtc-token`, `consultations/${U.slice(1)}/rtc-token`, `doctor/${PATH}`,
+    `consultations/${U}/telemetry`, `consultations/${U}/telemetry/events`, `consultations/${U}/complete`, 'auth/refresh', 'doctor/profile']) {
+    assert.equal(isRtcTokenMint(p, 'POST'), false, p);
+  }
+  for (const m of ['GET', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']) assert.equal(isRtcTokenMint(PATH, m), false, m);
+  // Anything that is exempt is also an allow-listed backend route (the exemption adds no reachable endpoint).
+  assert.equal(safeBackendPath(PATH, 'POST'), true);
+  // An unsuccessful or malformed mint response keeps full redaction, including a `token` key.
+  for (const body of [{ success: false, data: backend().data }, { success: true }, { success: true, data: null }, null, 'x',
+    { success: true, data: { ...backend().data, token: 5 } }, { success: true, data: { ...backend().data, app_id: undefined } }]) {
+    assert.equal(JSON.stringify(sanitizeRtcTokenResponse(body)).includes('eJxjYGBg'), false);
+  }
+});
