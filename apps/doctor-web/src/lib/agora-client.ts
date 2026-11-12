@@ -18,6 +18,7 @@ import type {
 import { api, recordCallTelemetry } from './client';
 import { callFailureDiagnostic, describeCallFailure, type CallStage } from './call-failure';
 import type { RtcTokenData } from './contracts';
+import { validateJoinArgs } from './join-args';
 
 export type CallPhase = 'connecting' | 'waiting-for-remote' | 'connected' | 'reconnecting' | 'failed' | 'ended';
 
@@ -101,6 +102,14 @@ export class AgoraCallSession {
       this.client = client;
       this.registerClientHandlers(client);
       stage = 'client_join';
+      // Pre-flight the four join arguments so a malformed or incomplete token
+      // response fails with a precise, sanitized diagnostic (field, type, length —
+      // never a value) instead of the SDK's opaque INVALID_PARAMS.
+      const args = validateJoinArgs(session);
+      if (!args.ok) {
+        console.warn('[doctor-web:call]', args.diagnostic);
+        throw Object.assign(new Error('invalid join arguments'), { code: `INVALID_${args.field!.toUpperCase()}`, name: 'JoinArguments' });
+      }
       await withTimeout(client.join(session.app_id, session.channel_name, session.token, session.uid), JOIN_TIMEOUT_MS);
       if (this.destroyed) { await client.leave().catch(() => undefined); return; }
       stage = 'media_devices';
