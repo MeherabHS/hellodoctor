@@ -1,3 +1,5 @@
+import '../../core/video/join_eligibility.dart';
+
 typedef Json = Map<String, dynamic>;
 
 String textOf(dynamic value, [String fallback = '']) =>
@@ -38,8 +40,31 @@ class AppointmentDto {
       this.emptyRoomDeadline,
       this.patientPresent,
       this.doctorPresent,
+      this.join,
       this.queueActionable = true});
   final bool queueActionable;
+
+  /// Server-derived join eligibility (authoritative policy); `null` from an
+  /// older backend, in which case nothing is locked client-side.
+  final JoinEligibility? join;
+
+  /// A video room that is outside the server-authorized join window.
+  bool get joinBlocked => modality == 'VIDEO' && !joinIsOpen(join);
+
+  /// "Room opens at 11:24 PM EAT" / "Joining window closed" — `null` when open.
+  String? get joinLockedLabel {
+    final j = join;
+    if (!joinBlocked || j == null) return null;
+    switch (j.gate()) {
+      case JoinGateState.locked:
+        return 'Room opens at ${formatEatDateTime(j.joinOpenAt)}';
+      case JoinGateState.closed:
+        return 'Joining window closed';
+      default:
+        return 'Consultation cannot be joined';
+    }
+  }
+
   bool get isQueueActionable =>
       queueActionable &&
       const ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].contains(status);
@@ -98,6 +123,7 @@ class AppointmentDto {
       emptyRoomDeadline: DateTime.tryParse(textOf(j['empty_room_deadline'])),
       patientPresent: j['patient_present'] as bool?,
       doctorPresent: j['doctor_present'] as bool?,
+      join: JoinEligibility.tryParse(j['join']),
       queueActionable: j['queue_actionable'] == true);
 }
 

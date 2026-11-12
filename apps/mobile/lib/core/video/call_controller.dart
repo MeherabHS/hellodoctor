@@ -105,6 +105,13 @@ class CallController extends ChangeNotifier {
   bool audioMuted = false;
   bool videoEnabled = true;
   String? errorMessage;
+
+  /// Sanitized stage/reason line (never tokens or clinical data) for support.
+  String? diagnostic;
+
+  /// False when the failure is a deterministic server denial (room not open,
+  /// window closed, invalid state, needs review): retrying cannot help.
+  bool retryable = true;
   bool _disposed = false;
   bool _wasVideoEnabledBeforeBackground = true;
   Timer? _tokenRenewalGuard;
@@ -155,10 +162,16 @@ class CallController extends ChangeNotifier {
 
   Future<void> _authorizeAndJoin() async {
     _setState(CallScreenState.authorizing);
+    diagnostic = null;
+    retryable = true;
+    var stage = 'token';
     try {
+      // Server authorization FIRST: a refusal (room not open, window closed,
+      // invalid state, needs review) never reaches the Agora engine.
       final token = await mintToken();
       if (_disposed) return;
       _tokenData = token;
+      stage = 'engine_init';
       await engine.initialize(token.appId);
       if (_disposed) return;
       engine.setEventHandlers(
@@ -172,6 +185,7 @@ class CallController extends ChangeNotifier {
       await engine.enableVideoAndStartPreview();
       if (_disposed) return;
       _setState(CallScreenState.connecting);
+      stage = 'join';
       await engine.joinChannel(
         token: token.token,
         channelId: token.channelId,
@@ -179,14 +193,26 @@ class CallController extends ChangeNotifier {
       );
     } catch (error) {
       if (_disposed) return;
-      errorMessage = _describeError(error);
+      if (error is CallAuthorizationException) {
+        errorMessage = error.userMessage;
+        retryable = error.retryable;
+        diagnostic = 'stage=token reason=${error.reason}';
+      } else if (stage == 'token' && error is! FormatException) {
+        errorMessage =
+            'Network unavailable. Check your connection and try again.';
+        diagnostic = 'stage=token type=${error.runtimeType}';
+      } else if (error is FormatException) {
+        errorMessage = error.message;
+        diagnostic = 'stage=$stage type=FormatException';
+      } else {
+        // An actual video-service (Agora) failure after authorization.
+        // Sanitized by construction: stage and exception type only.
+        errorMessage =
+            'The video service could not be started or reached. Please try again.';
+        diagnostic = 'stage=$stage type=${error.runtimeType}';
+      }
       _setState(CallScreenState.failed);
     }
-  }
-
-  String _describeError(Object error) {
-    if (error is FormatException) return error.message;
-    return 'The consultation call could not be connected. Please try again.';
   }
 
   void _onJoinSuccess() {
@@ -346,4 +372,21 @@ class CallController extends ChangeNotifier {
     _flushTelemetry();
     super.dispose();
   }
+}
+
+/// Thrown by an injected `mintToken` when the backend refuses to issue a token.
+/// Keeps [CallController] HTTP-agnostic: the caller maps the backend's stable
+/// error `code` to [userMessage]/[reason] (never the human message text).
+class CallAuthorizationException implements Exception {
+  const CallAuthorizationException(this.reason, this.userMessage,
+      {this.retryable = false});
+
+  /// Stable backend code (`NOT_YET_OPEN`, `WINDOW_CLOSED`, `INVALID_STATE`,
+  /// `NEEDS_REVIEW`, ...) or `NETWORK` / `SERVICE`.
+  final String reason;
+  final String userMessage;
+  final bool retryable;
+
+  @override
+  String toString() => 'CallAuthorizationException($reason)';
 }
