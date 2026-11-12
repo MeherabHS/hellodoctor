@@ -1,11 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/network/api_client.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/video/agora_engine.dart';
 import '../../core/video/call_controller.dart';
+import '../../core/video/join_eligibility.dart';
+import '../../core/video/mint_failure.dart';
 import 'doctor_cubit.dart';
+import 'doctor_repository.dart';
 
 /// Real Agora RTC consultation call screen. Reuses the existing server
 /// contract (`POST /consultations/:id/rtc-token`) exclusively — this screen
@@ -25,6 +31,15 @@ class AgoraPage extends StatefulWidget {
 class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
   late final CallController _controller;
 
+  /// Server-derived join eligibility. The call is only STARTED (permissions,
+  /// token request, Agora engine) once the server says the window is open; until
+  /// then this screen shows when the room opens, with a countdown. The token
+  /// mint remains the authoritative check at the real join boundary.
+  JoinEligibility? _join;
+  Timer? _ticker;
+  bool _started = false;
+  bool _checking = true;
+
   @override
   void initState() {
     super.initState();
@@ -38,13 +53,86 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
           .repo
           .telemetry(widget.appointmentId, events),
     )..addListener(_onControllerChanged);
+    unawaited(_bootstrap());
+  }
+
+  DoctorRepository get _repo => context.read<DoctorCubit>().repo;
+
+  Future<void> _bootstrap() async {
+    JoinEligibility? join;
+    try {
+      join = await _repo.joinEligibility(widget.appointmentId);
+    } catch (_) {
+      // Eligibility unknown (offline / older backend): do not invent a lock;
+      // the token request below is still authoritative and its refusal is
+      // mapped to an actionable message.
+    }
+    if (!mounted) return;
+    setState(() {
+      _join = join;
+      _checking = false;
+    });
+    if (joinIsOpen(join)) {
+      _startCall();
+      return;
+    }
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) async {
+      if (!mounted || _started) return;
+      final current = _join;
+      if (current != null && current.isOpen()) {
+        // Local clock says open: revalidate with the server before starting.
+        _ticker?.cancel();
+        JoinEligibility? fresh;
+        try {
+          fresh = await _repo.joinEligibility(widget.appointmentId);
+        } catch (_) {}
+        if (!mounted) return;
+        if (joinIsOpen(fresh)) {
+          _startCall();
+        } else {
+          setState(() => _join = fresh);
+          _ticker = Timer.periodic(const Duration(seconds: 5), (_) async {
+            try {
+              final again = await _repo.joinEligibility(widget.appointmentId);
+              if (!mounted || _started) return;
+              if (again.isOpen()) {
+                _ticker?.cancel();
+                _startCall();
+              } else {
+                setState(() => _join = again);
+              }
+            } catch (_) {}
+          });
+        }
+      } else {
+        setState(() {});
+      }
+    });
+  }
+
+  void _startCall() {
+    if (_started || !mounted) return;
+    _ticker?.cancel();
+    setState(() => _started = true);
     _controller.start();
   }
 
+  /// Mints the RTC token and translates a backend refusal into a typed,
+  /// actionable failure using the backend's stable error `code` (not its text).
   Future<RtcTokenData> _mintToken() async {
-    final data =
-        await context.read<DoctorCubit>().repo.rtcToken(widget.appointmentId);
-    return RtcTokenData.fromJson(Map<String, dynamic>.from(data));
+    try {
+      final data = await _repo.rtcToken(widget.appointmentId);
+      return RtcTokenData.fromJson(Map<String, dynamic>.from(data));
+    } on ApiException catch (e) {
+      DateTime? opensAt;
+      if (e.code == 'NOT_YET_OPEN') {
+        try {
+          opensAt =
+              (await _repo.joinEligibility(widget.appointmentId)).joinOpenAt;
+        } catch (_) {}
+      }
+      throw mapMintFailure(e, opensAt: opensAt);
+    }
   }
 
   Future<bool> _requestPermissions() async {
@@ -58,6 +146,7 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_started) return;
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
       _controller.handleAppBackgrounded();
@@ -69,14 +158,15 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _ticker?.cancel();
     _controller.removeListener(_onControllerChanged);
-    _controller.leave();
+    if (_started) _controller.leave();
     _controller.dispose();
     super.dispose();
   }
 
   Future<void> _leaveAndPop() async {
-    await _controller.leave();
+    if (_started) await _controller.leave();
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -99,7 +189,45 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
     );
   }
 
+  Widget _preJoinBody() {
+    final join = _join;
+    if (_checking) {
+      return const _CenteredStatus(
+        icon: Icons.lock_clock,
+        message: 'Checking the consultation room…',
+        showSpinner: true,
+      );
+    }
+    if (join == null) {
+      return const _CenteredStatus(
+          icon: Icons.lock_clock,
+          message: 'Preparing your call…',
+          showSpinner: true);
+    }
+    final gate = join.gate();
+    final String message;
+    if (gate == JoinGateState.locked) {
+      message =
+          '${joinDenialText('NOT_YET_OPEN', opensAt: join.joinOpenAt)}\n\nOpens in ${formatCountdown(join.untilOpen())}';
+    } else if (gate == JoinGateState.closed) {
+      message = joinDenialText('WINDOW_CLOSED');
+    } else {
+      message = joinDenialText(join.reason);
+    }
+    return _CenteredStatus(
+      icon: Icons.lock_clock,
+      message: message,
+      actionLabel: gate == JoinGateState.locked ? null : 'Back',
+      onAction: gate == JoinGateState.locked
+          ? null
+          : () async {
+              if (mounted) Navigator.of(context).pop();
+            },
+    );
+  }
+
   Widget _buildBody(BuildContext context) {
+    if (!_started) return _preJoinBody();
     switch (_controller.state) {
       case CallScreenState.requestingPermissions:
         return const _CenteredStatus(
@@ -133,10 +261,10 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
       case CallScreenState.failed:
         return _CenteredStatus(
           icon: Icons.cloud_off,
-          message: _controller.errorMessage ??
-              'The consultation call could not be connected.',
-          actionLabel: 'Retry',
-          onAction: _controller.retry,
+          message:
+              '${_controller.errorMessage ?? 'The consultation call could not be connected.'}${_controller.diagnostic == null ? '' : '\n\n[${_controller.diagnostic}]'}',
+          actionLabel: _controller.retryable ? 'Retry' : null,
+          onAction: _controller.retryable ? _controller.retry : null,
         );
       case CallScreenState.left:
         return const _CenteredStatus(

@@ -668,7 +668,7 @@ class _ConsultationActionsState extends State<ConsultationActions> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (a.canStart)
         FilledButton.icon(
-            onPressed: busy || !a.isQueueActionable
+            onPressed: busy || !a.isQueueActionable || a.joinBlocked
                 ? null
                 : a.isChat
                     ? openChat
@@ -676,7 +676,10 @@ class _ConsultationActionsState extends State<ConsultationActions> {
                         context, (_) => AgoraPage(appointmentId: a.id)),
             icon:
                 Icon(a.isChat ? Icons.chat_outlined : Icons.videocam_outlined),
-            label: Text(busy ? 'Opening consultation...' : a.startLabel,
+            label: Text(
+                busy
+                    ? 'Opening consultation...'
+                    : (a.joinLockedLabel ?? a.startLabel),
                 textAlign: TextAlign.center)),
       if (!a.canStart) Text(a.status.replaceAll('_', ' ')),
       Wrap(spacing: 8, children: [
@@ -4509,10 +4512,12 @@ class _ConsultationState extends State<ConsultationPage> {
                       icon: const Icon(Icons.history),
                       label: const Text('Patient history')),
                   FilledButton.icon(
-                      onPressed: () => _callScreenGuard.push(
-                          c, (_) => AgoraPage(appointmentId: a.id)),
+                      onPressed: a.joinBlocked
+                          ? null
+                          : () => _callScreenGuard.push(
+                              c, (_) => AgoraPage(appointmentId: a.id)),
                       icon: const Icon(Icons.video_call),
-                      label: const Text('Join Agora')),
+                      label: Text(a.joinLockedLabel ?? 'Join Agora')),
                   OutlinedButton.icon(
                       onPressed: () => Navigator.push(
                           c,
