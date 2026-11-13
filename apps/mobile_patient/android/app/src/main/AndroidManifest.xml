@@ -14,6 +14,12 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Re-arms the patient's own scheduled reminders after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Personal reminders ring like an alarm clock at the exact time
+         (AndroidScheduleMode.alarmClock). On Android 12+ the user can switch
+         this off in "Alarms & reminders"; the app then falls back to inexact
+         timing and says so on the Reminders screen. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <application
         android:label="AfyaMkononi"
         android:name="${applicationName}"
@@ -65,6 +71,11 @@
              notifications and restores them after a reboot or app update. -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
+            android:exported="false" />
+        <!-- Handles a reminder alarm's Done / Snooze buttons without opening
+             the app (handleReminderAlarmAction in reminder_alarm.dart). -->
+        <receiver
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"
             android:exported="false" />
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"

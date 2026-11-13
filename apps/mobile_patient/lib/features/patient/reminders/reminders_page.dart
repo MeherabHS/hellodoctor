@@ -90,7 +90,7 @@ class _RemindersPageState extends State<RemindersPage> {
         userId: widget.userId,
         store: widget.store ?? SecureReminderStore(),
         scheduler: widget.scheduler ?? LocalReminderScheduler(),
-        channelName: AppLocalizations.of(context).reminderChannelName)
+        text: reminderAlertText(AppLocalizations.of(context)))
       ..load();
   }
 
@@ -104,6 +104,11 @@ class _RemindersPageState extends State<RemindersPage> {
     await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => CreateReminderPage(cubit: _cubit!)));
     if (mounted) setState(() => _tab = 0);
+  }
+
+  Future<void> _edit(Reminder r) async {
+    await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => CreateReminderPage(cubit: _cubit!, existing: r)));
   }
 
   Future<void> _delete(Reminder r) async {
@@ -155,6 +160,14 @@ class _RemindersPageState extends State<RemindersPage> {
                         background: PatientTokens.amberCard,
                         accent: PatientTokens.amberText),
                     const SizedBox(height: 14),
+                  ] else if (!state.exactAlarmsAllowed) ...[
+                    AfyaInfoCard(
+                        icon: Icons.alarm_off_rounded,
+                        title: l.moduleReminders,
+                        body: l.remindersExactAlarmsOff,
+                        background: PatientTokens.amberCard,
+                        accent: PatientTokens.amberText),
+                    const SizedBox(height: 14),
                   ],
                   if (state.loading)
                     const Padding(
@@ -177,6 +190,8 @@ class _RemindersPageState extends State<RemindersPage> {
                             reminder: r,
                             when: r.nextAlert(now) ?? r.at,
                             locale: locale,
+                            onEdit: () => _edit(r),
+                            onToggle: (on) => _cubit!.setEnabled(r.id, on),
                             onDelete: () => _delete(r)),
                       ),
                   const SizedBox(height: 4),
@@ -200,10 +215,14 @@ class _ReminderCard extends StatelessWidget {
       {required this.reminder,
       required this.when,
       required this.locale,
+      required this.onEdit,
+      required this.onToggle,
       required this.onDelete});
   final Reminder reminder;
   final DateTime when;
   final String locale;
+  final VoidCallback onEdit;
+  final ValueChanged<bool> onToggle;
   final VoidCallback onDelete;
   @override
   Widget build(BuildContext context) {
@@ -212,6 +231,7 @@ class _ReminderCard extends StatelessWidget {
     final date = DateFormat('EEE, d MMM', locale).format(when);
     final time = DateFormat.jm(locale).format(when);
     return AfyaCard(
+      onTap: onEdit,
       padding: const EdgeInsets.fromLTRB(12, 14, 4, 14),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         AfyaIconTile(
@@ -244,11 +264,17 @@ class _ReminderCard extends StatelessWidget {
                     color: PatientTokens.ink)),
           ]),
         ),
-        IconButton(
-            onPressed: onDelete,
-            tooltip: l.reminderDeleteConfirm,
-            icon: const Icon(Icons.delete_outline_rounded,
-                color: PatientTokens.navInactive)),
+        Column(mainAxisSize: MainAxisSize.min, children: [
+          Semantics(
+            label: reminder.enabled ? l.reminderAlarmOn : l.reminderAlarmOff,
+            child: Switch(value: reminder.enabled, onChanged: onToggle),
+          ),
+          IconButton(
+              onPressed: onDelete,
+              tooltip: l.reminderDeleteConfirm,
+              icon: const Icon(Icons.delete_outline_rounded,
+                  color: PatientTokens.navInactive)),
+        ]),
       ]),
     );
   }
@@ -264,23 +290,30 @@ class CreateReminderPage extends StatefulWidget {
   const CreateReminderPage(
       {super.key,
       required this.cubit,
-      this.initialCategory = ReminderCategory.art});
+      this.initialCategory = ReminderCategory.art,
+      this.existing});
   final RemindersCubit cubit;
   final ReminderCategory initialCategory;
+
+  /// When set, the form edits this reminder instead of creating one.
+  final Reminder? existing;
   @override
   State<CreateReminderPage> createState() => _CreateReminderPageState();
 }
 
 class _CreateReminderPageState extends State<CreateReminderPage> {
-  late ReminderCategory _category = widget.initialCategory;
-  late ReminderRepeat _repeat = _defaultRepeat(_category);
-  late DateTime _at = _defaultTime();
-  final _title = TextEditingController();
-  final _note = TextEditingController();
+  late ReminderCategory _category =
+      widget.existing?.category ?? widget.initialCategory;
+  late ReminderRepeat _repeat =
+      widget.existing?.repeat ?? _defaultRepeat(_category);
+  late DateTime _at = widget.existing?.at ?? _defaultTime();
+  late final _title = TextEditingController(text: widget.existing?.title);
+  late final _note = TextEditingController(text: widget.existing?.note);
 
   /// True until the patient types their own title; while true, the title
-  /// follows the selected category's suggestion.
-  bool _titleIsSuggestion = true;
+  /// follows the selected category's suggestion. An edited reminder keeps
+  /// its own title.
+  late bool _titleIsSuggestion = widget.existing == null;
   bool _saving = false;
   String? _error;
 
@@ -383,13 +416,22 @@ class _CreateReminderPageState extends State<CreateReminderPage> {
       _saving = true;
       _error = null;
     });
-    final ok = await widget.cubit.add(Reminder(
-        id: '${widget.cubit.now.microsecondsSinceEpoch}',
-        category: _category,
-        title: title,
-        note: _note.text.trim(),
-        at: _at,
-        repeat: _repeat));
+    final existing = widget.existing;
+    final ok = existing == null
+        ? await widget.cubit.add(Reminder(
+            id: '${widget.cubit.now.microsecondsSinceEpoch}',
+            category: _category,
+            title: title,
+            note: _note.text.trim(),
+            at: _at,
+            repeat: _repeat))
+        : await widget.cubit.update(existing.copyWith(
+            category: _category,
+            title: title,
+            note: _note.text.trim(),
+            at: _at,
+            repeat: _repeat,
+            enabled: true));
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).pop();
@@ -728,3 +770,9 @@ class _CategoryGrid extends StatelessWidget {
     ]);
   }
 }
+
+/// Localized alarm channel name and action labels.
+ReminderAlertText reminderAlertText(AppLocalizations l) => ReminderAlertText(
+    channelName: l.reminderChannelName,
+    doneLabel: l.reminderAlarmDone,
+    snoozeLabel: l.reminderAlarmSnooze);
