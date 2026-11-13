@@ -304,10 +304,9 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
                         'WAITING',
                         'IN_CONSULTATION'
                       ].contains(state.status))
-                        const Padding(
-                            padding: EdgeInsets.all(14),
-                            child: Text(
-                                'Your consultation opens after payment is confirmed.'))
+                        Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Text(l10n.waitingRoomNotActive))
                       else ...[
                         if (isVideo) ...[
                           Text(l10n.waitingConnectionTitle,

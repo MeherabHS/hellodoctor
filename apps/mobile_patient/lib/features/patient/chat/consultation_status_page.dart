@@ -1,6 +1,5 @@
 import '../../../core/network/screen_refresh.dart';
 import 'package:dio/dio.dart' show CancelToken;
-import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/network/api_client.dart';
@@ -8,6 +7,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../consultation/consultation_scene.dart';
+import '../consultation/post_consultation_page.dart';
 import '../directory/directory_repository.dart';
 import '../booking/booking_models.dart';
 import '../booking/booking_repository.dart';
@@ -18,8 +18,11 @@ import '../booking/waiting_room_page.dart';
 import 'chat_repository.dart';
 import 'patient_chat_page.dart';
 
-/// Payment and activation are always read from the server. Opening a chat
-/// resolves the existing conversation; it never creates or charges a booking.
+/// "Consultation Confirmed" / consultation status. Everything shown is read
+/// from the server's appointment state; the app is payment-free, so no price,
+/// payment status or checkout appears here. Confirmed consultations continue
+/// into the modality-aware waiting room (video or chat), completed ones into
+/// the outcome screen, and ended ones show their real state.
 class ConsultationStatusPage extends StatefulWidget {
   const ConsultationStatusPage(
       {super.key,
@@ -35,38 +38,35 @@ class ConsultationStatusPage extends StatefulWidget {
   State<ConsultationStatusPage> createState() => _ConsultationStatusPageState();
 }
 
+const _activeStatuses = ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'];
+const _endedStatuses = [
+  'CANCELLED',
+  'REFUNDED',
+  'EXPIRED',
+  'PREMATURE_TERMINATION',
+  'DISPUTED',
+];
+
 class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
   AppointmentDetailDto? detail;
   String? error;
-  bool loading = false, opening = false, paying = false;
-  String? paymentError;
+  bool loading = false, opening = false;
   late final ScreenRefresh _screenRefresh;
   final _openAcknowledgement = CancelToken();
-  Timer? _holdTimer;
-  Stopwatch? _holdStopwatch;
-  int? _holdBaseSeconds;
-  int? _remainingHoldSeconds;
+
+  String get _status => detail?.status ?? widget.appointment.status;
+
   @override
   void initState() {
     super.initState();
     refresh();
-    _holdTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      _updateHoldCountdown();
-    });
     unawaited(_ackOpen());
     _screenRefresh = ScreenRefresh(refresh,
         interval: const Duration(seconds: 15),
         networkChanges: widget.repo.connectivity?.changes,
         hasError: () => error != null,
-        enabled: () => !const [
-              'COMPLETED',
-              'CANCELLED',
-              'REFUNDED',
-              'EXPIRED',
-              'PREMATURE_TERMINATION',
-              'DISPUTED',
-            ].contains(detail?.status ?? widget.appointment.status));
+        enabled: () =>
+            _status != 'COMPLETED' && !_endedStatuses.contains(_status));
   }
 
   Future<void> _ackOpen() async {
@@ -85,8 +85,6 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
   @override
   void dispose() {
     _screenRefresh.dispose();
-    _holdTimer?.cancel();
-    _holdStopwatch?.stop();
     _openAcknowledgement.cancel();
     super.dispose();
   }
@@ -94,35 +92,20 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
   Future<void> refresh() async {
     if (loading) return;
     loading = true;
-    final requestClock = Stopwatch()..start();
     try {
       final value = await widget.repo.appointment(widget.appointment.id);
       if (mounted) {
         setState(() {
           detail = value;
-          if (value.holdExpiresAt != null && value.serverTime != null) {
-            _holdBaseSeconds = value.holdExpiresAt!
-                .difference(value.serverTime!)
-                .inSeconds
-                .clamp(0, 600)
-                .toInt();
-            // Start from request initiation. This makes network latency reduce
-            // the displayed hold, never extend a server deadline.
-            _holdStopwatch = requestClock;
-          } else {
-            _holdBaseSeconds = null;
-            _holdStopwatch = null;
-          }
           error = null;
         });
-        _updateHoldCountdown();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           error = e is ApiException
-              ? e.message
-              : 'Unable to check payment. Please retry.';
+              ? e.userMessage
+              : AppLocalizations.of(context).consultStatusLoadError;
         });
       }
     } finally {
@@ -130,104 +113,50 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
     }
   }
 
-  void _updateHoldCountdown() {
-    final expires = detail?.holdExpiresAt;
-    final stopwatch = _holdStopwatch;
-    final baseSeconds = _holdBaseSeconds;
-    if (expires == null ||
-        detail?.status != 'PENDING_PAYMENT' ||
-        stopwatch == null ||
-        baseSeconds == null) {
-      if (_remainingHoldSeconds != null && mounted) {
-        setState(() => _remainingHoldSeconds = null);
-      }
-      return;
-    }
-    final seconds =
-        (baseSeconds - stopwatch.elapsed.inSeconds).clamp(0, 600).toInt();
-    if (!mounted || seconds == _remainingHoldSeconds) return;
-    setState(() => _remainingHoldSeconds = seconds);
-    if (seconds == 0) unawaited(refresh());
-  }
+  Future<void> _openWaitingRoom() => Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => WaitingRoomPage(
+              appointment: widget.appointment,
+              repo: widget.repo,
+              familyProfilesCubit: widget.familyProfilesCubit,
+              myUserId: widget.myUserId)));
 
-  String _formatHold(int seconds) {
-    final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
-    final remaining = (seconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$remaining';
-  }
+  Future<void> _openOutcome() => Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => PostConsultationPage(
+              appointment: widget.appointment,
+              clinicalOutcome: detail?.clinicalOutcome,
+              completedAt: DateTime.tryParse(detail?.completedAt ?? ''),
+              repo: widget.repo,
+              familyProfilesCubit: widget.familyProfilesCubit)));
 
-  Future<void> pay() async {
-    if (paying || detail?.status != 'PENDING_PAYMENT') return;
-    setState(() {
-      paying = true;
-      paymentError = null;
-    });
-    try {
-      final uri = await widget.repo.initiatePayment(widget.appointment.id);
-      if (!mounted) return;
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-        throw const ApiException(
-            null, 'Unable to open payment. Please try again.');
-      }
-      await refresh();
-    } catch (e) {
-      if (mounted) {
-        setState(() => paymentError = e is ApiException && e.status == 409
-            ? e.message
-            : 'Unable to start payment. Please try again.');
-      }
-    } finally {
-      if (mounted) setState(() => paying = false);
-    }
-  }
-
-  Future<void> open() async {
-    if (detail?.status == 'EXPIRED') return;
-    final history = const [
-      'CANCELLED',
-      'REFUNDED',
-      'EXPIRED',
-      'PREMATURE_TERMINATION',
-      'DISPUTED'
-    ].contains(detail?.status);
-    if (opening || error != null || (detail?.isReady != true && !history)) {
-      return;
-    }
+  /// Read-only history of an ended consultation's messages, if it had any.
+  Future<void> _openMessages() async {
+    if (opening) return;
     setState(() => opening = true);
     try {
-      if (widget.appointment.modality == 'CHAT' || history) {
-        final repo = ChatRepository(widget.repo.api,
-            connectivity: widget.repo.connectivity);
-        final conversation =
-            await repo.conversationForAppointment(widget.appointment.id);
-        if (!mounted) return;
-        await Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => PatientChatPage(
-                    conversation: conversation,
-                    doctorDisplayName: widget.appointment.doctorDisplayName,
-                    repo: repo,
-                    myUserId: widget.myUserId)));
-      } else {
-        await Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => WaitingRoomPage(
-                    appointment: widget.appointment,
-                    repo: widget.repo,
-                    familyProfilesCubit: widget.familyProfilesCubit,
-                    myUserId: widget.myUserId)));
-      }
+      final repo =
+          ChatRepository(widget.repo.api, connectivity: widget.repo.connectivity);
+      final conversation =
+          await repo.conversationForAppointment(widget.appointment.id);
+      if (!mounted) return;
+      await Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => PatientChatPage(
+                  conversation: conversation,
+                  doctorDisplayName: widget.appointment.doctorDisplayName,
+                  repo: repo,
+                  myUserId: widget.myUserId)));
     } catch (e) {
       if (mounted) {
-        setState(() {
-          error = e is ApiException && e.status == 404
-              ? 'Payment is confirmed. Your consultation is being prepared; please retry shortly.'
-              : e is ApiException
-                  ? e.message
-                  : 'Unable to open your consultation. Please retry.';
-        });
+        setState(() => error = e is ApiException && e.status == 404
+            ? AppLocalizations.of(context).consultStatusNoMessages
+            : e is ApiException
+                ? e.userMessage
+                : AppLocalizations.of(context).consultStatusLoadError);
       }
     } finally {
       if (mounted) setState(() => opening = false);
@@ -243,30 +172,45 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
   @override
   Widget build(BuildContext context) {
     final a = widget.appointment;
-    final ready = detail?.isReady == true && error == null;
-    final failed = detail?.paymentStatus == 'FAILED';
-    final ended = const [
-      'CANCELLED',
-      'REFUNDED',
-      'EXPIRED',
-      'PREMATURE_TERMINATION',
-      'DISPUTED'
-    ].contains(detail?.status);
-    final expired = detail?.status == 'EXPIRED';
     final l = AppLocalizations.of(context);
     final video = a.modality == 'VIDEO';
+    final status = _status;
+    final known = detail != null;
+    final active = known && _activeStatuses.contains(status);
+    final completed = known && status == 'COMPLETED';
+    final ended = known && _endedStatuses.contains(status);
+    final notActive = known && !active && !completed && !ended;
+
+    final (String title, String body) = !known
+        ? (l.consultStatusCheckingTitle, l.consultStatusCheckingBody)
+        : completed
+            ? (l.consultStatusCompletedTitle, l.consultStatusCompletedBody)
+            : status == 'IN_CONSULTATION'
+                ? (l.consultStatusInProgressTitle,
+                    video
+                        ? l.consultStatusActiveVideoBody
+                        : l.consultStatusActiveChatBody)
+                : active
+                    ? (l.consultStatusConfirmedTitle,
+                        video
+                            ? l.consultStatusActiveVideoBody
+                            : l.consultStatusActiveChatBody)
+                    : ended
+                        ? (l.consultStatusEndedTitle, l.consultStatusEndedBody)
+                        : (l.consultStatusNotActiveTitle,
+                            l.consultStatusNotActiveBody);
+
     return Scaffold(
         backgroundColor: PatientTokens.bg,
         body: SafeArea(
             child: ListView(padding: EdgeInsets.zero, children: [
           // Product owner's "Consultation Confirmed" design. The celebratory
-          // heading appears only once the server reports the booking ready;
-          // every other state keeps a neutral heading.
+          // heading appears only while the server reports the booking active.
           ConsultationHeader(
               art: 'consult_confirmed_header',
-              showCheck: ready,
-              title: ready ? l.consultConfirmedTitle : l.consultYourTitle,
-              subtitle: ready
+              showCheck: active,
+              title: active ? l.consultConfirmedTitle : l.consultYourTitle,
+              subtitle: active
                   ? (video ? l.consultConfirmedVideo : l.consultConfirmedChat)
                   : null),
           Padding(
@@ -282,61 +226,14 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                        Text(
-                            expired
-                                ? 'Reservation expired'
-                                : ended
-                                    ? 'Consultation ${detail!.status.toLowerCase()}'
-                                    : ready
-                                        ? 'Consultation confirmed'
-                                        : failed
-                                            ? 'Payment failed'
-                                            : detail == null
-                                                ? 'Checking consultation'
-                                                : 'Payment required',
+                        Text(title,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                                 color: PatientTokens.navy)),
                         const SizedBox(height: 6),
-                        Text(expired
-                            ? 'The unpaid reservation has expired. Make a new booking and upload your records again.'
-                            : ended
-                                ? 'Messaging and calling are unavailable for this booking.'
-                                : ready
-                                    ? 'Your consultation is available.'
-                                    : failed
-                                        ? 'Payment was not completed. You can try again.'
-                                        : 'Complete payment to confirm your consultation.'),
-                        if (!a.paymentRequired)
-                          const Padding(
-                              padding: EdgeInsets.only(top: 8),
-                              child: Text('No payment required'))
-                        else if (a.fee != null)
-                          Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Text('KES ${a.fee}')),
+                        Text(body),
                       ])),
-                  if (ready && video) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
-                      decoration: BoxDecoration(
-                          color: PatientTokens.primaryLight,
-                          borderRadius: BorderRadius.circular(14)),
-                      child: Row(children: [
-                        const Icon(Icons.event_available_outlined,
-                            color: PatientTokens.primary),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: Text(l.consultJoinInfo,
-                                style: const TextStyle(
-                                    fontSize: 13.5,
-                                    color: PatientTokens.navy))),
-                      ]),
-                    ),
-                  ],
-                  if (ready) ...[
+                  if (active) ...[
                     const SizedBox(height: 12),
                     ConsultationTipsCard(
                         title: l.consultBeforeTitle,
@@ -349,51 +246,30 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                   ],
                   const SizedBox(height: 16),
                   if (error != null) InlineError(error!, onRetry: refresh),
-                  if (paymentError != null)
-                    Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Text(paymentError!,
-                            style:
-                                const TextStyle(color: PatientTokens.danger))),
-                  if (expired)
+                  if (active)
+                    FilledButton(
+                        onPressed: error == null ? _openWaitingRoom : null,
+                        child: Text(video
+                            ? l.consultOpenVideoWaitingRoom
+                            : l.consultOpenChatWaitingRoom))
+                  else if (completed)
+                    FilledButton(
+                        onPressed: _openOutcome,
+                        child: Text(l.consultViewOutcome))
+                  else if (ended)
+                    OutlinedButton(
+                        onPressed: opening ? null : _openMessages,
+                        child: Text(l.consultViewMessages))
+                  else if (notActive)
                     FilledButton(
                         onPressed: () => Navigator.of(context)
                             .popUntil((route) => route.isFirst),
-                        child: const Text('Choose a new booking'))
-                  else if (ready || ended)
-                    FilledButton(
-                        onPressed: error == null && !opening ? open : null,
-                        child: Text(opening
-                            ? 'Opening...'
-                            : ended
-                                ? 'View consultation history'
-                                : a.modality == 'CHAT'
-                                    ? 'Open consultation'
-                                    : 'Open waiting room'))
-                  else if (detail?.status == 'PENDING_PAYMENT') ...[
-                    if ((_remainingHoldSeconds ?? 0) > 0)
-                      Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Text(
-                              'Reservation expires in ${_formatHold(_remainingHoldSeconds!)}',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: PatientTokens.danger))),
-                    FilledButton(
-                        onPressed: paying ||
-                                (detail?.holdExpiresAt != null &&
-                                    (_remainingHoldSeconds ?? 0) == 0)
-                            ? null
-                            : pay,
-                        child: Text(paying
-                            ? 'Starting payment...'
-                            : 'Proceed to payment method')),
-                  ],
-                  if (!ready && !ended)
+                        child: Text(l.consultBookNew)),
+                  if (!known)
                     TextButton(
-                        onPressed: refresh,
-                        child: const Text('Refresh status')),
-                  if (!expired)
+                        onPressed: refresh, child: Text(l.consultRefreshStatus)),
+                  if (active) ...[
+                    const SizedBox(height: 8),
                     OutlinedButton(
                         onPressed: () => showModalBottomSheet<void>(
                             context: context,
@@ -402,9 +278,10 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                                 doctorName: a.doctorDisplayName,
                                 appointmentId: a.id,
                                 repo: widget.repo)),
-                        child: const Text('Attach health records')),
+                        child: Text(l.consultAttachRecords)),
+                  ],
                   const SizedBox(height: 16),
-                  Text('Reference: ${a.appointmentNumber}',
+                  Text(l.consultReference(a.appointmentNumber),
                       style: const TextStyle(color: PatientTokens.textSub)),
                 ]),
           ),

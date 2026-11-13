@@ -291,18 +291,16 @@ void main() {
       });
     }
   }
-  for (final modes in [
-    ('800', '0', 'Book video', 'VIDEO'),
-    ('0', '300', 'Book chat', 'CHAT'),
-    ('800', '300', 'Consult', 'BOTH')
-  ]) {
-    testWidgets('available mode ${modes.$4} routes correct booking',
+  // Payment-free product (2026-11-13): every doctor the server lists offers
+  // both video and chat, whatever fee is configured, and no price is shown.
+  for (final fees in [('800', '0'), ('0', '300'), ('0', '0'), ('800', '300')]) {
+    testWidgets('fees ${fees.$1}/${fees.$2}: card offers both modalities, no price',
         (tester) async {
       await viewport(tester, 320);
       final doctor = PublicDoctorDto.fromJson({
         ...doctorJson,
-        'consultation_fee_video': modes.$1,
-        'consultation_fee_chat': modes.$2
+        'consultation_fee_video': fees.$1,
+        'consultation_fee_chat': fees.$2
       });
       String? chosen;
       await tester.pumpWidget(host(Scaffold(
@@ -315,26 +313,28 @@ void main() {
                   onBook: (m) => chosen = m)))));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
-      await capture(tester, 'doctor_${modes.$4.toLowerCase()}_320');
-      await tester.tap(find.text(modes.$3));
+      expect(find.textContaining('KES'), findsNothing);
+      await tester.tap(find.text('Consult'));
       await tester.pumpAndSettle();
-      if (modes.$4 == 'BOTH') {
-        expect(find.text('Book video'), findsOneWidget);
-        expect(find.text('Book chat'), findsOneWidget);
-        await capture(tester, 'consultation_choices_320');
-        await tester.tap(find.text('Book chat'));
-        await tester.pumpAndSettle();
-        expect(chosen, 'CHAT');
-      } else {
-        expect(chosen, modes.$4);
-      }
+      expect(find.text('Book video'), findsOneWidget);
+      expect(find.text('Book chat'), findsOneWidget);
+      expect(find.textContaining('KES'), findsNothing);
+      expect(find.textContaining('payment'), findsNothing);
+      await tester.tap(find.text('Book chat'));
+      await tester.pumpAndSettle();
+      expect(chosen, 'CHAT');
     });
   }
-  test('modality rules reject zero negative and malformed fees', () {
-    for (final fee in ['0', '-1', 'NaN', 'bad']) {
-      final d = PublicDoctorDto.fromJson(
-          {...doctorJson, 'consultation_fee_chat': fee});
-      expect(d.supportsChat, false);
+  test('every listed doctor offers both modalities whatever the fee', () {
+    for (final fee in ['0', '-1', 'NaN', 'bad', '500']) {
+      final d = PublicDoctorDto.fromJson({
+        ...doctorJson,
+        'consultation_fee_chat': fee,
+        'consultation_fee_video': fee
+      });
+      expect(d.supportsChat, true);
+      expect(d.supportsVideo, true);
+      expect(d.videoBookable(paymentRequired: true), true);
     }
   });
   test('photo presence and cache-busting fields parse from the directory DTO',
@@ -349,95 +349,6 @@ void main() {
     final withoutPhoto = PublicDoctorDto.fromJson(doctorJson);
     expect(withoutPhoto.hasPhoto, false);
     expect(withoutPhoto.photoUpdatedAt, isNull);
-  });
-  testWidgets(
-      'availability-tab slot tap routes into the real booking flow for a single supported modality',
-      (tester) async {
-    await viewport(tester, 320);
-    final connectivity = ConnectivityService();
-    addTearDown(connectivity.dispose);
-    final dio = Dio();
-    final api = ApiClient(dio: dio, tokenStore: MemoryTokens());
-    addTearDown(api.dispose);
-    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
-      final dynamic data = o.path.endsWith('/slots')
-          ? [
-              {
-                'id': 'slot-1',
-                'doctor_id': 'doctor-test',
-                'start_time': '2026-10-14T09:00:00Z',
-                'end_time': '2026-10-14T09:30:00Z',
-              }
-            ]
-          : {...doctorJson, 'consultation_fee_chat': '0'};
-      h.resolve(Response(
-          requestOptions: o,
-          statusCode: 200,
-          data: {'success': true, 'data': data}));
-    }));
-    final family = FamilyProfilesCubit(FamilyProfilesRepository(api));
-    addTearDown(family.close);
-    await tester.pumpWidget(host(DoctorProfilePage(
-        doctorId: 'doctor-test',
-        api: api,
-        cache: null,
-        connectivity: connectivity,
-        familyProfilesCubit: family)));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Availability'));
-    await tester.pumpAndSettle();
-    expect(find.text('Book Video'), findsNothing);
-    await tester.tap(find.byIcon(Icons.chevron_right).first);
-    await tester.pumpAndSettle();
-    // Only VIDEO is priced here, so tapping the slot must go straight into
-    // PatientBookingPage (identified by its own page title) rather than
-    // showing a modality chooser.
-    expect(find.text('Book Video Consultation'), findsOneWidget);
-  });
-  testWidgets(
-      'availability-tab slot tap tells the patient booking is unavailable when neither modality is priced',
-      (tester) async {
-    await viewport(tester, 320);
-    final connectivity = ConnectivityService();
-    addTearDown(connectivity.dispose);
-    final dio = Dio();
-    final api = ApiClient(dio: dio, tokenStore: MemoryTokens());
-    addTearDown(api.dispose);
-    dio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) {
-      final dynamic data = o.path.endsWith('/slots')
-          ? [
-              {
-                'id': 'slot-1',
-                'doctor_id': 'doctor-test',
-                'start_time': '2026-10-14T09:00:00Z',
-                'end_time': '2026-10-14T09:30:00Z',
-              }
-            ]
-          : {
-              ...doctorJson,
-              'consultation_fee_video': '0',
-              'consultation_fee_chat': '0'
-            };
-      h.resolve(Response(
-          requestOptions: o,
-          statusCode: 200,
-          data: {'success': true, 'data': data}));
-    }));
-    final family = FamilyProfilesCubit(FamilyProfilesRepository(api));
-    addTearDown(family.close);
-    await tester.pumpWidget(host(DoctorProfilePage(
-        doctorId: 'doctor-test',
-        api: api,
-        cache: null,
-        connectivity: connectivity,
-        familyProfilesCubit: family)));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Availability'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byIcon(Icons.chevron_right).first);
-    await tester.pumpAndSettle();
-    expect(find.text("This doctor hasn't set up consultation booking yet."),
-        findsOneWidget);
   });
   // P0 regression: Patient could see a verified doctor's slots but every tap
   // showed "This doctor hasn't set up consultation booking yet." because the
@@ -499,22 +410,29 @@ void main() {
     await tester.tap(find.byIcon(Icons.chevron_right).first);
     await tester.pumpAndSettle();
   }
-
   testWidgets(
-      'deferred mode: slot tap on an unpriced doctor opens the booking flow',
+      'payment-free: slot tap on a zero-fee doctor offers both modalities and opens booking',
       (tester) async {
     await pumpProfileWithPolicy(tester, policy: {'payment_required': false});
     expect(find.text("This doctor hasn't set up consultation booking yet."),
         findsNothing);
+    // The chooser sheet sits above the profile's own buttons.
+    expect(find.text('Book video'), findsWidgets);
+    expect(find.text('Book chat'), findsWidgets);
+    await tester.tap(find.text('Book video').last);
+    await tester.pumpAndSettle();
     expect(find.text('Book Video Consultation'), findsOneWidget);
+    expect(find.textContaining('KES'), findsNothing);
   });
   testWidgets(
-      'paid mode: slot tap on an unpriced doctor still reports booking unavailable',
+      'a server that requires payment: booking opens but is refused as a configuration error',
       (tester) async {
     await pumpProfileWithPolicy(tester, policy: {'payment_required': true});
-    expect(find.text("This doctor hasn't set up consultation booking yet."),
-        findsOneWidget);
-    expect(find.text('Book Video Consultation'), findsNothing);
+    await tester.tap(find.text('Book video').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Book Video Consultation'), findsOneWidget);
+    expect(find.textContaining('configuration issue'), findsOneWidget);
+    expect(find.textContaining('KES'), findsNothing);
   });
   testWidgets(
       'unreachable booking policy is reported as such, not as a doctor setup problem',
@@ -527,56 +445,12 @@ void main() {
             "Couldn't check booking availability. Check your connection and try again."),
         findsOneWidget);
   });
-  test('videoBookable follows the server policy, fee only in paid mode', () {
-    final unpriced = PublicDoctorDto.fromJson({
-      ...doctorJson,
-      'consultation_fee_video': '0',
-      'consultation_fee_chat': '0'
-    });
-    expect(unpriced.videoBookable(paymentRequired: false), true);
-    expect(unpriced.videoBookable(paymentRequired: true), false);
-    expect(unpriced.supportsChat, false);
-  });
-  testWidgets('deferred mode: unpriced doctor card offers video booking',
+  testWidgets('zero-fee doctor profile shows both consultation types and no price',
       (tester) async {
-    await viewport(tester, 320);
-    final d = PublicDoctorDto.fromJson({
-      ...doctorJson,
-      'consultation_fee_video': '0',
-      'consultation_fee_chat': '0'
-    });
-    String? booked;
-    await tester.pumpWidget(host(Scaffold(
-        body: PatientDoctorCard(
-            doctor: d,
-            repo: fakeDirectoryRepo(),
-            paymentRequired: false,
-            onProfile: () {},
-            onBook: (m) => booked = m))));
+    await pumpProfileWithPolicy(tester, policy: {'payment_required': false});
+    await tester.tapAt(const Offset(5, 5));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Book video'));
-    expect(booked, 'VIDEO');
     expect(find.textContaining('KES'), findsNothing);
-  });
-  testWidgets('neither mode offers profile without fake booking',
-      (tester) async {
-    await viewport(tester, 320);
-    final d = PublicDoctorDto.fromJson({
-      ...doctorJson,
-      'consultation_fee_video': '0',
-      'consultation_fee_chat': '0'
-    });
-    await tester.pumpWidget(host(Scaffold(
-        body: PatientDoctorCard(
-            doctor: d,
-            repo: fakeDirectoryRepo(),
-            onProfile: () {},
-            onBook: (_) {}))));
-    await tester.pumpAndSettle();
-    expect(find.text('View profile'), findsOneWidget);
-    expect(find.text('Consult'), findsNothing);
-    expect(find.text('Book chat'), findsNothing);
-    expect(find.text('Book video'), findsNothing);
   });
   testWidgets('specific historic fixture command removed from name',
       (tester) async {

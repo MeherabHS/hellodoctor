@@ -232,7 +232,7 @@
   "@bookingFormatTitle": {
     "description": "Patient interface: bookingFormatTitle"
   },
-  "bookingFormatSubtitle": "10-minute slot • Doctor calls you directly at scheduled time",
+  "bookingFormatSubtitle": "Join from the waiting room when your consultation room opens",
   "@bookingFormatSubtitle": {
     "description": "Patient interface: bookingFormatSubtitle"
   },
@@ -545,7 +545,7 @@
   "@paidChatTitle": {
     "description": "Paid chat booking modal title."
   },
-  "paidChatSubtitle": "Paid clinical text consultation with a verified KMPDC specialist",
+  "paidChatSubtitle": "Text consultation with a verified KMPDC specialist",
   "@paidChatSubtitle": {
     "description": "Paid chat booking modal subtitle."
   },
@@ -577,7 +577,7 @@
   "@paidChatSelectSlot": {
     "description": "Paid chat booking modal submit button."
   },
-  "apptStatusPendingPayment": "Pending Payment",
+  "apptStatusPendingPayment": "Not confirmed",
   "@apptStatusPendingPayment": {
     "description": "Appointment status label."
   },
@@ -643,7 +643,7 @@
       }
     }
   },
-  "waitingRoomVideoCallsYou": "Doctor Calls You at Your Booked Time",
+  "waitingRoomVideoCallsYou": "Join at your booked time",
   "@waitingRoomVideoCallsYou": {
     "description": "Waiting room video-modality readiness banner title."
   },
@@ -651,7 +651,7 @@
   "@waitingRoomChatMessageAnytime": {
     "description": "Waiting room chat-modality readiness banner title."
   },
-  "waitingRoomVideoCallsYouDetail": "Patients cannot place outgoing calls. When your booked slot arrives, join from here.",
+  "waitingRoomVideoCallsYouDetail": "Tap Join Video Call when your consultation room opens. Your doctor joins the same room.",
   "@waitingRoomVideoCallsYouDetail": {
     "description": "Waiting room video-modality readiness banner detail."
   },
@@ -687,7 +687,7 @@
   "@waitingRoomPermissionsDenied": {
     "description": "Waiting room permission-check failure message."
   },
-  "chatOpensOnceConfirmed": "Chat opens once your appointment is confirmed.",
+  "chatOpensOnceConfirmed": "Your chat is being prepared. Please try again in a moment.",
   "@chatOpensOnceConfirmed": {
     "description": "Waiting room 404 snackbar when chat isn't available yet."
   },
@@ -1725,7 +1725,7 @@
   "consultBookChat": "Book chat",
   "consultAction": "Consult",
   "consultProfile": "View profile",
-  "consultSlotNotice": "Choose an available slot, then complete payment.",
+  "consultSlotNotice": "Choose an available time slot to book.",
   "consultUnavailable": "Consultations not offered",
   "consultOffDuty": "Off duty",
   "profileVerified": "Verified clinician",
@@ -1933,7 +1933,7 @@
   "refreshButton": "Refresh",
   "doctorLabel": "Doctor",
   "patientLabel": "Patient",
-  "appointmentStatusPendingPayment": "Payment pending",
+  "appointmentStatusPendingPayment": "Not confirmed",
   "appointmentStatusConfirmed": "Confirmed",
   "appointmentStatusWaiting": "Waiting",
   "appointmentStatusInConsultation": "In consultation",
@@ -2230,5 +2230,49 @@
   "completeStatus": "Completed",
   "completeOutcomeTitle": "Consultation outcome",
   "completeViewRecords": "View Health Records",
-  "completeBookAnother": "Book Another Consultation"
+  "completeBookAnother": "Book Another Consultation",
+  "bookingUnavailableConfiguration": "Booking is not available right now because of a service configuration issue. This app never takes payment. Please try again later.",
+  "consultStatusLoadError": "Unable to load your consultation. Please retry.",
+  "consultStatusNoMessages": "This consultation has no messages.",
+  "consultStatusCheckingTitle": "Checking your consultation",
+  "consultStatusCheckingBody": "Getting the latest status...",
+  "consultStatusConfirmedTitle": "Consultation confirmed",
+  "consultStatusInProgressTitle": "Consultation in progress",
+  "consultStatusActiveVideoBody": "Go to the waiting room. You can join when your consultation room opens.",
+  "consultStatusActiveChatBody": "Go to the chat waiting room to message your doctor.",
+  "consultStatusCompletedTitle": "Consultation completed",
+  "consultStatusCompletedBody": "View the outcome your doctor recorded.",
+  "consultStatusEndedTitle": "This consultation is closed",
+  "consultStatusEndedBody": "It was cancelled or has expired. Messaging and calling are closed.",
+  "consultStatusNotActiveTitle": "This booking is not active",
+  "consultStatusNotActiveBody": "It was never confirmed. Please book a new consultation.",
+  "consultOpenVideoWaitingRoom": "Open waiting room",
+  "consultOpenChatWaitingRoom": "Open chat waiting room",
+  "consultViewOutcome": "View outcome",
+  "consultViewMessages": "View messages",
+  "consultBookNew": "Book a new consultation",
+  "consultRefreshStatus": "Refresh status",
+  "consultAttachRecords": "Attach health records",
+  "waitingRoomNotActive": "This consultation is not active.",
+  "consultCtaChat": "Book a Chat Consultation",
+  "consultHistoryLink": "My consultations",
+  "historyTitle": "My consultations",
+  "historySubtitle": "Current and past consultations",
+  "historyCurrent": "Current",
+  "historyPast": "Past",
+  "historyEmptyCurrent": "You have no current consultations.",
+  "historyEmptyPast": "You have no past consultations yet.",
+  "historyStatusClosed": "Closed",
+  "historyOutcomeWithRx": "Prescription issued",
+  "historyOutcomeNoRx": "No prescription needed",
+  "historyOutcomeReferred": "Referred",
+  "historyOutcomeEscalated": "Escalated",
+  "consultReference": "Reference: {reference}",
+  "@consultReference": {
+    "placeholders": {
+      "reference": {
+        "type": "String"
+      }
+    }
+  }
 }

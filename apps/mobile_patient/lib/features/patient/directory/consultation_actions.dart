@@ -40,13 +40,8 @@ class ConsultationChoices extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium),
           if (video) ...[
             const SizedBox(height: 24),
-            _option(
-                context,
-                Icons.videocam_outlined,
-                l.consultVideo,
-                doctor.supportsVideo ? doctor.consultationFeeVideo : null,
-                l.consultBookVideo,
-                'VIDEO'),
+            _option(context, Icons.videocam_outlined, l.consultVideo,
+                l.consultBookVideo, 'VIDEO'),
           ],
           if (video && doctor.supportsChat)
             const Padding(
@@ -54,14 +49,14 @@ class ConsultationChoices extends StatelessWidget {
           if (doctor.supportsChat) ...[
             if (!video) const SizedBox(height: 24),
             _option(context, Icons.chat_bubble_outline_rounded, l.consultChat,
-                doctor.consultationFeeChat, l.consultBookChat, 'CHAT'),
+                l.consultBookChat, 'CHAT'),
           ],
         ]),
       ),
     );
   }
 
-  Widget _option(BuildContext context, IconData icon, String title, String? fee,
+  Widget _option(BuildContext context, IconData icon, String title,
       String action, String modality) {
     final l = AppLocalizations.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -72,10 +67,6 @@ class ConsultationChoices extends StatelessWidget {
             child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
       ]),
       const SizedBox(height: 8),
-      if (fee != null) ...[
-        Text('KES $fee', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 4),
-      ],
       Text(l.consultSlotNotice),
       const SizedBox(height: 16),
       SizedBox(
@@ -190,10 +181,11 @@ class PatientDoctorCard extends StatelessWidget {
         const SizedBox(height: 16), const Divider(), const SizedBox(height: 12),
         Text(doctor.isOnDuty ? l.filterOnDuty : l.consultOffDuty,
             style: const TextStyle(color: PatientTokens.textSub, fontSize: 13)),
-        if (doctor.supportsVideo)
-          _price(context, l.consultVideo, doctor.consultationFeeVideo),
-        if (doctor.supportsChat)
-          _price(context, l.consultChat, doctor.consultationFeeChat),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 6, children: [
+          _modality(Icons.videocam_outlined, l.consultVideo),
+          _modality(Icons.chat_bubble_outline_rounded, l.consultChat),
+        ]),
         const SizedBox(height: 16),
         // Flow into separate rows on narrow screens or with larger text.
         LayoutBuilder(builder: (context, constraints) {
@@ -245,21 +237,15 @@ class PatientDoctorCard extends StatelessWidget {
     );
   }
 
-  Widget _price(BuildContext context, String label, String fee) => Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Wrap(
-            spacing: 12,
-            runSpacing: 4,
-            alignment: WrapAlignment.spaceBetween,
-            children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 13, color: PatientTokens.textSub)),
-              Text('KES $fee',
-                  style: const TextStyle(
-                      fontSize: 14,
-                      color: PatientTokens.text,
-                      fontWeight: FontWeight.w600)),
-            ]),
+  /// Offered consultation type, shown as a small label (no price: the app is
+  /// payment-free).
+  Widget _modality(IconData icon, String label) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: PatientTokens.primary),
+          const SizedBox(width: 4),
+          Text(label,
+              style: const TextStyle(fontSize: 13, color: PatientTokens.text)),
+        ],
       );
 }

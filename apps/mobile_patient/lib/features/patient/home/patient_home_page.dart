@@ -10,8 +10,10 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/afya_widgets.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/network/screen_refresh.dart';
 import '../../notifications/notification_center_page.dart';
 import '../../notifications/notification_cubit.dart';
+import '../../notifications/notification_navigation.dart';
 import '../directory/directory_repository.dart';
 import '../directory/doctor_photo_avatar.dart';
 import '../modules/afya_module_widgets.dart';
@@ -33,13 +35,12 @@ import 'upcoming_consultation_section.dart';
 /// - The search field opens the Services directory. It does not search
 ///   doctors (v2.1 brief: no homepage doctor search).
 ///
-/// The Emergency Contact banner, the family-profile switcher and the Upcoming
-/// Consultation card were removed from Home on 2026-11-12. Upcoming
-/// consultations are reached from Book Consultation; family profiles from
-/// the Profile tab.
-///
-/// State is unchanged: `HomeCubit`, `ProfileCubit`, `FamilyProfilesCubit` and
-/// `NotificationCubit` from `_SignedInRoot` are still loaded here.
+/// The Emergency Contact banner and the family-profile switcher are not on
+/// Home. The Upcoming Consultation card appears only inside the server's
+/// consultation window, from 15 minutes before the start (CLAUDE.md rule
+/// 2.4); it is re-evaluated every 30 seconds, and the appointment list is
+/// reloaded every minute, on resume, on reconnect and when Home is shown
+/// again (e.g. after booking).
 class PatientHomePage extends StatefulWidget {
   const PatientHomePage({super.key, required this.nav});
   final PatientShellNav nav;
@@ -50,10 +51,24 @@ class PatientHomePage extends StatefulWidget {
 
 class _PatientHomePageState extends State<PatientHomePage> {
   StreamSubscription<NetworkStatus>? _network;
+  ScreenRefresh? _appointmentsRefresh;
+  Timer? _windowTick;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _appointmentsRefresh ??= ScreenRefresh(
+        () => context.read<HomeCubit>().load(),
+        interval: const Duration(minutes: 1),
+        hasError: () => context.read<HomeCubit>().state.error != null);
+    _appointmentsRefresh!.attach(context);
+  }
 
   @override
   void dispose() {
     _network?.cancel();
+    _appointmentsRefresh?.dispose();
+    _windowTick?.cancel();
     super.dispose();
   }
 
@@ -65,6 +80,11 @@ class _PatientHomePageState extends State<PatientHomePage> {
       if (!mounted) return;
       setState(() {});
       if (status == NetworkStatus.online) unawaited(_reload());
+    });
+    // Re-evaluates the card against the server window without a request, so
+    // it appears at T-15 and its "Starts in" badge stays current.
+    _windowTick = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HomeCubit>().load();
@@ -84,7 +104,11 @@ class _PatientHomePageState extends State<PatientHomePage> {
   void _openNotifications() {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) =>
-          NotificationCenterPage(cubit: context.read<NotificationCubit>()),
+          NotificationCenterPage(
+              cubit: context.read<NotificationCubit>(),
+              deps: AppointmentRouteDeps(
+                  familyProfilesCubit: context.read<FamilyProfilesCubit>(),
+                  myUserId: context.read<ProfileCubit>().state.profile?.userId)),
     ));
   }
 
@@ -126,11 +150,12 @@ class _PatientHomePageState extends State<PatientHomePage> {
                             onAvatar: widget.nav.openProfile),
                         _GreetingCard(name: name),
                         _SearchField(onTap: widget.nav.openServices),
-                        if (homeState.nextUpcoming != null)
+                        if (!offline &&
+                            homeState.homeCardAppointment() != null)
                           _UpcomingCard(
-                              appointment: homeState.nextUpcoming!,
+                              appointment: homeState.homeCardAppointment()!,
                               onOpen: () => openWaitingRoomFor(
-                                  context, homeState.nextUpcoming!)),
+                                  context, homeState.homeCardAppointment()!)),
                         if (offline)
                           _OfflineBanner(onRetry: _reload)
                         else
@@ -466,7 +491,9 @@ class _UpcomingCard extends StatelessWidget {
 
   String? _badge(AppLocalizations l) {
     if (appointment.hasActiveConsultation) return l.homeInProgress;
-    final minutes = appointment.startTime.difference(DateTime.now()).inMinutes;
+    // Server clock, not the device clock (clock skew must not move it).
+    final now = appointment.join?.serverNow() ?? DateTime.now().toUtc();
+    final minutes = appointment.startTime.toUtc().difference(now).inMinutes;
     if (minutes > 60) return null;
     return minutes <= 0 ? l.homeStartsNow : l.homeStartsInMin('$minutes');
   }

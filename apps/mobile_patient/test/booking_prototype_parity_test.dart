@@ -100,36 +100,55 @@ void main() {
     });
   }
 
-  testWidgets('deferred mode shows every booking step, no payment picker',
+  /// Any patient-facing payment element (product rule: no payments anywhere).
+  void expectNoPaymentUi() {
+    for (final text in const [
+      'KES',
+      'Payable',
+      'Payment',
+      'payment',
+      'Fee',
+      'M-Pesa',
+      'Paid',
+      'Free'
+    ]) {
+      expect(find.textContaining(text), findsNothing, reason: text);
+    }
+  }
+
+  testWidgets('booking shows every step and no payment element',
       (tester) async {
-    await pump(tester, paymentRequired: false, fee: '0');
+    await pump(tester, paymentRequired: false, fee: '630');
     expect(find.text('Scheduled Video Consultation'), findsOneWidget);
     expect(find.text('Select Date'), findsOneWidget);
     expect(find.text('Available Slots'), findsOneWidget);
     expect(find.text('Times shown in EAT (UTC+3)'), findsOneWidget);
-    expect(find.text('Consultation Fee (10 mins)'), findsOneWidget);
-    expect(find.text('24-Hour Dedicated Chat'), findsOneWidget);
-    expect(find.text('Payable now'), findsOneWidget);
-    expect(find.textContaining('Payment deferred'), findsOneWidget);
     expect(find.textContaining('24-Hour Chat Included:'), findsOneWidget);
-    expect(find.text('Total Payable'), findsNothing);
-    expect(find.textContaining('M-Pesa'), findsNothing);
+    expect(find.textContaining('Doctor calls you'), findsNothing);
+    expectNoPaymentUi();
     await tester.tap(find.text('10:00 AM').first);
     await tester.pumpAndSettle();
     expect(
         find.widgetWithText(FilledButton, 'Confirm Booking →'), findsOneWidget);
-    await shot(tester, 'deferred_booking_$_width');
+    final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Confirm Booking →'));
+    expect(button.onPressed, isNotNull);
+    await shot(tester, 'payment_free_booking_$_width');
   });
 
-  testWidgets('paid mode keeps the same steps plus total and payment picker',
+  testWidgets(
+      'a server that requires payment gets a configuration error, never a checkout',
       (tester) async {
     await pump(tester, paymentRequired: true, fee: '630');
-    expect(find.text('Scheduled Video Consultation'), findsOneWidget);
-    expect(find.text('Total Payable'), findsOneWidget);
-    expect(find.text('KES 630'), findsWidgets);
-    expect(find.text('Payable now'), findsNothing);
-    expect(find.textContaining('24-Hour Chat Included:'), findsOneWidget);
-    await shot(tester, 'paid_booking_$_width');
+    expect(find.textContaining('configuration issue'), findsOneWidget);
+    expect(find.text('KES 630'), findsNothing);
+    expect(find.textContaining('M-Pesa'), findsNothing);
+    await tester.tap(find.text('10:00 AM').first);
+    await tester.pumpAndSettle();
+    final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Confirm Booking →'));
+    expect(button.onPressed, isNull);
+    await shot(tester, 'payment_required_blocked_$_width');
   });
 
   List<String> chipLabels(WidgetTester tester) => tester

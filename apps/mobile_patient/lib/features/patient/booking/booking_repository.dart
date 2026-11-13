@@ -2,6 +2,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/client_error_reporter.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/validation/upload_validation.dart';
+import '../home/home_models.dart';
 import 'booking_models.dart';
 import 'join_eligibility.dart';
 
@@ -206,6 +207,45 @@ class BookingRepository {
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'WaitingRoom', operation: 'poll_appointment');
+      rethrow;
+    }
+  }
+
+  /// `GET /appointments/:id` as a full summary (doctor, times, modality,
+  /// status, outcome and server join eligibility), so a notification or
+  /// history entry is always resolved from the latest server state rather
+  /// than from what the notification said when it was sent. No caching.
+  Future<AppointmentSummaryDto> appointmentSummary(String appointmentId) async {
+    try {
+      requireOnline();
+      final raw = _data(await api.get('/appointments/$appointmentId'));
+      return AppointmentSummaryDto.fromJson(
+          Map<String, dynamic>.from(raw as Map));
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Appointment', operation: 'resolve');
+      rethrow;
+    }
+  }
+
+  /// `GET /patients/me/appointments?status=…` — consultation history.
+  /// [status] is `upcoming` or `past`; no caching (history drives routing).
+  Future<List<AppointmentSummaryDto>> myAppointments(String status,
+      {String? profileId}) async {
+    try {
+      requireOnline();
+      final raw = _data(await api.get('/patients/me/appointments', query: {
+        'status': status,
+        'limit': 100,
+        if (profileId != null) 'profile_id': profileId,
+      }));
+      return (raw as List)
+          .map((e) => AppointmentSummaryDto.fromJson(
+              Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'ConsultationHistory', operation: 'load');
       rethrow;
     }
   }

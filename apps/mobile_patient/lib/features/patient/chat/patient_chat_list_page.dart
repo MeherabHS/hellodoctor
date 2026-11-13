@@ -281,15 +281,6 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
                                                     fontSize: 11.5,
                                                     color:
                                                         PatientTokens.textSub)),
-                                            if (a.paymentRequired &&
-                                                a.fee != null)
-                                              Text('KES ${a.fee}',
-                                                  style: const TextStyle(
-                                                      fontSize: 11.5,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color:
-                                                          PatientTokens.ink)),
                                           ]),
                                     ]),
                               ),

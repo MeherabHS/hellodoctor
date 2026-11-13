@@ -55,16 +55,15 @@ void main() {
   });
   for (final width in [320.0, 360.0, 390.0, 412.0]) {
     testWidgets(
-        'paid CHAT chooser through booking, payment polling and real repository chat at ${width}dp',
+        'payment-free CHAT: booking, chat waiting room and real repository chat at ${width}dp',
         (tester) async {
       tester.view.physicalSize = Size(width, 1000);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      var paid = false;
       final bookings = <Map<String, dynamic>>[];
       final messages = <Map<String, dynamic>>[];
-      final paymentMethods = <Map<String, dynamic>>[];
+      final unexpected = <String>[];
       final dio = Dio();
       dio.interceptors.add(InterceptorsWrapper(onRequest: (r, h) {
         dynamic data;
@@ -77,32 +76,24 @@ void main() {
               'end_time': '2026-11-01T07:10:00Z'
             }
           ];
-        } else if (r.path == '/patients/me/payment-methods') {
-          if (r.method == 'POST') {
-            final method = {
-              'id': 'pm-1',
-              'gateway': 'MPESA',
-              'masked_destination': 'M-Pesa •••• 5678',
-              'is_primary': true,
-            };
-            paymentMethods.add(method);
-            data = method;
-          } else {
-            data = paymentMethods;
-          }
+        } else if (r.path.endsWith('/trace-ack')) {
+          data = {}; // observational acknowledgement only
+        } else if (r.path == '/config/booking-policy') {
+          data = {'payment_required': false};
         } else if (r.path == '/appointments/book') {
           bookings.add(Map<String, dynamic>.from(r.data as Map));
           data = {
             'appointment_id': 'appointment',
             'appointment_number': 'HD1',
-            'status': 'PENDING_PAYMENT',
-            'amount': '350.00'
+            'status': 'CONFIRMED',
+            'payment_policy': 'NOT_REQUIRED',
+            'amount': '0'
           };
         } else if (r.path == '/appointments/appointment') {
           data = {
             'id': 'appointment',
-            'status': paid ? 'CONFIRMED' : 'PENDING_PAYMENT',
-            'payment_status': paid ? 'PAYMENT_HELD' : 'INITIATED'
+            'status': 'CONFIRMED',
+            'payment_policy': 'NOT_REQUIRED',
           };
         } else if (r.path.endsWith('/conversation')) {
           data = {
@@ -125,6 +116,7 @@ void main() {
             data = messages;
           }
         } else {
+          unexpected.add('${r.method} ${r.path}');
           h.reject(DioException(
               requestOptions: r, error: 'Unexpected request ${r.path}'));
           return;
@@ -137,6 +129,12 @@ void main() {
       final api = ApiClient(dio: dio, tokenStore: MemoryTokens());
       final repo = BookingRepository(api);
       final family = FamilyProfilesCubit(FamilyProfilesRepository(api));
+      void expectNoPaymentText() {
+        for (final text in const ['KES', 'Payment', 'payment', 'Paid', 'M-Pesa']) {
+          expect(find.textContaining(text), findsNothing, reason: text);
+        }
+      }
+
       await tester.pumpWidget(host(Builder(
           builder: (context) => Scaffold(
               body: FilledButton(
@@ -147,7 +145,8 @@ void main() {
                   child: const Text('Book chat'))))));
       await tester.tap(find.text('Book chat'));
       await tester.pumpAndSettle();
-      await capture(tester, 'paid_chat_details_${width.toInt()}');
+      expectNoPaymentText();
+      await capture(tester, 'chat_details_${width.toInt()}');
       await tester
           .tap(find.widgetWithText(FilledButton, 'Select a consultation slot'));
       await tester.pumpAndSettle();
@@ -159,33 +158,30 @@ void main() {
           '${hour.toString().padLeft(2, '0')}:00 ${local.hour >= 12 ? 'PM' : 'AM'}';
       await tester.tap(find.text(label));
       await tester.pumpAndSettle();
+      expectNoPaymentText();
       await capture(tester, 'chat_slot_booking_${width.toInt()}');
-      await tester.tap(find.text('+ Add M-Pesa Number'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).last, '0712345678');
-      await tester.tap(find.text('Save Payment Method'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byType(FilledButton).last);
+      await tester.tap(find.widgetWithText(FilledButton, 'Confirm Booking →'));
       await tester.pumpAndSettle();
       expect(bookings, hasLength(1));
       expect(bookings.single['modality'], 'CHAT');
       expect(bookings.single['slot_id'], 'slot');
-      expect(bookings.single['payment_method_id'], 'pm-1');
-      expect(find.text('Payment required'), findsOneWidget);
-      expect(find.text('Open consultation'), findsNothing);
-      expect(
-          tester
-              .widget<FilledButton>(find.widgetWithText(
-                  FilledButton, 'Proceed to payment method'))
-              .onPressed,
-          isNotNull);
-      await capture(tester, 'chat_payment_pending_${width.toInt()}');
-      paid = true;
-      await tester.tap(find.text('Refresh status'));
+      expect(bookings.single.containsKey('payment_method_id'), isFalse);
+      expect(bookings.single.containsKey('gateway'), isFalse);
+      expect(find.text('Consultation confirmed'), findsWidgets);
+      expectNoPaymentText();
+      await capture(tester, 'chat_confirmed_${width.toInt()}');
+      await tester.scrollUntilVisible(find.text('Open chat waiting room'), 200,
+          scrollable: find.byType(Scrollable).first);
+      await tester.tap(find.text('Open chat waiting room'));
       await tester.pumpAndSettle();
-      expect(find.text('Consultation confirmed'), findsOneWidget);
-      await capture(tester, 'chat_payment_confirmed_${width.toInt()}');
-      await tester.tap(find.text('Open consultation'));
+      // Chat waiting room: no camera, microphone or video join.
+      expect(find.text('Join Video Call'), findsNothing);
+      expect(find.text('Camera'), findsNothing);
+      await capture(tester, 'chat_waiting_room_${width.toInt()}');
+      final openChat = find.widgetWithText(FilledButton, 'Open Chat');
+      await tester.scrollUntilVisible(openChat, 200,
+          scrollable: find.byType(Scrollable).first);
+      await tester.tap(openChat);
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField), 'Hello doctor');
       await tester.testTextInput.receiveAction(TextInputAction.send);
@@ -193,7 +189,7 @@ void main() {
       expect(find.text('Hello doctor'), findsOneWidget);
       expect(messages, hasLength(1));
       expect(bookings, hasLength(1));
-      expect(find.textContaining('Upcoming feature'), findsNothing);
+      expect(unexpected, isEmpty);
       expect(tester.takeException(), isNull);
       await capture(tester, 'patient_chat_${width.toInt()}');
       await tester.pumpWidget(const SizedBox.shrink());
