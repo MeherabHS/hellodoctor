@@ -531,9 +531,12 @@ pub async fn list_own_documents(
     let mut tx = state.begin_authed(&ctx).await?;
     let prescription_rows = sqlx::query(
         "SELECT p.id, p.appointment_id, p.rx_number, p.page_number, p.mime_type, p.created_at, \
-                d.full_name AS doctor_display_name, d.primary_specialty \
+                d.full_name AS doctor_display_name, d.primary_specialty, \
+                a.appointment_number, a.modality::text AS modality, s.start_time AS consultation_start \
          FROM prescriptions p \
          JOIN doctor_public_directory d ON d.id = p.doctor_id \
+         JOIN appointments a ON a.id = p.appointment_id \
+         JOIN doctor_schedule_slots s ON s.id = a.slot_id \
          WHERE p.patient_id = $1 AND p.security_status = 'CLEAN' \
            AND p.rx_image_object_key IS NOT NULL \
          ORDER BY p.created_at DESC",
@@ -542,10 +545,15 @@ pub async fn list_own_documents(
     .fetch_all(&mut *tx)
     .await?;
     let intake_rows = sqlx::query(
-        "SELECT id, appointment_id, page_number, mime_type, created_at \
-         FROM prescription_intake_documents \
-         WHERE patient_id = $1 AND security_status = 'CLEAN' \
-         ORDER BY created_at DESC",
+        "SELECT i.id, i.appointment_id, i.page_number, i.mime_type, i.created_at, \
+                a.appointment_number, a.modality::text AS modality, s.start_time AS consultation_start, \
+                d.full_name AS doctor_display_name, d.primary_specialty \
+         FROM prescription_intake_documents i \
+         JOIN appointments a ON a.id = i.appointment_id \
+         JOIN doctor_schedule_slots s ON s.id = a.slot_id \
+         JOIN doctor_public_directory d ON d.id = a.doctor_id \
+         WHERE i.patient_id = $1 AND i.security_status = 'CLEAN' \
+         ORDER BY i.created_at DESC",
     )
     .bind(id)
     .fetch_all(&mut *tx)
@@ -566,6 +574,9 @@ pub async fn list_own_documents(
                 "mime_type": r.get::<Option<String>, _>("mime_type"),
                 "doctor_display_name": r.get::<String, _>("doctor_display_name"),
                 "primary_specialty": r.get::<String, _>("primary_specialty"),
+                "appointment_number": r.get::<String, _>("appointment_number"),
+                "modality": r.get::<String, _>("modality"),
+                "consultation_start": r.get::<chrono::DateTime<Utc>, _>("consultation_start"),
                 "created_at": created_at,
             }),
         ));
@@ -580,6 +591,11 @@ pub async fn list_own_documents(
                 "appointment_id": r.get::<uuid::Uuid, _>("appointment_id"),
                 "page_number": r.get::<i16, _>("page_number"),
                 "mime_type": r.get::<String, _>("mime_type"),
+                "doctor_display_name": r.get::<String, _>("doctor_display_name"),
+                "primary_specialty": r.get::<String, _>("primary_specialty"),
+                "appointment_number": r.get::<String, _>("appointment_number"),
+                "modality": r.get::<String, _>("modality"),
+                "consultation_start": r.get::<chrono::DateTime<Utc>, _>("consultation_start"),
                 "created_at": created_at,
             }),
         ));
