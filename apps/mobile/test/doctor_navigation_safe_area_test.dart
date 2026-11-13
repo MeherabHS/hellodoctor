@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hellodoctor_mobile/app.dart';
 import 'package:hellodoctor_mobile/core/network/api_client.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_cubit.dart';
-import 'package:hellodoctor_mobile/features/home/home_pages.dart';
+import 'package:hellodoctor_mobile/features/home/consultation_history_tab.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_repository.dart';
 import 'package:hellodoctor_mobile/features/notifications/notification_cubit.dart';
 import 'package:hellodoctor_mobile/features/notifications/notification_repository.dart';

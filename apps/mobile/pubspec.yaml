@@ -40,6 +40,7 @@ flutter:
     - assets/brand/
     - assets/auth/
     - assets/peer/
+    - assets/history/
   fonts:
     - family: Plus Jakarta Sans
       fonts:

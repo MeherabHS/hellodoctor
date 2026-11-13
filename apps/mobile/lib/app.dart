@@ -26,6 +26,7 @@ import 'features/doctor/doctor_pages.dart';
 import 'features/doctor/doctor_repository.dart';
 import 'features/notifications/notification_cubit.dart';
 import 'features/notifications/notification_repository.dart';
+import 'features/home/consultation_history_tab.dart';
 import 'features/home/home_pages.dart';
 
 class HelloDoctorApp extends StatefulWidget {
@@ -876,7 +877,9 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
           ? const SchedulePage()
           : AppointmentsPage(
               onBack: () => selectTab(0), onOpenSchedule: openSchedule),
-      ConsultationHistoryTab(onBack: () => selectTab(0)),
+      ConsultationHistoryTab(
+          onBack: () => selectTab(0),
+          onOpenAppointments: () => selectTab(1)),
       MorePage(onBack: () => selectTab(0)),
     ];
     return Scaffold(
