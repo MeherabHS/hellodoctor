@@ -4,6 +4,7 @@ import 'notification_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/time/kenya_time.dart';
 import '../../core/widgets/doctor_widgets.dart';
 import 'notification_cubit.dart';
 import 'notification_models.dart';
@@ -13,8 +14,10 @@ const _monthNames = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
+/// Kenya time (EAT), as everywhere else in the Doctor app; never the
+/// device's own timezone.
 String _mediumDateTime(BuildContext context, DateTime utc) {
-  final t = utc.toLocal();
+  final t = kenyaTime(utc);
   if (Localizations.localeOf(context).languageCode == 'sw') {
     final material = MaterialLocalizations.of(context);
     return '${material.formatMediumDate(t)} \u00b7 ${material.formatTimeOfDay(TimeOfDay.fromDateTime(t))}';

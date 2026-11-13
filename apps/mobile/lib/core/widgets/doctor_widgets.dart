@@ -1,6 +1,7 @@
 import '../l10n/doctor_locale.dart';
 import 'package:flutter/material.dart';
 import '../theme/tokens.dart';
+import '../time/kenya_time.dart';
 import '../utils/time_format.dart';
 
 class DoctorCard extends StatelessWidget {
@@ -163,7 +164,8 @@ class CacheStatusBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final updated = lastUpdated?.toLocal();
+    // Kenya time (EAT), not the device's timezone.
+    final updated = lastUpdated == null ? null : kenyaTime(lastUpdated!);
     final time = updated == null ? null : formatTime12h(updated);
     return Column(children: [
       if (refreshing) const LinearProgressIndicator(minHeight: 2),
