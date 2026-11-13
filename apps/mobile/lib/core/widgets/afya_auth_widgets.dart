@@ -22,9 +22,10 @@ class AfyaLogoMark extends StatelessWidget {
 /// a deep teal in the artwork.
 const _wordmark = Color(0xFF0E4A4A);
 
-/// Mark, "AfyaMkononi" and the "Doctor App" line (panel 1 header).
+/// Mark, "AfyaMkononi" and the product line. The splash reads
+/// "AfyaMkononi Care" (product-owner instruction, 2026-11-13).
 class AfyaBrandHeader extends StatelessWidget {
-  const AfyaBrandHeader({super.key, this.product = 'Doctor App'});
+  const AfyaBrandHeader({super.key, this.product = 'Care'});
   final String product;
   @override
   Widget build(BuildContext context) =>
