@@ -24,6 +24,7 @@ import '../profile/family_profiles_cubit.dart';
 import '../video/agora_call_page.dart';
 import 'booking_repository.dart';
 import 'join_eligibility.dart';
+import 'pre_consult_intake_modal.dart';
 import 'waiting_room_cubit.dart';
 
 /// `prototype/index.html` view-10 — "Scheduled Consultation" / Waiting Room.
@@ -323,6 +324,25 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
                               onCheck: _testPermissions),
                           const SizedBox(height: 14),
                         ],
+                        // Pre-consultation documents (product owner,
+                        // 2026-11-13): saved to Health Records under this
+                        // consultation, for both video and chat.
+                        AfyaInfoCard(
+                            icon: Icons.upload_file_rounded,
+                            title: l10n.waitingRoomUploadTitle,
+                            body: l10n.waitingRoomUploadBody),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                            onPressed: () => showModalBottomSheet<void>(
+                                context: context,
+                                isScrollControlled: true,
+                                builder: (_) => PreConsultIntakeModal(
+                                    doctorName: appointment.doctorDisplayName,
+                                    appointmentId: appointment.id,
+                                    repo: widget.repo)),
+                            icon: const Icon(Icons.attach_file_rounded),
+                            label: Text(l10n.waitingRoomUploadAction)),
+                        const SizedBox(height: 14),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
