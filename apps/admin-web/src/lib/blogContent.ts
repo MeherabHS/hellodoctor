@@ -2,6 +2,8 @@ export type ArticleStatus = 'DRAFT'|'PENDING_REVIEW'|'APPROVED'|'SCHEDULED'|'PUB
 export interface ArticleContent {
   title_en:string; title_sw:string; body_en:string; body_sw:string;
   category_id:string; tags:string[]; featured:boolean; sensitive:boolean;
+  /** YouTube link; a non-empty value makes this entry a video in the Patient app. '' = written article. */
+  video_url:string;
 }
 export interface AdminArticle extends ArticleContent {
   id:string; author_id:string; author_name:string; status:ArticleStatus;
@@ -11,12 +13,26 @@ export interface AdminArticle extends ArticleContent {
   cover_image_id:string|null; created_at:string; updated_at:string; published_at:string|null;
   scheduled_for:string|null;
   category_name_en?:string; category_name_sw?:string;
+  /** A quiz that is not attached to a blog article (Quiz Manager). */
+  standalone_quiz?:boolean;
 }
-export interface ArticleCategory { id:string; name_en:string; name_sw:string; sensitive:boolean }
+export type TopicKey='HIV_BASICS'|'PREP'|'CONDOMS'|'SRH'|'STIGMA_DISCLOSURE'|'HEALTHY_RELATIONSHIPS';
+/** The six HIV Prevention & Sexual Health topics shown in the Patient app. */
+export const educationTopics:{key:TopicKey;label:string}[]=[
+  {key:'HIV_BASICS',label:'HIV Basics'},{key:'PREP',label:'PrEP'},{key:'CONDOMS',label:'Condoms'},
+  {key:'SRH',label:'Sexual & Reproductive Health'},{key:'STIGMA_DISCLOSURE',label:'Stigma & Disclosure'},
+  {key:'HEALTHY_RELATIONSHIPS',label:'Healthy Relationships'},
+];
+export const topicLabel=(key:string|null|undefined)=>educationTopics.find(t=>t.key===key)?.label??'';
+export interface ArticleCategory { id:string; name_en:string; name_sw:string; sensitive:boolean; topic_key:TopicKey|null }
+/** Mirrors the backend's accepted YouTube link shapes (it stores the canonical watch URL). */
+export function isYouTubeLink(value:string):boolean{
+  return /^https?:\/\/((www\.|m\.)?youtube\.com\/(watch\?([^#]*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)[A-Za-z0-9_-]{11}([?&#/].*)?$/i.test(value.trim());
+}
 export const articleStatuses:ArticleStatus[]=['DRAFT','PENDING_REVIEW','APPROVED','SCHEDULED','PUBLISHED','ARCHIVED'];
-export const blankArticle=():ArticleContent=>({title_en:'',title_sw:'',body_en:'',body_sw:'',category_id:'',tags:[],featured:false,sensitive:true});
+export const blankArticle=():ArticleContent=>({title_en:'',title_sw:'',body_en:'',body_sw:'',category_id:'',tags:[],featured:false,sensitive:true,video_url:''});
 export function editableArticle(a:ArticleContent):ArticleContent {
-  return {title_en:a.title_en,title_sw:a.title_sw,body_en:a.body_en,body_sw:a.body_sw,category_id:a.category_id,tags:[...a.tags],featured:a.featured,sensitive:a.sensitive};
+  return {title_en:a.title_en,title_sw:a.title_sw,body_en:a.body_en,body_sw:a.body_sw,category_id:a.category_id,tags:[...a.tags],featured:a.featured,sensitive:a.sensitive,video_url:a.video_url??''};
 }
 export function articleErrors(c:ArticleContent):string[]{
   const errors:string[]=[];
@@ -25,6 +41,7 @@ export function articleErrors(c:ArticleContent):string[]{
   }
   if(Boolean(c.title_sw.trim())!==Boolean(c.body_sw.trim()))errors.push('Provide both Kiswahili title and content, or leave both empty for English fallback.');
   if(!c.category_id)errors.push('Select a category.');
+  if(c.video_url.trim()&&!isYouTubeLink(c.video_url))errors.push('Video link must be a YouTube video link (youtube.com or youtu.be).');
   if(c.tags.length>10||c.tags.some(t=>!t.trim()||Array.from(t.trim()).length>40||t.includes('\0')))errors.push('Use up to 10 tags of 1–40 characters.');
   return errors;
 }

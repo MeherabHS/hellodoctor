@@ -2,7 +2,8 @@ import {request} from './api';
 import type {AdminArticle,ArticleContent,ArticleCategory} from './blogContent';
 export const listArticles=(query:URLSearchParams)=>request<{items:AdminArticle[];total:number}>(`/admin/articles?${query}`);
 export const getArticle=(id:string)=>request<AdminArticle>(`/admin/articles/${encodeURIComponent(id)}`);
-export const saveArticle=(id:string,content:ArticleContent,version?:number)=>request<AdminArticle>(`/admin/articles${version?`/${encodeURIComponent(id)}`:''}`,{method:version?'PATCH':'POST',body:JSON.stringify(version?{version,content}:{id,content})});
+/** Creates (no version) or edits an entry. `standaloneQuiz` is only sent on creation. */
+export const saveArticle=(id:string,content:ArticleContent,version?:number,standaloneQuiz=false)=>request<AdminArticle>(`/admin/articles${version?`/${encodeURIComponent(id)}`:''}`,{method:version?'PATCH':'POST',body:JSON.stringify(version?{version,content}:{id,content,...(standaloneQuiz?{standalone_quiz:true}:{})})});
 export const transitionArticle=(id:string,version:number,action:string,scheduled_for?:string)=>request<AdminArticle>(`/admin/articles/${encodeURIComponent(id)}/${action}`,{method:'POST',body:JSON.stringify({version,...(scheduled_for?{scheduled_for}:{})})});
 export const listCategories=()=>request<ArticleCategory[]>('/admin/article-categories');
 export const saveCategory=(category:Omit<ArticleCategory,'id'>,id?:string)=>request<ArticleCategory>(`/admin/article-categories${id?`/${encodeURIComponent(id)}`:''}`,{method:id?'PATCH':'POST',body:JSON.stringify(category)});

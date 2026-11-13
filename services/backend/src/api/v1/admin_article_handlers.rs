@@ -21,6 +21,10 @@ use uuid::Uuid;
 pub struct Create {
     pub id: Uuid,
     pub content: ArticleContent,
+    /// A quiz that stands on its own (not attached to a blog article); the
+    /// content body is its introduction. Fixed at creation.
+    #[serde(default)]
+    pub standalone_quiz: bool,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -41,6 +45,8 @@ pub struct ListQuery {
     pub status: Option<String>,
     pub category_id: Option<Uuid>,
     pub search: Option<String>,
+    /// `quiz` = standalone quizzes only; `content` = articles and videos only.
+    pub kind: Option<String>,
 }
 fn response(data: Value) -> Json<Value> {
     Json(json!({"success":true,"data":data}))
@@ -81,7 +87,13 @@ pub async fn list(
             "Search is limited to 160 characters.".into(),
         ));
     }
-    let filter=" WHERE ($1::text IS NULL OR a.status=$1) AND ($2::uuid IS NULL OR a.category_id=$2) AND ($3::text IS NULL OR strpos(lower(a.title_en||' '||a.title_sw),lower($3))>0)";
+    let standalone = match q.kind.as_deref() {
+        None | Some("") => None,
+        Some("quiz") => Some(true),
+        Some("content") => Some(false),
+        Some(_) => return Err(AppError::Validation("Unknown kind.".into())),
+    };
+    let filter=" WHERE ($1::text IS NULL OR a.status=$1) AND ($2::uuid IS NULL OR a.category_id=$2) AND ($3::text IS NULL OR strpos(lower(a.title_en||' '||a.title_sw),lower($3))>0) AND ($6::bool IS NULL OR a.standalone_quiz=$6)";
     let rows: Vec<Value> = sqlx::query_scalar(&format!(
         "{}{filter} ORDER BY a.created_at DESC,a.id LIMIT $4 OFFSET $5",
         admin_article_repo::ADMIN_SELECT
@@ -91,12 +103,17 @@ pub async fn list(
     .bind(&q.search)
     .bind(limit)
     .bind(offset)
+    .bind(standalone)
     .fetch_all(&mut *tx)
     .await?;
+    // $4/$5 are unused here; bind them so $6 keeps its position.
     let total: i64 = sqlx::query_scalar(&format!("SELECT count(*) FROM admin_articles a {filter}"))
         .bind(&q.status)
         .bind(q.category_id)
         .bind(&q.search)
+        .bind(limit)
+        .bind(offset)
+        .bind(standalone)
         .fetch_one(&mut *tx)
         .await?;
     tx.commit().await?;
@@ -124,11 +141,16 @@ pub async fn create(
 ) -> Result<Json<Value>, AppError> {
     abac::authorize(&ctx, Action::ManageArticles)?;
     p.content.validate()?;
+    if p.standalone_quiz && p.content.video_url.is_some() {
+        return Err(AppError::Validation(
+            "A standalone quiz cannot carry a video link.".into(),
+        ));
+    }
     let mut tx = state.begin_authed(&ctx).await?;
     let c = &p.content;
     // Client-generated UUID makes retry discoverable without duplicating a draft.
-    let inserted=sqlx::query("INSERT INTO admin_articles(id,author_id,title_en,title_sw,body_en,body_sw,category_id,tags,featured,sensitive) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(id) DO NOTHING")
-        .bind(p.id).bind(ctx.user_id).bind(&c.title_en).bind(&c.title_sw).bind(&c.body_en).bind(&c.body_sw).bind(c.category_id).bind(&c.tags).bind(c.featured).bind(c.sensitive).execute(&mut *tx).await.map_err(db_error)?.rows_affected()==1;
+    let inserted=sqlx::query("INSERT INTO admin_articles(id,author_id,title_en,title_sw,body_en,body_sw,category_id,tags,featured,sensitive,video_url,standalone_quiz) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(id) DO NOTHING")
+        .bind(p.id).bind(ctx.user_id).bind(&c.title_en).bind(&c.title_sw).bind(&c.body_en).bind(&c.body_sw).bind(c.category_id).bind(&c.tags).bind(c.featured).bind(c.sensitive).bind(&c.video_url).bind(p.standalone_quiz).execute(&mut *tx).await.map_err(db_error)?.rows_affected()==1;
     let data = admin_article_repo::find(&mut *tx, p.id)
         .await?
         .ok_or_else(conflict)?;
@@ -166,10 +188,11 @@ pub async fn edit(
         || old.get::<Uuid, _>("category_id") != c.category_id
         || old.get::<Vec<String>, _>("tags") != c.tags
         || old.get::<bool, _>("featured") != c.featured
-        || old.get::<bool, _>("sensitive") != c.sensitive;
+        || old.get::<bool, _>("sensitive") != c.sensitive
+        || old.get::<Option<String>, _>("video_url") != c.video_url;
     if changed {
-        sqlx::query("UPDATE admin_articles SET title_en=$1,title_sw=$2,body_en=$3,body_sw=$4,category_id=$5,tags=$6,featured=$7,sensitive=$8,status='DRAFT',version=version+1,content_version=content_version+1,approved_version=NULL,approved_by=NULL,approved_at=NULL,scheduled_for=NULL,updated_at=now() WHERE id=$9")
-            .bind(&c.title_en).bind(&c.title_sw).bind(&c.body_en).bind(&c.body_sw).bind(c.category_id).bind(&c.tags).bind(c.featured).bind(c.sensitive).bind(id).execute(&mut *tx).await.map_err(db_error)?;
+        sqlx::query("UPDATE admin_articles SET title_en=$1,title_sw=$2,body_en=$3,body_sw=$4,category_id=$5,tags=$6,featured=$7,sensitive=$8,video_url=$10,status='DRAFT',version=version+1,content_version=content_version+1,approved_version=NULL,approved_by=NULL,approved_at=NULL,scheduled_for=NULL,updated_at=now() WHERE id=$9")
+            .bind(&c.title_en).bind(&c.title_sw).bind(&c.body_en).bind(&c.body_sw).bind(c.category_id).bind(&c.tags).bind(c.featured).bind(c.sensitive).bind(id).bind(&c.video_url).execute(&mut *tx).await.map_err(db_error)?;
     }
     let data = admin_article_repo::find(&mut *tx, id)
         .await?
@@ -206,12 +229,8 @@ pub async fn transition(
         "archive" if status != "ARCHIVED" => "ARCHIVED",
         _ => return Err(conflict()),
     };
-    if next == "APPROVED"
-        && old["requires_independent_review"] == true
-        && old["author_id"] == ctx.user_id.to_string()
-    {
-        return Err(AppError::Forbidden("Sensitive health articles require approval by another Admin. This article remains pending review.".into()));
-    }
+    // Product owner, 2026-11-13: any Admin, including the author, may approve
+    // (no second-Admin review; migration 20261214000001).
     if next == "SCHEDULED" && p.scheduled_for.is_none_or(|date| date <= Utc::now()) {
         return Err(AppError::Validation(
             "Schedule must be a future UTC timestamp.".into(),
@@ -265,7 +284,7 @@ pub async fn create_category(
     c.validate()?;
     let mut tx = state.begin_authed(&ctx).await?;
     let id = Uuid::new_v4();
-    let data:Value=sqlx::query_scalar("INSERT INTO article_categories(id,name_en,name_sw,sensitive) VALUES($1,$2,$3,$4) RETURNING to_jsonb(article_categories)").bind(id).bind(&c.name_en).bind(&c.name_sw).bind(c.sensitive).fetch_one(&mut *tx).await.map_err(db_error)?;
+    let data:Value=sqlx::query_scalar("INSERT INTO article_categories(id,name_en,name_sw,sensitive,topic_key) VALUES($1,$2,$3,$4,$5) RETURNING to_jsonb(article_categories)").bind(id).bind(&c.name_en).bind(&c.name_sw).bind(c.sensitive).bind(&c.topic_key).fetch_one(&mut *tx).await.map_err(db_error)?;
     audit(&mut tx, &ctx, id, "ARTICLE_CATEGORY_CREATE", &Value::Null).await?;
     tx.commit().await?;
     Ok(response(data))
@@ -279,7 +298,7 @@ pub async fn edit_category(
     abac::authorize(&ctx, Action::ManageArticles)?;
     c.validate()?;
     let mut tx = state.begin_authed(&ctx).await?;
-    let data:Value=sqlx::query_scalar("UPDATE article_categories SET name_en=$1,name_sw=$2 WHERE id=$3 AND sensitive=$4 RETURNING to_jsonb(article_categories)").bind(c.name_en).bind(c.name_sw).bind(id).bind(c.sensitive).fetch_optional(&mut *tx).await.map_err(db_error)?.ok_or_else(||AppError::Validation("Category not found or review requirement changed. Create a separate category to change its review requirement.".into()))?;
+    let data:Value=sqlx::query_scalar("UPDATE article_categories SET name_en=$1,name_sw=$2,topic_key=$5 WHERE id=$3 AND sensitive=$4 RETURNING to_jsonb(article_categories)").bind(c.name_en).bind(c.name_sw).bind(id).bind(c.sensitive).bind(&c.topic_key).fetch_optional(&mut *tx).await.map_err(db_error)?.ok_or_else(||AppError::Validation("Category not found or review requirement changed. Create a separate category to change its review requirement.".into()))?;
     audit(&mut tx, &ctx, id, "ARTICLE_CATEGORY_EDIT", &Value::Null).await?;
     tx.commit().await?;
     Ok(response(data))

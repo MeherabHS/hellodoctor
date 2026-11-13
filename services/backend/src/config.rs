@@ -1100,17 +1100,16 @@ fn validate_azure_email_configuration(config: &AppConfig) -> Result<(), &'static
 /// Phase 2: Secure Email OTP Password Recovery is now implemented
 /// end-to-end (see `services::password_reset_service`) and covered by the
 /// security/regression test suite required before this guard could be
-/// relaxed at all — see `tests/cases/password_reset.rs`. It remains
-/// fail-closed in every environment that `requires_https()` (staging,
-/// production): this codebase has never completed a real Azure
-/// Communication Services delivery acceptance test (see
-/// `EMAIL_OUTBOX_RECOVERY_POLICY.md` and the Phase 0 closure notes), and
-/// enabling self-service account recovery in production ahead of that
-/// verification — on an unexercised, novel attack surface — is a
-/// deliberately separate decision this change does not make unilaterally.
-/// Development and test may enable it once email delivery is otherwise
-/// configured (or bypassed via `DEV_AUTH_OTP_ENABLED`, same as every other
-/// OTP flow).
+/// relaxed at all — see `tests/cases/password_reset.rs`.
+///
+/// Staging and production (changed 2026-11-13 by product-owner instruction):
+/// the product owner has verified real Azure Communication Services delivery
+/// in production. Reset codes go through the same `email_delivery` path as
+/// login codes, so the flag may now be enabled there. It still fails closed
+/// unless all three Azure email settings are present: a reset that could
+/// never deliver its code is refused at startup, never shipped half-working.
+/// Development may rely on the `DEV_AUTH_OTP_ENABLED` bypass instead, as every
+/// other OTP flow does. The flag stays off by default everywhere.
 fn validate_password_reset_policy(
     enabled: bool,
     email_configured: bool,
@@ -1120,10 +1119,10 @@ fn validate_password_reset_policy(
     if !enabled {
         return Ok(());
     }
-    if requires_https {
+    if requires_https && !email_configured {
         return Err(
-            "PASSWORD_RESET_ENABLED cannot be enabled in staging/production until a real Azure \
-             Communication Services delivery acceptance test has been completed and separately approved.",
+            "PASSWORD_RESET_ENABLED in staging/production requires AZURE_EMAIL_ENDPOINT, \
+             AZURE_EMAIL_ACCESS_KEY and AZURE_EMAIL_SENDER.",
         );
     }
     // Mirrors the exact condition `auth_service`'s own login-OTP paths use
@@ -1332,15 +1331,16 @@ mod startup_mode_tests {
     }
 
     #[test]
-    fn password_reset_always_fails_closed_in_staging_or_production() {
-        // Even with email fully configured, production/staging must never
-        // accept PASSWORD_RESET_ENABLED=true — Phase 2's implementation has
-        // no completed real Azure Communication Services delivery
-        // acceptance test, so enabling it there remains a deliberately
-        // separate, unapproved decision.
-        assert!(validate_password_reset_policy(true, true, true, false)
-            .expect_err("production/staging must stay disabled regardless of email config")
-            .contains("staging/production"));
+    fn password_reset_in_staging_or_production_requires_azure_email() {
+        // Staging/production may enable reset only with Azure email fully
+        // configured; without it the process refuses to start.
+        assert!(validate_password_reset_policy(true, true, true, false).is_ok());
+        assert!(validate_password_reset_policy(true, false, true, false)
+            .expect_err("staging/production without email config must fail closed")
+            .contains("AZURE_EMAIL"));
+        // The development flag never stands in for real email outside
+        // development: `is_development` is false whenever HTTPS is required.
+        assert!(validate_password_reset_policy(false, false, true, false).is_ok());
     }
 
     #[test]

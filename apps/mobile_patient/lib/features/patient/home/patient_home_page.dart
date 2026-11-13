@@ -11,15 +11,13 @@ import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/afya_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/network/screen_refresh.dart';
-import '../../notifications/notification_center_page.dart';
-import '../../notifications/notification_cubit.dart';
-import '../../notifications/notification_navigation.dart';
 import '../directory/directory_repository.dart';
 import '../directory/doctor_photo_avatar.dart';
 import '../modules/afya_module_widgets.dart';
 import '../modules/patient_modules.dart';
 import '../profile/family_profiles_cubit.dart';
 import '../profile/profile_cubit.dart';
+import 'brand_header.dart';
 import 'home_cubit.dart';
 import 'home_models.dart';
 import 'upcoming_consultation_section.dart';
@@ -101,17 +99,6 @@ class _PatientHomePageState extends State<PatientHomePage> {
     ]);
   }
 
-  void _openNotifications() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) =>
-          NotificationCenterPage(
-              cubit: context.read<NotificationCubit>(),
-              deps: AppointmentRouteDeps(
-                  familyProfilesCubit: context.read<FamilyProfilesCubit>(),
-                  myUserId: context.read<ProfileCubit>().state.profile?.userId)),
-    ));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,14 +131,11 @@ class _PatientHomePageState extends State<PatientHomePage> {
                     return ListView(
                       padding: const EdgeInsets.only(bottom: 10),
                       children: [
-                        _BrandHeader(
-                            name: name,
-                            onBell: _openNotifications,
-                            onAvatar: widget.nav.openProfile),
+                        AfyaBrandHeader(
+                            deps: AppHeaderDeps.of(context, widget.nav)),
                         _GreetingCard(name: name),
                         _SearchField(onTap: widget.nav.openServices),
-                        if (!offline &&
-                            homeState.homeCardAppointment() != null)
+                        if (!offline && homeState.homeCardAppointment() != null)
                           _UpcomingCard(
                               appointment: homeState.homeCardAppointment()!,
                               onOpen: () => openWaitingRoomFor(
@@ -184,76 +168,6 @@ class _PatientHomePageState extends State<PatientHomePage> {
           ),
         ),
       ),
-    );
-  }
-}
-
-/// Logo, wordmark, tagline, notification bell and initials avatar.
-class _BrandHeader extends StatelessWidget {
-  const _BrandHeader(
-      {required this.name, required this.onBell, required this.onAvatar});
-  final String? name;
-  final VoidCallback onBell, onAvatar;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 6, 12, 0),
-      child: Row(children: [
-        const AfyaLogoMark(size: 48),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text('AfyaMkononi',
-                      maxLines: 1,
-                      style: TextStyle(
-                          fontSize: 22,
-                          height: 1.15,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -.2,
-                          color: PatientTokens.brandTeal)),
-                ),
-                const SizedBox(height: 3),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(l10n.brandTagline,
-                      maxLines: 1,
-                      style: const TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w600,
-                          color: PatientTokens.brandTealSoft)),
-                ),
-              ]),
-        ),
-        BlocBuilder<NotificationCubit, NotificationState>(
-          builder: (context, state) => IconButton(
-              onPressed: onBell,
-              tooltip: l10n.notificationSettingsMenuTitle,
-              icon: Badge(
-                  isLabelVisible: state.unreadCount > 0,
-                  label: Text(
-                      state.unreadCount > 99 ? '99+' : '${state.unreadCount}'),
-                  backgroundColor: PatientTokens.danger,
-                  child: const Icon(Icons.notifications_none_rounded,
-                      size: 26, color: PatientTokens.navy))),
-        ),
-        InkWell(
-          onTap: onAvatar,
-          customBorder: const CircleBorder(),
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: AfyaInitialsAvatar(name: name, size: 36),
-          ),
-        ),
-      ]),
     );
   }
 }

@@ -43,7 +43,7 @@ Set `BACKEND_IMAGE`, `ADMIN_WEB_IMAGE` and `DOCTOR_WEB_IMAGE` in the private fil
 
 ## 4. Password recovery policy
 
-Keep `PASSWORD_RESET_ENABLED=false`. The current source has no password-reset endpoint or UI. Setting it to true fails closed at backend startup, even if email credentials exist, until a separately reviewed and tested recovery implementation is delivered. Existing MFA, session revocation, logout and authenticated password-change paths are unaffected.
+`PASSWORD_RESET_ENABLED` turns on Patient/Doctor self-service password reset by emailed code. It defaults to `false`. In staging/production it may be set to `true` only when `AZURE_EMAIL_ENDPOINT`, `AZURE_EMAIL_ACCESS_KEY` and `AZURE_EMAIL_SENDER` are all set; otherwise the backend refuses to start (changed 2026-11-13 by product-owner instruction, after real Azure email delivery was verified). Send one real reset email on staging before enabling it in production. Existing MFA, session revocation, logout and authenticated password-change paths are unaffected.
 
 ## 5. Provider-specific values
 

@@ -1,8 +1,20 @@
 # CHECKPOINT — exact resume point for a new Claude Code session
 
-Updated 2026-11-13. Read `progress.md` first for full context (Task 5 is the current work).
+Updated 2026-11-13 (evening). Read `progress.md` Task 8 first.
 
-## Latest: Patient post-rebuild gap analysis (Task 7, diagnostic, complete)
+## Latest: Facilities & Services, education topics, password reset (Task 8)
+
+Everything is uncommitted on `fix/p0-consultation-repair`. Facilities & Services is implemented end to end (Admin Web, backend, Patient app) and verified on the emulator (tests A–F in `docs/facilities/FACILITIES_IMPLEMENTATION_REPORT.md`). The HIV Prevention & Sexual Health topics, videos and quizzes are in `docs/patient-ui/EDUCATION_TOPICS.md`. The re-checked gap list is `docs/patient-ui/PATIENT_REMEDIATION_GAP_MAP.md`.
+
+To run locally with photo storage: start the Azurite container `hd-azurite`, then start the backend with STORAGE_PROVIDER=azure, AZURE_STORAGE_AUTH_MODE=azurite, AZURE_STORAGE_USE_EMULATOR=true, AZURE_STORAGE_ACCOUNT_NAME=devstoreaccount1, the Azurite development key, AZURITE_BLOB_STORAGE_URL=http://127.0.0.1:10000, containers `clinical-local`/`articles-local`, and a 32-byte STORAGE_ENCRYPTION_KEY_B64 (keep the same key across restarts or stored photos cannot be decrypted).
+
+Also done: standalone quizzes (Quiz Manager), single-Admin content approval, Android Back on tabs (D-08c), Facilities map strip removed. Doctor-app files and the Doctor Rx dispatch changes in `consultation_service.rs`/`prescription_service.rs` belong to separate Doctor work and were left out of the Patient commit.
+
+Next: Admin Web full redesign (product owner, 2026-11-13); full-size Facilities empty-state art; Swahili review.
+
+---
+
+## Earlier: Patient post-rebuild gap analysis (Task 7, diagnostic, complete)
 
 Report: `docs/patient-ui/PATIENT_POST_REBUILD_GAP_ANALYSIS.md`; screenshots in `docs/patient-ui/screenshots/gap-analysis/pixel_9_api37/`. Source: HEAD `3c09124` plus the uncommitted/untracked redesign (nothing committed). `flutter analyze` clean, `flutter test` 462/462, debug build runs on `Pixel_9`.
 

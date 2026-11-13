@@ -18,7 +18,7 @@ export function BlogManager(){
   useEffect(()=>{let active=true;listCategories().then(c=>{if(active)setCategories(c);}).catch(e=>{if(active)setError(blogErrorMessage(e));});return()=>{active=false;};},[]);
   useEffect(()=>{let active=true;const timer=setTimeout(()=>{
     setLoading(true);setError('');
-    const query=new URLSearchParams({limit:'20',offset:String(offset),...(status?{status}:{}),...(category?{category_id:category}:{}),...(search.trim()?{search:search.trim()}: {})});
+    const query=new URLSearchParams({limit:'20',offset:String(offset),kind:'content',...(status?{status}:{}),...(category?{category_id:category}:{}),...(search.trim()?{search:search.trim()}: {})});
     listArticles(query).then(result=>{if(active){setRows(result.items);setTotal(result.total);}}).catch(e=>{if(active)setError(blogErrorMessage(e));}).finally(()=>{if(active)setLoading(false);});
   },180);return()=>{active=false;clearTimeout(timer);};},[offset,status,category,search,revision]);
   async function open(id:string){const current=++generation.current;setLoading(true);try{const result=await getArticle(id);if(current===generation.current)setEditor(result);}catch(e){setError(blogErrorMessage(e));}finally{setLoading(false);}}

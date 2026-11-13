@@ -179,30 +179,15 @@ async fn test_cms_sensitive_review_and_publication_audit_without_notifications(p
         StatusCode::CONFLICT
     );
     let a = step(&app, &admin, &a, "submit").await;
-    assert_eq!(a["can_approve"], false);
-    assert_eq!(a["approval_block_reason"], "INDEPENDENT_REVIEW_REQUIRED");
+    // Product owner, 2026-11-13: no second-Admin review. The author may
+    // approve sensitive content; any other Admin may too.
+    assert_eq!(a["can_approve"], true);
+    assert!(a["approval_block_reason"].is_null());
     let admin_path = format!("/api/v1/admin/articles/{}", a["id"].as_str().unwrap());
     let reviewer_view = json_body(get(&app, &admin_path, Some(&reviewer)).await).await;
     assert_eq!(reviewer_view["data"]["can_approve"], true);
-    assert!(reviewer_view["data"]["approval_block_reason"].is_null());
-    assert_eq!(
-        post(
-            &app,
-            &format!(
-                "/api/v1/admin/articles/{}/approve",
-                a["id"].as_str().unwrap()
-            ),
-            Some(&admin),
-            &json!({"version":a["version"]})
-        )
-        .await
-        .status(),
-        StatusCode::FORBIDDEN
-    );
-    let after_rejection = json_body(get(&app, &admin_path, Some(&admin)).await).await;
-    assert_eq!(after_rejection["data"]["status"], "PENDING_REVIEW");
-    assert_eq!(after_rejection["data"]["version"], a["version"]);
-    let a = step(&app, &reviewer, &a, "approve").await;
+    let a = step(&app, &admin, &a, "approve").await;
+    assert_eq!(a["approved_by"], ADMIN_USER_ID);
     assert_eq!(a["can_approve"], false);
     assert_eq!(a["approved_version"], a["content_version"]);
     let a = step(&app, &admin, &a, "publish").await;
@@ -392,7 +377,8 @@ async fn test_cms_database_guards_prevent_forged_approval(pool: PgPool) {
         .begin_authed(&actor(UserRole::Admin, ADMIN_USER_ID))
         .await
         .unwrap();
-    assert!(sqlx::query("UPDATE admin_articles SET status='APPROVED',approved_version=content_version,approved_by=author_id,approved_at=now(),version=version+1 WHERE id=$1").bind(id).execute(&mut *tx).await.is_err());
+    // Approval can only be recorded in the acting Admin's own name.
+    assert!(sqlx::query("UPDATE admin_articles SET status='APPROVED',approved_version=content_version,approved_by=$2,approved_at=now(),version=version+1 WHERE id=$1").bind(id).bind(uid(PATIENT_USER_ID)).execute(&mut *tx).await.is_err());
 }
 #[sqlx::test(migrations = "./migrations")]
 async fn test_cms_unified_feed_retains_doctor_ids_and_pagination(pool: PgPool) {
@@ -868,4 +854,151 @@ async fn test_cms_migration_round_trip_and_doctor_id_collision_guard(pool: PgPoo
         .unwrap();
     let restored:Value=sqlx::query_scalar("SELECT jsonb_agg(to_jsonb(p) ORDER BY policyname) FROM pg_policies p WHERE tablename='doctor_articles'").fetch_one(&pool).await.unwrap();
     assert_eq!(restored, policies);
+}
+
+/// Education topics and videos (2026-11-13): a category linked to a topic key
+/// lists its published articles under `?topic=`; an article carrying a YouTube
+/// link is a video, listed only under `?kind=video` and never among articles.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_education_topics_and_videos_feed(pool: PgPool) {
+    let (app, _pool) = test_app(pool).await;
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+
+    // Topic key is validated and canonical.
+    let bad = post(
+        &app,
+        "/api/v1/admin/article-categories",
+        Some(&admin),
+        &json!({"name_en":"Bad","name_sw":"Mbaya","sensitive":false,"topic_key":"prep"}),
+    )
+    .await;
+    assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let res = post(
+        &app,
+        "/api/v1/admin/article-categories",
+        Some(&admin),
+        &json!({"name_en":"PrEP","name_sw":"PrEP","sensitive":false,"topic_key":"PREP"}),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let prep = json_body(res).await["data"].clone();
+    assert_eq!(prep["topic_key"], "PREP");
+    let other = category(&app, &admin, false).await;
+
+    async fn publish(app: &axum::Router, admin: &str, mut body: Value) -> Value {
+        body["sensitive"] = json!(false);
+        let res = post(
+            app,
+            "/api/v1/admin/articles",
+            Some(admin),
+            &json!({"id":Uuid::new_v4(),"content":body}),
+        )
+        .await;
+        let status = res.status();
+        let data = json_body(res).await;
+        assert_eq!(status, StatusCode::OK, "{data}");
+        let mut a = data["data"].clone();
+        for action in ["submit", "approve", "publish"] {
+            a = step(app, admin, &a, action).await;
+        }
+        a
+    }
+    let mut article = content(&prep, false);
+    article["title_en"] = json!("What is PrEP?");
+    let prep_article = publish(&app, &admin, article).await;
+    let mut video = content(&prep, false);
+    video["title_en"] = json!("PrEP explained");
+    video["video_url"] = json!("https://youtu.be/dQw4w9WgXcQ?si=share");
+    let prep_video = publish(&app, &admin, video).await;
+    assert_eq!(
+        prep_video["video_url"],
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    );
+    publish(&app, &admin, content(&other, false)).await;
+
+    // A non-YouTube link is refused.
+    let mut evil = content(&prep, false);
+    evil["video_url"] = json!("https://evil.example/watch?v=dQw4w9WgXcQ");
+    let res = post(
+        &app,
+        "/api/v1/admin/articles",
+        Some(&admin),
+        &json!({"id":Uuid::new_v4(),"content":evil}),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::UNPROCESSABLE_ENTITY);
+
+    let ids = |body: &Value| -> Vec<String> {
+        body["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["id"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let topic_articles =
+        json_body(get(&app, "/api/v1/articles?topic=PREP", Some(&patient)).await).await;
+    assert_eq!(
+        ids(&topic_articles),
+        vec![prep_article["id"].as_str().unwrap().to_owned()]
+    );
+    assert_eq!(topic_articles["data"][0]["topic_key"], "PREP");
+
+    let topic_videos = json_body(
+        get(
+            &app,
+            "/api/v1/articles?topic=PREP&kind=video",
+            Some(&patient),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        ids(&topic_videos),
+        vec![prep_video["id"].as_str().unwrap().to_owned()]
+    );
+    assert_eq!(
+        topic_videos["data"][0]["video_url"],
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    );
+
+    // The general feed keeps its contract: articles only, every topic.
+    let all = json_body(get(&app, "/api/v1/articles", Some(&patient)).await).await;
+    let all_ids = ids(&all);
+    assert!(!all_ids.contains(&prep_video["id"].as_str().unwrap().to_owned()));
+    assert_eq!(all_ids.len(), 2);
+
+    let empty = json_body(get(&app, "/api/v1/articles?topic=CONDOMS", Some(&patient)).await).await;
+    assert!(ids(&empty).is_empty());
+    for bad in ["/api/v1/articles?topic=prep", "/api/v1/articles?kind=audio"] {
+        assert_eq!(
+            get(&app, bad, Some(&patient)).await.status(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{bad}"
+        );
+    }
+}
+
+/// Product owner, 2026-11-13: no second-Admin approval. The author of a
+/// sensitive topic article approves and publishes it alone, and it reaches
+/// the topic page.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_author_can_approve_and_publish_sensitive_topic_article(pool: PgPool) {
+    let (app, _pool) = test_app(pool).await;
+    let author = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let res = post(&app, "/api/v1/admin/article-categories", Some(&author),
+        &json!({"name_en":"HIV basics","name_sw":"Msingi wa VVU","sensitive":true,"topic_key":"HIV_BASICS"})).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let cat = json_body(res).await["data"].clone();
+    let a = draft(&app, &author, &cat, true).await;
+    let a = step(&app, &author, &a, "submit").await;
+    assert_eq!(a["can_approve"], true);
+    let a = step(&app, &author, &a, "approve").await;
+    assert_eq!(a["approved_by"], ADMIN_USER_ID);
+    step(&app, &author, &a, "publish").await;
+    let feed =
+        json_body(get(&app, "/api/v1/articles?topic=HIV_BASICS", Some(&patient)).await).await;
+    assert_eq!(feed["data"].as_array().unwrap().len(), 1);
 }

@@ -397,8 +397,18 @@ class _PatientShellState extends State<PatientShell> {
         ClientErrorReporter.current?.screen = _screens[index];
       });
 
+  /// Android Back on Services, Messages or Profile returns to Home; only Back
+  /// on Home leaves the app (D-08c).
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => PopScope(
+        canPop: tab == 0,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _selectTab(0);
+        },
+        child: _scaffold(context),
+      );
+
+  Widget _scaffold(BuildContext context) => Scaffold(
         backgroundColor: PatientTokens.bg,
         body: IndexedStack(index: tab, children: [
           PatientHomePage(nav: _nav),

@@ -196,6 +196,21 @@ void main() {
           expect(find.byType(AuthEntryPage, skipOffstage: false), findsNothing);
           final context = tester.element(find.byType(PatientShell));
           expect(Navigator.of(context).canPop(), isFalse);
+          // D-08c: Android Back on another tab returns to Home instead of
+          // leaving the app; on Home it is not intercepted.
+          int shellTab() =>
+              (tester.state(find.byType(PatientShell)) as dynamic).tab as int;
+          await tester.tap(find.descendant(
+              of: find.byType(PatientBottomNav),
+              matching: find.text('Services')));
+          await tester.pumpAndSettle();
+          expect(shellTab(), 1);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(shellTab(), 0);
+          expect(find.byType(PatientShell), findsOneWidget);
+          final shellRoute = ModalRoute.of(context)!;
+          expect(shellRoute.popDisposition, RoutePopDisposition.bubble);
           final auth = context.read<AuthCubit>();
           Navigator.of(context).push(MaterialPageRoute<void>(
               builder: (_) =>

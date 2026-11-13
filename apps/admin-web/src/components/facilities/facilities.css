@@ -1,0 +1,10 @@
+.fac-editor .cms-form { margin-bottom: 18px; }
+.fac-services { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.fac-hours-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.fac-hours-table { border-collapse: collapse; width: 100%; }
+.fac-hours-table th { text-align: left; font-weight: 600; padding: 6px 12px 6px 0; white-space: nowrap; vertical-align: top; }
+.fac-hours-table td { padding: 6px 8px 6px 0; vertical-align: top; }
+.fac-periods { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.fac-period { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fac-period input[type='time'] { width: auto; }
+.fac-photo-preview { display: block; max-width: 360px; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; margin-bottom: 8px; }

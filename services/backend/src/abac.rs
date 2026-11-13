@@ -87,6 +87,8 @@ pub enum Action {
     /// Milestone 6B/6C.
     ManageCampaigns,
     ManageArticles,
+    /// Facilities & Services directory: create, edit, photos, publish, archive.
+    ManageFacilities,
 }
 
 pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
@@ -139,7 +141,8 @@ pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
         | ManagePlatformPaymentMethod
         | ExecuteDataRightsAction
         | ManageCampaigns
-        | ManageArticles => matches!(ctx.role, Admin),
+        | ManageArticles
+        | ManageFacilities => matches!(ctx.role, Admin),
     };
 
     if allowed {

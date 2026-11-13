@@ -878,8 +878,8 @@ pub struct ChangePasswordRequest {
 }
 
 /// Authenticated password change — distinct from, and unrelated to, the
-/// still-disabled forgot-password/reset flow (`PASSWORD_RESET_ENABLED`
-/// fails closed at startup; see `config.rs`). This requires knowing the
+/// forgot-password/reset flow (gated by `PASSWORD_RESET_ENABLED`; see
+/// `config.rs`). This requires knowing the
 /// *current* password, so none of that flow's unresolved security
 /// questions (anonymous token delivery, account enumeration on a
 /// forgot-password request) apply here — the caller already holds a valid

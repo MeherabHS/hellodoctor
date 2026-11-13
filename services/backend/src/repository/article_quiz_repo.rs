@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
-const REVISION: &str = "SELECT to_jsonb(r)||jsonb_build_object('schema_version',1,'requires_independent_review',a.sensitive OR c.sensitive,'can_approve',r.status='PENDING_REVIEW' AND (NOT(a.sensitive OR c.sensitive) OR NULLIF(current_setting('app.current_user_id',true),'')::uuid NOT IN(r.created_by,r.edited_by)),'questions',COALESCE((SELECT jsonb_agg((to_jsonb(q)-'revision_id'-'position')||jsonb_build_object('options',COALESCE((SELECT jsonb_agg(to_jsonb(o)-'revision_id'-'question_id'-'position' ORDER BY o.position) FROM article_quiz_options o WHERE o.revision_id=r.id AND o.question_id=q.id),'[]'::jsonb)) ORDER BY q.position) FROM article_quiz_questions q WHERE q.revision_id=r.id),'[]'::jsonb)) FROM article_quiz_revisions r JOIN admin_articles a ON a.id=r.article_id JOIN article_categories c ON c.id=a.category_id";
+const REVISION: &str = "SELECT to_jsonb(r)||jsonb_build_object('schema_version',1,'requires_independent_review',false,'can_approve',r.status='PENDING_REVIEW','questions',COALESCE((SELECT jsonb_agg((to_jsonb(q)-'revision_id'-'position')||jsonb_build_object('options',COALESCE((SELECT jsonb_agg(to_jsonb(o)-'revision_id'-'question_id'-'position' ORDER BY o.position) FROM article_quiz_options o WHERE o.revision_id=r.id AND o.question_id=q.id),'[]'::jsonb)) ORDER BY q.position) FROM article_quiz_questions q WHERE q.revision_id=r.id),'[]'::jsonb)) FROM article_quiz_revisions r JOIN admin_articles a ON a.id=r.article_id JOIN article_categories c ON c.id=a.category_id";
 pub fn conflict() -> AppError {
     AppError::Conflict(
         "Quiz or article changed. Reload the saved questions before retrying.".into(),

@@ -8,6 +8,10 @@ import '../../../core/widgets/afya_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../blogs/blogs_page.dart';
 import '../blogs/blogs_repository.dart';
+import '../education/education_tabs.dart';
+import '../education/education_topics.dart';
+import '../education/topic_articles_page.dart';
+import '../home/brand_header.dart';
 import '../home/home_cubit.dart';
 import '../home/upcoming_consultation_section.dart';
 import '../profile/data_rights_page.dart';
@@ -27,19 +31,23 @@ const _pagePadding = EdgeInsets.fromLTRB(20, 6, 20, 24);
 // Panel 2 — HIV Prevention & Sexual Health
 // ---------------------------------------------------------------------------
 
-/// Education hub. Learn lists the six featured topics; a topic opens the
-/// existing article browser pre-filtered with the topic as its search text
-/// (the article feed has no category filter yet). Videos and Audio have no
-/// content model, so those tabs say so. Quizzes live inside admin articles.
-///
-/// Deviation from the panel: the "3 min" reading-time lines are omitted
-/// because no such value exists for a topic.
+/// Education hub. Learn lists the six topics; a topic opens its own page with
+/// the topic's published articles (server `?topic=` filter) or its empty state.
+/// Videos lists published YouTube entries, Quizzes lists published articles
+/// that carry a quiz, and Audio has no content model yet, so it shows its
+/// empty state. "Browse all articles" keeps the existing route to every
+/// article, including Doctor-written ones that belong to no topic.
 class EducationHubPage extends StatefulWidget {
   const EducationHubPage(
-      {super.key, required this.nav, required this.repo, this.initialTab = 0});
+      {super.key,
+      required this.nav,
+      required this.repo,
+      this.initialTab = 0,
+      this.appHeader});
   final PatientShellNav nav;
   final BlogsRepository repo;
   final int initialTab;
+  final AppHeaderDeps? appHeader;
   @override
   State<EducationHubPage> createState() => _EducationHubPageState();
 }
@@ -47,29 +55,24 @@ class EducationHubPage extends StatefulWidget {
 class _EducationHubPageState extends State<EducationHubPage> {
   late int _tab = widget.initialTab;
 
-  void _openArticles([String? query]) =>
+  void _openArticles() => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => BlogsPage(repo: widget.repo)));
+
+  void _openTopic(EducationTopic topic) =>
       Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => BlogsPage(repo: widget.repo, initialQuery: query)));
+          builder: (_) => TopicArticlesPage(
+              topic: topic,
+              repo: widget.repo,
+              nav: widget.nav,
+              appHeader: widget.appHeader)));
 
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final topics = <(String, String, String, String)>[
-      ('topic_hiv_basics', l.eduTopicHivBasics, l.eduTopicHivBasicsDesc, 'HIV'),
-      ('topic_prep', l.eduTopicPrep, l.eduTopicPrepDesc, 'PrEP'),
-      ('topic_condoms', l.eduTopicCondoms, l.eduTopicCondomsDesc, 'condom'),
-      ('topic_srh', l.eduTopicSrh, l.eduTopicSrhDesc, 'reproductive'),
-      ('topic_stigma', l.eduTopicStigma, l.eduTopicStigmaDesc, 'stigma'),
-      (
-        'topic_relationships',
-        l.eduTopicRelationships,
-        l.eduTopicRelationshipsDesc,
-        'relationship'
-      ),
-    ];
     return AfyaModuleScaffold(
       title: l.moduleHivPrevention,
       nav: widget.nav,
+      appHeader: widget.appHeader,
       child: ListView(padding: _pagePadding, children: [
         AfyaSegmentedTabs(labels: [
           l.eduTabLearn,
@@ -79,16 +82,16 @@ class _EducationHubPageState extends State<EducationHubPage> {
         ], selected: _tab, onSelected: (i) => setState(() => _tab = i)),
         const SizedBox(height: 18),
         if (_tab == 0) ...[
-          for (final t in topics)
+          for (final t in EducationTopic.values)
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: AfyaCard(
                 color: PatientTokens.cardTint,
                 shadow: false,
                 padding: EdgeInsets.zero,
-                onTap: () => _openArticles(t.$4),
+                onTap: () => _openTopic(t),
                 child: Row(children: [
-                  AfyaArt(t.$1, width: 104, height: 104),
+                  AfyaArt(t.thumbnail, width: 104, height: 104),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Padding(
@@ -96,13 +99,13 @@ class _EducationHubPageState extends State<EducationHubPage> {
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(t.$2,
+                            Text(t.title(l),
                                 style: const TextStyle(
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.w700,
                                     color: PatientTokens.navy)),
                             const SizedBox(height: 6),
-                            Text(t.$3,
+                            Text(t.listDescription(l),
                                 style: const TextStyle(
                                     fontSize: 13,
                                     height: 1.4,
@@ -122,25 +125,21 @@ class _EducationHubPageState extends State<EducationHubPage> {
           OutlinedButton(
               onPressed: _openArticles, child: Text(l.eduAllArticles)),
         ] else if (_tab == 1)
-          AfyaUnavailableNote(
-              icon: Icons.play_circle_outline_rounded,
-              title: l.moduleUnavailableTitle,
-              body: l.eduVideosUnavailable)
-        else if (_tab == 2) ...[
-          AfyaUnavailableNote(
-              icon: Icons.quiz_outlined, body: l.eduQuizzesInfo),
-          OutlinedButton(
-              onPressed: _openArticles, child: Text(l.eduAllArticles)),
-        ] else
-          AfyaUnavailableNote(
-              icon: Icons.headphones_outlined,
-              title: l.moduleUnavailableTitle,
-              body: l.eduAudioUnavailable),
+          EduTabFeed(
+              key: const ValueKey('videos'),
+              kind: EduTabKind.videos,
+              repo: widget.repo)
+        else if (_tab == 2)
+          EduTabFeed(
+              key: const ValueKey('quizzes'),
+              kind: EduTabKind.quizzes,
+              repo: widget.repo)
+        else
+          const EduAudioEmpty(),
       ]),
     );
   }
 }
-
 // ---------------------------------------------------------------------------
 // Panel 3 — HIV Support Chat (the existing anonymous Q&A)
 // ---------------------------------------------------------------------------
@@ -480,68 +479,6 @@ class _HealthRecordsHubPageState extends State<HealthRecordsHubPage> {
               icon: Icons.share_outlined,
               title: l.moduleUnavailableTitle,
               body: l.recordsShareUnavailable),
-      ]),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Panel 7 — Facilities & Services (no backend: chrome only, no listings)
-// ---------------------------------------------------------------------------
-
-/// Facilities layout without data. The panel's three hospitals, distances
-/// and "Get Directions" links are sample content and are not reproduced
-/// here. Search, filter chips and "View on Map" are shown disabled.
-class FacilitiesPage extends StatelessWidget {
-  const FacilitiesPage({super.key, required this.nav});
-  final PatientShellNav nav;
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return AfyaModuleScaffold(
-      title: l.moduleFacilities,
-      nav: nav,
-      child: ListView(padding: _pagePadding, children: [
-        Container(
-          constraints: const BoxConstraints(minHeight: 46),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-              color: PatientTokens.cardTint,
-              borderRadius: BorderRadius.circular(14)),
-          child: Row(children: [
-            const Icon(Icons.search_rounded,
-                size: 22, color: PatientTokens.navInactive),
-            const SizedBox(width: 10),
-            Expanded(
-                child: Text(l.facilitiesSearchHint,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 13, color: PatientTokens.hint))),
-          ]),
-        ),
-        const SizedBox(height: 16),
-        IgnorePointer(
-          child: AfyaSegmentedTabs(labels: [
-            l.facilitiesChipNearby,
-            l.facilitiesChipTesting,
-            l.facilitiesChipPrepArt,
-            l.facilitiesChipYouth
-          ], selected: 0, onSelected: (_) {}),
-        ),
-        AfyaUnavailableNote(
-            icon: Icons.location_on_outlined,
-            title: l.facilitiesEmptyTitle,
-            body: l.facilitiesEmptyBody),
-        const Opacity(
-            opacity: .55,
-            child: AfyaArt('facilities_map',
-                height: 96, radius: 14, alignment: Alignment.center)),
-        const SizedBox(height: 10),
-        AfyaPillButton(
-            label: l.facilitiesViewMap,
-            icon: Icons.map_outlined,
-            onPressed: null),
       ]),
     );
   }
