@@ -1355,15 +1355,16 @@ pub async fn run_t15_reminder_pass(
             c.appointment_id,
             c.start_time.to_rfc3339()
         );
-        const FALLBACK_TITLE: &str = "Consultation starting soon";
-        const FALLBACK_BODY: &str = "Your consultation starts in 15 minutes.";
+        let late = t15_reminder_is_late(c.start_time, now);
+        let (template_key, fallback_title, fallback_body) =
+            t15_reminder_text(late, &c.doctor_language);
         let (title, body) = crate::services::NotificationService::render(
             &state.system_db,
-            "consultation_reminder_15m",
+            template_key,
             &c.doctor_language,
             &[],
-            FALLBACK_TITLE,
-            FALLBACK_BODY,
+            fallback_title,
+            fallback_body,
         )
         .await?;
         notification_repo::insert_if_new_with_ttl(
@@ -1389,13 +1390,15 @@ pub async fn run_t15_reminder_pass(
                 c.start_time.to_rfc3339()
             );
             let patient_language = c.patient_language.as_deref().unwrap_or("en");
+            let (template_key, fallback_title, fallback_body) =
+                t15_reminder_text(late, patient_language);
             let (title, body) = crate::services::NotificationService::render(
                 &state.system_db,
-                "consultation_reminder_15m",
+                template_key,
                 patient_language,
                 &[],
-                FALLBACK_TITLE,
-                FALLBACK_BODY,
+                fallback_title,
+                fallback_body,
             )
             .await?;
             notification_repo::insert_if_new(
@@ -1415,6 +1418,74 @@ pub async fn run_t15_reminder_pass(
         }
     }
     Ok(())
+}
+
+/// True when fewer than 14 whole minutes remain before the start, i.e. the
+/// appointment was booked inside the 15-minute window or the scheduler tick
+/// ran late. "Starts in 15 minutes" would then be untrue.
+pub(crate) fn t15_reminder_is_late(start_time: DateTime<Utc>, now: DateTime<Utc>) -> bool {
+    start_time - now < chrono::Duration::minutes(14)
+}
+
+/// Template key and per-language fallback text for the T-15 reminder. The
+/// late variant never states a number of minutes. Same notification type and
+/// idempotency key either way, so a consultation still gets exactly one.
+pub(crate) fn t15_reminder_text(
+    late: bool,
+    language: &str,
+) -> (&'static str, &'static str, &'static str) {
+    match (late, language) {
+        (false, "sw") => (
+            "consultation_reminder_15m",
+            "Mashauriano yanaanza hivi karibuni",
+            "Mashauriano yako yanaanza baada ya dakika 15.",
+        ),
+        (false, _) => (
+            "consultation_reminder_15m",
+            "Consultation starting soon",
+            "Your consultation starts in 15 minutes.",
+        ),
+        (true, "sw") => (
+            "consultation_reminder_soon",
+            "Mashauriano yanaanza hivi karibuni",
+            "Mashauriano yako yanaanza hivi karibuni. Fungua programu ili ujiunge.",
+        ),
+        (true, _) => (
+            "consultation_reminder_soon",
+            "Consultation starting soon",
+            "Your consultation is starting soon. Open the app to join.",
+        ),
+    }
+}
+
+#[cfg(test)]
+mod t15_reminder_text_tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn on_time_reminder_states_fifteen_minutes_late_one_does_not() {
+        let start = Utc.with_ymd_and_hms(2026, 11, 13, 6, 0, 0).unwrap();
+        assert!(!t15_reminder_is_late(
+            start,
+            start - chrono::Duration::minutes(15)
+        ));
+        assert!(!t15_reminder_is_late(
+            start,
+            start - chrono::Duration::seconds(14 * 60)
+        ));
+        assert!(t15_reminder_is_late(
+            start,
+            start - chrono::Duration::minutes(4)
+        ));
+        for lang in ["en", "sw"] {
+            assert!(t15_reminder_text(false, lang).2.contains("15"));
+            assert!(!t15_reminder_text(true, lang)
+                .2
+                .chars()
+                .any(|c| c.is_ascii_digit()));
+        }
+    }
 }
 
 /// Creates a `CONSULTATION_READY` the moment an eligible (`CONFIRMED`,
