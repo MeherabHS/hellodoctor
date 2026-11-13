@@ -256,7 +256,9 @@ void main() {
     await tester.tap(clip);
     await tester.pumpAndSettle();
     expect(find.text('Attach to consultation'), findsOneWidget);
-    await tester.tap(find.text('Clinical image'));
+    expect(find.text('Take a photo'), findsOneWidget);
+    expect(find.text('Choose from gallery'), findsOneWidget);
+    await tester.tap(find.text('Choose a file'));
     await tester.pumpAndSettle();
     expect(find.byType(ClinicalMessageBubble), findsNothing);
     expect(
@@ -293,7 +295,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Attach clinical image'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Clinical image'));
+    await tester.tap(find.text('Choose a file'));
     await tester.pumpAndSettle();
     expect(picker.cleared, 1);
     expect(repo.keys, isEmpty);

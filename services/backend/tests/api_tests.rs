@@ -18707,17 +18707,37 @@ async fn test_pre_e2e_clinical_attachment_shared_private_persistent_and_idempote
         .status(),
         StatusCode::NOT_FOUND
     );
+    // Product owner, 2026-11-13: the patient may attach images to their own
+    // consultation chat too; the doctor sees them in the same thread.
+    let patient_upload = post_idem(
+        &app,
+        &upload,
+        Some(&patient),
+        &body,
+        &Uuid::new_v4().to_string(),
+    )
+    .await;
+    assert_eq!(patient_upload.status(), StatusCode::CREATED);
+    let patient_upload = json_body(patient_upload).await;
+    assert_eq!(patient_upload["data"]["sender_id"], PATIENT_USER_ID);
+    let patient_message = patient_upload["data"]["id"].as_str().unwrap();
+    let patient_view = format!("/api/v1/chat/{conversation}/messages/{patient_message}/attachment");
+    assert_eq!(
+        get(&app, &patient_view, Some(&doctor)).await.status(),
+        StatusCode::OK
+    );
+    // Another patient cannot see this conversation at all.
     assert_eq!(
         post_idem(
             &app,
             &upload,
-            Some(&patient),
+            Some(&other_patient),
             &body,
             &Uuid::new_v4().to_string()
         )
         .await
         .status(),
-        StatusCode::FORBIDDEN
+        StatusCode::NOT_FOUND
     );
     for token in [&other_doctor, &other_patient] {
         assert_eq!(
@@ -18730,25 +18750,29 @@ async fn test_pre_e2e_clinical_attachment_shared_private_persistent_and_idempote
         .execute(&pool)
         .await
         .unwrap();
-    assert_eq!(
-        post_idem(
-            &app,
-            &upload,
-            Some(&doctor),
-            &body,
-            &Uuid::new_v4().to_string()
-        )
-        .await
-        .status(),
-        StatusCode::FORBIDDEN
-    );
+    // Once the chat has expired, neither side can attach.
+    for token in [&doctor, &patient] {
+        assert_eq!(
+            post_idem(
+                &app,
+                &upload,
+                Some(token),
+                &body,
+                &Uuid::new_v4().to_string()
+            )
+            .await
+            .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
     let count: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages WHERE conversation_id=$1")
             .bind(Uuid::parse_str(conversation).unwrap())
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(count, 1);
+    // The doctor's image and the patient's image.
+    assert_eq!(count, 2);
 }
 
 #[sqlx::test(migrations = "./migrations")]

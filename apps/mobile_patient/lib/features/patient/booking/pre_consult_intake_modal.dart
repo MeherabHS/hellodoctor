@@ -47,8 +47,8 @@ class _PickedFile {
 /// further use for the plugin's temp file. Extracted as a standalone
 /// function so it's directly unit-testable without driving image_picker's
 /// platform channel. Failures are swallowed — cleanup must never surface to
-/// the UI or block the pick flow.
-@visibleForTesting
+/// the UI or block the pick flow. Also used by the consultation chat's
+/// image attachment.
 Future<void> deletePickedSourceFile(String path) async {
   try {
     final f = File(path);

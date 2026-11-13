@@ -251,6 +251,23 @@ class _ConsultationHistoryState extends State<ConsultationHistoryPage> {
               ]))));
 }
 
+/// The server accepts a doctor's prescription pages until 24 hours after a
+/// consultation ends (`doctor_history_context_allowed`). The button is
+/// offered only inside that window; the server still decides.
+bool rxWindowOpen(AppointmentDto a, [DateTime? now]) {
+  if (a.status != 'COMPLETED') return false;
+  final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
+  if (ended == null) return false;
+  return (now ?? DateTime.now())
+      .toUtc()
+      .isBefore(ended.toUtc().add(const Duration(hours: 24)));
+}
+
+/// "Gap Audit Tester · Video · Nov 13 · 11:27 AM": tells apart several
+/// consultations with the same patient.
+String rxConsultationLabel(AppointmentDto a) =>
+    '${a.patientName ?? 'Patient'} · ${a.isChat ? 'Chat' : 'Video'} · ${_mediumDateTime(a.start?.toIso8601String())}';
+
 class EncounterHistoryPage extends StatefulWidget {
   const EncounterHistoryPage(
       {super.key, required this.appointment, this.previous});
@@ -290,8 +307,8 @@ class _EncounterHistoryState extends State<EncounterHistoryPage> {
             x.id != widget.appointment.id &&
             (start == null || x.start == null || x.start!.isBefore(start)))
         .toList()
-      ..sort((a, b) =>
-          (b.start ?? DateTime(0)).compareTo(a.start ?? DateTime(0)));
+      ..sort(
+          (a, b) => (b.start ?? DateTime(0)).compareTo(a.start ?? DateTime(0)));
     return list;
   }
 
@@ -321,10 +338,7 @@ class _EncounterHistoryState extends State<EncounterHistoryPage> {
             children.add(Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                    leading: Icon(
-                        p.isChat
-                            ? Icons.chat_bubble_outline
-                            : Icons.videocam_outlined,
+                    leading: Icon(p.isChat ? Icons.chat_bubble_outline : Icons.videocam_outlined,
                         color: DoctorTokens.primary),
                     title: Text(
                         '${p.isChat ? 'Chat' : 'Video'} consultation · ${_mediumDateTime(p.start?.toIso8601String())}'),
@@ -336,9 +350,7 @@ class _EncounterHistoryState extends State<EncounterHistoryPage> {
                     onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (_) => EncounterHistoryPage(
-                                appointment: p,
-                                previous: [
+                            builder: (_) => EncounterHistoryPage(appointment: p, previous: [
                                   ...snap.data!.where((x) => x.id != p.id),
                                   widget.appointment
                                 ]))))));
@@ -404,6 +416,23 @@ class _EncounterHistoryState extends State<EncounterHistoryPage> {
                           if (context.mounted) showError(context, e);
                         }
                       }),
+                  if (rxWindowOpen(widget.appointment)) ...[
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                        icon: const Icon(Icons.receipt_long),
+                        label: const Text('Send prescription'),
+                        onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => ScannerPage(
+                                    initialAppointment: widget.appointment)))),
+                    const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                            'You can send a prescription up to 24 hours after the consultation ends.',
+                            style: TextStyle(
+                                fontSize: 12, color: DoctorTokens.textSub))),
+                  ],
                   const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Text('Clinical attachments and prescriptions')),
@@ -1180,8 +1209,7 @@ class _ScheduleHero extends StatelessWidget {
                         color: DoctorTokens.navy)),
                 SizedBox(height: 2),
                 Text('Manage your live availability & calendar slots',
-                    style:
-                        TextStyle(fontSize: 13.5, color: DoctorTokens.slate))
+                    style: TextStyle(fontSize: 13.5, color: DoctorTokens.slate))
               ]))
         ])
       ]));
@@ -3068,7 +3096,7 @@ class _ChatThreadState extends State<ChatThreadPage> {
 
   Future<void> pickAttachment() async {
     if (uploadingAttachment || widget.chat.isClosed || serverClosed) return;
-    final select = await showModalBottomSheet<bool>(
+    final select = await showModalBottomSheet<String>(
         context: context,
         builder: (context) => SafeArea(
             child: Padding(
@@ -3080,15 +3108,29 @@ class _ChatThreadState extends State<ChatThreadPage> {
                       const Text('Attach to consultation',
                           style: TextStyle(
                               fontSize: 20, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 4),
+                      const Text('A JPEG or PNG clinical image',
+                          style: TextStyle(color: DoctorTokens.textSub)),
+                      const SizedBox(height: 8),
+                      ListTile(
+                          leading: const Icon(Icons.photo_camera_outlined),
+                          title: const Text('Take a photo'),
+                          onTap: () => Navigator.pop(context, 'camera')),
+                      ListTile(
+                          leading: const Icon(Icons.photo_library_outlined),
+                          title: const Text('Choose from gallery'),
+                          onTap: () => Navigator.pop(context, 'gallery')),
                       ListTile(
                           leading: const Icon(Icons.description_outlined),
-                          title: const Text('Clinical image'),
-                          subtitle:
-                              const Text('JPEG or PNG medical document photo'),
-                          onTap: () => Navigator.pop(context, true)),
+                          title: const Text('Choose a file'),
+                          onTap: () => Navigator.pop(context, 'file')),
                     ]))));
-    if (select != true || !mounted) return;
+    if (select == null || !mounted) return;
+    if (select != 'file') {
+      await _attachPhoto(
+          select == 'camera' ? ImageSource.camera : ImageSource.gallery);
+      return;
+    }
     try {
       final result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
@@ -3122,6 +3164,50 @@ class _ChatThreadState extends State<ChatThreadPage> {
         setState(() => attachmentError = e is ApiException
             ? e.userMessage
             : 'Unable to select this image. Please retry.');
+      }
+    }
+  }
+
+  /// Camera or gallery. The picker's own copy is deleted once read, so the
+  /// clinical photo is not left in a generic disk cache.
+  Future<void> _attachPhoto(ImageSource source) async {
+    try {
+      final file =
+          await ImagePicker().pickImage(source: source, imageQuality: 85);
+      if (file == null || !mounted) return;
+      final name = file.name.toLowerCase();
+      final png = name.endsWith('.png');
+      final jpeg = name.endsWith('.jpg') || name.endsWith('.jpeg');
+      Uint8List? bytes;
+      try {
+        if (!png && !jpeg) {
+          throw const ApiException(422, 'Select a JPEG or PNG image.');
+        }
+        if (await file.length() > 10 * 1024 * 1024) {
+          throw const ApiException(413, 'Select an image smaller than 10 MB.');
+        }
+        bytes = await file.readAsBytes();
+      } finally {
+        try {
+          final copy = File(file.path);
+          if (await copy.exists()) await copy.delete();
+        } catch (_) {/* best-effort cleanup */}
+      }
+      if (!mounted) return;
+      pendingAttachment = bytes;
+      pendingMime = png ? 'image/png' : 'image/jpeg';
+      pendingUploadKey = List.generate(
+          16,
+          (_) => Random.secure()
+              .nextInt(256)
+              .toRadixString(16)
+              .padLeft(2, '0')).join();
+      await uploadAttachment();
+    } catch (e) {
+      if (mounted) {
+        setState(() => attachmentError = e is ApiException
+            ? e.userMessage
+            : 'Unable to use this image. Please retry.');
       }
     }
   }
@@ -3257,7 +3343,8 @@ class _ChatThreadState extends State<ChatThreadPage> {
                                 height: 20,
                                 child:
                                     CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.attach_file),
+                            : const Icon(Icons.attach_file,
+                                color: DoctorTokens.primary),
                         constraints:
                             const BoxConstraints(minWidth: 48, minHeight: 48)),
                     Expanded(
@@ -3402,8 +3489,18 @@ class _ChatTopBar extends StatelessWidget {
             _ChatIconBtn(
                 icon: Icons.medical_services_outlined,
                 tooltip: 'Snap & Send Rx',
+                // Opens with this chat's own consultation selected.
                 onTap: () => Navigator.push(
-                    c, MaterialPageRoute(builder: (_) => const ScannerPage())))
+                    c,
+                    MaterialPageRoute(
+                        builder: (_) => ScannerPage(
+                            initialAppointment: c
+                                .read<DoctorCubit>()
+                                .state
+                                .queue
+                                .whereType<AppointmentDto>()
+                                .where((a) => a.id == chat.appointmentId)
+                                .firstOrNull))))
         ]));
   }
 }
@@ -3745,7 +3842,9 @@ class _ScannerState extends State<ScannerPage> {
                               items: appointments
                                   .map((a) => DropdownMenuItem(
                                       value: a.id,
-                                      child: Text(a.patientName ?? 'Patient')))
+                                      child: Text(rxConsultationLabel(a),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis)))
                                   .toList(),
                               onChanged: uploading
                                   ? null
