@@ -34,6 +34,7 @@ import 'features/patient/profile/patient_profile_page.dart';
 import 'features/patient/profile/profile_cubit.dart';
 import 'features/patient/profile/profile_repository.dart';
 import 'features/patient/reminders/reminders_cubit.dart';
+import 'features/patient/reminders/reminders_page.dart';
 import 'features/patient/services/patient_services_page.dart';
 import 'l10n/app_localizations.dart';
 
@@ -287,7 +288,12 @@ class _SignedInRootState extends State<_SignedInRoot> {
         .map((s) => s.profile?.userId)
         .where((id) => id != null && id.isNotEmpty)
         .take(1)
-        .listen((id) => unawaited(_reminders.start(id!, 'Personal reminders')));
+        .listen((id) {
+      // The profile loads after the first frame, so localizations exist.
+      if (!mounted) return;
+      unawaited(_reminders.start(
+          id!, reminderAlertText(AppLocalizations.of(context))));
+    });
     _pushService = PushNotificationService(
       repository: _notificationCubit.repo,
       onNotificationReceived: _notificationCubit.load,

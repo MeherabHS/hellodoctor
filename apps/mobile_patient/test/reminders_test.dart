@@ -22,13 +22,17 @@ class MemoryReminderStore implements ReminderStore {
 
 class FakeScheduler implements ReminderScheduler {
   final scheduled = <String>[], cancelled = <String>[];
-  bool allowed = true;
+  bool allowed = true, exact = true;
   @override
   Future<bool> ensurePermission() async => allowed;
   @override
+  Future<bool> ensureExactAlarms() async => exact;
+  @override
   Future<void> schedule(Reminder reminder,
-          {required String channelName, required DateTime now}) async =>
-      scheduled.add(reminder.id);
+      {required ReminderAlertText text, required DateTime now}) async {
+    if (!reminder.enabled) return;
+    scheduled.add(reminder.id);
+  }
   @override
   Future<void> cancel(String reminderId) async => cancelled.add(reminderId);
 }
@@ -41,6 +45,11 @@ Reminder reminder(String id, DateTime at,
         title: 'Take my ART medication',
         at: at,
         repeat: repeat);
+
+const _text = ReminderAlertText(
+    channelName: 'Personal reminders',
+    doneLabel: 'Done',
+    snoozeLabel: 'Snooze 10 min');
 
 void main() {
   final now = DateTime(2026, 11, 13, 10); // a Friday
@@ -96,7 +105,7 @@ void main() {
         userId: user,
         store: store,
         scheduler: scheduler,
-        channelName: 'Personal reminders',
+        text: _text,
         clock: () => now);
     setUp(() {
       store = MemoryReminderStore();
@@ -174,7 +183,7 @@ void main() {
     test('a session schedules on sign-in and cancels on sign-out', () async {
       store.data['user-a'] = [reminder('r1', DateTime(2099, 1, 1, 8))];
       final session = ReminderSession(store: store, scheduler: scheduler);
-      await session.start('user-a', 'Personal reminders');
+      await session.start('user-a', _text);
       expect(scheduler.scheduled, ['r1']);
       await session.end('user-a');
       expect(scheduler.cancelled, ['r1']);
@@ -227,7 +236,7 @@ void main() {
             userId: 'user-a',
             store: store,
             scheduler: scheduler,
-            channelName: 'Personal reminders',
+            text: _text,
             clock: () => now);
         addTearDown(cubit.close);
         await cubit.load();
@@ -257,5 +266,78 @@ void main() {
         expect(scheduler.scheduled, [saved.id]);
       });
     }
+  });
+
+  group('edit and switch off', () {
+    RemindersCubit cubitWith(MemoryReminderStore store, FakeScheduler s) =>
+        RemindersCubit(
+            userId: 'user-a',
+            store: store,
+            scheduler: s,
+            text: _text,
+            clock: () => now);
+
+    test('editing reschedules the alarm with the new time and keeps the id',
+        () async {
+      final store = MemoryReminderStore();
+      final scheduler = FakeScheduler();
+      final cubit = cubitWith(store, scheduler);
+      await cubit.load();
+      final r = reminder('e', DateTime(2026, 11, 13, 12));
+      await cubit.add(r);
+      expect(await cubit.update(r.copyWith(at: DateTime(2026, 11, 13, 18))),
+          isTrue);
+      expect(store.data['user-a']!.single.at, DateTime(2026, 11, 13, 18));
+      expect(scheduler.scheduled, ['e', 'e']);
+      await cubit.close();
+    });
+
+    test('switching off cancels the alarm but keeps the reminder; on re-arms',
+        () async {
+      final store = MemoryReminderStore();
+      final scheduler = FakeScheduler();
+      final cubit = cubitWith(store, scheduler);
+      await cubit.load();
+      await cubit.add(reminder('t', DateTime(2026, 11, 13, 12)));
+      await cubit.setEnabled('t', false);
+      expect(store.data['user-a']!.single.enabled, isFalse);
+      expect(scheduler.cancelled, contains('t'));
+      expect(cubit.state.items.single.enabled, isFalse);
+      await cubit.setEnabled('t', true);
+      expect(scheduler.scheduled.where((id) => id == 't'), hasLength(2));
+      await cubit.close();
+    });
+
+    test('a disabled reminder is not re-armed at sign-in', () async {
+      final store = MemoryReminderStore()
+        ..data['user-a'] = [
+          reminder('on', DateTime(2026, 11, 20, 8)),
+          reminder('off', DateTime(2026, 11, 20, 8)).copyWith(enabled: false),
+        ];
+      final scheduler = FakeScheduler();
+      await ReminderSession(store: store, scheduler: scheduler)
+          .start('user-a', _text);
+      expect(scheduler.scheduled, ['on']);
+    });
+
+    test('saved reminders from before enable/disable load as enabled', () {
+      final decoded = Reminder.decodeList(
+          '[{"id":"x","category":"art","title":"T","note":"","at":"2026-11-20T08:00:00.000","repeat":"daily"}]');
+      expect(decoded.single.enabled, isTrue);
+      expect(Reminder.decodeList(Reminder.encodeList(
+              [decoded.single.copyWith(enabled: false)]))
+          .single
+          .enabled, isFalse);
+    });
+
+    test('without exact alarms the state says alerts may be late', () async {
+      final scheduler = FakeScheduler()..exact = false;
+      final cubit = cubitWith(MemoryReminderStore(), scheduler);
+      await cubit.load();
+      await cubit.add(reminder('x', DateTime(2026, 11, 13, 12)));
+      expect(cubit.state.exactAlarmsAllowed, isFalse);
+      expect(scheduler.scheduled, ['x']);
+      await cubit.close();
+    });
   });
 }

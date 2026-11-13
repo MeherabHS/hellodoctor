@@ -3,7 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../core/notifications/local_notification_service.dart';
-import '../../../core/notifications/notification_ids.dart';
+import '../../../core/notifications/reminder_alarm.dart';
 import 'reminder_models.dart';
 
 /// Where a patient's reminders are kept.
@@ -25,7 +25,11 @@ class SecureReminderStore implements ReminderStore {
       : _storage = storage ??
             const FlutterSecureStorage(
                 aOptions: AndroidOptions(
-                    sharedPreferencesName: 'afya_patient_reminders_v1'));
+                    sharedPreferencesName: reminderSecureStorageFile));
+
+  /// Named on every call; see `sessionSecureStorage` in api_client.dart for
+  /// why an unnamed store would read the wrong file.
+  static const reminderSecureStorageFile = 'afya_patient_reminders_v1';
   final FlutterSecureStorage _storage;
 
   String _key(String userId) => 'reminders_$userId';
@@ -39,33 +43,39 @@ class SecureReminderStore implements ReminderStore {
       _storage.write(key: _key(userId), value: Reminder.encodeList(reminders));
 }
 
+/// Localized text an alarm needs (channel name and action labels).
+class ReminderAlertText {
+  const ReminderAlertText(
+      {required this.channelName,
+      required this.doneLabel,
+      required this.snoozeLabel});
+  final String channelName, doneLabel, snoozeLabel;
+}
+
 /// Schedules and cancels the device alerts for reminders.
 abstract class ReminderScheduler {
   /// Whether the system will show this app's notifications. Asks the user
   /// when the platform requires a runtime permission.
   Future<bool> ensurePermission();
+
+  /// Whether alarms can fire at the exact time (Android "Alarms &
+  /// reminders"). Asks once when they cannot. When false, alerts may be a
+  /// few minutes late and the reminders screen says so.
+  Future<bool> ensureExactAlarms();
   Future<void> schedule(Reminder reminder,
-      {required String channelName, required DateTime now});
+      {required ReminderAlertText text, required DateTime now});
   Future<void> cancel(String reminderId);
 }
 
-/// Local notifications through `flutter_local_notifications`.
-///
-/// - Alerts fire at the device's local time, with no network.
-/// - Timing is inexact (the system may deliver a few minutes late). Exact
-///   alarms need an extra Android permission that this app does not request.
-/// - On a locked screen Android hides the notification's text
-///   ([NotificationVisibility.private]); the reminder's title and note show
-///   only once the phone is unlocked.
+/// Alarm-style local notifications (see [ReminderAlarm]): exact alarm-clock
+/// timing where allowed, the system alarm sound repeating until Done or
+/// Snooze, text hidden on a locked screen, no network needed.
 class LocalReminderScheduler implements ReminderScheduler {
   LocalReminderScheduler([FlutterLocalNotificationsPlugin? plugin])
       : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
   final FlutterLocalNotificationsPlugin _plugin;
 
-  static const _channelId = 'patient_personal_reminders';
-
-  static int idFor(String reminderId) =>
-      stableNotificationId('patient_reminder:$reminderId');
+  static int idFor(String reminderId) => ReminderAlarm.idFor(reminderId);
 
   @override
   Future<bool> ensurePermission() async {
@@ -74,12 +84,20 @@ class LocalReminderScheduler implements ReminderScheduler {
   }
 
   @override
-  Future<void> schedule(Reminder reminder,
-      {required String channelName, required DateTime now}) async {
+  Future<bool> ensureExactAlarms() async {
     await LocalNotificationService.init();
-    await _plugin.cancel(idFor(reminder.id));
+    return LocalNotificationService.requestExactAlarms();
+  }
+
+  @override
+  Future<void> schedule(Reminder reminder,
+      {required ReminderAlertText text, required DateTime now}) async {
+    await LocalNotificationService.init();
+    await cancel(reminder.id);
+    if (!reminder.enabled) return;
     final next = reminder.nextAlert(now);
     if (next == null) return; // a one-time reminder already in the past
+    final exact = await ReminderAlarm.exactAlarmsAllowed(_plugin);
     // The alert instant is fixed in UTC from the device-local wall time.
     // Repeats then match on the UTC clock components, which keeps the same
     // local time wherever the device has no daylight-saving shift (Kenya).
@@ -89,15 +107,22 @@ class LocalReminderScheduler implements ReminderScheduler {
       reminder.title,
       reminder.note.isEmpty ? null : reminder.note,
       when,
-      NotificationDetails(
-          android: AndroidNotificationDetails(_channelId, channelName,
-              importance: Importance.high,
-              priority: Priority.high,
-              visibility: NotificationVisibility.private,
-              category: AndroidNotificationCategory.reminder)),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      ReminderAlarm.details(
+          channelName: text.channelName,
+          doneLabel: text.doneLabel,
+          snoozeLabel: text.snoozeLabel),
+      androidScheduleMode: exact
+          ? AndroidScheduleMode.alarmClock
+          : AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
+      payload: ReminderAlarm.payload(
+          reminderId: reminder.id,
+          title: reminder.title,
+          note: reminder.note,
+          channelName: text.channelName,
+          doneLabel: text.doneLabel,
+          snoozeLabel: text.snoozeLabel),
       matchDateTimeComponents: switch (reminder.repeat) {
         ReminderRepeat.once => null,
         ReminderRepeat.daily => DateTimeComponents.time,
@@ -108,5 +133,8 @@ class LocalReminderScheduler implements ReminderScheduler {
   }
 
   @override
-  Future<void> cancel(String reminderId) => _plugin.cancel(idFor(reminderId));
+  Future<void> cancel(String reminderId) async {
+    await _plugin.cancel(idFor(reminderId));
+    await _plugin.cancel(ReminderAlarm.snoozeIdFor(reminderId));
+  }
 }

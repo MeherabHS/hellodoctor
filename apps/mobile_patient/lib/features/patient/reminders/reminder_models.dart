@@ -18,7 +18,29 @@ class Reminder {
     required this.at,
     required this.repeat,
     this.note = '',
+    this.enabled = true,
   });
+
+  /// A disabled reminder is kept in the list but never alerts.
+  final bool enabled;
+
+  Reminder copyWith({
+    ReminderCategory? category,
+    String? title,
+    String? note,
+    DateTime? at,
+    ReminderRepeat? repeat,
+    bool? enabled,
+  }) =>
+      Reminder(
+        id: id,
+        category: category ?? this.category,
+        title: title ?? this.title,
+        note: note ?? this.note,
+        at: at ?? this.at,
+        repeat: repeat ?? this.repeat,
+        enabled: enabled ?? this.enabled,
+      );
 
   final String id;
   final ReminderCategory category;
@@ -77,6 +99,7 @@ class Reminder {
         'note': note,
         'at': at.toIso8601String(),
         'repeat': repeat.name,
+        'enabled': enabled,
       };
 
   static Reminder? fromJson(Object? raw) {
@@ -94,6 +117,8 @@ class Reminder {
       at: at,
       repeat: ReminderRepeat.values.firstWhere((r) => r.name == raw['repeat'],
           orElse: () => ReminderRepeat.once),
+      // Saved before enable/disable existed: treated as enabled.
+      enabled: raw['enabled'] != false,
     );
   }
 
