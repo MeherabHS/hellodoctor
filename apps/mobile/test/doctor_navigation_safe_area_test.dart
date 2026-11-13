@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hellodoctor_mobile/app.dart';
 import 'package:hellodoctor_mobile/core/network/api_client.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_cubit.dart';
-import 'package:hellodoctor_mobile/features/doctor/doctor_pages.dart';
+import 'package:hellodoctor_mobile/features/home/home_pages.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_repository.dart';
 import 'package:hellodoctor_mobile/features/notifications/notification_cubit.dart';
 import 'package:hellodoctor_mobile/features/notifications/notification_repository.dart';
@@ -50,14 +50,7 @@ void main() {
         final nav = find.byType(DoctorBottomNav);
         expect(nav, findsOneWidget);
         expect(tester.getRect(nav).bottom, 800 - inset);
-        for (final label in [
-          'Queue',
-          'Chat',
-          'Scan Rx',
-          'Schedule',
-          'Wallet',
-          'Settings'
-        ]) {
+        for (final label in ['Home', 'Appointments', 'Patients', 'More']) {
           final text = find.descendant(of: nav, matching: find.text(label));
           expect(text, findsOneWidget);
           expect(tester.getRect(text).bottom, lessThanOrEqualTo(800 - inset));
@@ -70,9 +63,11 @@ void main() {
         }
 
         await tester
-            .tap(find.descendant(of: nav, matching: find.text('Schedule')));
+            .tap(find.descendant(of: nav, matching: find.text('Patients')));
         await tester.pumpAndSettle();
-        expect(find.byType(SchedulePage), findsOneWidget);
+        // Patients, not Appointments: opening Appointments starts a live
+        // queue refresh, which this layout-only harness has no server for.
+        expect(find.byType(PatientsPage), findsOneWidget);
         expect(tester.getRect(nav).bottom, 800 - inset);
         expect(tester.takeException(), isNull);
       });

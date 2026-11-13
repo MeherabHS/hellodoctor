@@ -6,8 +6,8 @@ import 'package:hellodoctor_mobile/features/doctor/doctor_cubit.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_repository.dart';
 
 void main() {
-  test('prototype design tokens remain centralized', () {
-    expect(DoctorTokens.primary.toARGB32(), 0xFF059669);
+  test('reference-board design tokens remain centralized', () {
+    expect(DoctorTokens.primary.toARGB32(), 0xFF05804F);
     expect(DoctorTokens.radius, 16);
   });
 

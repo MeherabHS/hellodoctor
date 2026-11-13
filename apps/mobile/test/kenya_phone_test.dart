@@ -80,18 +80,27 @@ void main() {
   });
 
   group('RegistrationPage phone validation', () {
-    Future<void> enterCommonValidFields(WidgetTester tester) async {
+    // Registration is two screens: account (name, email, password, phone)
+    // then professional details. The phone is validated on the first.
+    Future<void> enterAccountFields(WidgetTester tester, String phone) async {
       final fields = find.byType(TextField);
       await tester.enterText(fields.at(0), 'Dr Jane Doe'); // name
+      await tester.enterText(fields.at(1), 'jane.doe@example.com'); // email
+      await tester.enterText(fields.at(2), 'Abcdefg1!'); // password
+      await tester.enterText(fields.at(3), phone);
+      await tester.tap(find.text('Create Account'));
+      await tester.pump();
+    }
+
+    Future<void> enterProfessionalFields(WidgetTester tester) async {
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'General Medicine'); // specialty
       await tester.enterText(fields.at(1), 'KMPDC-12345'); // license
-      // index 2 is phone, filled per-test below
-      await tester.enterText(fields.at(3), 'jane.doe@example.com'); // email
-      await tester.enterText(fields.at(4), 'Abcdefg1!'); // password
-      await tester.enterText(fields.at(5), 'General Medicine'); // specialty
-      await tester.enterText(fields.at(6), '5'); // experience
-      await tester.enterText(fields.at(7), 'City Hospital'); // hospital
-      await tester.enterText(fields.at(8), 'MBChB'); // qualifications
-      await tester.enterText(fields.at(9), '123 Main St'); // address
+      await tester.enterText(fields.at(2), '5'); // experience
+      await tester.enterText(fields.at(3), 'City Hospital'); // hospital
+      await tester.enterText(fields.at(4), 'MBChB'); // qualifications
+      await tester.enterText(fields.at(5), '123 Main St'); // address
+      await tester.tap(find.text('Next'));
     }
 
     testWidgets(
@@ -104,13 +113,11 @@ void main() {
       addTearDown(auth.close);
       await tester.pumpWidget(MaterialApp(home: RegistrationPage(auth: auth)));
 
-      await enterCommonValidFields(tester);
-      await tester.enterText(find.byType(TextField).at(2), '+25420341371');
-      await tester.tap(find.text('Continue'));
-      await tester.pump();
+      await enterAccountFields(tester, '+25420341371');
 
       expect(
           find.textContaining('Enter a Kenyan phone number'), findsOneWidget);
+      expect(find.text('Next'), findsNothing);
       expect(find.byType(LegalConsentPage), findsNothing);
     });
 
@@ -123,9 +130,8 @@ void main() {
       addTearDown(auth.close);
       await tester.pumpWidget(MaterialApp(home: RegistrationPage(auth: auth)));
 
-      await enterCommonValidFields(tester);
-      await tester.enterText(find.byType(TextField).at(2), '0712345678');
-      await tester.tap(find.text('Continue'));
+      await enterAccountFields(tester, '0712345678');
+      await enterProfessionalFields(tester);
       // Not pumpAndSettle: LegalConsentPage's initState fires a real network
       // GET (`/legal/documents`) with no server behind it in this test, which
       // never settles. Pumping through just the MaterialPageRoute transition
@@ -147,9 +153,8 @@ void main() {
       addTearDown(auth.close);
       await tester.pumpWidget(MaterialApp(home: RegistrationPage(auth: auth)));
 
-      await enterCommonValidFields(tester);
-      await tester.enterText(find.byType(TextField).at(2), '0203413710');
-      await tester.tap(find.text('Continue'));
+      await enterAccountFields(tester, '0203413710');
+      await enterProfessionalFields(tester);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 

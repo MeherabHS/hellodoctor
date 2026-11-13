@@ -4,8 +4,17 @@ abstract final class DoctorTokens {
   static const bg = Color(0xFFF5F9F7);
   static const surface = Colors.white;
   static const surfaceSubtle = Color(0xFFF0F6F3);
-  static const primary = Color(0xFF059669);
-  static const primaryDark = Color(0xFF047857);
+  // Doctor reference board, panel 1 "Sign In" button: #058152 (top) to
+  // #01764B (bottom), #128359 through the label. One flat value is used.
+  static const primary = Color(0xFF05804F);
+  static const primaryDark = Color(0xFF01764B);
+  // Board headings ("Welcome, Doctor") and body copy.
+  static const navy = Color(0xFF0B1026);
+  static const slate = Color(0xFF4C5161);
+  static const fieldText = Color(0xFF37394A);
+  static const fieldBorder = Color(0xFFE1E6EB);
+  static const noticeBg = Color(0xFFE1F1F5);
+  static const screen = Color(0xFFFDFDFD);
   static const primaryLight = Color(0xFFD1FAE5);
   static const text = Color(0xFF0F291E);
   static const textSub = Color(0xFF789A90);
@@ -26,9 +35,37 @@ abstract final class DoctorTokens {
   static const pad = 18.0;
   static ThemeData theme() => ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: bg,
+        scaffoldBackgroundColor: screen,
         colorScheme: ColorScheme.fromSeed(seedColor: primary, surface: surface),
         fontFamily: 'Plus Jakarta Sans',
+        appBarTheme: const AppBarTheme(
+            backgroundColor: screen,
+            surfaceTintColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            foregroundColor: navy,
+            titleTextStyle: TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: navy)),
+        filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+                backgroundColor: primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 50),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                textStyle: const TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800))),
+        textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+                foregroundColor: primaryDark,
+                textStyle: const TextStyle(
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontWeight: FontWeight.w700))),
         cardTheme: const CardThemeData(
             color: surface, elevation: 0, margin: EdgeInsets.zero),
         inputDecorationTheme: InputDecorationTheme(
@@ -40,6 +77,9 @@ abstract final class DoctorTokens {
           enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: primary, width: 1.5)),
         ),
       );
 }

@@ -99,10 +99,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(doctor.state.queue.single.id, 'next');
       final nav = find.byType(DoctorBottomNav);
-      await tester.tap(find.descendant(of: nav, matching: find.text('Chat')));
+      await tester
+          .tap(find.descendant(of: nav, matching: find.text('Patients')));
       await tester.pumpAndSettle();
       repo.current = [];
-      await tester.tap(find.descendant(of: nav, matching: find.text('Queue')));
+      await tester.tap(find.descendant(of: nav, matching: find.text('Home')));
       await tester.pumpAndSettle();
       expect(doctor.state.queue, isEmpty);
       expect(tester.takeException(), isNull);
