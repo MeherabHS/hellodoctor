@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_client.dart';
 import '../../core/cache/patient_cache_store.dart';
@@ -245,6 +247,13 @@ class AuthCubit extends Cubit<AuthState> {
         await cache?.clear();
         emit(const SignedOut());
       }
+    } on TimeoutException {
+      // A slow network or a slow device-proof signature is not a rejected
+      // session. Treat it like being offline: stay signed in with the stored
+      // tokens. If the refresh still in flight is later rejected (401/403),
+      // ApiClient expires the session and onSessionExpired signs out then.
+      authDiag('restore.timeout', {'state': 'kept signed in'});
+      emit(const SignedIn());
     } catch (_) {
       emit(const SignedOut());
     } finally {
