@@ -206,18 +206,46 @@ List<Map<String, dynamic>> _queue() => [
           }),
     ];
 
-List<Map<String, dynamic>> _history() => [
-      {
-        ..._appointment('h1', 'Sample Patient Four', 'VIDEO', 'COMPLETED',
-            const Duration(days: -2), 'COMPLETED_WITH_RX'),
-        'completed_at': _at(const Duration(days: -2)),
-      },
-      {
-        ..._appointment('h2', 'Sample Patient Five', 'CHAT', 'COMPLETED',
-            const Duration(days: -5), 'COMPLETED_NO_RX'),
-        'completed_at': _at(const Duration(days: -5)),
-      },
-    ];
+/// `--dart-define=PREVIEW_HISTORY=EMPTY` shows the Consultation History
+/// empty state.
+const _historyMode =
+    String.fromEnvironment('PREVIEW_HISTORY', defaultValue: 'PILED');
+
+/// A completed consultation at a fixed time (UTC), for the history list.
+Map<String, dynamic> _done(
+        String id, String patient, String name, String modality, String utc) =>
+    {
+      'id': id,
+      'appointment_number': 'PREVIEW-$id',
+      'patient_id': patient,
+      'patient_display_name': name,
+      'modality': modality,
+      'status': 'COMPLETED',
+      'start_time': utc,
+      'end_time': DateTime.parse(utc)
+          .add(const Duration(minutes: 10))
+          .toIso8601String(),
+      'completed_at': utc,
+      'conversation_id': 'c-$id',
+      'chat_locked': true,
+      'queue_actionable': false,
+    };
+
+/// The piled-up list of the history reference image
+/// (docs/design/doctor-consultation-history-list-reference.png); names are
+/// fixtures taken from that image.
+List<Map<String, dynamic>> _history() => _historyMode == 'EMPTY'
+    ? []
+    : [
+        _done('h1', 'pg', 'Grace Wanjiku', 'VIDEO', '2026-11-13T05:33:00Z'),
+        _done('h2', 'pj', 'John Ondimu', 'CHAT', '2026-11-11T13:20:00Z'),
+        _done('h3', 'pp', 'Peter Mwangi', 'VIDEO', '2026-11-08T08:05:00Z'),
+        _done('h4', 'pg', 'Grace Wanjiku', 'CHAT', '2026-11-02T07:00:00Z'),
+        _done('h5', 'pg', 'Grace Wanjiku', 'VIDEO', '2026-10-20T07:00:00Z'),
+        _done('h6', 'pp', 'Peter Mwangi', 'CHAT', '2026-10-30T07:00:00Z'),
+        _done('h7', 'pp', 'Peter Mwangi', 'VIDEO', '2026-10-15T07:00:00Z'),
+        _done('h8', 'pp', 'Peter Mwangi', 'VIDEO', '2026-09-28T07:00:00Z'),
+      ];
 
 List<Map<String, dynamic>> _slots() {
   Map<String, dynamic> slot(String id, Duration start, String status,

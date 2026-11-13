@@ -4,16 +4,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_cubit.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_models.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_pages.dart';
-import 'package:hellodoctor_mobile/features/home/home_pages.dart';
+import 'package:hellodoctor_mobile/features/home/consultation_history_tab.dart';
 
 import 'doctor_cubit_test.dart' show StubDoctorRepository;
 
-AppointmentDto _a(String id, String patient, String name, String modality,
-        DateTime start) =>
+AppointmentDto _a(
+        String id, String patient, String name, String modality, DateTime start,
+        {String status = 'COMPLETED'}) =>
     AppointmentDto(
         id: id,
-        status: 'COMPLETED',
-        lifecycle: 'COMPLETED',
+        status: status,
+        lifecycle: status,
         patientId: patient,
         patientName: name,
         modality: modality,
@@ -21,12 +22,8 @@ AppointmentDto _a(String id, String patient, String name, String modality,
         end: start.add(const Duration(minutes: 10)));
 
 class HistoryRepository extends StubDoctorRepository {
-  final rows = [
-    _a('a3', 'p1', 'Amina Otieno', 'CHAT', DateTime.utc(2026, 11, 12, 8)),
-    _a('b1', 'p2', 'Brian Mwangi', 'VIDEO', DateTime.utc(2026, 11, 11, 8)),
-    _a('a2', 'p1', 'Amina Otieno', 'VIDEO', DateTime.utc(2026, 11, 10, 8)),
-    _a('a1', 'p1', 'Amina Otieno', 'CHAT', DateTime.utc(2026, 11, 1, 8)),
-  ];
+  HistoryRepository(this.rows);
+  final List<AppointmentDto> rows;
   @override
   Future<List<AppointmentDto>> consultationHistory({int offset = 0}) async =>
       offset == 0 ? rows : [];
@@ -34,62 +31,86 @@ class HistoryRepository extends StubDoctorRepository {
   Future<Json> summary(String id) async => {'chief_complaint': 'Follow-up'};
 }
 
-Future<void> _mount(WidgetTester tester, DoctorCubit cubit) async {
-  tester.view.physicalSize = const Size(412, 1400);
+final _piled = [
+  _a('a3', 'p1', 'Grace Wanjiku', 'VIDEO', DateTime.utc(2026, 11, 13, 5, 33)),
+  _a('j1', 'p2', 'John Ondimu', 'CHAT', DateTime.utc(2026, 11, 11, 13, 20)),
+  _a('a2', 'p1', 'Grace Wanjiku', 'CHAT', DateTime.utc(2026, 11, 10, 8)),
+  _a('a1', 'p1', 'Grace Wanjiku', 'VIDEO', DateTime.utc(2026, 11, 1, 8)),
+  // Booked but never completed: not part of the completed history.
+  _a('x1', 'p2', 'John Ondimu', 'CHAT', DateTime.utc(2026, 11, 13, 6),
+      status: 'CONFIRMED'),
+];
+
+int appointmentsOpened = 0;
+
+Future<void> _mount(WidgetTester tester, List<AppointmentDto> rows) async {
+  tester.view.physicalSize = const Size(412, 2400);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
+  final cubit = DoctorCubit(HistoryRepository(rows));
+  addTearDown(cubit.close);
   await tester.pumpWidget(BlocProvider<DoctorCubit>.value(
       value: cubit,
-      child: MaterialApp(home: ConsultationHistoryTab(onBack: () {}))));
+      child: MaterialApp(
+          home: ConsultationHistoryTab(
+              onBack: () {}, onOpenAppointments: () => appointmentsOpened++))));
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets('History tab lists past consultations, filters and searches',
-      (tester) async {
-    final cubit = DoctorCubit(HistoryRepository());
-    addTearDown(cubit.close);
-    await _mount(tester, cubit);
-
+  testWidgets('empty history shows the reference empty state', (tester) async {
+    appointmentsOpened = 0;
+    await _mount(tester, [
+      _a('x1', 'p2', 'John Ondimu', 'CHAT', DateTime.utc(2026, 11, 13, 6),
+          status: 'CONFIRMED')
+    ]);
     expect(find.text('Consultation History'), findsOneWidget);
-    expect(find.text('Patient records are not available yet'), findsNothing);
-    expect(find.byType(AppointmentRow), findsNWidgets(4));
+    expect(find.text('Review completed patient consultations'), findsOneWidget);
+    expect(find.text('No consultation history yet'), findsOneWidget);
+    expect(
+        find.text(
+            'Completed consultations will appear here once you finish a session.'),
+        findsOneWidget);
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.byType(HistoryCard), findsNothing);
+    await tester.tap(find.text('Go to appointments'));
+    expect(appointmentsOpened, 1);
+  });
+
+  testWidgets('completed consultations pile up as reference cards',
+      (tester) async {
+    await _mount(tester, _piled);
+    expect(find.byType(HistoryCard), findsNWidgets(4));
+    expect(find.text('Completed'), findsNWidgets(4));
+    expect(find.text('Video consultation · Completed'), findsNWidgets(2));
+    expect(find.text('Chat consultation · Completed'), findsNWidgets(2));
+    // EAT: 05:33 UTC is 8:33 AM in Nairobi.
+    expect(find.text('Nov 13 · 8:33 AM'), findsOneWidget);
+    expect(
+        find.text('Clinical attachments and prescriptions'), findsNWidgets(4));
+    // Newest Grace card has two earlier completed consultations; John has none.
+    expect(find.text('Previous consultations: 2'), findsOneWidget);
+    expect(find.text('Previous consultations: 1'), findsOneWidget);
+    expect(find.text('View details'), findsNWidgets(4));
 
     await tester.tap(find.text('Chat'));
     await tester.pumpAndSettle();
-    expect(find.byType(AppointmentRow), findsNWidgets(2));
-
-    await tester.tap(find.text('All'));
-    await tester.enterText(find.byType(TextField), 'brian');
+    expect(find.byType(HistoryCard), findsNWidgets(2));
+    await tester.tap(find.text('Video'));
     await tester.pumpAndSettle();
-    expect(find.byType(AppointmentRow), findsOneWidget);
-    expect(find.text('Brian Mwangi'), findsOneWidget);
+    expect(find.byType(HistoryCard), findsNWidgets(2));
   });
 
-  testWidgets(
-      'tapping a consultation shows the earlier consultations with that patient',
+  testWidgets('View details opens the consultation with earlier ones',
       (tester) async {
-    final cubit = DoctorCubit(HistoryRepository());
-    addTearDown(cubit.close);
-    await _mount(tester, cubit);
-
-    // Newest Amina consultation (12 Nov, chat).
-    await tester.tap(find.byType(AppointmentRow).first);
+    await _mount(tester, _piled);
+    await tester.tap(find.text('View details').first);
     await tester.pumpAndSettle();
     expect(find.byType(EncounterHistoryPage), findsOneWidget);
-    expect(find.text('Previous consultations with this patient'),
-        findsOneWidget);
-    // Two earlier consultations with Amina; Brian's is not listed.
-    final previous = find.descendant(
-        of: find.byType(Card), matching: find.byType(ListTile));
-    expect(previous, findsNWidgets(2));
-    expect(find.textContaining('Video consultation · Nov 10'), findsOneWidget);
-    expect(find.textContaining('Chat consultation · Nov 1'), findsOneWidget);
-
-    // Opening the oldest one shows no earlier consultations.
-    await tester.tap(find.textContaining('Chat consultation · Nov 1'));
-    await tester.pumpAndSettle();
-    expect(find.text('No previous consultations.'), findsOneWidget);
+    expect(
+        find.text('Previous consultations with this patient'), findsOneWidget);
+    expect(find.textContaining('Chat consultation · Nov 10'), findsOneWidget);
+    expect(find.textContaining('Video consultation · Nov 1 '), findsOneWidget);
   });
 }
