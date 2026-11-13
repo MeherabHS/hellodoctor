@@ -98,10 +98,10 @@ void main() {
         (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      // Freeze only the displayed refresh time. The original golden images
-      // contain 14:45; wall-clock time made their exact pixel checks flaky.
+      // Freeze only the displayed refresh time, as a UTC instant: shown in
+      // Kenya time (11:45 UTC = 2:45 PM EAT) on every machine.
       final cubit = NotificationCubit(entry.value,
-          now: () => DateTime(2026, 10, 5, 14, 45));
+          now: () => DateTime.utc(2026, 10, 5, 11, 45));
       addTearDown(cubit.close);
       await tester.pumpWidget(harness(cubit));
       await tester.pump(const Duration(milliseconds: 200));
