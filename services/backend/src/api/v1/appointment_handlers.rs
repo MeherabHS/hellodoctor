@@ -282,12 +282,28 @@ pub async fn get_conversation_for_appointment(
     let appointment = appointment_repo::find_by_id(&mut *tx, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
-    let mut conversation = chat_repo::find_conversation_by_appointment(&mut *tx, id)
-        .await?
-        .ok_or_else(|| {
-            AppError::NotFound("No chat conversation exists for this appointment.".into())
-        })?;
+    let existing = chat_repo::find_conversation_by_appointment(&mut *tx, id).await?;
     tx.commit().await?;
+
+    // Repair path for a confirmed appointment that has no conversation yet
+    // (confirmed before payment-free activation existed, or a failed
+    // post-commit activation). Only reached after the appointment was read
+    // under the caller's own RLS, i.e. by one of its participants; the
+    // activation itself is idempotent and does nothing for unconfirmed
+    // appointments. The conversation is then re-read under the caller's RLS.
+    let conversation = match existing {
+        Some(conversation) => Some(conversation),
+        None => {
+            crate::services::AppointmentService::ensure_consultation_activated(&state, id).await?;
+            let mut tx = state.begin_authed(&ctx).await?;
+            let conversation = chat_repo::find_conversation_by_appointment(&mut *tx, id).await?;
+            tx.commit().await?;
+            conversation
+        }
+    };
+    let mut conversation = conversation.ok_or_else(|| {
+        AppError::NotFound("No chat conversation exists for this appointment.".into())
+    })?;
 
     // Read-only history remains accessible to authorized participants. A closed
     // appointment must not present an editable thread, even before lazy locking.
