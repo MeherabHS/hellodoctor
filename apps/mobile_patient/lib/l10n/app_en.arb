@@ -1487,7 +1487,7 @@
   "@vaultAllRecords": {
     "description": "Patient interface: vaultAllRecords"
   },
-  "vaultPrescriptions": "e-Prescriptions",
+  "vaultPrescriptions": "From your doctor",
   "@vaultPrescriptions": {
     "description": "Patient interface: vaultPrescriptions"
   },
@@ -2274,5 +2274,15 @@
         "type": "String"
       }
     }
-  }
+  },
+  "reminderAlarmDone": "Done",
+  "reminderAlarmSnooze": "Snooze 10 min",
+  "reminderAlarmOn": "Alarm on",
+  "reminderAlarmOff": "Alarm off",
+  "remindersExactAlarmsOff": "Exact alarms are off for AfyaMkononi, so a reminder may ring a few minutes late. To ring on time, allow \"Alarms & reminders\" for AfyaMkononi in your phone settings.",
+  "vaultFromDoctor": "Sent by your doctor",
+  "vaultMyUploads": "Uploaded by you",
+  "waitingRoomUploadTitle": "Before your consultation",
+  "waitingRoomUploadBody": "Upload prescriptions, test results or other documents for your doctor. They are saved in Health Records under this consultation.",
+  "waitingRoomUploadAction": "Upload documents"
 }

@@ -316,7 +316,7 @@
   "vaultTitle": "Hifadhi ya Afya",
   "vaultSubtitle": "Maagizo ya dawa ya kidijitali na rekodi ulizopakia",
   "vaultAllRecords": "Rekodi Zote",
-  "vaultPrescriptions": "Maagizo ya Dawa",
+  "vaultPrescriptions": "Kutoka kwa daktari",
   "vaultUploads": "Nilizopakia",
   "vaultEmpty": "Hakuna rekodi bado",
   "vaultEmptyHint": "Maagizo ya dawa na nyaraka zilizopakiwa zitaonekana hapa.",
@@ -836,5 +836,15 @@
   "historyOutcomeNoRx": "Hakuna dawa iliyohitajika",
   "historyOutcomeReferred": "Amepewa rufaa",
   "historyOutcomeEscalated": "Imepandishwa",
-  "consultReference": "Kumbukumbu: {reference}"
+  "consultReference": "Kumbukumbu: {reference}",
+  "reminderAlarmDone": "Nimemaliza",
+  "reminderAlarmSnooze": "Ahirisha dakika 10",
+  "reminderAlarmOn": "Kengele imewashwa",
+  "reminderAlarmOff": "Kengele imezimwa",
+  "remindersExactAlarmsOff": "Kengele sahihi zimezimwa kwa AfyaMkononi, kwa hiyo kikumbusho kinaweza kulia dakika chache baadaye. Ili kilie kwa wakati, ruhusu \"Kengele na vikumbusho\" kwa AfyaMkononi katika mipangilio ya simu yako.",
+  "vaultFromDoctor": "Imetumwa na daktari wako",
+  "vaultMyUploads": "Ulizopakia wewe",
+  "waitingRoomUploadTitle": "Kabla ya mashauriano yako",
+  "waitingRoomUploadBody": "Pakia maagizo ya dawa, majibu ya vipimo au nyaraka nyingine kwa daktari wako. Zitahifadhiwa katika Rekodi za Afya chini ya mashauriano haya.",
+  "waitingRoomUploadAction": "Pakia nyaraka"
 }
