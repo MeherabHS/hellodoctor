@@ -6,6 +6,9 @@ import 'package:flutter/material.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/patient_widgets.dart';
+import '../../../l10n/app_localizations.dart';
+import '../consultation/consultation_scene.dart';
+import '../directory/directory_repository.dart';
 import '../booking/booking_models.dart';
 import '../booking/booking_repository.dart';
 import '../booking/pre_consult_intake_modal.dart';
@@ -250,113 +253,161 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
       'DISPUTED'
     ].contains(detail?.status);
     final expired = detail?.status == 'EXPIRED';
+    final l = AppLocalizations.of(context);
+    final video = a.modality == 'VIDEO';
     return Scaffold(
-        appBar: AppBar(title: const Text('Your consultation')),
+        backgroundColor: PatientTokens.bg,
         body: SafeArea(
-            child: ListView(padding: const EdgeInsets.all(20), children: [
-          Text(a.doctorDisplayName,
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Text(a.primarySpecialty),
-          const SizedBox(height: 20),
-          PatientCard(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(
-                    a.modality == 'CHAT'
-                        ? 'Chat consultation'
-                        : 'Video consultation',
-                    style: Theme.of(context).textTheme.titleMedium),
-                if (!a.paymentRequired)
-                  const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text('No payment required'))
-                else if (a.fee != null)
-                  Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text('KES ${a.fee}')),
-                const SizedBox(height: 16),
-                Text(
-                    expired
-                        ? 'Reservation expired'
-                        : ended
-                            ? 'Consultation ${detail!.status.toLowerCase()}'
-                            : ready
-                                ? 'Consultation confirmed'
-                                : failed
-                                    ? 'Payment failed'
-                                    : detail == null
-                                        ? 'Checking consultation'
-                                        : 'Payment required',
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Text(expired
-                    ? 'The unpaid reservation has expired. Make a new booking and upload your records again.'
-                    : ended
-                        ? 'Messaging and calling are unavailable for this booking.'
-                        : ready
-                            ? 'Your consultation is available.'
-                            : failed
-                                ? 'Payment was not completed. You can try again.'
-                                : 'Complete payment to confirm your consultation.'),
-              ])),
-          const SizedBox(height: 16),
-          if (error != null) InlineError(error!, onRetry: refresh),
-          if (paymentError != null)
-            Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(paymentError!,
-                    style: const TextStyle(color: PatientTokens.danger))),
-          if (expired)
-            FilledButton(
-                onPressed: () =>
-                    Navigator.of(context).popUntil((route) => route.isFirst),
-                child: const Text('Choose a new booking'))
-          else if (ready || ended)
-            FilledButton(
-                onPressed: error == null && !opening ? open : null,
-                child: Text(opening
-                    ? 'Opening...'
-                    : ended
-                        ? 'View consultation history'
-                        : a.modality == 'CHAT'
-                            ? 'Open consultation'
-                            : 'Open waiting room'))
-          else if (detail?.status == 'PENDING_PAYMENT') ...[
-            if ((_remainingHoldSeconds ?? 0) > 0)
-              Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                      'Reservation expires in ${_formatHold(_remainingHoldSeconds!)}',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: PatientTokens.danger))),
-            FilledButton(
-                onPressed: paying ||
-                        (detail?.holdExpiresAt != null &&
-                            (_remainingHoldSeconds ?? 0) == 0)
-                    ? null
-                    : pay,
-                child: Text(paying
-                    ? 'Starting payment...'
-                    : 'Proceed to payment method')),
-          ],
-          if (!ready && !ended)
-            TextButton(onPressed: refresh, child: const Text('Refresh status')),
-          if (!expired)
-            OutlinedButton(
-                onPressed: () => showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    builder: (_) => PreConsultIntakeModal(
-                        doctorName: a.doctorDisplayName,
-                        appointmentId: a.id,
-                        repo: widget.repo)),
-                child: const Text('Attach health records')),
-          const SizedBox(height: 16),
-          Text('Reference: ${a.appointmentNumber}',
-              style: const TextStyle(color: PatientTokens.textSub)),
+            child: ListView(padding: EdgeInsets.zero, children: [
+          // Product owner's "Consultation Confirmed" design. The celebratory
+          // heading appears only once the server reports the booking ready;
+          // every other state keeps a neutral heading.
+          ConsultationHeader(
+              art: 'consult_confirmed_header',
+              showCheck: ready,
+              title: ready ? l.consultConfirmedTitle : l.consultYourTitle,
+              subtitle: ready
+                  ? (video ? l.consultConfirmedVideo : l.consultConfirmedChat)
+                  : null),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ConsultationDoctorCard(
+                      appointment: a,
+                      photos: DirectoryRepository(widget.repo.api)),
+                  const SizedBox(height: 14),
+                  PatientCard(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(
+                            expired
+                                ? 'Reservation expired'
+                                : ended
+                                    ? 'Consultation ${detail!.status.toLowerCase()}'
+                                    : ready
+                                        ? 'Consultation confirmed'
+                                        : failed
+                                            ? 'Payment failed'
+                                            : detail == null
+                                                ? 'Checking consultation'
+                                                : 'Payment required',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: PatientTokens.navy)),
+                        const SizedBox(height: 6),
+                        Text(expired
+                            ? 'The unpaid reservation has expired. Make a new booking and upload your records again.'
+                            : ended
+                                ? 'Messaging and calling are unavailable for this booking.'
+                                : ready
+                                    ? 'Your consultation is available.'
+                                    : failed
+                                        ? 'Payment was not completed. You can try again.'
+                                        : 'Complete payment to confirm your consultation.'),
+                        if (!a.paymentRequired)
+                          const Padding(
+                              padding: EdgeInsets.only(top: 8),
+                              child: Text('No payment required'))
+                        else if (a.fee != null)
+                          Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text('KES ${a.fee}')),
+                      ])),
+                  if (ready && video) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                          color: PatientTokens.primaryLight,
+                          borderRadius: BorderRadius.circular(14)),
+                      child: Row(children: [
+                        const Icon(Icons.event_available_outlined,
+                            color: PatientTokens.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                            child: Text(l.consultJoinInfo,
+                                style: const TextStyle(
+                                    fontSize: 13.5,
+                                    color: PatientTokens.navy))),
+                      ]),
+                    ),
+                  ],
+                  if (ready) ...[
+                    const SizedBox(height: 12),
+                    ConsultationTipsCard(
+                        title: l.consultBeforeTitle,
+                        art: 'consult_tips',
+                        tips: [
+                          l.consultBefore1,
+                          l.consultBefore2,
+                          l.consultBefore3
+                        ]),
+                  ],
+                  const SizedBox(height: 16),
+                  if (error != null) InlineError(error!, onRetry: refresh),
+                  if (paymentError != null)
+                    Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Text(paymentError!,
+                            style:
+                                const TextStyle(color: PatientTokens.danger))),
+                  if (expired)
+                    FilledButton(
+                        onPressed: () => Navigator.of(context)
+                            .popUntil((route) => route.isFirst),
+                        child: const Text('Choose a new booking'))
+                  else if (ready || ended)
+                    FilledButton(
+                        onPressed: error == null && !opening ? open : null,
+                        child: Text(opening
+                            ? 'Opening...'
+                            : ended
+                                ? 'View consultation history'
+                                : a.modality == 'CHAT'
+                                    ? 'Open consultation'
+                                    : 'Open waiting room'))
+                  else if (detail?.status == 'PENDING_PAYMENT') ...[
+                    if ((_remainingHoldSeconds ?? 0) > 0)
+                      Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Text(
+                              'Reservation expires in ${_formatHold(_remainingHoldSeconds!)}',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: PatientTokens.danger))),
+                    FilledButton(
+                        onPressed: paying ||
+                                (detail?.holdExpiresAt != null &&
+                                    (_remainingHoldSeconds ?? 0) == 0)
+                            ? null
+                            : pay,
+                        child: Text(paying
+                            ? 'Starting payment...'
+                            : 'Proceed to payment method')),
+                  ],
+                  if (!ready && !ended)
+                    TextButton(
+                        onPressed: refresh,
+                        child: const Text('Refresh status')),
+                  if (!expired)
+                    OutlinedButton(
+                        onPressed: () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            builder: (_) => PreConsultIntakeModal(
+                                doctorName: a.doctorDisplayName,
+                                appointmentId: a.id,
+                                repo: widget.repo)),
+                        child: const Text('Attach health records')),
+                  const SizedBox(height: 16),
+                  Text('Reference: ${a.appointmentNumber}',
+                      style: const TextStyle(color: PatientTokens.textSub)),
+                ]),
+          ),
         ])));
   }
 }

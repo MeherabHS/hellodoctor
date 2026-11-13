@@ -133,6 +133,8 @@ void main() {
           await tester.tap(find.text('Create an account'));
           await tester.pumpAndSettle();
           await tester.enterText(field('Full name'), 'Patient Y');
+          await tester.ensureVisible(field('Date of birth'));
+          await tester.pumpAndSettle();
           await tester.tap(field('Date of birth'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('OK'));
@@ -140,9 +142,11 @@ void main() {
           await tester.enterText(field('Phone number'), '0712345678');
         }
         await tester.enterText(field('Email address'), 'patient.y@example.com');
-        await tester.enterText(field('Password'), 'PatientPassword!2026');
+        await tester.enterText(
+            field(registration ? 'Create password' : 'Password'),
+            'PatientPassword!2026');
         final submit = find.widgetWithText(
-            FilledButton, registration ? 'Continue' : 'Sign in');
+            FilledButton, registration ? 'Create account' : 'Log in');
         await tester.ensureVisible(submit);
         await tester.tap(submit);
         await tester.pumpAndSettle();

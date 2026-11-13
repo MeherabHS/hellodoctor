@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hellodoctor_mobile_patient/l10n/app_localizations.dart';
 import 'package:hellodoctor_mobile_patient/core/network/api_client.dart';
 import 'package:hellodoctor_mobile_patient/features/patient/booking/booking_cubit.dart';
 import 'package:hellodoctor_mobile_patient/features/patient/booking/booking_models.dart';
@@ -95,6 +96,8 @@ void main() {
           paymentPolicy: 'REQUIRED',
           paymentStatus: payment));
       await tester.pumpWidget(MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: ConsultationStatusPage(
               appointment: AppointmentSummaryDto(
                   id: 'a',
@@ -148,6 +151,8 @@ void main() {
       serverTime: now,
     ));
     await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: ConsultationStatusPage(
             appointment: AppointmentSummaryDto(
                 id: 'a',

@@ -15,24 +15,29 @@ import 'core/network/client_error_reporter.dart';
 import 'core/notifications/push_notification_service.dart';
 import 'core/network/connectivity_service.dart';
 import 'core/theme/tokens.dart';
+import 'core/widgets/afya_bottom_nav.dart';
+import 'core/widgets/afya_widgets.dart';
 import 'core/widgets/startup_error_page.dart';
 import 'features/auth/auth_cubit.dart';
 import 'features/auth/auth_entry_page.dart';
 import 'features/auth/profile_completion_page.dart';
 import 'features/notifications/notification_cubit.dart';
 import 'features/notifications/notification_repository.dart';
-import 'features/patient/blogs/blogs_page.dart';
-import 'features/patient/blogs/blogs_repository.dart';
+import 'features/patient/chat/patient_chat_list_page.dart';
 import 'features/patient/home/home_cubit.dart';
 import 'features/patient/home/home_repository.dart';
 import 'features/patient/home/patient_home_page.dart';
+import 'features/patient/modules/patient_modules.dart';
 import 'features/patient/profile/family_profiles_cubit.dart';
 import 'features/patient/profile/family_profiles_repository.dart';
 import 'features/patient/profile/patient_profile_page.dart';
 import 'features/patient/profile/profile_cubit.dart';
 import 'features/patient/profile/profile_repository.dart';
+import 'features/patient/reminders/reminders_cubit.dart';
 import 'features/patient/services/patient_services_page.dart';
 import 'l10n/app_localizations.dart';
+
+export 'core/widgets/afya_bottom_nav.dart' show PatientBottomNav;
 
 /// Root widget of the Patient app.
 ///
@@ -196,14 +201,7 @@ class _SplashPage extends StatelessWidget {
       backgroundColor: PatientTokens.bg,
       body: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-                color: PatientTokens.primaryLight,
-                borderRadius: BorderRadius.circular(18)),
-            child: const Icon(Icons.medical_services_rounded,
-                color: PatientTokens.primary, size: 30)),
+        const AfyaLogoMark(size: 64),
         const SizedBox(height: 16),
         const Text('AfyaMkononi',
             style: TextStyle(
@@ -255,6 +253,8 @@ class _SignedInRootState extends State<_SignedInRoot> {
   late final FamilyProfilesCubit _familyProfilesCubit;
   late final NotificationCubit _notificationCubit;
   late final PushNotificationService _pushService;
+  final _reminders = ReminderSession();
+  StreamSubscription<String?>? _reminderStart;
   bool _completionHandled = false;
 
   @override
@@ -282,6 +282,12 @@ class _SignedInRootState extends State<_SignedInRoot> {
     _notificationCubit = NotificationCubit(NotificationRepository(widget.api))
       ..load()
       ..startPolling(interval: const Duration(minutes: 1));
+    // Re-arm this account's saved reminders once its id is known.
+    _reminderStart = _profileCubit.stream
+        .map((s) => s.profile?.userId)
+        .where((id) => id != null && id.isNotEmpty)
+        .take(1)
+        .listen((id) => unawaited(_reminders.start(id!, 'Personal reminders')));
     _pushService = PushNotificationService(
       repository: _notificationCubit.repo,
       onNotificationReceived: _notificationCubit.load,
@@ -311,6 +317,10 @@ class _SignedInRootState extends State<_SignedInRoot> {
     _profileCubit.close();
     _homeCubit.close();
     _familyProfilesCubit.close();
+    // Personal reminder alerts belong to the signed-in account: cancel them
+    // when the session ends so a signed-out phone shows nobody's reminders.
+    _reminderStart?.cancel();
+    unawaited(_reminders.end(_profileCubit.state.profile?.userId));
     _notificationCubit.close();
     unawaited(_pushService.dispose());
     NotificationTaps.clear();
@@ -356,16 +366,18 @@ class PatientShell extends StatefulWidget {
 class _PatientShellState extends State<PatientShell> {
   int tab = 0;
 
-  // Not `static const`: `PatientHomePage` needs an instance callback
-  // (`onOpenAccountTab`) back into this state, mirroring the prototype's
-  // `onclick="switchScreen(7)"` avatar tap now that the Profile screen is a
-  // real tab rather than a "coming soon" stub.
-  late final _pages = [
-    PatientHomePage(onOpenAccountTab: () => _selectTab(3)),
-    const PatientServicesPage(),
-    BlogsPage(repo: BlogsRepository(widget.api)),
-    const PatientProfilePage(),
-  ];
+  /// Messages is built on first visit, not at boot, so opening the app does
+  /// not add a consultation-list request to the startup traffic.
+  bool _messagesVisited = false;
+
+  late final _nav = PatientShellNav(
+    openServices: () => _selectTab(1),
+    openMessages: () => _selectTab(2),
+    openProfile: () => _selectTab(3),
+    select: _selectTab,
+  );
+
+  static const _screens = ['Home', 'Services', 'Messages', 'Profile'];
 
   @override
   void initState() {
@@ -375,67 +387,23 @@ class _PatientShellState extends State<PatientShell> {
 
   void _selectTab(int index) => setState(() {
         tab = index;
-        ClientErrorReporter.current?.screen =
-            const ['Home', 'Services', 'Blogs', 'Profile'][index];
+        if (index == 2) _messagesVisited = true;
+        ClientErrorReporter.current?.screen = _screens[index];
       });
 
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: PatientTokens.bg,
-        body: IndexedStack(index: tab, children: _pages),
+        body: IndexedStack(index: tab, children: [
+          PatientHomePage(nav: _nav),
+          PatientServicesPage(nav: _nav),
+          _messagesVisited
+              ? buildPatientMessagesTab(context)
+              : const SizedBox.shrink(),
+          const PatientProfilePage(),
+        ]),
         bottomNavigationBar: SafeArea(
             top: false,
             child: PatientBottomNav(selected: tab, onSelected: _selectTab)),
       );
-}
-
-class PatientBottomNav extends StatelessWidget {
-  const PatientBottomNav(
-      {super.key, required this.selected, required this.onSelected});
-  final int selected;
-  final ValueChanged<int> onSelected;
-  static const items = <(IconData, String)>[
-    (Icons.home_outlined, 'Home'),
-    (Icons.grid_view_outlined, 'Services'),
-    (Icons.article_outlined, 'Blogs'),
-    (Icons.person_outline, 'Account'),
-  ];
-  @override
-  Widget build(BuildContext context) => Container(
-      height: 76,
-      decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: PatientTokens.border))),
-      padding: const EdgeInsets.only(top: 7, bottom: 5),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-        for (var i = 0; i < items.length; i++)
-          Expanded(
-              child: InkWell(
-                  onTap: () => onSelected(i),
-                  child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(items[i].$1,
-                            size: 22,
-                            color: selected == i
-                                ? PatientTokens.primary
-                                : PatientTokens.textSub),
-                        const SizedBox(height: 3),
-                        Text(
-                            [
-                              AppLocalizations.of(context).navHome,
-                              AppLocalizations.of(context).navServices,
-                              AppLocalizations.of(context).navBlogs,
-                              AppLocalizations.of(context).accountLabel,
-                            ][i],
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: selected == i
-                                    ? FontWeight.w700
-                                    : FontWeight.w600,
-                                color: selected == i
-                                    ? PatientTokens.primary
-                                    : PatientTokens.textSub))
-                      ])))
-      ]));
 }

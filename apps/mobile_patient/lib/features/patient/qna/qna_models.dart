@@ -40,7 +40,7 @@ class AnsweredQuestionDto {
   bool get isInternalFixture => category == 'WEB_FIXTURE';
   String get doctorDisplayName => patientDoctorName(answeringDoctor);
   String get displayCategory =>
-      qnaCategories.contains(category) ? category! : qnaCategories.first;
+      qnaCategories.contains(category) ? category! : qnaOtherCategory;
 
   factory AnsweredQuestionDto.fromJson(Json j) => AnsweredQuestionDto(
         id: _textOf(j['id']),
@@ -57,15 +57,19 @@ class AnsweredQuestionDto {
       );
 }
 
-/// Fixed topic chips offered when asking a question — `health_questions
-/// .category` is a free-text `VARCHAR(80)`, not a backend-enforced enum, so
-/// this list (mirroring `prototype/index.html` view-12's topic strip) is a
-/// client-side convenience only, the same shape as the Grievance modal's
-/// fixed category list.
+/// Topics offered when asking a question. The app is HIV-centred, so these
+/// are the support-chat categories of reference panel 3, plus "Other".
+/// `health_questions.category` is a free-text `VARCHAR(80)`, not a
+/// backend-enforced enum, so this list is a client-side choice only. The
+/// stored values stay in English; labels are localized where they are shown.
 const qnaCategories = <String>[
-  'General Health',
-  'Fevers & Infections',
-  'Child Health',
-  'Diet & Diabetes',
-  'Skin & Allergy',
+  'HIV Testing',
+  'PrEP',
+  'ART',
+  'Sexual Health',
+  'Stigma & Mental Health',
+  qnaOtherCategory,
 ];
+
+/// Also the display fallback for a question saved under an older topic.
+const qnaOtherCategory = 'Other';

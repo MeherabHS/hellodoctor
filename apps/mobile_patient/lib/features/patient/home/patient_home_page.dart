@@ -1,52 +1,71 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:intl/intl.dart';
 
+import '../../../core/l10n/kenya_time.dart';
+import '../../../core/network/connectivity_service.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/time_format.dart';
-import '../../../core/widgets/patient_widgets.dart';
+import '../../../core/widgets/afya_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../notifications/notification_center_page.dart';
 import '../../notifications/notification_cubit.dart';
-import '../booking/booking_repository.dart';
-import '../booking/waiting_room_page.dart';
 import '../directory/directory_repository.dart';
 import '../directory/doctor_photo_avatar.dart';
-import '../directory/patient_directory_page.dart';
-import '../chat/patient_chat_list_page.dart';
-import '../profile/add_dependent_sheet.dart';
-import '../profile/family_profile_chip_row.dart';
+import '../modules/afya_module_widgets.dart';
+import '../modules/patient_modules.dart';
 import '../profile/family_profiles_cubit.dart';
 import '../profile/profile_cubit.dart';
-import '../qna/qna_page.dart';
-import '../qna/qna_repository.dart';
-import '../vault/health_vault_page.dart';
-import '../vault/vault_repository.dart';
-import 'emergency_contact_banner.dart';
 import 'home_cubit.dart';
 import 'home_models.dart';
+import 'upcoming_consultation_section.dart';
 
-/// `prototype/index.html` view-0 — "AESTHETIC HOME (4 core services)".
+/// Home dashboard, rebuilt to reference panel 1 of
+/// `docs/design/afyamkononi-patient-ui-reference.jpeg`: brand header, greeting
+/// card, search field, hero banner and the 3 x 3 grid of the nine modules,
+/// all visible without scrolling on a 411 dp wide phone at text scale 1.0.
+/// Narrower screens and larger text scroll.
 ///
-/// Directory, Health Vault (M7), and Q&A (M8, gap #6) are real now; Chat
-/// remains a later-milestone gap — tapping it shows an honest "coming soon"
-/// notice rather than navigating to nothing or a fake screen, per CLAUDE.md's
-/// "No Phantom Completions" rule. The avatar tap is the one exception: the
-/// prototype routes it to the Profile screen
-/// (`onclick="switchScreen(7)"`), and that screen is now real (the Account
-/// tab), so [onOpenAccountTab] switches to it directly instead of showing a
-/// "coming soon" notice for a destination that already exists.
+/// Differences from the panel, each by product-owner decision:
+/// - Card 3 reads "Book Consultation" (v2.1 brief, M03).
+/// - The search field opens the Services directory. It does not search
+///   doctors (v2.1 brief: no homepage doctor search).
+///
+/// The Emergency Contact banner, the family-profile switcher and the Upcoming
+/// Consultation card were removed from Home on 2026-11-12. Upcoming
+/// consultations are reached from Book Consultation; family profiles from
+/// the Profile tab.
+///
+/// State is unchanged: `HomeCubit`, `ProfileCubit`, `FamilyProfilesCubit` and
+/// `NotificationCubit` from `_SignedInRoot` are still loaded here.
 class PatientHomePage extends StatefulWidget {
-  const PatientHomePage({super.key, this.onOpenAccountTab});
-  final VoidCallback? onOpenAccountTab;
+  const PatientHomePage({super.key, required this.nav});
+  final PatientShellNav nav;
 
   @override
   State<PatientHomePage> createState() => _PatientHomePageState();
 }
 
 class _PatientHomePageState extends State<PatientHomePage> {
+  StreamSubscription<NetworkStatus>? _network;
+
+  @override
+  void dispose() {
+    _network?.cancel();
+    super.dispose();
+  }
+
   @override
   void initState() {
     super.initState();
+    _network =
+        context.read<HomeCubit>().repo.connectivity?.changes.listen((status) {
+      if (!mounted) return;
+      setState(() {});
+      if (status == NetworkStatus.online) unawaited(_reload());
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HomeCubit>().load();
       context.read<ProfileCubit>().load();
@@ -54,123 +73,83 @@ class _PatientHomePageState extends State<PatientHomePage> {
     });
   }
 
-  void _comingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-          content:
-              Text(AppLocalizations.of(context).comingSoonSnackbar(feature))),
-    );
+  Future<void> _reload() async {
+    await Future.wait([
+      context.read<HomeCubit>().load(),
+      context.read<ProfileCubit>().load(),
+      context.read<FamilyProfilesCubit>().load(),
+    ]);
   }
 
-  /// Opens the real specialist Directory (M4) — reads the already-constructed
-  /// `ApiClient`/`PatientCacheStore`/`ConnectivityService` off `HomeCubit`'s
-  /// own repository rather than threading three new constructor params
-  /// through `PatientHomePage`, since `HomeRepository` already exposes them
-  /// publicly and this page is a tab (not a pushed route), so `context.read`
-  /// on cubits declared in `_SignedInRootState` works normally here.
-  void _openChats() => openPatientChats(context);
-
-  void _openDirectory() {
-    final homeRepo = context.read<HomeCubit>().repo;
+  void _openNotifications() {
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => PatientDirectoryPage(
-        api: homeRepo.api,
-        cache: homeRepo.cache,
-        connectivity: homeRepo.connectivity!,
-        familyProfilesCubit: context.read<FamilyProfilesCubit>(),
-      ),
-    ));
-  }
-
-  /// Opens the Waiting Room (M5) for the Home card's single nearest upcoming
-  /// appointment. Refreshes `HomeCubit` on return in case its status changed
-  /// (e.g. completed) while the patient was there.
-  Future<void> _openWaitingRoom(AppointmentSummaryDto appointment) async {
-    final homeRepo = context.read<HomeCubit>().repo;
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => WaitingRoomPage(
-        appointment: appointment,
-        repo: BookingRepository(homeRepo.api,
-            connectivity: homeRepo.connectivity),
-        familyProfilesCubit: context.read<FamilyProfilesCubit>(),
-        myUserId: context.read<ProfileCubit>().state.profile?.userId,
-      ),
-    ));
-    if (mounted) context.read<HomeCubit>().load();
-  }
-
-  /// Opens the real Health Vault (M7, gap #2).
-  void _openHealthVault() {
-    final homeRepo = context.read<HomeCubit>().repo;
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => HealthVaultPage(
-        repo: VaultRepository(homeRepo.api,
-            cache: homeRepo.cache, connectivity: homeRepo.connectivity),
-        familyProfilesCubit: context.read<FamilyProfilesCubit>(),
-      ),
-    ));
-  }
-
-  /// Opens the real Free Health Q&A feed (M8, gap #6).
-  void _openQna() {
-    final homeRepo = context.read<HomeCubit>().repo;
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => QnaPage(
-        repo: QnaRepository(homeRepo.api),
-        familyProfilesCubit: context.read<FamilyProfilesCubit>(),
-      ),
+      builder: (_) =>
+          NotificationCenterPage(cubit: context.read<NotificationCubit>()),
     ));
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     return Scaffold(
       backgroundColor: PatientTokens.bg,
       body: SafeArea(
         // Keeps `HomeCubit`'s active profile in sync with the Family
-        // Profiles switcher (§5b) — switching re-queries Upcoming
-        // Consultation for the newly active profile, without the page
-        // itself needing to know the switcher ever changed.
+        // Profiles switcher: switching re-queries Upcoming Consultation for
+        // the newly active profile.
         child: BlocListener<FamilyProfilesCubit, FamilyProfilesState>(
           listenWhen: (previous, current) =>
               previous.activeProfileId != current.activeProfileId,
           listener: (context, state) =>
               context.read<HomeCubit>().setActiveProfile(state.activeProfileId),
           child: RefreshIndicator(
-            onRefresh: () async {
-              await Future.wait([
-                context.read<HomeCubit>().load(),
-                context.read<ProfileCubit>().load(),
-                context.read<FamilyProfilesCubit>().load(),
-              ]);
-            },
+            onRefresh: _reload,
             child: BlocBuilder<ProfileCubit, ProfileState>(
               builder: (context, profileState) {
                 return BlocBuilder<HomeCubit, HomeState>(
                   builder: (context, homeState) {
+                    final name = profileState.profile?.fullName;
+                    // Offline as soon as the device reports no connection,
+                    // not only after a request has failed.
+                    final offline = homeState.offline ||
+                        (context
+                                .read<HomeCubit>()
+                                .repo
+                                .connectivity
+                                ?.isOffline ??
+                            false);
                     return ListView(
-                      padding: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.only(bottom: 10),
                       children: [
-                        _Greeting(
-                          name: profileState.profile?.fullName,
-                          onAvatarTap: widget.onOpenAccountTab ??
-                              () => _comingSoon(l10n.accountLabel),
-                        ),
-                        const SizedBox(height: 14),
-                        _CoreServicesGrid(
-                            onOpenDirectory: _openDirectory,
-                            onOpenHealthVault: _openHealthVault,
-                            onOpenQna: _openQna,
-                            onOpenChats: _openChats),
-                        const EmergencyContactBanner(),
-                        const _ProfileSwitcherBar(),
-                        _UpcomingConsultationSection(
-                          state: homeState,
-                          onManage: homeState.nextUpcoming == null
-                              ? () {}
-                              : () => _openWaitingRoom(homeState.nextUpcoming!),
-                        ),
+                        _BrandHeader(
+                            name: name,
+                            onBell: _openNotifications,
+                            onAvatar: widget.nav.openProfile),
+                        _GreetingCard(name: name),
+                        _SearchField(onTap: widget.nav.openServices),
+                        if (homeState.nextUpcoming != null)
+                          _UpcomingCard(
+                              appointment: homeState.nextUpcoming!,
+                              onOpen: () => openWaitingRoomFor(
+                                  context, homeState.nextUpcoming!)),
+                        if (offline)
+                          _OfflineBanner(onRetry: _reload)
+                        else
+                          _HeroBanner(
+                              onExplore: () =>
+                                  openEducation(context, widget.nav)),
+                        _ServiceGrid(nav: widget.nav, offline: offline),
+                        if (offline)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                            child: AfyaInfoCard(
+                                icon: Icons.info_outline_rounded,
+                                title: AppLocalizations.of(context)
+                                    .offlineLimitedTitle,
+                                body: AppLocalizations.of(context)
+                                    .offlineLimitedBody,
+                                background: PatientTokens.mintCard,
+                                accent: PatientTokens.primaryDark),
+                          ),
                       ],
                     );
                   },
@@ -184,477 +163,466 @@ class _PatientHomePageState extends State<PatientHomePage> {
   }
 }
 
-/// Compact "Managing for: X" entry point to the Family Profiles switcher
-/// (§5b) — the plan's "reachable from Home" requirement, placed directly
-/// above Upcoming Consultation so it's obvious which profile that card is
-/// scoped to. Hidden until the list has actually loaded, rather than
-/// flashing an empty/self-only bar before the first response lands.
-class _ProfileSwitcherBar extends StatelessWidget {
-  const _ProfileSwitcherBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<FamilyProfilesCubit, FamilyProfilesState>(
-      builder: (context, state) {
-        if (state.profiles.isEmpty) return const SizedBox.shrink();
-        final active = state.activeProfile;
-        final l10n = AppLocalizations.of(context);
-        final label = active == null
-            ? l10n.homeManagingForYou
-            : '${l10n.homeManagingForName(active.fullName)}'
-                '${active.isSelf ? '' : ' (${active.relationship ?? l10n.homeDependentFallback})'}';
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-          child: InkWell(
-            onTap: () => _openSwitcher(context),
-            borderRadius: BorderRadius.circular(PatientTokens.chipRadius),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: PatientTokens.surface,
-                borderRadius: BorderRadius.circular(PatientTokens.chipRadius),
-                border: Border.all(color: PatientTokens.border),
-              ),
-              child: Row(children: [
-                Icon(
-                    active == null || active.isSelf
-                        ? Icons.person
-                        : Icons.group_outlined,
-                    size: 16,
-                    color: PatientTokens.primaryDark),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(label,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: PatientTokens.text)),
-                ),
-                const Icon(Icons.unfold_more,
-                    size: 16, color: PatientTokens.textSub),
-              ]),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _openSwitcher(BuildContext pageContext) {
-    final cubit = pageContext.read<FamilyProfilesCubit>();
-    showModalBottomSheet(
-      context: pageContext,
-      isScrollControlled: true,
-      builder: (sheetContext) => BlocProvider.value(
-        value: cubit,
-        child: _ProfileSwitcherSheet(
-          onAddDependent: () {
-            Navigator.of(sheetContext).pop();
-            showAddDependentSheet(pageContext);
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileSwitcherSheet extends StatelessWidget {
-  const _ProfileSwitcherSheet({required this.onAddDependent});
-  final VoidCallback onAddDependent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 20, 0, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(AppLocalizations.of(context).homeSwitchProfile,
-                style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: PatientTokens.text)),
-          ),
-          const SizedBox(height: 14),
-          BlocBuilder<FamilyProfilesCubit, FamilyProfilesState>(
-            builder: (context, state) => FamilyProfileChipRow(
-              profiles: state.profiles,
-              activeProfileId: state.activeProfileId,
-              onSelect: (id) {
-                context.read<FamilyProfilesCubit>().setActiveProfile(id);
-                Navigator.of(context).pop();
-              },
-              onAddDependent: onAddDependent,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Greeting extends StatelessWidget {
-  const _Greeting({required this.name, required this.onAvatarTap});
+/// Logo, wordmark, tagline, notification bell and initials avatar.
+class _BrandHeader extends StatelessWidget {
+  const _BrandHeader(
+      {required this.name, required this.onBell, required this.onAvatar});
   final String? name;
-  final VoidCallback onAvatarTap;
-
-  void _openNotifications(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) =>
-          NotificationCenterPage(cubit: context.read<NotificationCubit>()),
-    ));
-  }
+  final VoidCallback onBell, onAvatar;
 
   @override
   Widget build(BuildContext context) {
-    final displayName = (name == null || name!.isEmpty) ? '' : name!;
     final l10n = AppLocalizations.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
+      padding: const EdgeInsets.fromLTRB(20, 6, 12, 0),
+      child: Row(children: [
+        const AfyaLogoMark(size: 48),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(l10n.homeWelcomeBack,
-                    style: const TextStyle(
-                        fontSize: 13, color: PatientTokens.textSub)),
-                Text(
-                  displayName.isEmpty
-                      ? l10n.homeGreetingDefault
-                      : l10n.homeGreetingNamed(displayName),
-                  style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w800,
-                      color: PatientTokens.text),
-                ),
-              ],
-            ),
-          ),
-          BlocBuilder<NotificationCubit, NotificationState>(
-            builder: (context, state) => Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: NotificationBellAction(
-                unreadCount: state.unreadCount,
-                onTap: () => _openNotifications(context),
-              ),
-            ),
-          ),
-          InkWell(
-            onTap: onAvatarTap,
-            borderRadius: BorderRadius.circular(22),
-            child: const CircleAvatar(
-              radius: 20,
-              backgroundColor: PatientTokens.primaryLight,
-              child: Icon(Icons.person, color: PatientTokens.primaryDark),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CoreServiceItem {
-  const _CoreServiceItem({
-    required this.icon,
-    required this.iconBg,
-    required this.iconFg,
-    required this.badge,
-    required this.badgeBg,
-    required this.badgeFg,
-    required this.title,
-    required this.description,
-    required this.onTap,
-  });
-  final IconData icon;
-  final Color iconBg, iconFg, badgeBg, badgeFg;
-  final String badge, title, description;
-  final VoidCallback onTap;
-}
-
-/// `prototype/index.html` view-0's `.core-services-2x2` grid
-/// (`.grid-service-card`) — each card is an icon chip, a colored status
-/// badge, a title and a description, not just an icon-and-label tile. Copy
-/// is the prototype's exact text except the Chat card's fee badge: the
-/// prototype hardcodes "৳ 300 Fee" (Bangladesh taka, the prototype's
-/// original market), but no Kenya KES consultation fee is specified
-/// anywhere in `docs/` — inventing a number here would violate CLAUDE.md's
-/// "No Unilateral Feature Inventions" rule, so this uses the honest, number-
-/// free "Paid" badge instead.
-class _CoreServicesGrid extends StatelessWidget {
-  const _CoreServicesGrid(
-      {required this.onOpenDirectory,
-      required this.onOpenHealthVault,
-      required this.onOpenQna,
-      required this.onOpenChats});
-  final VoidCallback onOpenChats;
-  final VoidCallback onOpenDirectory, onOpenHealthVault, onOpenQna;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final items = <_CoreServiceItem>[
-      _CoreServiceItem(
-        icon: Icons.calendar_month_outlined,
-        iconBg: PatientTokens.primaryLight,
-        iconFg: PatientTokens.primaryDark,
-        badge: l10n.homeServiceSpecialistBadge,
-        badgeBg: PatientTokens.primaryLight,
-        badgeFg: PatientTokens.primaryDark,
-        title: l10n.homeServiceBookSpecialist,
-        description: l10n.homeServiceBookSpecialistDesc,
-        onTap: onOpenDirectory,
-      ),
-      _CoreServiceItem(
-        icon: Icons.chat_bubble_outline,
-        iconBg: PatientTokens.warningLight,
-        iconFg: PatientTokens.amberText,
-        badge: l10n.homeServicePaidBadge,
-        badgeBg: PatientTokens.warningLight,
-        badgeFg: PatientTokens.amberText,
-        title: l10n.chatWithDoctorLabel,
-        description: l10n.homeServiceChatDesc,
-        onTap: onOpenChats,
-      ),
-      _CoreServiceItem(
-        icon: Icons.health_and_safety_outlined,
-        iconBg: PatientTokens.surfaceAlt,
-        iconFg: PatientTokens.primary,
-        badge: l10n.homeServiceFreeBadge,
-        badgeBg: PatientTokens.surfaceAlt,
-        badgeFg: PatientTokens.primaryDark,
-        title: l10n.homeServiceQnaTitle,
-        description: l10n.homeServiceQnaDesc,
-        onTap: onOpenQna,
-      ),
-      _CoreServiceItem(
-        icon: Icons.folder_shared_outlined,
-        iconBg: PatientTokens.roseLight,
-        iconFg: PatientTokens.roseText,
-        badge: l10n.homeServiceVaultBadge,
-        badgeBg: PatientTokens.roseLight,
-        badgeFg: PatientTokens.roseText,
-        title: l10n.homeServiceVaultTitle,
-        description: l10n.homeServiceVaultDesc,
-        onTap: onOpenHealthVault,
-      ),
-    ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
-      child: LayoutBuilder(
-          builder: (context, constraints) => Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final item in items)
-                    SizedBox(
-                        width: (constraints.maxWidth - 10) / 2,
-                        child: InkWell(
-                          onTap: item.onTap,
-                          borderRadius:
-                              BorderRadius.circular(PatientTokens.cardRadius),
-                          child: PatientCard(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Container(
-                                      width: 38,
-                                      height: 38,
-                                      decoration: BoxDecoration(
-                                          color: item.iconBg,
-                                          shape: BoxShape.circle),
-                                      alignment: Alignment.center,
-                                      child: Icon(item.icon,
-                                          color: item.iconFg, size: 20),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                        child: StatusChip(item.badge,
-                                            color: item.badgeBg,
-                                            textColor: item.badgeFg)),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Text(item.title,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        color: PatientTokens.text,
-                                        fontSize: 13)),
-                                const SizedBox(height: 2),
-                                Text(item.description,
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        color: PatientTokens.textSub)),
-                              ],
-                            ),
-                          ),
-                        )),
-                ],
-              )),
-    );
-  }
-}
-
-class _UpcomingConsultationSection extends StatelessWidget {
-  const _UpcomingConsultationSection(
-      {required this.state, required this.onManage});
-  final HomeState state;
-  final VoidCallback onManage;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                  child: Text(l10n.homeUpcomingConsultation,
-                      style: const TextStyle(
-                          fontSize: 15,
+                const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text('AfyaMkononi',
+                      maxLines: 1,
+                      style: TextStyle(
+                          fontSize: 22,
+                          height: 1.15,
                           fontWeight: FontWeight.w800,
-                          color: PatientTokens.text))),
-              if (state.nextUpcoming != null)
-                TextButton(
-                    onPressed: onManage, child: Text(l10n.homeManageButton)),
-            ],
-          ),
-          if (state.loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Column(children: [
-                SkeletonBlock(height: 70),
+                          letterSpacing: -.2,
+                          color: PatientTokens.brandTeal)),
+                ),
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(l10n.brandTagline,
+                      maxLines: 1,
+                      style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: PatientTokens.brandTealSoft)),
+                ),
               ]),
-            )
-          else if (state.error != null && state.nextUpcoming == null)
-            InlineError(state.error!)
-          else if (state.nextUpcoming == null)
-            PatientCard(
-              child: Text(l10n.homeNoUpcoming,
-                  style: const TextStyle(color: PatientTokens.textSub)),
-            )
-          else
-            _ConsultCard(
-                appointment: state.nextUpcoming!,
-                onOpen: onManage,
-                repo: DirectoryRepository(context.read<HomeCubit>().repo.api)),
-        ],
-      ),
-    );
-  }
-}
-
-class _ConsultCard extends StatelessWidget {
-  const _ConsultCard(
-      {required this.appointment, required this.onOpen, required this.repo});
-  final AppointmentSummaryDto appointment;
-  final VoidCallback onOpen;
-  final DirectoryRepository repo;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final start = appointment.startTime;
-    final time = formatTimeEat(start);
-    return PatientCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (appointment.hasActiveConsultation)
-          Container(
-              padding: const EdgeInsets.all(12),
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF86EFAC))),
-              child: Row(children: [
-                const Icon(Icons.videocam, color: Color(0xFF166534)),
-                const SizedBox(width: 8),
-                const Expanded(
-                    child: Text('Active Consultation',
-                        style: TextStyle(
-                            color: Color(0xFF166534),
-                            fontWeight: FontWeight.w800))),
-                FilledButton(
-                    style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF16A34A)),
-                    onPressed: onOpen,
-                    child: const Text('Rejoin'))
-              ])),
-        Row(children: [
-          DoctorPhotoAvatar(
-            doctorId: appointment.doctorId,
-            initials: appointment.doctorInitials,
-            hasPhoto: appointment.hasPhoto,
-            photoUpdatedAt: appointment.photoUpdatedAt,
-            repo: repo,
-            radius: 22,
+        ),
+        BlocBuilder<NotificationCubit, NotificationState>(
+          builder: (context, state) => IconButton(
+              onPressed: onBell,
+              tooltip: l10n.notificationSettingsMenuTitle,
+              icon: Badge(
+                  isLabelVisible: state.unreadCount > 0,
+                  label: Text(
+                      state.unreadCount > 99 ? '99+' : '${state.unreadCount}'),
+                  backgroundColor: PatientTokens.danger,
+                  child: const Icon(Icons.notifications_none_rounded,
+                      size: 26, color: PatientTokens.navy))),
+        ),
+        InkWell(
+          onTap: onAvatar,
+          customBorder: const CircleBorder(),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: AfyaInitialsAvatar(name: name, size: 36),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(appointment.doctorDisplayName,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: PatientTokens.text)),
-                Text(appointment.primarySpecialty,
-                    style: const TextStyle(
-                        fontSize: 12, color: PatientTokens.textSub)),
-                Text(
-                    l10n.homeConsultCardLine(
-                        '${start.day}',
-                        '${start.month}',
-                        time,
-                        appointment.modality == 'VIDEO'
-                            ? l10n.modalityVideo
-                            : l10n.modalityChat),
-                    style: const TextStyle(
-                        fontSize: 11, color: PatientTokens.textSub)),
-              ],
-            ),
-          ),
-          StatusChip(_statusLabel(l10n, appointment.status)),
-        ]),
-        if (appointment.isWaitingForReconnect)
-          Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                  appointment.doctorPresent == false &&
-                          appointment.patientPresent == true
-                      ? 'Doctor is reconnecting. Your consultation remains active.'
-                      : appointment.doctorPresent == true &&
-                              appointment.patientPresent == false
-                          ? 'You are disconnected. Rejoin to continue the consultation.'
-                          : 'The room is empty. Either participant can rejoin now.',
-                  style: const TextStyle(
-                      color: Color(0xFF166534),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600))),
+        ),
       ]),
     );
   }
+}
 
-  String _statusLabel(AppLocalizations l10n, String status) => switch (status) {
-        'PENDING_PAYMENT' => l10n.apptStatusPendingPayment,
-        'CONFIRMED' => l10n.apptStatusConfirmed,
-        'WAITING' => l10n.apptStatusWaiting,
-        'IN_CONSULTATION' => l10n.apptStatusInConsultation,
-        _ => status,
-      };
+class _GreetingCard extends StatelessWidget {
+  const _GreetingCard({required this.name});
+  final String? name;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final first = (name ?? '').trim().split(RegExp(r'\s+')).first;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 13),
+      decoration: BoxDecoration(
+          color: PatientTokens.primaryLight,
+          borderRadius: BorderRadius.circular(12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(first.isEmpty ? l10n.homeHiDefault : l10n.homeHiNamed(first),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: PatientTokens.text)),
+        const SizedBox(height: 4),
+        Text(l10n.homeGreetingSub,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: PatientTokens.greetingSub)),
+      ]),
+    );
+  }
+}
+
+/// The reference's search pill. It is an entry point to the Services
+/// directory, not a text search: there is no search backend for services or
+/// topics, and the v2.1 brief rules out a homepage doctor search.
+class _SearchField extends StatelessWidget {
+  const _SearchField({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+        child: Semantics(
+          button: true,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 44),
+            decoration: BoxDecoration(
+                color: PatientTokens.surface,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: PatientTokens.softShadow),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                  child: Row(children: [
+                    const Icon(Icons.search_rounded,
+                        size: 21, color: PatientTokens.navInactive),
+                    const SizedBox(width: 8),
+                    Expanded(
+                        child: Text(AppLocalizations.of(context).homeSearchHint,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 12.5, color: PatientTokens.hint))),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _HeroBanner extends StatelessWidget {
+  const _HeroBanner({required this.onExplore});
+  final VoidCallback onExplore;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    const headline = TextStyle(
+        fontSize: 17,
+        height: 1.4,
+        fontWeight: FontWeight.w800,
+        color: PatientTokens.navy);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      constraints: const BoxConstraints(minHeight: 150),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          gradient: const LinearGradient(
+              begin: Alignment.bottomLeft,
+              end: Alignment.topRight,
+              colors: [PatientTokens.heroSkyLight, PatientTokens.heroSky])),
+      child: LayoutBuilder(builder: (context, constraints) {
+        final artWidth = constraints.maxWidth * .40;
+        return Stack(children: [
+          Positioned(
+              left: 0,
+              bottom: 0,
+              top: 0,
+              width: artWidth,
+              child: const _HeroArt()),
+          Padding(
+            padding: EdgeInsets.fromLTRB(artWidth + 8, 14, 14, 12),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(l10n.homeHeroLine1, style: headline),
+                  Text(l10n.homeHeroLine2, style: headline),
+                  Text(l10n.homeHeroLine3, style: headline),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton(
+                      onPressed: onExplore,
+                      style: FilledButton.styleFrom(
+                          backgroundColor: PatientTokens.heroCta,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(0, 36),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          tapTargetSize: MaterialTapTargetSize.padded,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                          textStyle: const TextStyle(
+                              fontFamily: 'Plus Jakarta Sans',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700)),
+                      child:
+                          Text(l10n.homeHeroCta, textAlign: TextAlign.center),
+                    ),
+                  ),
+                ]),
+          ),
+        ]);
+      }),
+    );
+  }
+}
+
+/// The hero character: the product owner's high-resolution regeneration of
+/// the reference's illustration, on a transparent background so it sits on
+/// the banner gradient. Anchored bottom-left and never cropped at the head.
+class _HeroArt extends StatelessWidget {
+  const _HeroArt();
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Image.asset(
+          'assets/illustrations/home_hero_girl.png',
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          filterQuality: FilterQuality.medium,
+          excludeFromSemantics: true,
+        ),
+      );
+}
+
+/// The nine modules as a 3 x 3 grid, each row sized to its tallest card.
+class _ServiceGrid extends StatelessWidget {
+  const _ServiceGrid({required this.nav, this.offline = false});
+  final PatientShellNav nav;
+
+  /// Offline design: modules that need the network are greyed out and
+  /// explain themselves when tapped; the two that work offline are marked.
+  final bool offline;
+  @override
+  Widget build(BuildContext context) {
+    final modules = patientModules(context, nav);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      child: Column(children: [
+        for (var row = 0; row < 3; row++)
+          Padding(
+            padding: EdgeInsets.only(bottom: row == 2 ? 0 : 10),
+            child: IntrinsicHeight(
+              child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var col = 0; col < 3; col++) ...[
+                      if (col > 0) const SizedBox(width: 10),
+                      Expanded(
+                          child: AfyaServiceTile(
+                              icon: modules[row * 3 + col].icon,
+                              color: modules[row * 3 + col].color,
+                              background: modules[row * 3 + col].background,
+                              label: modules[row * 3 + col].label,
+                              enabled: !offline ||
+                                  modules[row * 3 + col].availableOffline,
+                              badge: offline &&
+                                      modules[row * 3 + col].availableOffline
+                                  ? AppLocalizations.of(context)
+                                      .offlineAvailable
+                                  : null,
+                              onTap: () {
+                                final m = modules[row * 3 + col];
+                                if (offline && !m.availableOffline) {
+                                  ScaffoldMessenger.of(context)
+                                    ..hideCurrentSnackBar()
+                                    ..showSnackBar(SnackBar(
+                                        content: Text(
+                                            AppLocalizations.of(context)
+                                                .offlineNeedsInternet)));
+                                } else {
+                                  m.open(context);
+                                }
+                              })),
+                    ],
+                  ]),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+/// Upcoming-consultation card of the product owner's Home design. It is
+/// shown only while the patient has an upcoming or active consultation.
+/// The button opens the waiting room, where joining stays gated by the
+/// server's join window; it never starts a call directly.
+class _UpcomingCard extends StatelessWidget {
+  const _UpcomingCard({required this.appointment, required this.onOpen});
+  final AppointmentSummaryDto appointment;
+  final VoidCallback onOpen;
+
+  String? _badge(AppLocalizations l) {
+    if (appointment.hasActiveConsultation) return l.homeInProgress;
+    final minutes = appointment.startTime.difference(DateTime.now()).inMinutes;
+    if (minutes > 60) return null;
+    return minutes <= 0 ? l.homeStartsNow : l.homeStartsInMin('$minutes');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final a = appointment;
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final video = a.modality == 'VIDEO';
+    final badge = _badge(l);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      decoration: BoxDecoration(
+          color: const Color(0xFFE9F8F0),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFCDEEDB))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Icon(video ? Icons.videocam_rounded : Icons.chat_bubble_rounded,
+              size: 24, color: PatientTokens.primaryDark),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(l.homeUpcomingConsultation,
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: PatientTokens.navy)),
+          ),
+          if (badge != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFCDEEDB),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: PatientTokens.primary)),
+              child: Text(badge,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: PatientTokens.primaryDark)),
+            ),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          DoctorPhotoAvatar(
+              doctorId: a.doctorId,
+              initials: a.doctorInitials,
+              hasPhoto: a.hasPhoto,
+              photoUpdatedAt: a.photoUpdatedAt,
+              repo: DirectoryRepository(context.read<HomeCubit>().repo.api),
+              radius: 26),
+          const SizedBox(width: 12),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(a.doctorDisplayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                      color: PatientTokens.navy)),
+              Text(a.primarySpecialty,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      const TextStyle(fontSize: 13, color: PatientTokens.ink)),
+              const SizedBox(height: 4),
+              Text(
+                  '${DateFormat('EEE, d MMM y', locale).format(kenyaTime(a.startTime))}'
+                  '  •  ${formatTimeEat(a.startTime)}',
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: PatientTokens.ink)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+            onPressed: onOpen,
+            icon: Icon(video
+                ? Icons.videocam_rounded
+                : Icons.chat_bubble_outline_rounded),
+            label:
+                Text(video ? l.homeJoinConsultation : l.homeOpenConsultation),
+            style: FilledButton.styleFrom(
+                backgroundColor: PatientTokens.primaryDark,
+                minimumSize: const Size.fromHeight(46),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)))),
+      ]),
+    );
+  }
+}
+
+/// Replaces the hero while the device has no connection (product owner's
+/// offline design): what is wrong, what still works, and a retry.
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner({required this.onRetry});
+  final Future<void> Function() onRetry;
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+          color: const Color(0xFFE4F4FB),
+          borderRadius: BorderRadius.circular(14)),
+      child: IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(
+            flex: 9,
+            child: Image.asset('assets/illustrations/offline_hero.jpg',
+                fit: BoxFit.cover,
+                alignment: Alignment.bottomLeft,
+                excludeFromSemantics: true),
+          ),
+          Expanded(
+            flex: 11,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(10, 14, 14, 14),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(l.offlineTitle,
+                        style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: PatientTokens.navy)),
+                    const SizedBox(height: 4),
+                    Text(l.offlineBody,
+                        style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.35,
+                            color: PatientTokens.ink)),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                        onPressed: onRetry,
+                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        label: Text(l.offlineTryAgain),
+                        style: FilledButton.styleFrom(
+                            backgroundColor: PatientTokens.primaryDark,
+                            minimumSize: const Size(0, 42),
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)))),
+                  ]),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
 }

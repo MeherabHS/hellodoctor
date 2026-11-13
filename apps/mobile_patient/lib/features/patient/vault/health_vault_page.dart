@@ -26,7 +26,11 @@ class HealthVaultPage extends StatefulWidget {
     super.key,
     required this.repo,
     required this.familyProfilesCubit,
+    this.initialKind = 'all',
   });
+
+  /// Initial tab: `all`, `PRESCRIPTION` or `INTAKE`.
+  final String initialKind;
   final VaultRepository repo;
   final FamilyProfilesCubit familyProfilesCubit;
 
@@ -36,7 +40,7 @@ class HealthVaultPage extends StatefulWidget {
 
 class _HealthVaultPageState extends State<HealthVaultPage> {
   late final VaultCubit _cubit;
-  String _kindFilter = 'all';
+  late String _kindFilter = widget.initialKind;
   final Set<String> _openingIds = {};
 
   @override
