@@ -494,3 +494,258 @@ async fn test_deferred_booking_requires_authentication(pool: PgPool) {
     .await;
     assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
 }
+
+// ---------------------------------------------------------------------------
+// Payment-free consultation activation (P0-B, 2026-11-13). Before this, the
+// chat conversation was created only by the payment webhook, so every
+// deferred booking had none: chat consultations could never start and the
+// post-video chat was missing. `AppointmentService::ensure_consultation_activated`
+// is now shared by the webhook, the deferred booking and the
+// participant-authorized repair in `GET /appointments/:id/conversation`.
+// ---------------------------------------------------------------------------
+
+async fn book_deferred(app: &axum::Router, token: &str, modality: &str) -> (Uuid, Uuid) {
+    let slot_id = first_bookable_slot(app, token).await;
+    let res = post_idem(
+        app,
+        "/api/v1/appointments/book",
+        Some(token),
+        &serde_json::json!({"doctor_id": DOCTOR1_PROFILE_ID, "slot_id": slot_id, "modality": modality}),
+        &Uuid::new_v4().to_string(),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+    let body = json_body(res).await;
+    assert_eq!(body["data"]["status"], "CONFIRMED");
+    assert_eq!(body["data"]["payment_policy"], "NOT_REQUIRED");
+    (
+        Uuid::parse_str(body["data"]["appointment_id"].as_str().unwrap()).unwrap(),
+        slot_id,
+    )
+}
+
+/// Fixture-only: returns an appointment to the state of one confirmed before
+/// payment-free activation existed (no conversation, no activation trace).
+async fn remove_conversation_as_if_legacy(pool: &PgPool, apt_id: Uuid) {
+    sqlx::query(
+        "DELETE FROM consultation_trace_events WHERE conversation_id IN \
+         (SELECT id FROM chat_conversations WHERE appointment_id = $1)",
+    )
+    .bind(apt_id)
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query("DELETE FROM chat_conversations WHERE appointment_id = $1")
+        .bind(apt_id)
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+async fn conversation_count(pool: &PgPool, apt_id: Uuid) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM chat_conversations WHERE appointment_id = $1")
+        .bind(apt_id)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn conversation_id_for(app: &axum::Router, token: &str, apt_id: Uuid) -> Uuid {
+    let res = get(
+        app,
+        &format!("/api/v1/appointments/{apt_id}/conversation"),
+        Some(token),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    Uuid::parse_str(json_body(res).await["data"]["id"].as_str().unwrap()).unwrap()
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_deferred_chat_booking_activates_conversation_and_both_parties_exchange_messages(
+    pool: PgPool,
+) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    unprice_doctor1(&pool).await;
+    let patient = fresh_patient_token(&pool).await;
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+
+    // A zero-fee verified doctor is discoverable for CHAT in deferred mode.
+    let listed = get(&app, "/api/v1/doctors?modality=CHAT", Some(&patient)).await;
+    assert!(json_body(listed).await["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|d| d["id"] == DOCTOR1_PROFILE_ID));
+
+    let (apt_id, slot_id) = book_deferred(&app, &patient, "CHAT").await;
+    assert_eq!(conversation_count(&pool, apt_id).await, 1);
+
+    // The messaging window outlives the booked slot.
+    let (expires_at, slot_end): (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
+        sqlx::query_as(
+            "SELECT c.expires_at, s.end_time FROM chat_conversations c, doctor_schedule_slots s \
+             WHERE c.appointment_id = $1 AND s.id = $2",
+        )
+        .bind(apt_id)
+        .bind(slot_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(expires_at >= slot_end + chrono::Duration::hours(24) - chrono::Duration::seconds(5));
+
+    let conv = conversation_id_for(&app, &patient, apt_id).await;
+    assert_eq!(conversation_id_for(&app, &doctor, apt_id).await, conv);
+
+    for (token, text) in [(&patient, "Patient hello"), (&doctor, "Doctor reply")] {
+        let res = post_idem(
+            &app,
+            &format!("/api/v1/chat/{conv}/messages"),
+            Some(token),
+            &serde_json::json!({"content": text}),
+            &Uuid::new_v4().to_string(),
+        )
+        .await;
+        assert!(res.status().is_success(), "send failed: {}", res.status());
+    }
+    for token in [&patient, &doctor] {
+        let res = get(&app, &format!("/api/v1/chat/{conv}/messages"), Some(token)).await;
+        assert_eq!(res.status(), StatusCode::OK);
+        let messages = json_body(res).await["data"].as_array().unwrap().clone();
+        let contents: Vec<&str> = messages
+            .iter()
+            .filter_map(|m| m["content"].as_str())
+            .collect();
+        assert!(contents.contains(&"Patient hello") && contents.contains(&"Doctor reply"));
+    }
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_deferred_conversation_is_not_reachable_by_unrelated_accounts(pool: PgPool) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    let patient = fresh_patient_token(&pool).await;
+    let (apt_id, _) = book_deferred(&app, &patient, "CHAT").await;
+    let conv = conversation_id_for(&app, &patient, apt_id).await;
+
+    let stranger = fresh_patient_token(&pool).await;
+    let other_doctor = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
+    for token in [&stranger, &other_doctor] {
+        let lookup = get(
+            &app,
+            &format!("/api/v1/appointments/{apt_id}/conversation"),
+            Some(token),
+        )
+        .await;
+        assert_eq!(lookup.status(), StatusCode::NOT_FOUND);
+        let read = get(&app, &format!("/api/v1/chat/{conv}/messages"), Some(token)).await;
+        assert!(
+            !read.status().is_success(),
+            "unrelated account read the thread"
+        );
+        let send = post_idem(
+            &app,
+            &format!("/api/v1/chat/{conv}/messages"),
+            Some(token),
+            &serde_json::json!({"content": "intrusion"}),
+            &Uuid::new_v4().to_string(),
+        )
+        .await;
+        assert!(
+            !send.status().is_success(),
+            "unrelated account posted into the thread"
+        );
+    }
+    let intrusions: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages WHERE conversation_id = $1")
+            .bind(conv)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(intrusions, 0);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_deferred_video_booking_gets_session_and_post_video_conversation(pool: PgPool) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    let patient = fresh_patient_token(&pool).await;
+    let (apt_id, _) = book_deferred(&app, &patient, "VIDEO").await;
+    assert_eq!(conversation_count(&pool, apt_id).await, 1);
+    let sessions: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM consultation_sessions WHERE appointment_id = $1")
+            .bind(apt_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(sessions, 1);
+    let conv = conversation_id_for(&app, &patient, apt_id).await;
+    let send = post_idem(
+        &app,
+        &format!("/api/v1/chat/{conv}/messages"),
+        Some(&patient),
+        &serde_json::json!({"content": "Follow-up question after the call"}),
+        &Uuid::new_v4().to_string(),
+    )
+    .await;
+    assert!(send.status().is_success());
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_conversation_activation_is_idempotent_and_repairs_missing_conversations(
+    pool: PgPool,
+) {
+    let (app, pool, state) = test_app_and_state_with_config(pool, deferred_config()).await;
+    let patient = fresh_patient_token(&pool).await;
+    let (apt_id, _) = book_deferred(&app, &patient, "CHAT").await;
+
+    // Simulate an appointment confirmed before payment-free activation existed.
+    remove_conversation_as_if_legacy(&pool, apt_id).await;
+
+    // An unrelated account cannot trigger activation through this appointment.
+    let stranger = fresh_patient_token(&pool).await;
+    let res = get(
+        &app,
+        &format!("/api/v1/appointments/{apt_id}/conversation"),
+        Some(&stranger),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(conversation_count(&pool, apt_id).await, 0);
+
+    // Concurrent activation converges on a single conversation.
+    let (a, b, c) = tokio::join!(
+        hellodoctor_backend::services::AppointmentService::ensure_consultation_activated(
+            &state, apt_id
+        ),
+        hellodoctor_backend::services::AppointmentService::ensure_consultation_activated(
+            &state, apt_id
+        ),
+        hellodoctor_backend::services::AppointmentService::ensure_consultation_activated(
+            &state, apt_id
+        ),
+    );
+    a.unwrap();
+    b.unwrap();
+    c.unwrap();
+    assert_eq!(conversation_count(&pool, apt_id).await, 1);
+
+    // The participant's lookup repairs it if missing, and is stable afterwards.
+    remove_conversation_as_if_legacy(&pool, apt_id).await;
+    let first = conversation_id_for(&app, &patient, apt_id).await;
+    let second = conversation_id_for(&app, &patient, apt_id).await;
+    assert_eq!(first, second);
+    assert_eq!(conversation_count(&pool, apt_id).await, 1);
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_enabled_mode_unpriced_doctor_stays_unlisted_for_chat(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    unprice_doctor1(&pool).await;
+    let patient = fresh_patient_token(&pool).await;
+    let listed = get(&app, "/api/v1/doctors?modality=CHAT", Some(&patient)).await;
+    assert_eq!(listed.status(), StatusCode::OK);
+    assert!(!json_body(listed).await["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|d| d["id"] == DOCTOR1_PROFILE_ID));
+}

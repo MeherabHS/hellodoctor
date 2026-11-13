@@ -577,13 +577,20 @@ async fn test_app_with_storage_fixture(
 /// grant/policy set (e.g. confirming `hellodoctor_system_worker`'s notification
 /// grants actually work, not just that a superuser connection can do anything).
 async fn test_app_and_state(pool: PgPool) -> (axum::Router, PgPool, AppState) {
+    test_app_and_state_with_config(pool, test_config()).await
+}
+
+/// `test_app_and_state` with a caller-supplied config (e.g. deferred payments).
+async fn test_app_and_state_with_config(
+    pool: PgPool,
+    config: AppConfig,
+) -> (axum::Router, PgPool, AppState) {
     hellodoctor_backend::telemetry::init_tracing();
     seed::seed_dev_data(&pool).await.expect("seed dev data");
     // Real persisted families for the fixture JWT helper, not a middleware bypass.
     sqlx::query("INSERT INTO auth_sessions(id,user_id,token_family_id,refresh_token_hash,created_at,last_used_at,expires_at) SELECT gen_random_uuid(),id,id,'fixture-session-'||id::text,NOW(),NOW(),NOW()+INTERVAL '7 days' FROM users")
         .execute(&pool).await.unwrap();
     let roles = build_role_pools(&pool).await;
-    let config = test_config();
     let redis_cfg = deadpool_redis::Config::from_url(&config.redis_url);
     let redis = redis_cfg
         .create_pool(Some(deadpool_redis::Runtime::Tokio1))
