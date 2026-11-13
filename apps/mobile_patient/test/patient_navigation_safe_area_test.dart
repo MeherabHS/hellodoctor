@@ -73,7 +73,7 @@ void main() {
         final nav = find.byType(PatientBottomNav);
         expect(nav, findsOneWidget);
         expect(tester.getRect(nav).bottom, 900 - inset);
-        for (final label in ['Home', 'Services', 'Blogs', 'Account']) {
+        for (final label in ['Home', 'Services', 'Messages', 'Profile']) {
           final item = find.descendant(of: nav, matching: find.text(label));
           expect(item, findsOneWidget);
           expect(tester.getRect(item).bottom, lessThanOrEqualTo(900 - inset));

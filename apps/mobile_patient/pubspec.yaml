@@ -48,6 +48,10 @@ dev_dependencies:
 flutter:
   generate: true
   uses-material-design: true
+  assets:
+    - assets/brand/
+    - assets/illustrations/
+    - assets/auth/
   fonts:
     - family: Plus Jakarta Sans
       fonts:

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/theme/tokens.dart';
 import '../../core/widgets/patient_widgets.dart';
 import 'auth_cubit.dart';
+import 'auth_scene.dart';
 import 'reset_otp_verify_page.dart';
 
 /// Phase 2: Secure Email OTP Password Recovery — step 1. Collects only an
@@ -27,76 +27,128 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     super.dispose();
   }
 
+  /// "Forgot your password?": dark green card over the clinic scene, with the
+  /// lock tile overlapping its top edge.
+  ///
+  /// The supplied design offers "email address or phone number" and "a link
+  /// or code". Password recovery here is by email code only, so the label and
+  /// the sentence say that; the layout is otherwise the design's.
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: PatientTokens.bg,
-        appBar: AppBar(title: const Text('Reset your password')),
-        body: SafeArea(
-          child: BlocConsumer<AuthCubit, AuthState>(
-            bloc: widget.auth,
-            listenWhen: (_, s) => s is PasswordResetOtpSent,
-            listener: (context, state) {
-              if (state is PasswordResetOtpSent && !navigated) {
-                navigated = true;
-                Navigator.of(context)
-                    .push(MaterialPageRoute(
-                        builder: (_) => ResetOtpVerifyPage(
-                            auth: widget.auth, challenge: state)))
-                    .then((_) => navigated = false);
-              }
-            },
-            builder: (context, state) {
-              final busy = state is AuthBusy;
-              return SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Forgot your password?',
-                        style: Theme.of(context).textTheme.headlineSmall),
-                    const SizedBox(height: 8),
-                    const Text(
-                        "Enter the email address on your account. If it matches an account, we'll send a verification code.",
-                        style: TextStyle(color: PatientTokens.textSub)),
-                    const SizedBox(height: 24),
-                    PatientField(
-                        label: 'Email address',
-                        controller: email,
-                        hint: 'you@example.com',
-                        keyboardType: TextInputType.emailAddress),
-                    if (state is AuthFailure) ...[
-                      const SizedBox(height: 12),
-                      Text(state.message,
-                          style: const TextStyle(color: PatientTokens.danger)),
-                    ],
-                    const SizedBox(height: 26),
-                    SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                            onPressed: busy
-                                ? null
-                                : () => widget.auth
-                                    .requestPasswordReset(email.text),
-                            child: busy
-                                ? const SizedBox(
-                                    width: 19,
-                                    height: 19,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white))
-                                : const Text('Send verification code'))),
-                    const SizedBox(height: 16),
-                    Center(
-                      child: TextButton(
+        backgroundColor: AuthColors.cream,
+        body: BlocConsumer<AuthCubit, AuthState>(
+          bloc: widget.auth,
+          listenWhen: (_, s) => s is PasswordResetOtpSent,
+          listener: (context, state) {
+            if (state is PasswordResetOtpSent && !navigated) {
+              navigated = true;
+              Navigator.of(context)
+                  .push(MaterialPageRoute(
+                      builder: (_) => ResetOtpVerifyPage(
+                          auth: widget.auth, challenge: state)))
+                  .then((_) => navigated = false);
+            }
+          },
+          builder: (context, state) {
+            final busy = state is AuthBusy;
+            return AuthScene(
+              name: 'forgot',
+              headerRows: 600,
+              topColor: const Color(0xFFFEF2DF),
+              sideMargin: 16,
+              overlap: 8,
+              child: Stack(clipBehavior: Clip.none, children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(22, 50, 22, 22),
+                  decoration: BoxDecoration(
+                      color: AuthColors.darkCard,
+                      borderRadius: BorderRadius.circular(36)),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('Forgot your password?',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 26,
+                              height: 1.2,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -.3,
+                              color: Colors.white)),
+                      const SizedBox(height: 10),
+                      const Text(
+                          "No worries. Enter your email address and we'll "
+                          'send you a code to reset your password.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 14.5,
+                              height: 1.45,
+                              color: Colors.white)),
+                      const SizedBox(height: 22),
+                      PatientField(
+                          label: 'Email address',
+                          controller: email,
+                          hint: 'you@example.com',
+                          keyboardType: TextInputType.emailAddress,
+                          labelIcon: Icons.mail_outline_rounded,
+                          labelColor: Colors.white,
+                          prefixIcon: Icons.mail_outline_rounded,
+                          fillColor: Colors.white,
+                          borderColor: Colors.white,
+                          borderRadius: 16),
+                      if (state is AuthFailure) ...[
+                        const SizedBox(height: 10),
+                        Text(state.message,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFFFC9C4))),
+                      ],
+                      const SizedBox(height: 18),
+                      AuthPrimaryButton(
+                          label: 'Reset password',
+                          trailingIcon: Icons.arrow_forward_rounded,
+                          busy: busy,
+                          color: AuthColors.resetButton,
+                          onPressed: busy
+                              ? null
+                              : () =>
+                                  widget.auth.requestPasswordReset(email.text)),
+                      const SizedBox(height: 10),
+                      TextButton.icon(
                         onPressed:
                             busy ? null : () => Navigator.of(context).pop(),
-                        child: const Text('Back to sign in'),
+                        icon: const Icon(Icons.arrow_back_rounded,
+                            size: 20, color: Colors.white),
+                        label: const Text('Back to log in',
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white)),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              );
-            },
-          ),
+                Positioned(
+                  top: -24,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      width: 68,
+                      height: 62,
+                      decoration: BoxDecoration(
+                          color: AuthColors.lockTile,
+                          borderRadius: BorderRadius.circular(18)),
+                      child: const Icon(Icons.lock_reset_rounded,
+                          size: 36, color: AuthColors.darkButton),
+                    ),
+                  ),
+                ),
+              ]),
+            );
+          },
         ),
       );
 }

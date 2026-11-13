@@ -5,7 +5,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/l10n/locale_controller.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/afya_widgets.dart';
 import '../../../core/widgets/patient_widgets.dart';
+import '../modules/afya_module_widgets.dart';
 import '../../auth/auth_cubit.dart';
 import 'add_dependent_sheet.dart';
 import 'family_profile_chip_row.dart';
@@ -42,13 +44,6 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     });
   }
 
-  void _comingSoon(String feature) {
-    final l10n = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(l10n.comingSoonSnackbar(feature))),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -71,14 +66,23 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                 context.read<FamilyProfilesCubit>().load(),
               ]),
               child: ListView(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
                 children: [
+                  Text(l10n.navProfile,
+                      style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: PatientTokens.text)),
+                  const SizedBox(height: 14),
                   if (profile != null) _Hero(profile: profile),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 20),
                   const _FamilyProfilesSection(),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 18),
+                  _SectionLabel(l10n.profileSettingsSection),
                   _SettingsTile(
-                    icon: Icons.language,
+                    icon: Icons.language_rounded,
+                    tint: PatientTokens.tileBlue,
+                    tintBg: PatientTokens.tileBlueBg,
                     title: l10n.languageTitle,
                     trailing: Builder(builder: (context) {
                       final locale = context.read<LocaleController>();
@@ -88,7 +92,8 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                           locale.locale.languageCode == 'sw'
                               ? l10n.languageSwahili
                               : l10n.languageEnglish,
-                          style: const TextStyle(color: PatientTokens.textSub),
+                          style: const TextStyle(
+                              fontSize: 13, color: PatientTokens.textSub),
                         ),
                       );
                     }),
@@ -96,39 +101,35 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                         context, context.read<LocaleController>()),
                   ),
                   _SettingsTile(
-                    icon: Icons.notifications_outlined,
+                    icon: Icons.notifications_rounded,
+                    tint: PatientTokens.tileAmber,
+                    tintBg: PatientTokens.tileAmberBg,
                     title: l10n.notificationSettingsMenuTitle,
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => const NotificationSettingsPage())),
                   ),
                   _SettingsTile(
-                    icon: Icons.payments_outlined,
-                    title: l10n.profilePaymentMethods,
-                    onTap: () => _comingSoon(l10n.profilePaymentMethods),
-                  ),
-                  _SettingsTile(
-                    icon: Icons.privacy_tip_outlined,
+                    icon: Icons.lock_rounded,
+                    tint: PatientTokens.tilePurple,
+                    tintBg: PatientTokens.tilePurpleBg,
                     title: l10n.profilePrivacySecurity,
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
                         builder: (_) => const DataRightsPage())),
                   ),
-                  _SettingsTile(
-                    icon: Icons.report_outlined,
-                    title: l10n.profileReportIssue,
-                    color: PatientTokens.danger,
-                    onTap: () => _comingSoon(l10n.profileReportIssue),
-                  ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton(
+                    child: OutlinedButton.icon(
                       onPressed: () => context.read<AuthCubit>().logout(),
+                      icon: const Icon(Icons.logout_rounded, size: 19),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: PatientTokens.danger,
-                        side: const BorderSide(color: PatientTokens.danger),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        foregroundColor: PatientTokens.urgentIcon,
+                        backgroundColor: PatientTokens.urgentCard,
+                        side: BorderSide.none,
+                        minimumSize: const Size.fromHeight(52),
+                        shape: const StadiumBorder(),
                       ),
-                      child: Text(l10n.profileLogout),
+                      label: Text(l10n.profileLogout),
                     ),
                   ),
                 ],
@@ -141,42 +142,61 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: PatientTokens.text)),
+      );
+}
+
 class _Hero extends StatelessWidget {
   const _Hero({required this.profile});
   final PatientProfileDto profile;
 
   @override
   Widget build(BuildContext context) {
-    return PatientCard(
-      child: Column(
-        children: [
-          Row(children: [
-            const ProfilePhotoAvatar(radius: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(profile.fullName,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: PatientTokens.text)),
-                  Text(
-                      '${_genderLabel(context, profile.gender)} • ${_age(context, profile.dateOfBirth)}',
-                      style: const TextStyle(
-                          fontSize: 12, color: PatientTokens.textSub)),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined,
-                  color: PatientTokens.primaryDark),
-              onPressed: () => showProfileEditSheet(context, profile),
-            ),
-          ]),
-        ],
-      ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 14, 6, 14),
+      decoration: BoxDecoration(
+          color: PatientTokens.primaryLight,
+          borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        const ProfilePhotoAvatar(radius: 30),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(profile.fullName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      color: PatientTokens.text)),
+              const SizedBox(height: 3),
+              Text(
+                  '${_genderLabel(context, profile.gender)} • ${_age(context, profile.dateOfBirth)}',
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: PatientTokens.greetingSub)),
+            ],
+          ),
+        ),
+        IconButton(
+          tooltip: AppLocalizations.of(context).profileEdit,
+          icon: const Icon(Icons.edit_outlined, color: PatientTokens.navActive),
+          onPressed: () => showProfileEditSheet(context, profile),
+        ),
+      ]),
     );
   }
 
@@ -223,7 +243,7 @@ class _FamilyProfilesSection extends StatelessWidget {
               padding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
               child: Text(AppLocalizations.of(context).profileFamily,
                   style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 15,
                       fontWeight: FontWeight.w800,
                       color: PatientTokens.text)),
             ),
@@ -253,39 +273,39 @@ class _FamilyProfilesSection extends StatelessWidget {
 class _SettingsTile extends StatelessWidget {
   const _SettingsTile({
     required this.icon,
+    required this.tint,
+    required this.tintBg,
     required this.title,
     required this.onTap,
     this.trailing,
-    this.color,
   });
   final IconData icon;
+  final Color tint, tintBg;
   final String title;
   final VoidCallback onTap;
   final Widget? trailing;
-  final Color? color;
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: InkWell(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: AfyaCard(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(PatientTokens.cardRadius),
-          child: PatientCard(
-            child: Row(children: [
-              Icon(icon, color: color ?? PatientTokens.textSub, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(title,
-                    style: TextStyle(
-                        color: color ?? PatientTokens.text,
-                        fontWeight: FontWeight.w600)),
-              ),
-              if (trailing != null) trailing!,
-              const SizedBox(width: 4),
-              const Icon(Icons.chevron_right,
-                  color: PatientTokens.textSub, size: 18),
-            ]),
-          ),
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+          child: Row(children: [
+            AfyaIconTile(icon: icon, color: tint, background: tintBg, size: 42),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(title,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      color: PatientTokens.text,
+                      fontWeight: FontWeight.w700)),
+            ),
+            if (trailing != null) trailing!,
+            const SizedBox(width: 2),
+            const Icon(Icons.chevron_right_rounded,
+                color: PatientTokens.navInactive),
+          ]),
         ),
       );
 }

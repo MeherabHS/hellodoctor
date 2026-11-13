@@ -7,6 +7,7 @@ import 'package:hellodoctor_mobile_patient/features/patient/chat/patient_chat_li
 import 'package:hellodoctor_mobile_patient/features/patient/home/home_models.dart';
 import 'package:hellodoctor_mobile_patient/features/patient/profile/family_profiles_cubit.dart';
 import 'package:hellodoctor_mobile_patient/features/patient/profile/family_profiles_repository.dart';
+import 'package:hellodoctor_mobile_patient/l10n/app_localizations.dart';
 
 class _FixedChatRepository extends ChatRepository {
   _FixedChatRepository(this.fixed) : super(ApiClient(dio: Dio()));
@@ -43,6 +44,8 @@ void main() {
     final family =
         FamilyProfilesCubit(FamilyProfilesRepository(ApiClient(dio: Dio())));
     await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: PatientChatListPage(
             repo: repo, familyProfilesCubit: family, onBook: (_) {})));
     await tester.pumpAndSettle();
@@ -62,6 +65,8 @@ void main() {
     final family =
         FamilyProfilesCubit(FamilyProfilesRepository(ApiClient(dio: Dio())));
     await tester.pumpWidget(MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: PatientChatListPage(
             repo: repo, familyProfilesCubit: family, onBook: (_) {})));
     await tester.pumpAndSettle();

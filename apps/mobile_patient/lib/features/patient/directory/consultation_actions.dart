@@ -103,21 +103,31 @@ class DoctorDirectoryFilters extends StatelessWidget {
   Widget build(BuildContext context) => SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(children: [
-          _button(specialty, onSpecialty),
-          const SizedBox(width: 8),
-          _button(availability, onAvailability),
-          const SizedBox(width: 8),
-          _button(visitType, onVisitType),
+          const SizedBox(width: 16),
+          _button(Icons.medical_services_outlined, specialty, onSpecialty),
+          const SizedBox(width: 6),
+          _button(Icons.event_outlined, availability, onAvailability),
+          const SizedBox(width: 6),
+          _button(Icons.videocam_outlined, visitType, onVisitType),
+          const SizedBox(width: 20),
         ]),
       );
-  Widget _button(String label, VoidCallback onTap) => OutlinedButton(
+  Widget _button(IconData icon, String label, VoidCallback onTap) =>
+      OutlinedButton(
         style: OutlinedButton.styleFrom(
             minimumSize: const Size(0, 48),
-            padding: const EdgeInsets.symmetric(horizontal: 16)),
+            shape: const StadiumBorder(),
+            padding: const EdgeInsets.symmetric(horizontal: 11),
+            textStyle: const TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700)),
         onPressed: onTap,
         child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 18, color: PatientTokens.primaryDark),
+          const SizedBox(width: 5),
           Text(label, maxLines: 1, softWrap: false),
-          const SizedBox(width: 6),
+          const SizedBox(width: 2),
           const Icon(Icons.expand_more_rounded, size: 18),
         ]),
       );

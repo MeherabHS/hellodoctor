@@ -7,6 +7,9 @@ import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../booking/booking_repository.dart';
+import '../directory/directory_repository.dart';
+import '../directory/patient_directory_page.dart';
+import 'consultation_scene.dart';
 import '../grievance/grievance_modal.dart';
 import '../grievance/grievance_repository.dart';
 import '../home/home_models.dart';
@@ -66,59 +69,132 @@ class PostConsultationPage extends StatelessWidget {
         _ => l10n.postConsultOutcomeDefault,
       };
 
+  void _bookAnother(BuildContext context) {
+    final connectivity = repo.connectivity;
+    if (connectivity == null) return _returnHome(context);
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => PatientDirectoryPage(
+            api: repo.api,
+            cache: null,
+            connectivity: connectivity,
+            familyProfilesCubit: familyProfilesCubit)));
+  }
+
+  /// Product owner's "Consultation Complete" design.
+  ///
+  /// The design's "Consultation Summary" and "Follow-up Plan" cards hold
+  /// clinical text written by a doctor. The app receives only the recorded
+  /// outcome (and a prescription when one was issued), so this screen shows
+  /// that outcome and never invents a summary or a plan.
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final grievanceRepo = GrievanceRepository(repo.api);
+    final video = appointment.modality == 'VIDEO';
     return Scaffold(
       backgroundColor: PatientTokens.bg,
       body: SafeArea(
-        child: Column(children: [
-          PatientPageHeader(l10n.postConsultHeader,
-              l10n.postConsultSubtitle(appointment.doctorDisplayName)),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(18),
-              children: [
-                const SizedBox(height: 8),
-                const Icon(Icons.check_circle,
-                    color: PatientTokens.primary, size: 56),
-                const SizedBox(height: 14),
-                Text(l10n.postConsultHeader,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: PatientTokens.text)),
-                const SizedBox(height: 6),
-                Text(_outcomeMessage(l10n),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: PatientTokens.textSub,
-                        height: 1.45)),
-                const SizedBox(height: 22),
-                if (clinicalOutcome == 'COMPLETED_WITH_RX')
-                  _RxCard(
-                    appointment: appointment,
-                    completedAt: completedAt,
-                    onTap: () => _openVault(context),
+        child: ListView(padding: EdgeInsets.zero, children: [
+          ConsultationHeader(
+              art: 'consult_complete_header',
+              title: video ? l10n.completeTitleVideo : l10n.completeTitleChat,
+              subtitle: l10n.completeBody),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ConsultationDoctorCard(
+                      appointment: appointment,
+                      photos: DirectoryRepository(repo.api),
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                            color: PatientTokens.primaryDark,
+                            borderRadius: BorderRadius.circular(20)),
+                        child: Row(mainAxisSize: MainAxisSize.min, children: [
+                          const Icon(Icons.check_rounded,
+                              size: 16, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(l10n.completeStatus,
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white)),
+                        ]),
+                      )),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                        color: PatientTokens.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: PatientTokens.border)),
+                    child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                  color: PatientTokens.primaryLight,
+                                  borderRadius: BorderRadius.circular(12)),
+                              child: const Icon(Icons.description_outlined,
+                                  color: PatientTokens.primaryDark)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(l10n.completeOutcomeTitle,
+                                      style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w800,
+                                          color: PatientTokens.navy)),
+                                  const SizedBox(height: 4),
+                                  Text(_outcomeMessage(l10n),
+                                      style: const TextStyle(
+                                          fontSize: 13.5,
+                                          height: 1.45,
+                                          color: PatientTokens.ink)),
+                                ]),
+                          ),
+                        ]),
                   ),
-                const SizedBox(height: 26),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => _returnHome(context),
-                    style: FilledButton.styleFrom(
-                        backgroundColor: PatientTokens.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 13)),
-                    child: Text(l10n.postConsultReturnHome),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
+                  if (clinicalOutcome == 'COMPLETED_WITH_RX') ...[
+                    const SizedBox(height: 12),
+                    _RxCard(
+                      appointment: appointment,
+                      completedAt: completedAt,
+                      onTap: () => _openVault(context),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                      onPressed: () => _openVault(context),
+                      icon: const Icon(Icons.description_outlined),
+                      label: Text(l10n.completeViewRecords),
+                      style: FilledButton.styleFrom(
+                          backgroundColor: PatientTokens.primaryDark,
+                          minimumSize: const Size.fromHeight(52),
+                          shape: const StadiumBorder())),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                      onPressed: () => _bookAnother(context),
+                      icon: const Icon(Icons.event_repeat_outlined),
+                      label: Text(l10n.completeBookAnother),
+                      style: OutlinedButton.styleFrom(
+                          foregroundColor: PatientTokens.primaryDark,
+                          side: const BorderSide(
+                              color: PatientTokens.primaryDark, width: 1.5),
+                          minimumSize: const Size.fromHeight(52),
+                          shape: const StadiumBorder())),
+                  const SizedBox(height: 6),
+                  TextButton(
+                      onPressed: () => _returnHome(context),
+                      child: Text(l10n.postConsultReturnHome)),
+                  TextButton.icon(
                     onPressed: () => showGrievanceModal(
                       context,
                       appointmentId: appointment.id,
@@ -128,17 +204,16 @@ class PostConsultationPage extends StatelessWidget {
                     icon: const Icon(Icons.report_problem_outlined,
                         size: 16, color: PatientTokens.danger),
                     label: Text(l10n.postConsultReportIssue,
-                        style: TextStyle(
+                        style: const TextStyle(
                             color: PatientTokens.danger,
                             fontWeight: FontWeight.w700)),
-                    style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFFECACA)),
-                        padding: const EdgeInsets.symmetric(vertical: 11)),
                   ),
-                ),
-              ],
-            ),
+                ]),
           ),
+          Image.asset('assets/illustrations/hills_footer.jpg',
+              width: double.infinity,
+              fit: BoxFit.fitWidth,
+              excludeFromSemantics: true),
         ]),
       ),
     );

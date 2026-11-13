@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hellodoctor_mobile_patient/l10n/app_localizations.dart';
 import 'package:hellodoctor_mobile_patient/core/l10n/kenya_time.dart';
 import 'package:hellodoctor_mobile_patient/core/network/api_client.dart';
 import 'package:hellodoctor_mobile_patient/core/network/availability_refresh.dart';
@@ -190,6 +191,8 @@ void main() {
         final now = DateTime.now().toUtc();
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: ConsultationStatusPage(
               appointment: AppointmentSummaryDto(
                 id: 'a',
