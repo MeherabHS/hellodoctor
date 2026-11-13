@@ -765,7 +765,7 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
       tab = index;
       _schedule = false;
       ClientErrorReporter.current?.screen =
-          const ['Home', 'Appointments', 'Patients', 'More'][index];
+          const ['Home', 'Appointments', 'History', 'More'][index];
     });
     if (index <= 1) _refreshDoctorData();
   }
@@ -876,7 +876,7 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
           ? const SchedulePage()
           : AppointmentsPage(
               onBack: () => selectTab(0), onOpenSchedule: openSchedule),
-      PatientsPage(onBack: () => selectTab(0), onOpenTab: selectTab),
+      ConsultationHistoryTab(onBack: () => selectTab(0)),
       MorePage(onBack: () => selectTab(0)),
     ];
     return Scaffold(
@@ -895,7 +895,7 @@ class DoctorBottomNav extends StatelessWidget {
   static const items = <(IconData, String)>[
     (Icons.home_outlined, 'Home'),
     (Icons.calendar_month_outlined, 'Appointments'),
-    (Icons.person_outline, 'Patients'),
+    (Icons.history, 'History'),
     (Icons.more_horiz, 'More'),
   ];
   @override

@@ -330,18 +330,9 @@ class HomePage extends StatelessWidget {
                             title: 'My Appointments',
                             subtitle: 'View and manage consultations',
                             onTap: () => onOpenTab(1)),
-                        BoardActionRow(
-                            icon: Icons.groups_outlined,
-                            title: 'Patient Records',
-                            subtitle: 'Search and view patient history',
-                            onTap: () => onOpenTab(2)),
-                        BoardActionRow(
-                            icon: Icons.calendar_month_outlined,
-                            title: 'Availability',
-                            subtitle: 'Set your consultation schedule',
-                            onTap: () => DoctorShell.openSchedule(c)),
                         // Added by product-owner instruction (2026-11-13);
-                        // not on the reference board.
+                        // not on the reference board. Kept second so it is
+                        // visible without scrolling.
                         BoardActionRow(
                             icon: Icons.question_answer_outlined,
                             title:
@@ -350,6 +341,24 @@ class HomePage extends StatelessWidget {
                                 ? '$openQuestions unanswered'
                                 : 'Anonymous questions awaiting a doctor’s answer',
                             onTap: () => showDoctorQna(c)),
+                        // Chat consultations and consultation history:
+                        // product-owner instruction (2026-11-13); history
+                        // replaces "Patient Records".
+                        BoardActionRow(
+                            icon: Icons.chat_bubble_outline,
+                            title: 'Chat Consultations',
+                            subtitle: 'Open patient chats and reply',
+                            onTap: () => _push(c, const ChatPage())),
+                        BoardActionRow(
+                            icon: Icons.calendar_month_outlined,
+                            title: 'Availability',
+                            subtitle: 'Set your consultation schedule',
+                            onTap: () => DoctorShell.openSchedule(c)),
+                        BoardActionRow(
+                            icon: Icons.history,
+                            title: 'Consultation History',
+                            subtitle: 'Past consultations, notes and documents',
+                            onTap: () => onOpenTab(2)),
                       ])),
                 ]))));
   }
@@ -638,13 +647,16 @@ class AppointmentRow extends StatelessWidget {
                                   size: 16,
                                   color: DoctorTokens.primary),
                               const SizedBox(width: 5),
-                              Text(
-                                  a.isChat
-                                      ? 'Chat Consultation'
-                                      : 'Video Consultation',
-                                  style: const TextStyle(
-                                      fontSize: 12.5,
-                                      color: DoctorTokens.slate))
+                              Flexible(
+                                  child: Text(
+                                      a.isChat
+                                          ? 'Chat Consultation'
+                                          : 'Video Consultation',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 12.5,
+                                          color: DoctorTokens.slate)))
                             ])
                           ])),
                       const SizedBox(width: 8),
@@ -688,49 +700,150 @@ String appointmentDateLabel(DateTime? utc) {
 
 // ------------------------------------------------------------ Patients
 
-/// Panel 8 has no backend: there is no doctor-facing patient list. Until
-/// one exists the real app says so plainly instead of showing sample names.
-class PatientsPage extends StatelessWidget {
-  const PatientsPage(
-      {super.key, required this.onBack, required this.onOpenTab});
+/// Consultation History tab. It replaces the board's panel 8 "Patients"
+/// list by product-owner instruction (2026-11-13). It is backed by the real
+/// `view=history` consultation list. Tapping a consultation opens it with
+/// the doctor's previous consultations with the same patient.
+class ConsultationHistoryTab extends StatefulWidget {
+  const ConsultationHistoryTab({super.key, required this.onBack});
   final VoidCallback onBack;
-  final ValueChanged<int> onOpenTab;
   @override
-  Widget build(BuildContext context) => Scaffold(
-      backgroundColor: DoctorTokens.screen,
-      body: SafeArea(
-          bottom: false,
-          child: Column(children: [
-            BoardTitleBar('Patients', onBack: onBack),
-            Expanded(
-                child: Center(
-                    child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child:
-                            Column(mainAxisSize: MainAxisSize.min, children: [
-                          const Icon(Icons.groups_outlined,
-                              size: 72, color: DoctorTokens.primary),
-                          const SizedBox(height: 14),
-                          const Text('Patient records are not available yet',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w800,
-                                  color: DoctorTokens.navy)),
-                          const SizedBox(height: 8),
-                          const Text(
-                              'You can open a patient\'s history from their appointment.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 15,
-                                  height: 1.4,
-                                  color: DoctorTokens.slate)),
-                          const SizedBox(height: 20),
-                          AfyaPrimaryButton(
-                              label: 'Go to Appointments',
-                              onPressed: () => onOpenTab(1))
-                        ]))))
-          ])));
+  State<ConsultationHistoryTab> createState() => _ConsultationHistoryTabState();
+}
+
+class _ConsultationHistoryTabState extends State<ConsultationHistoryTab> {
+  final items = <AppointmentDto>[];
+  bool loading = false, hasMore = true;
+  String? error;
+  String query = '';
+  int filter = 0; // 0 all, 1 video, 2 chat
+
+  @override
+  void initState() {
+    super.initState();
+    _load(reset: true);
+  }
+
+  Future<void> _load({bool reset = false}) async {
+    if (loading) return;
+    setState(() => loading = true);
+    try {
+      final rows = await context
+          .read<DoctorCubit>()
+          .repo
+          .consultationHistory(offset: reset ? 0 : items.length);
+      if (!mounted) return;
+      setState(() {
+        if (reset) items.clear();
+        final known = items.map((a) => a.id).toSet();
+        items.addAll(rows.where((a) => known.add(a.id)));
+        items.sort((a, b) =>
+            (b.start ?? DateTime(0)).compareTo(a.start ?? DateTime(0)));
+        hasMore = rows.length == 100;
+        error = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => error =
+            'Unable to load consultation history. Check your connection and try again.');
+      }
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  /// Every loaded consultation with the same patient, newest first.
+  List<AppointmentDto> _withPatient(AppointmentDto a) => a.patientId == null
+      ? [a]
+      : items.where((x) => x.patientId == a.patientId).toList();
+
+  @override
+  Widget build(BuildContext c) {
+    final q = query.trim().toLowerCase();
+    final shown = items.where((a) {
+      if (filter == 1 && a.isChat) return false;
+      if (filter == 2 && !a.isChat) return false;
+      return q.isEmpty ||
+          (a.patientName ?? '').toLowerCase().contains(q) ||
+          (a.number ?? '').toLowerCase().contains(q);
+    }).toList();
+    return Scaffold(
+        backgroundColor: DoctorTokens.screen,
+        body: SafeArea(
+            bottom: false,
+            child: Column(children: [
+              BoardTitleBar('Consultation History', onBack: widget.onBack),
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 2, 18, 10),
+                  child: TextField(
+                      onChanged: (v) => setState(() => query = v),
+                      decoration: InputDecoration(
+                          hintText: 'Search by patient name or reference',
+                          prefixIcon: const Icon(Icons.search),
+                          filled: true,
+                          fillColor: Colors.white,
+                          isDense: true,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: DoctorTokens.fieldBorder)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(
+                                  color: DoctorTokens.fieldBorder))))),
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+                  child: Row(children: [
+                    _Segment('All', filter == 0,
+                        () => setState(() => filter = 0)),
+                    const SizedBox(width: 8),
+                    _Segment('Video', filter == 1,
+                        () => setState(() => filter = 1)),
+                    const SizedBox(width: 8),
+                    _Segment('Chat', filter == 2,
+                        () => setState(() => filter = 2)),
+                  ])),
+              Expanded(
+                  child: RefreshIndicator(
+                      onRefresh: () => _load(reset: true),
+                      child: ListView(
+                          padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
+                          children: [
+                            if (error != null)
+                              ErrorPanel(error!,
+                                  onRetry: () => _load(reset: items.isEmpty)),
+                            if (!loading && error == null && shown.isEmpty)
+                              Padding(
+                                  padding: const EdgeInsets.only(top: 64),
+                                  child: Center(
+                                      child: Text(
+                                          items.isEmpty
+                                              ? 'No past consultations yet'
+                                              : 'No consultations match',
+                                          style: const TextStyle(
+                                              fontSize: 15,
+                                              color: DoctorTokens.slate)))),
+                            for (final a in shown)
+                              AppointmentRow(a,
+                                  onTap: () => _push(
+                                      c,
+                                      EncounterHistoryPage(
+                                          appointment: a,
+                                          previous: _withPatient(a)
+                                              .where((x) => x.id != a.id)
+                                              .toList()))),
+                            if (loading)
+                              const Padding(
+                                  padding: EdgeInsets.all(18),
+                                  child: Center(
+                                      child: CircularProgressIndicator())),
+                            if (hasMore && !loading && items.isNotEmpty)
+                              TextButton(
+                                  onPressed: () => _load(),
+                                  child: const Text('Load more history')),
+                          ])))
+            ])));
+  }
 }
 
 // ---------------------------------------------------------------- More

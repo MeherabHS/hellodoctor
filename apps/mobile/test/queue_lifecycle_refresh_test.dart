@@ -14,6 +14,9 @@ import 'doctor_cubit_test.dart' show StubDoctorRepository;
 
 class LifecycleQueueRepository extends StubDoctorRepository {
   int queueReads = 0;
+  @override
+  Future<List<AppointmentDto>> consultationHistory({int offset = 0}) async =>
+      [];
   List<AppointmentDto> current = [
     const AppointmentDto(
       id: 'stale',
@@ -100,7 +103,7 @@ void main() {
       expect(doctor.state.queue.single.id, 'next');
       final nav = find.byType(DoctorBottomNav);
       await tester
-          .tap(find.descendant(of: nav, matching: find.text('Patients')));
+          .tap(find.descendant(of: nav, matching: find.text('History')));
       await tester.pumpAndSettle();
       repo.current = [];
       await tester.tap(find.descendant(of: nav, matching: find.text('Home')));

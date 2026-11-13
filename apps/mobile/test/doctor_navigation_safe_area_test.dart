@@ -50,7 +50,7 @@ void main() {
         final nav = find.byType(DoctorBottomNav);
         expect(nav, findsOneWidget);
         expect(tester.getRect(nav).bottom, 800 - inset);
-        for (final label in ['Home', 'Appointments', 'Patients', 'More']) {
+        for (final label in ['Home', 'Appointments', 'History', 'More']) {
           final text = find.descendant(of: nav, matching: find.text(label));
           expect(text, findsOneWidget);
           expect(tester.getRect(text).bottom, lessThanOrEqualTo(800 - inset));
@@ -63,11 +63,14 @@ void main() {
         }
 
         await tester
-            .tap(find.descendant(of: nav, matching: find.text('Patients')));
-        await tester.pumpAndSettle();
-        // Patients, not Appointments: opening Appointments starts a live
+            .tap(find.descendant(of: nav, matching: find.text('History')));
+        // The history list loads from a server this harness does not have;
+        // its spinner never settles, so pump a few frames instead.
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        // History, not Appointments: opening Appointments starts a live
         // queue refresh, which this layout-only harness has no server for.
-        expect(find.byType(PatientsPage), findsOneWidget);
+        expect(find.byType(ConsultationHistoryTab), findsOneWidget);
         expect(tester.getRect(nav).bottom, 800 - inset);
         expect(tester.takeException(), isNull);
       });
