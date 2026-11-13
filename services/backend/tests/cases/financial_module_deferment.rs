@@ -749,3 +749,47 @@ async fn test_enabled_mode_unpriced_doctor_stays_unlisted_for_chat(pool: PgPool)
         .iter()
         .any(|d| d["id"] == DOCTOR1_PROFILE_ID));
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_appointment_detail_carries_routing_fields_for_owner_only(pool: PgPool) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    let patient = fresh_patient_token(&pool).await;
+    let (apt_id, slot_id) = book_deferred(&app, &patient, "CHAT").await;
+
+    let res = get(
+        &app,
+        &format!("/api/v1/appointments/{apt_id}"),
+        Some(&patient),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let data = json_body(res).await["data"].clone();
+    assert_eq!(data["status"], "CONFIRMED");
+    assert_eq!(data["modality"], "CHAT");
+    assert!(data["doctor_display_name"]
+        .as_str()
+        .is_some_and(|s| !s.is_empty()));
+    assert!(data["primary_specialty"].is_string());
+    let slot_start: chrono::DateTime<chrono::Utc> =
+        sqlx::query_scalar("SELECT start_time FROM doctor_schedule_slots WHERE id = $1")
+            .bind(slot_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let returned = chrono::DateTime::parse_from_rfc3339(data["start_time"].as_str().unwrap())
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    assert_eq!(returned, slot_start);
+    // Chat has no RTC room: the server's own join policy says so.
+    assert_eq!(data["join"]["reason"], "NOT_VIDEO");
+    assert!(data["join"]["server_time"].is_string());
+
+    let stranger = fresh_patient_token(&pool).await;
+    let res = get(
+        &app,
+        &format!("/api/v1/appointments/{apt_id}"),
+        Some(&stranger),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}

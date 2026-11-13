@@ -164,8 +164,54 @@ pub async fn get_appointment(
         .bind(id)
         .fetch_one(&mut *tx)
         .await?;
+    // Display and routing fields, so a notification or history entry can be
+    // resolved from the appointment id alone. Read in the same caller-RLS
+    // transaction, after the appointment itself was found visible to the
+    // caller; the same columns `GET /patients/me/appointments` already
+    // returns to its owner (public directory projection, never doctor_profiles).
+    #[allow(clippy::type_complexity)]
+    let summary: Option<(
+        chrono::DateTime<chrono::Utc>,
+        chrono::DateTime<chrono::Utc>,
+        String,
+        String,
+        Option<i32>,
+        Option<chrono::DateTime<chrono::Utc>>,
+    )> = sqlx::query_as(
+        "SELECT s.start_time, s.end_time, d.full_name, d.primary_specialty, \
+                d.profile_picture_size_bytes, d.profile_picture_updated_at \
+           FROM doctor_schedule_slots s \
+           JOIN doctor_public_directory d ON d.id = $2 \
+          WHERE s.id = $1",
+    )
+    .bind(apt.slot_id)
+    .bind(apt.doctor_id)
+    .fetch_optional(&mut *tx)
+    .await?;
     tx.commit().await?;
     let mut data = serde_json::to_value(apt).map_err(|e| AppError::internal(e.to_string()))?;
+    if let Some((start_time, end_time, doctor_name, specialty, photo_size, photo_updated)) = summary
+    {
+        let status = data["status"].as_str().unwrap_or_default().to_string();
+        let modality = data["modality"].as_str().unwrap_or_default().to_string();
+        data["start_time"] = serde_json::json!(start_time);
+        data["end_time"] = serde_json::json!(end_time);
+        data["doctor_display_name"] = serde_json::json!(doctor_name);
+        data["primary_specialty"] = serde_json::json!(specialty);
+        data["profile_picture_size_bytes"] = serde_json::json!(photo_size);
+        data["profile_picture_updated_at"] = serde_json::json!(photo_updated);
+        data["join"] = crate::domain::join_window::evaluate(
+            &status,
+            &modality,
+            start_time,
+            end_time,
+            server_time,
+            state.config.agora_token_window_before_mins,
+            state.config.agora_token_window_after_mins,
+        )
+        .with_recovery_state(consultation.as_ref().map(|s| s.recovery_state.as_str()))
+        .to_json();
+    }
     data["payment_status"] = serde_json::json!(payment);
     data["hold_expires_at"] = serde_json::json!(hold_expires_at);
     data["server_time"] = serde_json::json!(server_time);
