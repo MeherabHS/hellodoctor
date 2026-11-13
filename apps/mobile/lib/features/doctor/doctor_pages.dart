@@ -252,19 +252,101 @@ class _ConsultationHistoryState extends State<ConsultationHistoryPage> {
 }
 
 class EncounterHistoryPage extends StatefulWidget {
-  const EncounterHistoryPage({super.key, required this.appointment});
+  const EncounterHistoryPage(
+      {super.key, required this.appointment, this.previous});
   final AppointmentDto appointment;
+
+  /// The doctor's other consultations with this patient, when the caller
+  /// already has them; otherwise they are loaded from the history list.
+  final List<AppointmentDto>? previous;
   @override
   State<EncounterHistoryPage> createState() => _EncounterHistoryState();
 }
 
 class _EncounterHistoryState extends State<EncounterHistoryPage> {
   late final Future<Json> details;
+  late final Future<List<AppointmentDto>> others;
   @override
   void initState() {
     super.initState();
-    details = context.read<DoctorCubit>().repo.summary(widget.appointment.id);
+    final repo = context.read<DoctorCubit>().repo;
+    details = repo.summary(widget.appointment.id);
+    final a = widget.appointment;
+    others = widget.previous != null
+        ? Future.value(widget.previous)
+        : a.patientId == null
+            ? Future.value(const <AppointmentDto>[])
+            : repo.consultationHistory().then((rows) => rows
+                .where((x) => x.patientId == a.patientId && x.id != a.id)
+                .toList());
   }
+
+  /// Consultations with this patient that started before this one,
+  /// newest first.
+  List<AppointmentDto> _earlier(List<AppointmentDto> all) {
+    final start = widget.appointment.start;
+    final list = all
+        .where((x) =>
+            x.id != widget.appointment.id &&
+            (start == null || x.start == null || x.start!.isBefore(start)))
+        .toList()
+      ..sort((a, b) =>
+          (b.start ?? DateTime(0)).compareTo(a.start ?? DateTime(0)));
+    return list;
+  }
+
+  Widget _previousSection() => FutureBuilder<List<AppointmentDto>>(
+      future: others,
+      builder: (context, snap) {
+        final children = <Widget>[
+          const Padding(
+              padding: EdgeInsets.only(top: 20, bottom: 8),
+              child: Text('Previous consultations with this patient',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: DoctorTokens.navy))),
+        ];
+        if (snap.connectionState != ConnectionState.done) {
+          children.add(const LinearProgressIndicator());
+        } else if (snap.hasError) {
+          children.add(const Text('Unable to load previous consultations.'));
+        } else {
+          final earlier = _earlier(snap.data ?? const []);
+          if (earlier.isEmpty) {
+            children.add(const Text('No previous consultations.',
+                style: TextStyle(color: DoctorTokens.slate)));
+          }
+          for (final p in earlier) {
+            children.add(Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                    leading: Icon(
+                        p.isChat
+                            ? Icons.chat_bubble_outline
+                            : Icons.videocam_outlined,
+                        color: DoctorTokens.primary),
+                    title: Text(
+                        '${p.isChat ? 'Chat' : 'Video'} consultation · ${_mediumDateTime(p.start?.toIso8601String())}'),
+                    subtitle: Text([
+                      p.status.replaceAll('_', ' ').toLowerCase(),
+                      if (p.number != null) p.number!
+                    ].join(' · ')),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => EncounterHistoryPage(
+                                appointment: p,
+                                previous: [
+                                  ...snap.data!.where((x) => x.id != p.id),
+                                  widget.appointment
+                                ]))))));
+          }
+        }
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.start, children: children);
+      });
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -290,8 +372,9 @@ class _EncounterHistoryState extends State<EncounterHistoryPage> {
                   Text(widget.appointment.patientName ?? 'Patient',
                       style: Theme.of(context).textTheme.titleLarge),
                   Text(
-                      '${widget.appointment.modality} consultation - ${widget.appointment.status}'),
-                  Text('${widget.appointment.start ?? ''}'),
+                      '${widget.appointment.isChat ? 'Chat' : 'Video'} consultation · ${widget.appointment.status.replaceAll('_', ' ').toLowerCase()}'),
+                  Text(_mediumDateTime(
+                      widget.appointment.start?.toIso8601String())),
                   if (data['chief_complaint'] != null)
                     ListTile(
                         title: const Text('Presenting concern'),
@@ -330,6 +413,7 @@ class _EncounterHistoryState extends State<EncounterHistoryPage> {
                       appointmentId: widget.appointment.id,
                       documentId: doc.id,
                       mimeType: doc.mimeType)),
+                  _previousSection(),
                 ]);
               })));
 }
