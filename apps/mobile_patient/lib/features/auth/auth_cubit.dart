@@ -92,6 +92,7 @@ class AuthCubit extends Cubit<AuthState> {
       : repository = repository ?? AuthRepository(api),
         super(const SignedOut()) {
     api.onSessionExpired = () {
+      authDiag('auth.signedOutByExpiry', {'state': state.runtimeType.toString()});
       _phoneNumber = null;
       cache?.clear();
       if (!isClosed) emit(const SignedOut());
