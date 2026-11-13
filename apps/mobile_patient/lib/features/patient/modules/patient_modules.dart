@@ -8,6 +8,9 @@ import '../blogs/blogs_repository.dart';
 import '../booking/booking_repository.dart';
 import '../consultation/consultation_history_page.dart';
 import '../directory/patient_directory_page.dart';
+import '../facilities/facility_directory_page.dart';
+import '../facilities/facility_repository.dart';
+import '../home/brand_header.dart';
 import '../home/home_cubit.dart';
 import '../profile/family_profiles_cubit.dart';
 import '../profile/profile_cubit.dart';
@@ -117,8 +120,11 @@ List<PatientModule> patientModules(BuildContext context, PatientShellNav nav) {
                               repo: BookingRepository(homeRepo.api,
                                   connectivity: homeRepo.connectivity),
                               familyProfilesCubit: family,
-                              myUserId:
-                                  c.read<ProfileCubit>().state.profile?.userId)))));
+                              myUserId: c
+                                  .read<ProfileCubit>()
+                                  .state
+                                  .profile
+                                  ?.userId)))));
         }),
     PatientModule(
         icon: Icons.people_alt_rounded,
@@ -171,7 +177,12 @@ List<PatientModule> patientModules(BuildContext context, PatientShellNav nav) {
         background: PatientTokens.tileGreenBg,
         label: l.moduleFacilities,
         description: l.moduleFacilitiesDesc,
-        open: (c) => push(c, FacilitiesPage(nav: nav))),
+        open: (c) => push(
+            c,
+            FacilityDirectoryPage(
+                repo: FacilityRepository(c.read<HomeCubit>().repo.api),
+                nav: nav,
+                appHeader: AppHeaderDeps.of(c, nav)))),
     PatientModule(
         icon: Icons.more_horiz_rounded,
         color: PatientTokens.tileSlateBlue,
@@ -192,7 +203,8 @@ void openEducation(BuildContext context, PatientShellNav nav,
       builder: (_) => EducationHubPage(
           nav: nav,
           repo: BlogsRepository(homeRepo.api),
-          initialTab: initialTab)));
+          initialTab: initialTab,
+          appHeader: AppHeaderDeps.of(context, nav))));
 }
 
 /// Honest state for a module with no backend yet. It shows the module's own

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/afya_bottom_nav.dart';
 import '../../../core/widgets/afya_widgets.dart';
+import '../home/brand_header.dart';
 import 'patient_modules.dart';
 
 /// Frame shared by the module screens (reference panels 2-8 and 11): a
@@ -14,17 +15,23 @@ class AfyaModuleScaffold extends StatelessWidget {
       required this.title,
       required this.nav,
       required this.child,
-      this.selectedTab = 1});
+      this.selectedTab = 1,
+      this.appHeader});
   final String title;
   final PatientShellNav nav;
   final Widget child;
   final int selectedTab;
+
+  /// When set, the app's main header (logo, bell, avatar) sits above the
+  /// back-arrow title, as on the HIV Prevention & Sexual Health screens.
+  final AppHeaderDeps? appHeader;
   @override
   Widget build(BuildContext context) => Scaffold(
         backgroundColor: PatientTokens.bg,
         body: SafeArea(
             bottom: false,
             child: Column(children: [
+              if (appHeader != null) AfyaBrandHeader(deps: appHeader!),
               AfyaBackHeader(title.replaceAll('\n', ' ')),
               Expanded(child: child),
             ])),

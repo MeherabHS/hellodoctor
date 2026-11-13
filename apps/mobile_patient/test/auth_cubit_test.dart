@@ -189,6 +189,21 @@ void main() {
       expect(repo.lastResetRequestedEmail, isNull);
     });
 
+    test(
+        'a 404 from the request endpoint means reset is switched off, '
+        'not a missing record', () async {
+      repo.resetRequestError =
+          const ApiException(404, 'Password reset is not available.');
+      await cubit.requestPasswordReset('someone@example.com');
+      expect(cubit.state, isA<PasswordResetUnavailable>());
+    });
+
+    test('other request failures still surface as AuthFailure', () async {
+      repo.resetRequestError = const ApiException(429, 'Too many attempts.');
+      await cubit.requestPasswordReset('someone@example.com');
+      expect(cubit.state, isA<AuthFailure>());
+    });
+
     test('verifyPasswordResetOtp does nothing without a prior request',
         () async {
       await cubit.verifyPasswordResetOtp('123456');

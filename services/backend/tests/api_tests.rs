@@ -64,6 +64,8 @@ mod doctor_queue_nairobi_day;
 mod email_outbox_delivery;
 #[path = "cases/engagement_and_holiday_notifications.rs"]
 mod engagement_and_holiday_notifications;
+#[path = "cases/facilities.rs"]
+mod facilities;
 #[path = "cases/financial_module_deferment.rs"]
 mod financial_module_deferment;
 #[path = "cases/notification_localization_preferences.rs"]

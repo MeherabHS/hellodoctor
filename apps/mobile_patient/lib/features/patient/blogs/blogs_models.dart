@@ -46,6 +46,9 @@ class BlogArticleDto {
     this.categorySw = '',
     this.coverImageId,
     this.quiz,
+    this.topicKey,
+    this.videoUrl,
+    this.standaloneQuiz = false,
   });
   final String id, authorName, specialty, title, summary, body;
   final List<String> referencesList;
@@ -58,6 +61,28 @@ class BlogArticleDto {
       categorySw;
   final String? coverImageId;
   final QuizPublication? quiz;
+
+  /// The HIV Prevention & Sexual Health topic of this entry's category
+  /// (HIV_BASICS, PREP, ...), or null.
+  final String? topicKey;
+
+  /// Canonical YouTube watch URL when this entry is a video, else null.
+  final Uri? videoUrl;
+  bool get isVideo => videoUrl != null;
+
+  /// A quiz that is not attached to a blog article (Admin Quiz Manager);
+  /// its body is a short introduction.
+  final bool standaloneQuiz;
+
+  /// Estimated reading time at 200 words a minute, at least one minute.
+  int readMinutesFor(String language) {
+    final words = bodyFor(language)
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .length;
+    return words <= 200 ? 1 : (words / 200).ceil();
+  }
+
   bool get isAdmin => articleType == 'ADMIN';
   bool get hasCover => isAdmin && coverImageId != null;
   bool _sw(String language) =>
@@ -100,6 +125,20 @@ class BlogArticleDto {
       coverImageId:
           RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(cover) ? cover : null,
       quiz: admin ? QuizPublication.parse(j['quiz']) : null,
+      topicKey:
+          admin && j['topic_key'] is String ? j['topic_key'] as String : null,
+      videoUrl: admin ? youTubeWatchUri(j['video_url']) : null,
+      standaloneQuiz: admin && j['standalone_quiz'] == true,
     );
   }
+}
+
+/// Accepts only the backend's canonical YouTube watch URL, so a tampered or
+/// unexpected value can never make the app open another site.
+Uri? youTubeWatchUri(dynamic value) {
+  if (value is! String) return null;
+  return RegExp(r'^https://www\.youtube\.com/watch\?v=[A-Za-z0-9_-]{11}$')
+          .hasMatch(value)
+      ? Uri.parse(value)
+      : null;
 }

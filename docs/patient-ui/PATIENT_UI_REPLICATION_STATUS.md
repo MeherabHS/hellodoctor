@@ -21,7 +21,7 @@ Open defect, not yet diagnosed: the app signs itself out when it should not.
 | Topic thumbnail: Healthy Relationships | Product owner's heart on the reference's pink, 480 px | In the build |
 | Logo mark | Redrawn as vector shapes from the reference, 512 px transparent PNG | In the build |
 | Support-chat category tiles | Native Flutter gradient tiles with vector glyphs | In the build |
-| Facilities map strip | Still an enlarged crop of the reference, shown dimmed | **Not replaced** |
+| Facilities map strip | Removed (product owner, 2026-11-13) | **Removed** |
 
 The character PNGs sit on native Flutter backgrounds (banner gradient, mint card, blue card with inner panel), so no artwork carries embedded UI.
 

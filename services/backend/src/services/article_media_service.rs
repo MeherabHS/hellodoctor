@@ -91,7 +91,8 @@ pub fn sanitize(bytes: &[u8], mime: &str) -> Result<Vec<u8>, AppError> {
         "Cover could not be optimized safely.".into(),
     ))
 }
-async fn sanitize_async(bytes: Vec<u8>, mime: String) -> Result<Vec<u8>, AppError> {
+/// Also used for facility photos (same limits, same re-encoding).
+pub async fn sanitize_async(bytes: Vec<u8>, mime: String) -> Result<Vec<u8>, AppError> {
     static DECODERS: OnceLock<Arc<tokio::sync::Semaphore>> = OnceLock::new();
     let permit = DECODERS
         .get_or_init(|| Arc::new(tokio::sync::Semaphore::new(2)))

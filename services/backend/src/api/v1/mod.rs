@@ -9,6 +9,7 @@ pub mod client_error_handlers;
 pub mod config_handlers;
 pub mod consultation_handlers;
 pub mod doctor_handlers;
+pub mod facility_handlers;
 pub mod grievance_handlers;
 pub mod legal_handlers;
 pub mod notification_handlers;

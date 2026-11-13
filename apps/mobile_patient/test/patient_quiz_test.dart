@@ -145,7 +145,10 @@ class QuizBlogs extends BlogsRepository {
           {String search = '',
           String language = 'en',
           BlogCursor? cursor,
-          int limit = 20}) async =>
+          int limit = 20,
+          String? topic,
+          bool videos = false,
+          bool standaloneQuizzes = false}) async =>
       BlogPage([await detail(id(1))], null);
   @override
   Future<BlogArticleDto> detail(String articleId) async {
@@ -180,13 +183,16 @@ Widget host(Widget child, {String language = 'en', double scale = 1}) =>
                 disableAnimations: true, textScaler: TextScaler.linear(scale)),
             child: child!),
         home: child);
-Widget section(FakeQuizRepo repo, {VoidCallback? refresh}) => Scaffold(
-    body: SingleChildScrollView(
-        child: ArticleQuizSection(
-            articleId: id(1),
-            publication: QuizPublication(id(2), 2),
-            repository: repo,
-            onRefreshArticle: refresh ?? () {})));
+Widget section(FakeQuizRepo repo,
+        {VoidCallback? refresh, bool standalone = false}) =>
+    Scaffold(
+        body: SingleChildScrollView(
+            child: ArticleQuizSection(
+                articleId: id(1),
+                publication: QuizPublication(id(2), 2),
+                repository: repo,
+                standalone: standalone,
+                onRefreshArticle: refresh ?? () {})));
 Future<void> tap(WidgetTester tester, String text) async {
   final finder = find.text(text);
   await tester.ensureVisible(finder);
@@ -428,6 +434,21 @@ void main() {
     expect(repo.checks, 1);
     expect(repo.reads, 1);
   });
+  testWidgets('standalone quiz intro does not mention an article',
+      (tester) async {
+    for (final standalone in [false, true]) {
+      await tester
+          .pumpWidget(host(section(FakeQuizRepo(), standalone: standalone)));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('after reading the article'),
+          standalone ? findsNothing : findsOneWidget);
+      expect(
+          find.text(
+              'Try this optional learning quiz. Your progress is kept only on this screen.'),
+          standalone ? findsOneWidget : findsNothing);
+    }
+  });
+
   testWidgets('Kiswahili locale gets full English content fallback',
       (tester) async {
     final repo = FakeQuizRepo()..translated = false;

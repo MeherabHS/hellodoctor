@@ -64,6 +64,13 @@ class AuthFailure extends AuthState {
   final String message;
 }
 
+/// The server has password reset switched off (`PASSWORD_RESET_ENABLED`):
+/// `POST /auth/password-reset/request` answers 404 only in that case, since
+/// for an unknown email it answers exactly as for a known one.
+class PasswordResetUnavailable extends AuthState {
+  const PasswordResetUnavailable();
+}
+
 /// Phase 2: Secure Email OTP Password Recovery — step 1 complete. The
 /// backend never reveals whether [email] actually has an eligible account;
 /// the UI must show the same "check your email" screen either way.
@@ -94,7 +101,8 @@ class AuthCubit extends Cubit<AuthState> {
       : repository = repository ?? AuthRepository(api),
         super(const SignedOut()) {
     api.onSessionExpired = () {
-      authDiag('auth.signedOutByExpiry', {'state': state.runtimeType.toString()});
+      authDiag(
+          'auth.signedOutByExpiry', {'state': state.runtimeType.toString()});
       _phoneNumber = null;
       cache?.clear();
       if (!isClosed) emit(const SignedOut());
@@ -291,7 +299,9 @@ class AuthCubit extends Cubit<AuthState> {
       // convenience, never relied on for correctness.
       emit(PasswordResetOtpSent(email: trimmed, expiresInSeconds: 300));
     } on ApiException catch (e) {
-      emit(AuthFailure(e.userMessage));
+      emit(e.status == 404
+          ? const PasswordResetUnavailable()
+          : AuthFailure(e.userMessage));
     } catch (_) {
       emit(const AuthFailure(
           'Unable to request a password reset. Please retry.'));

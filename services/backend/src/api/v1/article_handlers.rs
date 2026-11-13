@@ -86,6 +86,10 @@ pub struct PublishedArticleQuery {
     pub language: Option<String>,
     pub before_time: Option<chrono::DateTime<chrono::Utc>>,
     pub before_id: Option<Uuid>,
+    /// One of `domain::admin_articles::TOPIC_KEYS`.
+    pub topic: Option<String>,
+    /// `article` (default), `video` or `quiz` (standalone quizzes).
+    pub kind: Option<String>,
 }
 
 pub async fn list_own(
@@ -110,6 +114,14 @@ pub async fn feed(
         || !matches!(language, "en" | "sw")
         || query.before_time.is_some() != query.before_id.is_some()
         || query.before_time.is_some() && query.offset.unwrap_or(0) != 0
+        || query
+            .topic
+            .as_deref()
+            .is_some_and(|t| !crate::domain::admin_articles::TOPIC_KEYS.contains(&t))
+        || !matches!(
+            query.kind.as_deref(),
+            None | Some("article" | "video" | "quiz")
+        )
     {
         return Err(AppError::Validation(
             "Invalid article search or pagination parameters.".into(),
@@ -125,6 +137,12 @@ pub async fn feed(
         language,
         query.before_time,
         query.before_id,
+        query.topic.as_deref(),
+        match query.kind.as_deref() {
+            Some("video") => admin_article_repo::FeedKind::Video,
+            Some("quiz") => admin_article_repo::FeedKind::Quiz,
+            _ => admin_article_repo::FeedKind::Article,
+        },
     )
     .await?;
     tx.commit().await?;

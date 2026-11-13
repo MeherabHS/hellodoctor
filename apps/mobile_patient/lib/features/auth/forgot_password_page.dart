@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/widgets/patient_widgets.dart';
+import '../../l10n/app_localizations.dart';
 import 'auth_cubit.dart';
 import 'auth_scene.dart';
 import 'reset_otp_verify_page.dart';
@@ -96,9 +97,14 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           fillColor: Colors.white,
                           borderColor: Colors.white,
                           borderRadius: 16),
-                      if (state is AuthFailure) ...[
+                      if (state is AuthFailure ||
+                          state is PasswordResetUnavailable) ...[
                         const SizedBox(height: 10),
-                        Text(state.message,
+                        Text(
+                            state is AuthFailure
+                                ? state.message
+                                : AppLocalizations.of(context)
+                                    .passwordResetUnavailable,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                                 fontSize: 13,

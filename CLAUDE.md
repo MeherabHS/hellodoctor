@@ -22,7 +22,8 @@
    - **Logic is preserved:** auth, booking, join-window gating, API clients, localization wiring and tests are not part of the redesign; only the presentation layer is rebuilt. Booking and consultation screens not shown in the image keep their behavior and are restyled with the image's design language.
    - **Screens without a backend:** a panel whose feature has no backend yet (e.g. HIV Support Chat, Peer Navigator, Facilities map, GHI dashboard, WhatsApp/SMS/USSD) is built to match the image visually but must show honest empty/"coming soon" states instead of fake data, per rule 6 and the privacy rules below.
    - **Doctor Flutter app (`apps/mobile`) — changed 2026-11-13 by product-owner instruction:** the Doctor App reference board at [`docs/design/afyamkononi-doctor-ui-reference-11-panel.png`](docs/design/afyamkononi-doctor-ui-reference-11-panel.png) is the source of truth, pixel for pixel. Its 11 panels are: 1 Login, 2 Home Dashboard, 3 Appointment Queue, 4 Patient Details, 5 Waiting Room, 6 Video Consultation, 7 Clinical Notes & Outcome, 8 Patient Records (List), 9 Patient Record (Detail), 10 Profile & Availability, 11 Notifications; bottom nav: Home, Appointments, Patients, More. The 14-panel board beside it adds 12 Registration, 13 Availability (10-minute slots) and 14 Prescription. The measuring, imagery, design-preview-fixture, logic-preserved and no-backend rules above apply to it exactly as they do to the Patient app. Discovery and plan: [`docs/doctor-ui/`](docs/doctor-ui/).
-   - **All other surfaces (Doctor Web, Admin Web):** the prototype in `index.html` remains the source of truth, unchanged. Do not redesign, simplify, or reinvent the product.
+   - **Admin Web (`apps/admin-web`) — changed 2026-11-13 by product-owner instruction:** the `index.html` prototype is no longer its visual source of truth. Admin Web gets a full UI redesign in the AfyaMkononi design language of the Patient and Doctor reference boards in `docs/design/` (colours, typography, iconography, cards, spacing), adapted to a desktop admin console. If the product owner supplies an Admin reference board, it becomes the source of truth, pixel for pixel. Only presentation changes: the BFF routes, auth/session handling, API clients, validation, workflows (content approval, facilities, doctor verification and the rest) and tests are preserved, and no feature is added or removed without instruction.
+   - **Doctor Web:** the prototype in `index.html` remains the source of truth, unchanged. Do not redesign, simplify, or reinvent the product.
 3. **Strict Technology Boundaries**:
    - The mobile application must be written in **Flutter**. Do not use web wrappers (e.g., Capacitor, Cordova, WebView shells).
    - The backend service must be written in **Rust** using **Axum** and **SQLx**.
@@ -74,6 +75,9 @@
    - Active deployment scope is Kenya only; English and Swahili.
 6. **Consultation Outcomes**:
    - Consultation completion does NOT require a prescription. Doctors may complete consultations with clinical outcomes: COMPLETED_WITH_RX, COMPLETED_NO_RX, REFERRED, ESCALATED.
+
+7. **Content publishing needs one Admin (changed 2026-11-13 by product-owner instruction)**:
+   - Articles, videos, standalone quizzes and quiz revisions keep the submit → approve → publish steps, but any Admin, including the author, may approve and publish them. There is no second-Admin (independent) review anywhere, including sensitive health content; the `sensitive` flag is a content label only. Migration `20261214000001_single_admin_approval` (reversible).
 
 ---
 
@@ -200,6 +204,6 @@ Before marking any milestone or task complete in [`docs/PROGRESS.md`](docs/PROGR
 - [ ] Automated unit, service, and integration tests have been written and pass 100%.
 - [ ] Form inputs validate on both client (Flutter) and server (Rust).
 - [ ] Database entities and migrations reflect the specification in [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md).
-- [ ] UI visually matches the reference (Patient app: the UI reference image, pixel for pixel; other apps: the prototype per [`docs/VISUAL_FIDELITY.md`](docs/VISUAL_FIDELITY.md)).
+- [ ] UI visually matches the reference (Patient app: the UI reference image, pixel for pixel; Doctor app: its reference board; Admin Web: the AfyaMkononi design language per rule 2; Doctor Web: the prototype per [`docs/VISUAL_FIDELITY.md`](docs/VISUAL_FIDELITY.md)).
 - [ ] Acceptance criteria in [`docs/ACCEPTANCE_CRITERIA.md`](docs/ACCEPTANCE_CRITERIA.md) are fully satisfied.
 - [ ] No sensitive credentials, tokens, or PII are exposed in logs or test fixtures.

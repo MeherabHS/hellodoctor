@@ -86,7 +86,10 @@ class BlogFixture extends BlogsRepository {
           {String search = '',
           String language = 'en',
           BlogCursor? cursor,
-          int limit = 20}) async =>
+          int limit = 20,
+          String? topic,
+          bool videos = false,
+          bool standaloneQuizzes = false}) async =>
       BlogPage(rows, null);
   @override
   Future<BlogArticleDto> detail(String id) async {
@@ -203,7 +206,8 @@ void main() {
         BlogDetailPage(articleId: articleId, repo: BlogFixture()),
         language: 'sw'));
     await tester.pumpAndSettle();
-    expect(find.text('Mwongozo'), findsOneWidget);
+    // Title appears in the header and as the page title.
+    expect(find.text('Mwongozo'), findsNWidgets(2));
     expect(find.text('Soma kwa makini.', findRichText: true), findsOneWidget);
     expect(find.text('Editorial guide'), findsNothing);
   });
@@ -236,7 +240,7 @@ void main() {
     await tester.pumpWidget(
         host(BlogDetailPage(articleId: articleId, repo: BlogFixture())));
     await tester.pumpAndSettle();
-    expect(find.text('Editorial guide'), findsOneWidget);
+    expect(find.text('Editorial guide'), findsNWidgets(2));
     expect(tester.takeException(), isNull);
   });
 }

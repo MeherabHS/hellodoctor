@@ -1,9 +1,11 @@
-﻿'use client';
+'use client';
 import { dataRightsNotice } from '../lib/dataRightsOutcome';
 
 import { GrievanceInvestigation } from '@/components/GrievanceInvestigation';
 import { CampaignManager } from '@/components/campaigns/CampaignManager';
 import { BlogManager } from '@/components/blogs/BlogManager';
+import { FacilityManager } from '@/components/facilities/FacilityManager';
+import { QuizManager } from '@/components/blogs/QuizManager';
 import {NavigationGuard,useAdminNavigation} from '@/components/navigation/NavigationGuard';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -66,6 +68,8 @@ type AdminPageId =
   | 'grievances'
   | 'campaigns'
   | 'blogs'
+  | 'facilities'
+  | 'quizzes'
   | 'settings';
 
 interface ToastNotice {
@@ -352,6 +356,8 @@ function AdminPortalContent() {
       breadcrumb: 'Patient Rights & Clinical Accountability • Doctor Conduct & System Failure Disputes',
     },
     blogs: { title: 'Blog Manager', breadcrumb: 'Articles · Draft, Review & Publish' },
+    facilities: { title: 'Facilities & Services', breadcrumb: 'Content · Facility directory for the Patient app' },
+    quizzes: { title: 'Quiz Manager', breadcrumb: 'Content · Standalone quizzes · Draft, Review & Publish' },
     campaigns: {
       title: 'Admin Campaign Manager',
       breadcrumb: 'Patient & Doctor Push Notification Campaigns • Draft, Review, Schedule & Monitor',
@@ -835,7 +841,7 @@ function AdminPortalContent() {
   const selectedTxObj = selectedTransactionId ? transactions.find((t) => t.txId === selectedTransactionId) : null;
 
   return (
-    <div id="adminPortalShell" className={`admin-portal-shell${activeAdminPage === 'blogs' ? ' cms-active' : ''}`}>
+    <div id="adminPortalShell" className={`admin-portal-shell${(activeAdminPage === 'blogs' || activeAdminPage === 'facilities' || activeAdminPage === 'quizzes') ? ' cms-active' : ''}`}>
       {/* Toast Overlay */}
       <div id="adminToastContainer" className="app-toast-container" style={{ position: 'fixed', top: '70px', right: '24px', left: 'auto', width: '360px', zIndex: 9999 }}>
         {toasts.map((t) => (
@@ -985,6 +991,12 @@ function AdminPortalContent() {
           </div>
           <button type="button" className={`admin-nav-item ${activeAdminPage === 'blogs' ? 'active' : ''}`} id="adminNav-blogs" onClick={()=>navigateAdmin('blogs')}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 3h14v18H5zM8 7h8M8 11h8M8 15h5"/></svg><span>Blog Manager</span>
+          </button>
+          <button type="button" className={`admin-nav-item ${activeAdminPage === 'quizzes' ? 'active' : ''}`} id="adminNav-quizzes" onClick={()=>navigateAdmin('quizzes')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 3h6v2h3v16H6V5h3z"/><path d="M9 11l2 2 4-4M9 17h6"/></svg><span>Quiz Manager</span>
+          </button>
+          <button type="button" className={`admin-nav-item ${activeAdminPage === 'facilities' ? 'active' : ''}`} id="adminNav-facilities" onClick={()=>navigateAdmin('facilities')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><path d="M12 7v5M9.5 9.5h5"/></svg><span>Facilities &amp; Services</span>
           </button>
 
           <div
@@ -2102,6 +2114,8 @@ function AdminPortalContent() {
 
           {/* PAGE: ADMIN CAMPAIGN MANAGER */}
           {activeAdminPage === 'blogs' && <div className="admin-page-view active" id="adminPage_blogs"><BlogManager /></div>}
+          {activeAdminPage === 'facilities' && <div className="admin-page-view active" id="adminPage_facilities"><FacilityManager /></div>}
+          {activeAdminPage === 'quizzes' && <div className="admin-page-view active" id="adminPage_quizzes"><QuizManager /></div>}
           {activeAdminPage === 'campaigns' && (
             <div className="admin-page-view active" id="adminPage_campaigns">
               <CampaignManager />
