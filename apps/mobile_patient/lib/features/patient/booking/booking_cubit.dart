@@ -27,6 +27,7 @@ class BookingState {
     this.addPaymentMethodError,
     this.loadingPolicy = true,
     this.paymentRequired = true,
+    this.policyLoadFailed = false,
   });
   final bool loadingSlots, submitting, uploading;
 
@@ -36,6 +37,13 @@ class BookingState {
   /// flashes a "no payment needed" state before the server has actually said
   /// so.
   final bool loadingPolicy, paymentRequired;
+
+  /// The server's booking policy could not be read; booking waits for a retry.
+  final bool policyLoadFailed;
+
+  /// The server reports that bookings require payment, which this app never
+  /// collects. Booking is refused rather than creating an unpaid booking.
+  bool get paymentBlocked => !loadingPolicy && !policyLoadFailed && paymentRequired;
   final String? slotsError, submitError, uploadError, selectedSlotId;
   final List<DoctorSlotDto> slots;
   final DateTime? selectedDate;
@@ -77,10 +85,16 @@ class BookingState {
   /// server-decided [paymentRequired] policy says payment is actually
   /// needed for this booking — when it isn't (deferred mode), a payment
   /// method is neither shown nor required.
+  ///
+  /// The patient app is payment-free: booking proceeds only once the server's
+  /// policy has loaded and says no payment is required. If an environment is
+  /// ever configured to require payment, booking is refused with a
+  /// configuration error ([paymentBlocked]) — no checkout is ever offered.
   bool get canProceed =>
       selectedDate != null &&
       selectedSlotId != null &&
-      (!paymentRequired || selectedPaymentMethodId != null) &&
+      !loadingPolicy &&
+      !paymentRequired &&
       !loadingSlots &&
       slotsError == null &&
       !submitting &&
@@ -107,8 +121,10 @@ class BookingState {
     Object? addPaymentMethodError = _unset,
     bool? loadingPolicy,
     bool? paymentRequired,
+    bool? policyLoadFailed,
   }) =>
       BookingState(
+        policyLoadFailed: policyLoadFailed ?? this.policyLoadFailed,
         loadingSlots: loadingSlots ?? this.loadingSlots,
         slotsError: identical(slotsError, _unset)
             ? this.slotsError
@@ -216,7 +232,7 @@ class BookingCubit extends Cubit<BookingState> {
   /// true`, matching the constructor default) rather than ever assuming
   /// payment is optional just because this call failed.
   Future<void> loadBookingPolicy() async {
-    emit(state.copyWith(loadingPolicy: true));
+    emit(state.copyWith(loadingPolicy: true, policyLoadFailed: false));
     try {
       final policy = await repo.bookingPolicy();
       if (isClosed) return;
@@ -226,7 +242,9 @@ class BookingCubit extends Cubit<BookingState> {
       ));
     } catch (_) {
       if (isClosed) return;
-      emit(state.copyWith(loadingPolicy: false));
+      // Keep paymentRequired at its safe default: booking stays disabled until
+      // the policy is actually known.
+      emit(state.copyWith(loadingPolicy: false, policyLoadFailed: true));
     }
   }
 
@@ -318,8 +336,8 @@ class BookingCubit extends Cubit<BookingState> {
         doctorId: doctorId,
         slotId: state.selectedSlotId!,
         modality: modality,
-        paymentMethodId:
-            state.paymentRequired ? state.selectedPaymentMethodId! : null,
+        // Payment-free: never sends a payment method or gateway.
+        paymentMethodId: null,
         chiefComplaint: state.chiefComplaint,
         profileId: profileId,
       );

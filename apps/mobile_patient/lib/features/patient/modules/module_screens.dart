@@ -557,9 +557,17 @@ class FacilitiesPage extends StatelessWidget {
 /// urgent card dials the configured emergency number, not the panel's 11663.
 class VideoConsultationPage extends StatelessWidget {
   const VideoConsultationPage(
-      {super.key, required this.nav, required this.onFindDoctor});
+      {super.key,
+      required this.nav,
+      required this.onFindDoctor,
+      this.onHistory});
   final PatientShellNav nav;
-  final VoidCallback onFindDoctor;
+
+  /// Opens doctor discovery filtered to `'video'` or `'chat'`.
+  final ValueChanged<String> onFindDoctor;
+
+  /// Opens the patient's consultation history (current and completed).
+  final VoidCallback? onHistory;
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -588,7 +596,26 @@ class VideoConsultationPage extends StatelessWidget {
         AfyaPillButton(
             label: l.consultCta,
             icon: Icons.videocam_rounded,
-            onPressed: onFindDoctor),
+            onPressed: () => onFindDoctor('video')),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+            onPressed: () => onFindDoctor('chat'),
+            icon: const Icon(Icons.chat_bubble_outline_rounded),
+            label: Text(l.consultCtaChat),
+            style: OutlinedButton.styleFrom(
+                foregroundColor: PatientTokens.primaryDark,
+                side: const BorderSide(
+                    color: PatientTokens.primaryDark, width: 1.5),
+                minimumSize: const Size.fromHeight(52),
+                shape: const StadiumBorder())),
+        if (onHistory != null)
+          Align(
+            alignment: Alignment.center,
+            child: TextButton.icon(
+                onPressed: onHistory,
+                icon: const Icon(Icons.history_rounded, size: 18),
+                label: Text(l.consultHistoryLink)),
+          ),
         const _MyUpcomingConsultation(),
         const SizedBox(height: 18),
         AfyaCard(

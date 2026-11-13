@@ -50,22 +50,14 @@ class PublicDoctorDto {
   final bool hasPhoto;
   final DateTime? photoUpdatedAt;
 
-  // Matches DoctorQuery: a positive configured fee enables that modality.
-  bool get supportsVideo => _positiveFee(consultationFeeVideo);
-  bool get supportsChat => _positiveFee(consultationFeeChat);
-
-  /// Whether VIDEO can be booked. When the server's booking policy says no
-  /// payment is required (`FINANCIAL_MODULE_MODE=deferred`) an unpriced doctor
-  /// is still bookable — the deferred booking endpoint never charges the fee,
-  /// so a zero fee must not hide the modality. In paid mode the configured
-  /// fee remains the offering signal, exactly as before. CHAT stays
-  /// fee-driven (its booking flow is payment-specific).
-  bool videoBookable({required bool paymentRequired}) =>
-      !paymentRequired || supportsVideo;
-  static bool _positiveFee(String fee) {
-    final value = double.tryParse(fee);
-    return value != null && value.isFinite && value > 0;
-  }
+  /// The patient app is payment-free (product decision, 2026-11-13): every
+  /// doctor the server lists is approved and offers both video and chat,
+  /// whatever fee is configured. Fees are never shown or used to decide
+  /// availability; the server's directory decides who is listed, and booking
+  /// refuses with a configuration error if the server ever requires payment.
+  bool get supportsVideo => true;
+  bool get supportsChat => true;
+  bool videoBookable({required bool paymentRequired}) => true;
 
   String get displayName => patientDoctorName(fullName);
 

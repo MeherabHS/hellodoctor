@@ -58,6 +58,18 @@ class JoinEligibility {
   DateTime _serverNow(DateTime? now) =>
       (now ?? DateTime.now()).toUtc().add(clockOffset);
 
+  /// The current time on the server's clock (device clock + measured offset).
+  DateTime serverNow([DateTime? now]) => _serverNow(now);
+
+  /// Whether the server's consultation window ([joinOpenAt]..[joinCloseAt])
+  /// is open now, whatever the modality. Video joining additionally needs
+  /// [isOpen]; a chat consultation has no RTC room but shares the window
+  /// for display purposes (e.g. the Home card).
+  bool withinWindow([DateTime? now]) {
+    final serverNow = _serverNow(now);
+    return !serverNow.isBefore(joinOpenAt) && !serverNow.isAfter(joinCloseAt);
+  }
+
   JoinGateState gate([DateTime? now]) {
     if (_unavailable.contains(reason)) return JoinGateState.unavailable;
     final serverNow = _serverNow(now);

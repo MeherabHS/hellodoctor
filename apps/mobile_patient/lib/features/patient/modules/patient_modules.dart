@@ -5,6 +5,8 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/afya_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../blogs/blogs_repository.dart';
+import '../booking/booking_repository.dart';
+import '../consultation/consultation_history_page.dart';
 import '../directory/patient_directory_page.dart';
 import '../home/home_cubit.dart';
 import '../profile/family_profiles_cubit.dart';
@@ -101,13 +103,22 @@ List<PatientModule> patientModules(BuildContext context, PatientShellNav nav) {
                   ],
                   child: VideoConsultationPage(
                       nav: nav,
-                      onFindDoctor: () => push(
+                      onFindDoctor: (modality) => push(
                           c,
                           PatientDirectoryPage(
                               api: homeRepo.api,
                               cache: homeRepo.cache,
                               connectivity: homeRepo.connectivity!,
-                              familyProfilesCubit: family)))));
+                              familyProfilesCubit: family,
+                              initialModality: modality)),
+                      onHistory: () => push(
+                          c,
+                          ConsultationHistoryPage(
+                              repo: BookingRepository(homeRepo.api,
+                                  connectivity: homeRepo.connectivity),
+                              familyProfilesCubit: family,
+                              myUserId:
+                                  c.read<ProfileCubit>().state.profile?.userId)))));
         }),
     PatientModule(
         icon: Icons.people_alt_rounded,

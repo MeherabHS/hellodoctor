@@ -13,6 +13,7 @@ import 'add_dependent_sheet.dart';
 import 'family_profile_chip_row.dart';
 import 'family_profiles_cubit.dart';
 import 'language_modal.dart';
+import '../../notifications/notification_cubit.dart';
 import '../../notifications/notification_settings_page.dart';
 import 'profile_cubit.dart';
 import 'profile_edit_sheet.dart';
@@ -105,8 +106,12 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                     tint: PatientTokens.tileAmber,
                     tintBg: PatientTokens.tileAmberBg,
                     title: l10n.notificationSettingsMenuTitle,
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => const NotificationSettingsPage())),
+                    onTap: () {
+                      final repo = context.read<NotificationCubit>().repo;
+                      Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) =>
+                              NotificationSettingsPage(repo: repo)));
+                    },
                   ),
                   _SettingsTile(
                     icon: Icons.lock_rounded,

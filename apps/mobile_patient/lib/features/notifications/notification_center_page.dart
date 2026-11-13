@@ -3,6 +3,7 @@ import 'notification_navigation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../core/l10n/kenya_time.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/afya_widgets.dart';
 import '../../core/widgets/patient_widgets.dart';
@@ -15,8 +16,10 @@ const _monthNames = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
+/// Shown in Kenya time (EAT) like every other appointment time in the app,
+/// whatever the device's own time zone is.
 String _mediumDateTime(BuildContext context, DateTime utc) {
-  final t = utc.toLocal();
+  final t = kenyaTime(utc);
   if (Localizations.localeOf(context).languageCode == 'sw') {
     final material = MaterialLocalizations.of(context);
     return '${material.formatMediumDate(t)} \u00b7 ${material.formatTimeOfDay(TimeOfDay.fromDateTime(t))}';
@@ -30,8 +33,12 @@ String _mediumDateTime(BuildContext context, DateTime utc) {
 /// Owner-scoped inbox. Explicit taps use the same authorization checks as OS
 /// notification taps; receipts alone never navigate or mark notices read.
 class NotificationCenterPage extends StatefulWidget {
-  const NotificationCenterPage({super.key, required this.cubit});
+  const NotificationCenterPage({super.key, required this.cubit, this.deps});
   final NotificationCubit cubit;
+
+  /// Session dependencies for appointment destinations (waiting room,
+  /// outcome). Without them an appointment opens the plain status page.
+  final AppointmentRouteDeps? deps;
 
   @override
   State<NotificationCenterPage> createState() => _NotificationCenterPageState();
@@ -48,7 +55,7 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
   Future<void> _handleTap(NotificationDto n) async {
     try {
       await openNotificationDestination(context, widget.cubit, n.id, _tapGate,
-          fromInbox: true);
+          fromInbox: true, deps: widget.deps);
     } catch (_) {}
   }
 
