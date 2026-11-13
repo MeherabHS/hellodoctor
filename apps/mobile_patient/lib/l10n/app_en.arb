@@ -925,7 +925,19 @@
   "@chatNotSent": {
     "description": "Chat screen failed-send indicator."
   },
-  "chatInputHint": "Type your message",
+  "chatAttachTooltip": "Attach image",
+  "@chatAttachTooltip": {
+    "description": "Chat composer paperclip button."
+  },
+  "chatAttachTitle": "Attach to consultation",
+  "chatAttachSubtitle": "A JPEG or PNG photo, for example a prescription, lab result or the affected area.",
+  "chatAttachCamera": "Take a photo",
+  "chatAttachGallery": "Choose from gallery",
+  "chatAttachSending": "Sending image…",
+  "chatAttachInvalid": "Choose a JPEG or PNG image.",
+  "chatAttachTooLarge": "Choose an image smaller than 10 MB.",
+  "chatAttachFailed": "The image was not sent. Check your connection and retry.",
+  "chatAttachRetry": "Retry sending image",  "chatInputHint": "Type your message",
   "@chatInputHint": {
     "description": "Chat message input placeholder."
   },

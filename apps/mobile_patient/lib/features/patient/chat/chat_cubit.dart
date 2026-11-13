@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/network/api_client.dart';
@@ -17,9 +19,17 @@ class ChatState {
     this.serverLocked = false,
     this.hasOlder = true,
     this.loadingOlder = false,
+    this.uploadingImage = false,
+    this.imageError,
+    this.imagePending = false,
   });
   final bool loading, sending, notSent, serverLocked, hasOlder, loadingOlder;
   final String? error;
+
+  /// An image is being sent; [imageError] is why the last one was not, and
+  /// [imagePending] means it is kept for a retry.
+  final bool uploadingImage, imagePending;
+  final String? imageError;
   final List<ChatMessageDto> messages;
 
   ChatState copyWith({
@@ -31,6 +41,9 @@ class ChatState {
     bool? serverLocked,
     bool? hasOlder,
     bool? loadingOlder,
+    bool? uploadingImage,
+    Object? imageError = _unset,
+    bool? imagePending,
   }) =>
       ChatState(
         loading: loading ?? this.loading,
@@ -41,6 +54,11 @@ class ChatState {
         serverLocked: serverLocked ?? this.serverLocked,
         hasOlder: hasOlder ?? this.hasOlder,
         loadingOlder: loadingOlder ?? this.loadingOlder,
+        uploadingImage: uploadingImage ?? this.uploadingImage,
+        imageError: identical(imageError, _unset)
+            ? this.imageError
+            : imageError as String?,
+        imagePending: imagePending ?? this.imagePending,
       );
 }
 
@@ -172,6 +190,46 @@ class ChatCubit extends Cubit<ChatState> {
           notSent: true,
           serverLocked:
               e is ApiException && (e.status == 403 || e.status == 409)));
+    }
+  }
+
+  ({Uint8List bytes, String mime, String key})? _pendingImage;
+
+  /// Sends a JPEG or PNG. On failure the image and its request key are kept,
+  /// so [retryImage] cannot post it twice.
+  Future<void> sendImage(Uint8List bytes, String mimeType) async {
+    if (state.uploadingImage || state.serverLocked) return;
+    final key = List.generate(
+            16,
+            (_) =>
+                Random.secure().nextInt(256).toRadixString(16).padLeft(2, '0'))
+        .join();
+    _pendingImage = (bytes: bytes, mime: mimeType, key: key);
+    await retryImage();
+  }
+
+  Future<void> retryImage() async {
+    final pending = _pendingImage;
+    if (pending == null || state.uploadingImage || isClosed) return;
+    emit(state.copyWith(uploadingImage: true, imageError: null));
+    try {
+      final message = await repo.uploadClinicalImage(
+          conversationId, pending.bytes, pending.mime, pending.key);
+      _pendingImage = null;
+      if (isClosed) return;
+      emit(state.copyWith(
+          uploadingImage: false,
+          imagePending: false,
+          messages: merge(state.messages, [message])));
+    } catch (e) {
+      if (isClosed) return;
+      final locked = e is ApiException && e.status == 403;
+      if (locked) _pendingImage = null;
+      emit(state.copyWith(
+          uploadingImage: false,
+          imagePending: !locked,
+          serverLocked: locked || state.serverLocked,
+          imageError: e is ApiException ? e.userMessage : ''));
     }
   }
 }

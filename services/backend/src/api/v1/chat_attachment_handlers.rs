@@ -64,6 +64,24 @@ async fn check_doctor_window(
     Ok(())
 }
 
+/// Doctors and patients may both attach images to their own consultation
+/// chat (product owner, 2026-11-13), under the same participant rules as a
+/// text message: a verified doctor, or the patient, of that conversation.
+/// Row-level security limits each caller to their own conversations.
+async fn require_participant(state: &AppState, ctx: &AuthContext) -> Result<(), AppError> {
+    abac::authorize(ctx, Action::AnyAuthenticated)?;
+    match ctx.role {
+        UserRole::Doctor => {
+            ctx.verified_doctor_profile_id(state).await?;
+            Ok(())
+        }
+        UserRole::Patient => Ok(()),
+        _ => Err(AppError::Forbidden(
+            "Only consultation participants may attach images.".into(),
+        )),
+    }
+}
+
 pub async fn upload(
     state: State<AppState>,
     ctx: AuthContext,
@@ -71,8 +89,7 @@ pub async fn upload(
     headers: HeaderMap,
     body: Json<ClinicalImageRequest>,
 ) -> Result<Response, AppError> {
-    abac::authorize(&ctx, Action::UploadDoctorPrescription)?;
-    ctx.verified_doctor_profile_id(&state).await?;
+    require_participant(&state, &ctx).await?;
     let mut tx = state.begin_authed(&ctx).await?;
     let conversation = chat_repo::find_conversation(&mut *tx, path.0)
         .await?
@@ -114,8 +131,7 @@ async fn upload_authorized(
     headers: HeaderMap,
     Json(body): Json<ClinicalImageRequest>,
 ) -> Result<Response, AppError> {
-    abac::authorize(&ctx, Action::UploadDoctorPrescription)?;
-    ctx.verified_doctor_profile_id(&state).await?;
+    require_participant(&state, &ctx).await?;
     rate_limit::check_upload_limit(&state.redis, &ctx.user_id.to_string()).await?;
     let mut tx = state.begin_authed(&ctx).await?;
     let conv = chat_repo::find_conversation(&mut *tx, conversation_id)
@@ -124,20 +140,25 @@ async fn upload_authorized(
     let appointment = appointment_repo::find_by_id(&mut *tx, conv.appointment_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
-    let authorization = if appointment.modality == Modality::Chat {
-        "SELECT doctor_own_encounter_allowed($1,$2)"
-    } else {
-        "SELECT doctor_history_context_allowed($1,$2)"
-    };
-    let allowed: bool = sqlx::query_scalar(authorization)
-        .bind(conv.appointment_id)
-        .bind(ctx.user_id)
-        .fetch_one(&mut *tx)
-        .await?;
-    if !allowed {
-        return Err(AppError::Forbidden(
-            "Clinical documents are unavailable outside the authorized consultation window.".into(),
-        ));
+    // Doctors keep their clinical-window check. A patient is bound by the
+    // conversation's own state below, exactly as for a text message.
+    if ctx.role == UserRole::Doctor {
+        let authorization = if appointment.modality == Modality::Chat {
+            "SELECT doctor_own_encounter_allowed($1,$2)"
+        } else {
+            "SELECT doctor_history_context_allowed($1,$2)"
+        };
+        let allowed: bool = sqlx::query_scalar(authorization)
+            .bind(conv.appointment_id)
+            .bind(ctx.user_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        if !allowed {
+            return Err(AppError::Forbidden(
+                "Clinical documents are unavailable outside the authorized consultation window."
+                    .into(),
+            ));
+        }
     }
     if !matches!(
         appointment.status,
