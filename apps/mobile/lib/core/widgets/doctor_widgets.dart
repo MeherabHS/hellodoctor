@@ -55,6 +55,19 @@ class DoctorPageHeader extends StatelessWidget {
           color: DoctorTokens.surface,
           border: Border(bottom: BorderSide(color: DoctorTokens.border))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // These screens were tab roots and are now pushed from More or Home;
+        // a pushed one needs a way back.
+        if (Navigator.of(context).canPop())
+          Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  tooltip: 'Back',
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints(minWidth: 36, minHeight: 36),
+                  icon: const Icon(Icons.arrow_back, size: 22),
+                  color: DoctorTokens.navy)),
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

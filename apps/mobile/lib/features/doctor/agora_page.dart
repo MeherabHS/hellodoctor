@@ -323,6 +323,27 @@ class _InCallView extends StatelessWidget {
                   style: TextStyle(color: Colors.white)),
             ),
           ),
+        // Title from panel 6. The elapsed timer, in-call chat, notes and
+        // checklist on the board are not built: the first needs a start
+        // time the call layer does not expose, the rest have no backend.
+        const Positioned(
+          left: 16,
+          top: 16,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black45,
+              borderRadius: BorderRadius.all(Radius.circular(10)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              child: Text('Video Consultation',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ),
         Positioned(
           left: 0,
           right: 0,

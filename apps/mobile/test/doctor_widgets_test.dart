@@ -245,7 +245,9 @@ void main() {
     });
 
     for (final width in [360.0, 390.0, 412.0]) {
-      await tester.binding.setSurfaceSize(Size(width, 800));
+      // Tall enough that both slot cards sit below the schedule header
+      // without scrolling.
+      await tester.binding.setSurfaceSize(Size(width, 1100));
       await tester.pumpWidget(harness(const SchedulePage(),
           DoctorState(slots: [booked, available], queue: [appointment])));
       await tester.pumpAndSettle();
@@ -287,7 +289,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Blocked'), findsWidgets);
     expect(
-        find.text('Blocked ? unavailable for patient booking'), findsOneWidget);
+        find.text('Blocked — unavailable for patient booking'), findsOneWidget);
     expect(find.text('Booked (0)'), findsOneWidget);
     expect(find.text('Available (0)'), findsOneWidget);
     expect(find.text('Call Patient'), findsNothing);
@@ -323,6 +325,9 @@ void main() {
       'doctor_lifecycle': 'BOOKED',
     });
 
+    // Tall enough that both slot cards sit below the schedule header.
+    await tester.binding.setSurfaceSize(const Size(412, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(harness(const SchedulePage(),
         DoctorState(slots: [booked, available], queue: [appointment])));
     await tester.pumpAndSettle();
@@ -523,6 +528,9 @@ void main() {
       'doctor_lifecycle': 'BOOKED',
     });
 
+    // Tall enough that both slot cards sit below the schedule header.
+    await tester.binding.setSurfaceSize(const Size(412, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(harness(const SchedulePage(),
         DoctorState(slots: [booked, available], queue: [appointment])));
     await tester.pumpAndSettle();

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/tokens.dart';
+import '../../app.dart';
 import 'auth_cubit.dart';
 
 /// Everything already collected on the registration form, carried forward to
@@ -136,51 +137,47 @@ class _LegalConsentState extends State<LegalConsentPage> {
               body: SingleChildScrollView(
                   padding: const EdgeInsets.all(20), child: Text(doc.body)))));
 
-  Widget _checkboxRow(_LegalDocument doc) => CheckboxListTile(
-      value: _checked.contains(doc.type),
-      onChanged: (value) => setState(() {
-            if (value ?? false) {
-              _checked.add(doc.type);
-            } else {
-              _checked.remove(doc.type);
-            }
-          }),
-      controlAffinity: ListTileControlAffinity.leading,
-      contentPadding: EdgeInsets.zero,
-      title: Text(doc.title),
-      subtitle: Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(
-              onPressed: () => _openDocument(doc),
-              style: TextButton.styleFrom(padding: EdgeInsets.zero),
-              child: const Text('View →'))));
+  Widget _checkboxRow(_LegalDocument doc) => Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: DoctorTokens.fieldBorder)),
+      child: CheckboxListTile(
+          value: _checked.contains(doc.type),
+          activeColor: DoctorTokens.primary,
+          onChanged: (value) => setState(() {
+                if (value ?? false) {
+                  _checked.add(doc.type);
+                } else {
+                  _checked.remove(doc.type);
+                }
+              }),
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: const EdgeInsets.fromLTRB(4, 2, 12, 0),
+          title: Text(doc.title,
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: DoctorTokens.navy)),
+          subtitle: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                  onPressed: () => _openDocument(doc),
+                  style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                  child: const Text('View →')))));
 
   @override
   Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(title: const Text('Legal & Professional Agreements')),
+      backgroundColor: DoctorTokens.screen,
+      appBar: AppBar(title: const Text('Agreements')),
       body: BlocBuilder<AuthCubit, AuthState>(
           bloc: widget.auth,
           builder: (_, state) {
             if (state is RegistrationSubmitted) {
-              return Center(
-                  child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.pending_actions,
-                            color: DoctorTokens.primary, size: 52),
-                        const SizedBox(height: 14),
-                        const Text('Registration submitted',
-                            style: TextStyle(
-                                fontSize: 22, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 8),
-                        const Text(
-                            'Your Doctor account is pending ClinicalAdmin verification.'),
-                        const SizedBox(height: 18),
-                        FilledButton(
-                            onPressed: () => Navigator.popUntil(
-                                context, (route) => route.isFirst),
-                            child: const Text('Return to login'))
-                      ])));
+              return RegistrationSubmittedView(
+                  onDone: () =>
+                      Navigator.popUntil(context, (route) => route.isFirst));
             }
             if (_loadError != null) {
               return Center(
@@ -206,9 +203,16 @@ class _LegalConsentState extends State<LegalConsentPage> {
             final optional = documents.where((d) => !d.required).toList();
             final busy = state is AuthBusy;
             return ListView(padding: const EdgeInsets.all(24), children: [
+              const Text('Legal & Professional Agreements',
+                  style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w800,
+                      color: DoctorTokens.navy)),
+              const SizedBox(height: 6),
               const Text(
                   'Before submitting your application, review and accept the following requirements.',
-                  style: TextStyle(color: DoctorTokens.textSub)),
+                  style: TextStyle(
+                      fontSize: 15, height: 1.4, color: DoctorTokens.slate)),
               const SizedBox(height: 18),
               for (final doc in required) _checkboxRow(doc),
               if (optional.isNotEmpty) ...[

@@ -16,6 +16,7 @@ import '../../core/network/screen_refresh.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/time/kenya_time.dart';
 import '../../core/validation/kenya_phone.dart';
+import '../../core/widgets/afya_auth_widgets.dart';
 import '../../core/widgets/doctor_widgets.dart';
 import '../auth/auth_cubit.dart';
 import 'profile_photo_avatar.dart';
@@ -32,6 +33,12 @@ import '../../core/video/call_screen_guard.dart';
 /// in this file — see [CallScreenGuard]'s own doc comment for why one
 /// instance, not one per call site.
 final _callScreenGuard = CallScreenGuard();
+
+/// Opens the video call for [appointmentId] through the same single guard as
+/// every other entry point in this file, for screens that live elsewhere.
+void openConsultationCall(BuildContext context, String appointmentId) =>
+    _callScreenGuard.push(
+        context, (_) => AgoraPage(appointmentId: appointmentId));
 
 /// Shared bell builder so every tab constructs the same `onTap` navigation
 /// and reads the same live `NotificationCubit` unread count, without
@@ -226,7 +233,7 @@ class _ConsultationHistoryState extends State<ConsultationHistoryPage> {
                     leading: const Icon(Icons.assignment_outlined),
                     title: Text(a.patientName ?? 'Patient'),
                     subtitle: Text(
-                        '${a.modality} consultation ? ${a.start ?? ''} ? ${a.status}'),
+                        '${a.isChat ? 'Chat' : 'Video'} consultation · ${_mediumDateTime(a.start?.toIso8601String())} · ${a.status.replaceAll('_', ' ').toLowerCase()}'),
                     onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -813,8 +820,7 @@ class _ScheduleState extends State<SchedulePage> {
                     onRefresh: () =>
                         c.read<DoctorCubit>().refreshSlots(day: selectedDate),
                     child: ListView(padding: EdgeInsets.zero, children: [
-                      DoctorPageHeader('Consultation Schedule',
-                          'Manage your live availability & calendar slots',
+                      _ScheduleHero(
                           onRefresh: () => c
                               .read<DoctorCubit>()
                               .refreshSlots(day: selectedDate),
@@ -874,6 +880,14 @@ class _ScheduleState extends State<SchedulePage> {
                                 'available',
                                 filter,
                                 (v) => setState(() => filter = v)),
+                          ])),
+                      // Legend from panel 13 of the reference board.
+                      const Padding(
+                          padding: EdgeInsets.fromLTRB(18, 0, 18, 12),
+                          child: Wrap(spacing: 14, runSpacing: 6, children: [
+                            _SlotLegend('Available', Color(0xFFFEF3C7)),
+                            _SlotLegend('Booked', Color(0xFFDBEAFE)),
+                            _SlotLegend('Blocked', DoctorTokens.surfaceSubtle),
                           ])),
                       if (visible.isEmpty)
                         const Padding(
@@ -1026,6 +1040,89 @@ class _ScheduleState extends State<SchedulePage> {
   }
 }
 
+/// Header of the schedule screen, built to
+/// docs/design/afyamkononi-doctor-schedule-reference.png: logo bar with the
+/// bell and refresh, then the doctor illustration beside the title.
+class _ScheduleHero extends StatelessWidget {
+  const _ScheduleHero({required this.onRefresh, this.actions = const []});
+  final VoidCallback onRefresh;
+  final List<Widget> actions;
+  @override
+  Widget build(BuildContext context) => Container(
+      decoration: const BoxDecoration(
+          gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.white, Color(0xFFE3F3EC)])),
+      padding: const EdgeInsets.fromLTRB(16, 6, 6, 12),
+      child: Column(children: [
+        Row(children: [
+          const AfyaLogoMark(size: 30),
+          const SizedBox(width: 6),
+          const Expanded(
+              child: Text('AfyaMkononi',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0E4A4A)))),
+          ...actions,
+          IconButton(
+              onPressed: onRefresh,
+              tooltip: 'Refresh',
+              icon: const Icon(Icons.refresh, size: 22),
+              color: DoctorTokens.primaryDark)
+        ]),
+        const SizedBox(height: 4),
+        Row(children: [
+          ClipOval(
+              child: Image.asset('assets/auth/doctor_portrait.jpg',
+                  width: 74,
+                  height: 74,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                  excludeFromSemantics: true)),
+          const SizedBox(width: 12),
+          const Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text('Consultation Schedule',
+                    style: TextStyle(
+                        fontSize: 21,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
+                        color: DoctorTokens.navy)),
+                SizedBox(height: 2),
+                Text('Manage your live availability & calendar slots',
+                    style:
+                        TextStyle(fontSize: 13.5, color: DoctorTokens.slate))
+              ]))
+        ])
+      ]));
+}
+
+class _SlotLegend extends StatelessWidget {
+  const _SlotLegend(this.label, this.color);
+  final String label;
+  final Color color;
+  @override
+  Widget build(BuildContext context) =>
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: DoctorTokens.fieldBorder))),
+        const SizedBox(width: 6),
+        Text(label,
+            style: const TextStyle(fontSize: 12, color: DoctorTokens.slate))
+      ]);
+}
+
 class _ScheduleSummaryBanner extends StatelessWidget {
   const _ScheduleSummaryBanner(
       {required this.leftToday,
@@ -1039,14 +1136,10 @@ class _ScheduleSummaryBanner extends StatelessWidget {
   Widget build(BuildContext c) => Container(
       margin: const EdgeInsets.fromLTRB(18, 10, 18, 12),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      // Board palette (panel 2 greeting card) in place of the old dark slab.
       decoration: BoxDecoration(
-          gradient: const LinearGradient(
-              colors: [Color(0xFF1E293B), Color(0xFF0F172A)]),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [
-            BoxShadow(
-                color: Color(0x2E0F172A), blurRadius: 12, offset: Offset(0, 3))
-          ]),
+          color: const Color(0xFFDAEDE9),
+          borderRadius: BorderRadius.circular(14)),
       child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         Expanded(
             child:
@@ -1056,7 +1149,7 @@ class _ScheduleSummaryBanner extends StatelessWidget {
                   fontSize: 10.5,
                   letterSpacing: .5,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white70)),
+                  color: DoctorTokens.slate)),
           const SizedBox(height: 2),
           Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -1069,14 +1162,14 @@ class _ScheduleSummaryBanner extends StatelessWidget {
                         style: const TextStyle(
                             fontSize: 19,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF34D399)))),
+                            color: DoctorTokens.navy))),
                 const SizedBox(width: 6),
                 Flexible(
                     child: Text('($completedToday Completed)',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                            fontSize: 11, color: Colors.white60)))
+                            fontSize: 11, color: DoctorTokens.slate)))
               ])
         ])),
         const SizedBox(width: 10),
@@ -1292,7 +1385,7 @@ class _ScheduleSlotCard extends StatelessWidget {
           ] else if (blocked) ...[
             const Padding(
                 padding: EdgeInsets.only(top: 6, bottom: 10),
-                child: Text('Blocked ? unavailable for patient booking',
+                child: Text('Blocked — unavailable for patient booking',
                     style: TextStyle(
                         fontSize: 11.5, color: DoctorTokens.textSub))),
             SizedBox(
@@ -3683,6 +3776,34 @@ class _ScannerState extends State<ScannerPage> {
                             _RxPadFooter(profile: profile)
                           ],
                           const SizedBox(height: 14),
+                          if (allDone) ...[
+                            // Panel 14, second phone. Shown only once every
+                            // page has been confirmed by the server.
+                            Container(
+                                width: double.infinity,
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                    color: DoctorTokens.noticeBg,
+                                    borderRadius: BorderRadius.circular(14)),
+                                child: Column(children: [
+                                  const Icon(Icons.check_circle,
+                                      size: 56, color: DoctorTokens.primary),
+                                  const SizedBox(height: 8),
+                                  const Text('Prescription Submitted!',
+                                      style: TextStyle(
+                                          fontSize: 19,
+                                          fontWeight: FontWeight.w800,
+                                          color: DoctorTokens.navy)),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                      'The prescription has been added to ${appointment?.patientName ?? 'the patient'}’s health record.',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          color: DoctorTokens.slate)),
+                                ]))
+                          ],
                           SizedBox(
                               width: double.infinity,
                               child: FilledButton(
@@ -4479,11 +4600,11 @@ class _ConsultationState extends State<ConsultationPage> {
     }
     if (error != null) {
       return Scaffold(
-          appBar: AppBar(title: const Text('Consultation Detail')),
+          appBar: AppBar(title: const Text('Consultation Notes')),
           body: ErrorPanel(error!, onRetry: load));
     }
     return Scaffold(
-        appBar: AppBar(title: const Text('Consultation Detail')),
+        appBar: AppBar(title: const Text('Consultation Notes')),
         body: ListView(padding: const EdgeInsets.all(18), children: [
           CacheStatusBar(
               offline: offline,
@@ -4501,7 +4622,23 @@ class _ConsultationState extends State<ConsultationPage> {
                 if (summary?['chief_complaint'] != null)
                   Text('Chief complaint: ${summary!['chief_complaint']}'),
                 if (summary?['clinical_notes'] != null)
-                  Text('Clinical notes: ${summary!['clinical_notes']}'),
+                  Text('Patient intake note: ${summary!['clinical_notes']}'),
+                const SizedBox(height: 12),
+                // Panel 7 also draws clinical notes, diagnosis, plan and
+                // follow-up fields. Nothing on the server stores them, so
+                // they are not offered: typing them here would lose them.
+                Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                        color: DoctorTokens.noticeBg,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: const Text(
+                        'Record the consultation outcome below. Written clinical notes, diagnosis, plan and follow-up cannot be saved in the app yet.',
+                        style: TextStyle(
+                            fontSize: 13.5,
+                            height: 1.4,
+                            color: DoctorTokens.fieldText))),
                 const SizedBox(height: 14),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   OutlinedButton.icon(
@@ -4517,7 +4654,7 @@ class _ConsultationState extends State<ConsultationPage> {
                           : () => _callScreenGuard.push(
                               c, (_) => AgoraPage(appointmentId: a.id)),
                       icon: const Icon(Icons.video_call),
-                      label: Text(a.joinLockedLabel ?? 'Join Agora')),
+                      label: Text(a.joinLockedLabel ?? 'Join video call')),
                   OutlinedButton.icon(
                       onPressed: () => Navigator.push(
                           c,
