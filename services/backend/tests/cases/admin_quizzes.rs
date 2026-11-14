@@ -708,3 +708,49 @@ async fn test_standalone_quiz_lifecycle_and_feed(pool: PgPool) {
     assert_eq!(quiz["question_count"], 1);
     assert!(!quiz.to_string().contains("correct_option"));
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_quiz_import_refuses_html_script_links_and_hidden_characters(pool: PgPool) {
+    let (app, _pool) = test_app(pool).await;
+    let a = article(&app, false, true).await;
+    let token = admin();
+    for bad in [
+        "<script>alert(1)</script>",
+        "Click javascript:alert(1)",
+        "Hidden\u{202E}txt.exe",
+        "<img src=x onerror=alert(1)>",
+    ] {
+        let csv = format!(
+            "text_en,option_a_en,option_b_en,correct_option,explanation_en\r\n\"{bad}\",Yes,No,a,Explanation"
+        );
+        let body = json!({"format":"csv","content":csv,"revision_id":null,"version":null});
+        let preview = data(
+            post(
+                &app,
+                &format!("{}/import-preview", path(&a)),
+                Some(&token),
+                &body,
+            )
+            .await,
+        )
+        .await;
+        assert!(
+            !preview["errors"].as_array().unwrap().is_empty(),
+            "{bad:?} must be reported"
+        );
+    }
+    // An option with HTML is refused too; ordinary text with "<" is fine.
+    let csv = "text_en,option_a_en,option_b_en,correct_option,explanation_en\r\nIs CD4 < 200 low?,<b>Yes</b>,No,a,Explanation";
+    let body = json!({"format":"csv","content":csv,"revision_id":null,"version":null});
+    let preview = data(
+        post(
+            &app,
+            &format!("{}/import-preview", path(&a)),
+            Some(&token),
+            &body,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(preview["errors"].as_array().unwrap().len(), 1);
+}

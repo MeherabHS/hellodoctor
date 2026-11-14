@@ -153,6 +153,10 @@ pub fn create_router_with_metrics(state: AppState, metrics_handle: PrometheusHan
     // Layers execute from last to first: authenticate before preparing any
     // idempotency context. Public credentials/download grants never use it.
     let protected = protected_routes()
+        .route_layer(from_fn_with_state(
+            state.clone(),
+            content_cache_invalidation,
+        ))
         .route_layer(from_fn_with_state(state.clone(), idempotency_middleware))
         .route_layer(from_fn_with_state(state.clone(), auth_middleware));
 
@@ -190,12 +194,28 @@ pub fn create_router_with_metrics(state: AppState, metrics_handle: PrometheusHan
         // `request_id()` resolves the real per-request id, not a fallback.
         .layer(CatchPanicLayer::custom(handle_panic))
         .layer(from_fn(crate::api::middleware::request_context::middleware))
+        .layer(from_fn(default_no_store))
         .layer(
             ServiceBuilder::new()
                 .layer(HandleErrorLayer::new(handle_overload_error))
                 .load_shed()
                 .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS)),
         )
+}
+
+/// Cache-poisoning and replay guard: any response that does not choose its
+/// own caching policy (images do) is marked `no-store`, so no shared cache,
+/// CDN or proxy ever stores or replays API data, including error pages.
+async fn default_no_store(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let mut response = next.run(request).await;
+    response
+        .headers_mut()
+        .entry(axum::http::header::CACHE_CONTROL)
+        .or_insert(axum::http::HeaderValue::from_static("no-store"));
+    response
 }
 
 /// `GET /healthz` — a real readiness check, not a static "OK". Verifies the
@@ -369,6 +389,15 @@ fn public_routes() -> Router<AppState> {
             "/auth/password-reset/complete",
             axum::routing::post(auth_handlers::complete_password_reset),
         )
+        // Accepting an Admin invitation (public; the emailed token is the secret).
+        .route(
+            "/auth/admin/invitations/lookup",
+            axum::routing::post(admin_team_handlers::lookup),
+        )
+        .route(
+            "/auth/admin/invitations/accept",
+            axum::routing::post(admin_team_handlers::accept),
+        )
         .route(
             "/webhooks/payment/:provider",
             axum::routing::post(webhook_handlers::handle_payment_webhook),
@@ -383,6 +412,43 @@ fn public_routes() -> Router<AppState> {
 /// `create_router_with_metrics`) — a route added here is authenticated
 /// automatically; resource-level ownership/role checks still happen inside
 /// each handler via `abac::authorize` and `AuthContext`.
+/// Clears the soft content cache (`content_cache.rs`) after any successful
+/// change to articles or facilities, so patients see Admin edits at once.
+async fn content_cache_invalidation(
+    State(state): State<AppState>,
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let changes = !matches!(
+        *request.method(),
+        axum::http::Method::GET | axum::http::Method::HEAD | axum::http::Method::OPTIONS
+    );
+    let path = request.uri().path().to_owned();
+    let response = next.run(request).await;
+    if changes && response.status().is_success() {
+        let rest = path.strip_prefix("/api/v1").unwrap_or(&path);
+        if [
+            "/admin/articles",
+            "/admin/article-categories",
+            "/doctor/articles",
+        ]
+        .iter()
+        .any(|p| rest.starts_with(p))
+        {
+            state
+                .content_cache
+                .invalidate(crate::content_cache::Area::Articles);
+        } else if rest.starts_with("/admin/facilities")
+            || rest.starts_with("/admin/facility-services")
+        {
+            state
+                .content_cache
+                .invalidate(crate::content_cache::Area::Facilities);
+        }
+    }
+    response
+}
+
 fn protected_routes() -> Router<AppState> {
     Router::new()
         .route(
@@ -586,6 +652,30 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/admin/grievances/:id/dismiss",
             axum::routing::post(grievance_handlers::adjudicate_dismiss),
+        )
+        // Appeals recorded by an Admin (docs/admin-ui/ADMIN_REDESIGN_PLAN.md).
+        .route("/admin/grievances/appeals", get(grievance_handlers::list_appeals))
+        .route(
+            "/admin/grievances/:id/appeals",
+            axum::routing::post(grievance_handlers::record_appeal),
+        )
+        .route(
+            "/admin/grievance-appeals/:id/decide",
+            axum::routing::post(grievance_handlers::decide_appeal),
+        )
+        // Activity Log: who did what and when, for every Admin.
+        .route("/admin/activity", get(activity_handlers::list_activity))
+        .route("/admin/notifications", get(activity_handlers::notifications))
+        // Admin Team: invite other Admins by email.
+        .route("/admin/team", get(admin_team_handlers::team))
+        .route("/admin/team/invitations", axum::routing::post(admin_team_handlers::invite))
+        .route("/admin/team/invitations/:id/resend", axum::routing::post(admin_team_handlers::resend))
+        .route("/admin/team/invitations/:id/revoke", axum::routing::post(admin_team_handlers::revoke))
+        // Q&A answer audit.
+        .route("/admin/qna/answers", get(qna_audit_handlers::list_answers))
+        .route(
+            "/admin/qna/answers/:id/reviews",
+            get(qna_audit_handlers::list_reviews).post(qna_audit_handlers::review_answer),
         )
         .route(
             "/admin/finance/refund-requests",

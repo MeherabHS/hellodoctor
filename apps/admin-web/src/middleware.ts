@@ -20,7 +20,11 @@ function sideDoorBlocked(status: number) {
 // concern — see `lib/sideDoorGuard.ts` for why each is safe to block
 // unconditionally — and run before any of that session logic.
 const SESSION_MARKER = 'hd_admin_session';
-const PUBLIC_PATHS = ['/login', '/api/login', '/api/bot-challenge'];
+// /brand and /fonts hold the static logo and font files the login page shows
+// before any session exists; nothing sensitive is served from either.
+// /invite and /api/invite: accepting an Admin invitation happens before any
+// session exists; the emailed single-use token is the credential.
+const PUBLIC_PATHS = ['/login', '/api/login', '/api/bot-challenge', '/brand', '/fonts', '/invite', '/api/invite', '/forgot-password', '/api/password-reset'];
 
 export async function middleware(req: NextRequest) {
   try {
@@ -69,6 +73,8 @@ export async function middleware(req: NextRequest) {
     // origin's responses as a sub-resource.
     response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
     response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+    // Never send this origin's URLs (e.g. an /invite?token=… link) as a Referer.
+    response.headers.set('Referrer-Policy', 'no-referrer');
     return response;
   };
 

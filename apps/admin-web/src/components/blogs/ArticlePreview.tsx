@@ -9,8 +9,8 @@ export function ArticlePreview({content,category,language,setLanguage,article,lo
   const text=articleLanguage(content,language);
   const cover=localCover||(article?.cover_image_id?`/api/article-media/${article.id}?v=${article.version}`:'');
   return <section className="cms-preview" aria-label="Patient article preview">
-    <div className="cms-preview-label"><strong>Live Patient preview</strong><span>Unsaved preview · never publishes</span></div>
-    <div className="cms-language" role="group" aria-label="Preview language">
+    <div className="cms-preview-label"><strong>Patient app preview</strong><span>Shows unsaved changes · never publishes</span></div>
+    <div className="afya-lang-switch" role="group" aria-label="Preview language">
       <button type="button" aria-pressed={language==='en'} onClick={()=>setLanguage('en')}>English</button>
       <button type="button" aria-pressed={language==='sw'} onClick={()=>setLanguage('sw')}>Kiswahili</button>
     </div>

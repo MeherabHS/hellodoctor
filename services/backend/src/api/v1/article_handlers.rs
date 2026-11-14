@@ -128,6 +128,25 @@ pub async fn feed(
         ));
     }
     let limit = query.limit.unwrap_or(20).clamp(1, 50);
+    // Published, non-personal content: soft-cached for 60 s (content_cache.rs).
+    let cache_key = crate::content_cache::key(
+        crate::content_cache::Area::Articles,
+        ctx.role.as_str(),
+        &[
+            "feed",
+            search,
+            language,
+            &limit.to_string(),
+            &query.offset.unwrap_or(0).max(0).to_string(),
+            &format!("{:?}", query.before_time),
+            &format!("{:?}", query.before_id),
+            query.topic.as_deref().unwrap_or(""),
+            query.kind.as_deref().unwrap_or(""),
+        ],
+    );
+    if let Some(hit) = state.content_cache.get(&cache_key) {
+        return Ok(Json(hit));
+    }
     let mut tx = state.begin_authed(&ctx).await?;
     let mut rows = admin_article_repo::published_page(
         &mut *tx,
@@ -155,9 +174,11 @@ pub async fn feed(
         None
     };
     let data: Vec<_> = rows.into_iter().map(|r| r.article).collect();
-    Ok(Json(
-        json!({"success":true,"data":data,"next_cursor":cursor}),
-    ))
+    let body = json!({"success":true,"data":data,"next_cursor":cursor});
+    state
+        .content_cache
+        .put(cache_key, std::time::Duration::from_secs(60), body.clone());
+    Ok(Json(body))
 }
 async fn list(
     state: &AppState,
@@ -182,12 +203,24 @@ pub async fn detail(
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let cache_key = crate::content_cache::key(
+        crate::content_cache::Area::Articles,
+        ctx.role.as_str(),
+        &["detail", &id.to_string()],
+    );
+    if let Some(hit) = state.content_cache.get(&cache_key) {
+        return Ok(Json(hit));
+    }
     let mut tx = state.begin_authed(&ctx).await?;
     let article = admin_article_repo::published(&mut *tx, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Published article not found.".into()))?;
     tx.commit().await?;
-    Ok(Json(json!({"success":true,"data":article})))
+    let body = json!({"success":true,"data":article});
+    state
+        .content_cache
+        .put(cache_key, std::time::Duration::from_secs(60), body.clone());
+    Ok(Json(body))
 }
 pub async fn own_detail(
     State(state): State<AppState>,

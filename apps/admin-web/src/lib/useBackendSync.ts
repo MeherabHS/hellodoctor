@@ -149,7 +149,7 @@ export function useBackendSync(callbacks:BackendSyncCallbacks,statementMonth:str
   if(activePage==='patients')jobs.push(async()=>{
    const rows=await getAdminPatients();if(!current())return;
    rawPatients.current=Object.fromEntries(rows.map(row=>[row.id,row]));
-   patients.current=Object.fromEntries(rows.map((row,index)=>{const mapped=backendPatientToStoreItem(row,index);return [row.id,{...mapped,encounters:patients.current[row.id]?.encounters??mapped.encounters}];}));
+   patients.current=Object.fromEntries(rows.map((row,index)=>{const mapped=backendPatientToStoreItem(row,index);const previous=patients.current[row.id];return [row.id,{...mapped,encounters:previous?.encounters??mapped.encounters,visits:previous?.visits?.length?previous.visits:mapped.visits,vaultRecords:previous?.vaultRecords??mapped.vaultRecords}];}));
    cbRef.current.onPatientsUpdate(patients.current);
   });
   // Unconditional, not gated by activePage: the sidebar's unresolved-error

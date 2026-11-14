@@ -8,7 +8,8 @@ import {blankArticle,type AdminArticle} from '../src/lib/blogContent';
 
 const category={id:'category-a',name_en:'Education',name_sw:'Elimu',sensitive:false};
 const article={...blankArticle(),id:'00000000-0000-4000-8000-000000000001',title_en:'Saved title',body_en:'Saved body',category_id:category.id,status:'DRAFT',version:1,content_version:1} as AdminArticle;
-function button(v:ReactTestRenderer,label:string){return v.root.findAllByType('button').find(n=>n.children.join('')===label)!;}
+// Buttons match their text, or their aria-label for icon-only buttons (redesign, 2026-11-14).
+function button(v:ReactTestRenderer,label:string){return v.root.findAllByType('button').find(n=>n.children.join('')===label||n.props['aria-label']===label)!;}
 function Harness({initial=article}:{initial?:AdminArticle|null}) {
   const [open,setOpen]=useState(true);const {requestNavigation}=useAdminNavigation();
   return <><button onClick={()=>requestNavigation(()=>setOpen(false))}>Sidebar destination</button>{open?<ArticleEditor initial={initial} categories={[category,{...category,id:'category-b'}]} onSaved={()=>{}} onClose={()=>setOpen(false)}/>:<p>Destination</p>}</>;
@@ -16,10 +17,12 @@ function Harness({initial=article}:{initial?:AdminArticle|null}) {
 const mount=async(initial:AdminArticle|null=article)=>{let v!:ReactTestRenderer;await act(async()=>{v=create(<NavigationGuard><Harness initial={initial}/></NavigationGuard>);});return v;};
 const edit=(v:ReactTestRenderer,label:string,type:'input'|'textarea'|'select',value:unknown)=>{
   const node=v.root.findAllByType('label').find(n=>n.children.filter(c=>typeof c==='string').join('').startsWith(label))!;
-  node.findByType(type).props.onChange({target:{value}});
+  // A label names its control by htmlFor (redesigned editor) or by nesting it.
+  const control=node.props.htmlFor?v.root.find(n=>n.type===type&&n.props.id===node.props.htmlFor):node.findByType(type);
+  control.props.onChange({target:{value}});
 };
 
-for(const [label,type,value] of [['English title','input','Unsaved title'],['English content','textarea','Unsaved body'],['Tags','input','unsaved'],['Category','select','category-b']] as const){
+for(const [label,type,value] of [['Title (English)','input','Unsaved title'],['Content (English)','textarea','Unsaved body'],['Tags','input','unsaved'],['Topic / Category','select','category-b']] as const){
   test(`navigation protects ${label}, Stay retains it, explicit discard unmounts`,async()=>{
     const v=await mount();try{
       await act(async()=>edit(v,label,type,value));await act(async()=>button(v,'Sidebar destination').props.onClick());
@@ -30,12 +33,12 @@ for(const [label,type,value] of [['English title','input','Unsaved title'],['Eng
   });
 }
 test('untouched new article and reverted article edits leave without a warning',async()=>{
-  for(const initial of [null,article]){const v=await mount(initial);try{if(initial){await act(async()=>edit(v,'English title','input','changed'));await act(async()=>edit(v,'English title','input','Saved title'));}await act(async()=>button(v,'Back to articles').props.onClick());assert.equal(v.root.findAllByProps({role:'alertdialog'}).length,0);assert.equal(v.root.findAllByType(ArticleEditor).length,0);}finally{act(()=>v.unmount());}}
+  for(const initial of [null,article]){const v=await mount(initial);try{if(initial){await act(async()=>edit(v,'Title (English)','input','changed'));await act(async()=>edit(v,'Title (English)','input','Saved title'));}await act(async()=>button(v,'Back to articles').props.onClick());assert.equal(v.root.findAllByProps({role:'alertdialog'}).length,0);assert.equal(v.root.findAllByType(ArticleEditor).length,0);}finally{act(()=>v.unmount());}}
 });
 test('a pending save prevents discard/unmount; failure retains the dirty draft',async()=>{
   const old=globalThis.fetch;let reject!:(e:Error)=>void;globalThis.fetch=async()=>new Promise<Response>((_r,j)=>{reject=j;});const v=await mount();
   try{
-    await act(async()=>edit(v,'English title','input','Keep this draft'));
+    await act(async()=>edit(v,'Title (English)','input','Keep this draft'));
     let saving:Promise<void>|undefined;act(()=>{saving=button(v,'Save draft').props.onClick();});
     await act(async()=>button(v,'Sidebar destination').props.onClick());assert.equal(button(v,'Discard and Leave').props.disabled,true);
     await act(async()=>button(v,'Discard and Leave').props.onClick());assert.equal(v.root.findAllByType(ArticleEditor).length,1);

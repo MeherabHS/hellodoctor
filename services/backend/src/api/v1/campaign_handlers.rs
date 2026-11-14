@@ -57,6 +57,12 @@ impl CampaignContent {
                     "{name} must contain 1-{maximum} characters."
                 )));
             }
+            let kind = if maximum == 160 {
+                crate::sanitize::TextKind::Line
+            } else {
+                crate::sanitize::TextKind::Paragraphs
+            };
+            crate::sanitize::check_content(name, text, kind)?;
         }
         Ok(())
     }

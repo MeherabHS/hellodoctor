@@ -267,6 +267,26 @@ pub async fn directory(
     };
     let limit = q.limit.unwrap_or(20).clamp(1, 50);
     let offset = q.offset.unwrap_or(0).clamp(0, 10_000);
+    // Published directory, same for every reader: soft-cached for 30 s
+    // (content_cache.rs). "Open now" can lag by at most that; server_time is
+    // always current.
+    let cache_key = crate::content_cache::key(
+        crate::content_cache::Area::Facilities,
+        ctx.role.as_str(),
+        &[
+            "directory",
+            &search,
+            county.as_deref().unwrap_or(""),
+            q.services.as_deref().unwrap_or("").trim(),
+            &format!("{:?}", q.youth_friendly),
+            &limit.to_string(),
+            &offset.to_string(),
+        ],
+    );
+    if let Some(mut hit) = state.content_cache.get(&cache_key) {
+        hit["server_time"] = json!(Utc::now());
+        return Ok(Json(hit));
+    }
     let mut tx = state.begin_authed(&ctx).await?;
     let cats = categories(&mut *tx).await?;
     let services: Vec<String> = match q
@@ -318,13 +338,17 @@ pub async fn directory(
     tx.commit().await?;
     let now = Utc::now();
     let next = (offset + (rows.len() as i64) < total).then_some(offset + rows.len() as i64);
-    Ok(Json(json!({
+    let body = json!({
         "success": true,
         "data": rows.iter().map(|r| r.patient_json(&cats, now)).collect::<Vec<_>>(),
         "total": total,
         "next_offset": next,
         "server_time": now,
-    })))
+    });
+    state
+        .content_cache
+        .put(cache_key, std::time::Duration::from_secs(30), body.clone());
+    Ok(Json(body))
 }
 
 pub async fn counties(
@@ -332,6 +356,14 @@ pub async fn counties(
     ctx: AuthContext,
 ) -> Result<Json<Value>, AppError> {
     abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let cache_key = crate::content_cache::key(
+        crate::content_cache::Area::Facilities,
+        ctx.role.as_str(),
+        &["counties"],
+    );
+    if let Some(hit) = state.content_cache.get(&cache_key) {
+        return Ok(Json(hit));
+    }
     let mut tx = state.begin_authed(&ctx).await?;
     let list: Vec<String> = sqlx::query_scalar(
         "SELECT DISTINCT county FROM health_facilities WHERE publication_status='PUBLISHED' ORDER BY county",
@@ -339,7 +371,11 @@ pub async fn counties(
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;
-    Ok(ok(json!(list)))
+    let body = ok(json!(list)).0;
+    state
+        .content_cache
+        .put(cache_key, std::time::Duration::from_secs(300), body.clone());
+    Ok(Json(body))
 }
 
 pub async fn detail(
@@ -348,6 +384,15 @@ pub async fn detail(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, AppError> {
     abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let cache_key = crate::content_cache::key(
+        crate::content_cache::Area::Facilities,
+        ctx.role.as_str(),
+        &["detail", &id.to_string()],
+    );
+    if let Some(mut hit) = state.content_cache.get(&cache_key) {
+        hit["data"]["server_time"] = json!(Utc::now());
+        return Ok(Json(hit));
+    }
     let mut tx = state.begin_authed(&ctx).await?;
     let cats = categories(&mut *tx).await?;
     let row = find(&mut *tx, id)
@@ -358,7 +403,11 @@ pub async fn detail(
     let now = Utc::now();
     let mut data = row.patient_json(&cats, now);
     data["server_time"] = json!(now);
-    Ok(ok(data))
+    let body = ok(data).0;
+    state
+        .content_cache
+        .put(cache_key, std::time::Duration::from_secs(30), body.clone());
+    Ok(Json(body))
 }
 
 pub async fn image(

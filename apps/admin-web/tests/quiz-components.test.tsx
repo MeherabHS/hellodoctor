@@ -10,6 +10,7 @@ import {QuizImport} from '../src/components/blogs/QuizImport';
 import {ArticlePreview} from '../src/components/blogs/ArticlePreview';
 import {newQuestion,editableQuiz,quizTemplate,type QuizContent,type QuizDocument,type QuizRevision} from '../src/lib/quizContent';
 import {blankArticle,type AdminArticle} from '../src/lib/blogContent';
+import {clearSoftReads} from '../src/lib/api';
 const article={...blankArticle(),id:'00000000-0000-4000-8000-000000000001',author_id:'author',title_en:'Article body',body_en:'Article paragraph',status:'PUBLISHED',version:4,content_version:1} as AdminArticle;
 function ready():QuizContent{const q=newQuestion();q.text_en='Which answer?';q.text_sw='Jibu gani?';q.explanation_en='First is correct';q.explanation_sw='Kwanza ni sahihi';q.options[0].text_en='First';q.options[0].text_sw='Kwanza';q.options[1].text_en='Second';q.options[1].text_sw='Pili';q.correct_option_id=q.options[0].id;return {include_quiz:true,questions:[q]};}
 function revision(content:QuizContent=ready()):QuizRevision{return {...content,id:'00000000-0000-4000-8000-000000000002',article_id:article.id,status:'DRAFT',version:1,content_version:1,article_content_version:1,can_approve:false,requires_independent_review:true,approved_by:null};}
@@ -43,6 +44,8 @@ test('sensitive quiz author sees disabled approval; server rejection remains rea
   const pending={...revision(),status:'PENDING_REVIEW' as const};globalThis.fetch=async()=>response({schema_version:1,draft:pending,published:null});
   try{await act(async()=>{view=create(<McqBuilder article={article} onPreview={()=>{}} onDirty={()=>{}}/>);});await act(async()=>{button(view!,'Open MCQ Builder').props.onClick();});assert.equal(button(view!,'Approve quiz').props.disabled,true);assert.ok(JSON.stringify(view!.toJSON()).includes('Approval required from another Admin.'));
     act(()=>view!.unmount());pending.can_approve=true;
+    // The server changed without a write from this tab: drop the 3 s soft read cache, as a reload would.
+    clearSoftReads();
     globalThis.fetch=async(_url,init)=>{if(!init?.method)return response({schema_version:1,draft:pending,published:null});writes++;return new Response(JSON.stringify({success:false,error:{message:'Approval required from another Admin.'}}),{status:403});};
     await act(async()=>{view=create(<McqBuilder article={article} onPreview={()=>{}} onDirty={()=>{}}/>);});await act(async()=>{button(view!,'Open MCQ Builder').props.onClick();});await act(async()=>{button(view!,'Approve quiz').props.onClick();});assert.equal(writes,1);const output=JSON.stringify(view!.toJSON());assert.ok(output.includes('Approval required from another Admin.'));assert.ok(!output.includes('API Error'));
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=previous;}

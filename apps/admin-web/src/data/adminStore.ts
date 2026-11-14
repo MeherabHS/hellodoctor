@@ -65,6 +65,22 @@ export interface PatientRecordItem {
   videoVisits?: number;
   chatSessions?: number;
   totalSpend?: number;
+  /** Raw fields for the redesigned People & Care pages (no clinical conditions). */
+  backendId?: string;
+  dateOfBirth?: string | null;
+  gender?: string | null;
+  consultationsCount?: number;
+  lastConsultAt?: string | null;
+  registeredAt?: string | null;
+  visits?: {
+    appointmentId: string;
+    appointmentNumber: string;
+    doctor: string;
+    modality: string;
+    status: string;
+    outcome: string | null;
+    createdAt: string | null;
+  }[];
   vaultRecords?: {
     id: string;
     appointmentId: string;

@@ -642,7 +642,7 @@ pub async fn list_answered_questions(
          FROM health_questions q \
          LEFT JOIN health_answers a ON a.question_id = q.id \
          LEFT JOIN doctor_public_directory d ON d.id = a.doctor_id \
-         WHERE q.status = 'ANSWERED' \
+         WHERE (q.status = 'ANSWERED' AND COALESCE(a.audit_status, 'UNREVIEWED') <> 'FLAGGED') \
             OR ($3 AND q.id IN (SELECT id FROM patient_owned_open_question_ids())) \
          ORDER BY COALESCE(a.created_at,q.created_at) DESC, q.id LIMIT $1 OFFSET $2",
     )

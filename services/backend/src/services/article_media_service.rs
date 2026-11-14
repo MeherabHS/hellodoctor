@@ -235,6 +235,7 @@ pub async fn maintenance(state: &AppState) -> Result<(), AppError> {
     let ctx = AuthContext::system();
     let mut tx = state.begin_authed_as(&ctx, DbRole::SystemWorker).await?;
     let ids:Vec<Uuid>=sqlx::query_scalar("UPDATE admin_articles SET status='PUBLISHED',version=version+1,published_at=now(),scheduled_for=NULL,updated_at=now() WHERE id IN (SELECT id FROM admin_articles WHERE status='SCHEDULED' AND scheduled_for<=now() AND approved_version=content_version ORDER BY scheduled_for,id LIMIT 50 FOR UPDATE SKIP LOCKED) AND status='SCHEDULED' AND approved_version=content_version RETURNING id").fetch_all(&mut *tx).await?;
+    let published_any = !ids.is_empty();
     for id in ids {
         AuditService::log_in_tx(
             &mut *tx,
@@ -250,6 +251,12 @@ pub async fn maintenance(state: &AppState) -> Result<(), AppError> {
         .await?;
     }
     tx.commit().await?;
+    if published_any {
+        // After the commit, so a reader cannot re-cache the old feed.
+        state
+            .content_cache
+            .invalidate(crate::content_cache::Area::Articles);
+    }
     if state.object_storage.is_none() {
         return Ok(());
     }

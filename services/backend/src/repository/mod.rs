@@ -70,6 +70,8 @@ pub struct AppState {
     pub article_media_storage: Option<Arc<dyn object_store::ObjectStore>>,
     pub admission: Arc<crate::admission::Admission>,
     pub web_auth: Arc<crate::api::middleware::web_auth::WebAuthGate>,
+    /// Soft cache for published, non-personal content (`content_cache.rs`).
+    pub content_cache: Arc<crate::content_cache::ContentCache>,
     pub notification_transport:
         Arc<dyn crate::services::notification_transport::NotificationTransport>,
     pub email_transport: Arc<dyn crate::services::email_transport::EmailTransport>,
@@ -260,6 +262,7 @@ impl AppState {
             article_media_storage,
             admission,
             web_auth,
+            content_cache: Arc::new(crate::content_cache::ContentCache::default()),
             notification_transport,
             email_assets,
             email_links,

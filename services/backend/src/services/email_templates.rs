@@ -1186,6 +1186,103 @@ Stay safe,\nAfyaMkononi Account Security Team\n\n{footer}",
 }
 
 // =====================================================================
+// Admin invitation (product owner, 2026-11-14). Sent by
+// `admin_invitation_service::AdminInvitationService::invite` through the
+// fire-and-forget `send_templated_email` path.
+// =====================================================================
+
+/// The accept link for an Admin invitation: `{admin_web_url}/invite?token=…`.
+/// `None` unless the operator-configured base is a valid https URL. `token`
+/// is server-generated hex, so it needs no escaping.
+pub fn admin_invite_url(admin_web_url: &str, token: &str) -> Option<String> {
+    if token.is_empty() || !token.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let base = validate_https_url(admin_web_url.trim_end_matches('/'))?;
+    Some(format!(
+        "{}/invite?token={token}",
+        base.trim_end_matches('/')
+    ))
+}
+
+pub fn render_admin_invitation(
+    invite_url: &str,
+    expiry_minutes: i64,
+    assets: &EmailAssets,
+) -> RenderedEmail {
+    let subject = "Your AfyaMkononi Admin invitation (expires in 5 minutes)";
+    let subject = if expiry_minutes == 5 {
+        subject.to_string()
+    } else {
+        format!("Your AfyaMkononi Admin invitation (expires in {expiry_minutes} minutes)")
+    };
+    let cta = Some(Cta {
+        label: "Accept invitation",
+        href: invite_url,
+    });
+    let steps = [
+        "Open the button below on the device you will use for the Admin console.".to_string(),
+        "Enter your Kenyan phone number and choose a strong password (at least 8 characters with an uppercase letter, a lowercase letter, a digit and a special character).".to_string(),
+        "Sign in at the Admin console with this email and your new password. We will email you a one-time verification code to finish signing in.".to_string(),
+    ];
+    let steps_html: String = steps
+        .iter()
+        .map(|s| format!("<li style=\"margin:0 0 8px;\">{}</li>", html_escape(s)))
+        .collect();
+    let steps_text: String = steps
+        .iter()
+        .enumerate()
+        .map(|(i, s)| format!("{}. {s}\n", i + 1))
+        .collect();
+    let body_html = format!(
+        "<h1 style=\"margin:0 0 16px;font-size:20px;color:{teal};\">You're invited to join as an Admin</h1>\
+<p style=\"margin:0 0 16px;\">Hello,</p>\
+<p style=\"margin:0 0 16px;\">An AfyaMkononi administrator has invited this email address to the Admin console, where the team manages content, doctor verification, operations and campaigns.</p>\
+<div style=\"margin:0 0 18px;padding:12px 16px;background-color:{mint};border-radius:10px;font-weight:bold;color:{teal};\">This link works for {expiry_minutes} minutes and only once.</div>\
+<p style=\"margin:0 0 8px;font-weight:bold;\">How to accept</p>\
+<ol style=\"margin:0 0 8px;padding-left:20px;\">{steps_html}</ol>\
+{cta_html}\
+<p style=\"margin:24px 0 8px;font-weight:bold;\">If the link has expired</p>\
+<p style=\"margin:0 0 16px;\">Ask the Admin who invited you to send a new invitation. Each new invitation cancels the previous link.</p>\
+<p style=\"margin:0 0 8px;font-weight:bold;\">Keep your account safe</p>\
+<p style=\"margin:0 0 16px;\">Never forward this email or share the link, your password or verification codes. AfyaMkononi will never ask for them. If you were not expecting this invitation, ignore this email: no account is created unless the invitation is accepted.</p>\
+<p style=\"margin:0;\">Regards,<br /><strong>AfyaMkononi Account Security Team</strong></p>",
+        teal = palette::DEEP_TEAL,
+        mint = palette::MINT,
+        cta_html = cta_button_html(cta),
+    );
+    let footer = Footer {
+        contact_label: "Security assistance:",
+        transactional_disclaimer: true,
+    };
+    let text_body = format!(
+        "You're invited to join as an Admin\n\n\
+Hello,\n\n\
+An AfyaMkononi administrator has invited this email address to the Admin console, where the team manages content, doctor verification, operations and campaigns.\n\n\
+This link works for {expiry_minutes} minutes and only once.\n\n\
+How to accept\n{steps_text}{cta_text}\n\
+If the link has expired: ask the Admin who invited you to send a new invitation. Each new invitation cancels the previous link.\n\n\
+Keep your account safe: never forward this email or share the link, your password or verification codes. If you were not expecting this invitation, ignore this email: no account is created unless the invitation is accepted.\n\n\
+Regards,\nAfyaMkononi Account Security Team\n\n{footer}",
+        cta_text = cta_text(cta),
+        footer = footer_text(&footer),
+    );
+    RenderedEmail {
+        html_body: layout(
+            &subject,
+            "Accept your AfyaMkononi Admin invitation within the next few minutes.",
+            Some("hero-security.svg"),
+            "Shield illustration representing account security",
+            assets,
+            &body_html,
+            &footer,
+        ),
+        subject,
+        text_body,
+    }
+}
+
+// =====================================================================
 // 12. Password-reset verification code (Phase 2: Secure Email OTP Password
 //     Recovery). Content: AFYAMKONONI_EMAIL_CONTENT_V1.md "reset mail".
 //     Unlike the 11 templates above, this one IS wired to a live trigger —
@@ -1492,6 +1589,35 @@ Regards,\nAfyaMkononi Security Team\n\n{footer}",
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn admin_invitation_link_is_https_with_hex_token_only() {
+        let token = "ab".repeat(32);
+        assert_eq!(
+            admin_invite_url("https://admin.afyamkononi.app/", &token).as_deref(),
+            Some(format!("https://admin.afyamkononi.app/invite?token={token}").as_str())
+        );
+        assert!(admin_invite_url("http://admin.afyamkononi.app", &token).is_none());
+        assert!(admin_invite_url("javascript:alert(1)", &token).is_none());
+        assert!(admin_invite_url("https://admin.afyamkononi.app", "<script>").is_none());
+        assert!(admin_invite_url("https://user:pw@admin.afyamkononi.app", &token).is_none());
+    }
+
+    #[test]
+    fn admin_invitation_email_states_five_minutes_and_steps() {
+        let url = format!(
+            "https://admin.afyamkononi.app/invite?token={}",
+            "cd".repeat(32)
+        );
+        let email = render_admin_invitation(&url, 5, &EmailAssets::none());
+        assert!(email.subject.contains("5 minutes"));
+        for text in [&email.html_body, &email.text_body] {
+            assert!(text.contains("5 minutes and only once"));
+            assert!(text.contains("How to accept"));
+            assert!(text.contains(&url));
+        }
+        assert!(!email.html_body.contains("<script"));
+    }
+
     use super::*;
 
     const ASSETS_LOCAL: fn() -> EmailAssets = || EmailAssets::with_base_url("assets");

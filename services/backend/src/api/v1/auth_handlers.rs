@@ -332,7 +332,7 @@ pub async fn patient_register(
         &state.redis,
         &format!(
             "ratelimit:patient-registration:{}",
-            payload.email.trim().to_lowercase()
+            crate::domain::validation::normalize_email(&payload.email)
         ),
         5,
         900,
@@ -369,7 +369,7 @@ pub async fn patient_login(
     Json(payload): Json<PatientLoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let ip = addr.ip().to_string();
-    let normalized_email = payload.email.trim().to_lowercase();
+    let normalized_email = crate::domain::validation::normalize_email(&payload.email);
     let account_key = format!("patient:{normalized_email}");
 
     if ip_jail::is_account_jailed(&state.redis, &account_key).await? {
@@ -516,7 +516,7 @@ pub async fn doctor_register(
     crate::domain::validation::validate_email(&payload.email)?;
 
     let license = payload.license_number.trim().to_string();
-    let email = payload.email.trim().to_lowercase();
+    let email = crate::domain::validation::normalize_email(&payload.email);
 
     let duplicate_license = doctor_repo::find_by_license(&state.auth_db, &license)
         .await?
@@ -720,7 +720,7 @@ pub async fn doctor_login(
     Json(payload): Json<DoctorLoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let ip = addr.ip().to_string();
-    let normalized_email = payload.email.trim().to_lowercase();
+    let normalized_email = crate::domain::validation::normalize_email(&payload.email);
     let account_key = format!("doctor:{normalized_email}");
 
     if ip_jail::is_account_jailed(&state.redis, &account_key).await? {
@@ -794,7 +794,7 @@ pub async fn admin_login(
     Json(payload): Json<AdminLoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     let ip = addr.ip().to_string();
-    let normalized_email = payload.email.trim().to_lowercase();
+    let normalized_email = crate::domain::validation::normalize_email(&payload.email);
     let account_key = format!("admin:{normalized_email}");
 
     if ip_jail::is_account_jailed(&state.redis, &account_key).await? {
