@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAdminSession, backendUrl, backendHeaders } from '@/lib/session';
+import { backendPath } from '@/lib/proxyPath';
 
 // The only place the browser's requests ever reach the Rust backend from.
 // Every admin-web API call (`src/lib/api.ts`) goes through this same-origin
@@ -10,7 +11,10 @@ import { withAdminSession, backendUrl, backendHeaders } from '@/lib/session';
 // using the refresh-token cookie and retries, so the admin doesn't get
 // logged out every 15 minutes of active use.
 async function forward(req: NextRequest, path: string[]): Promise<NextResponse> {
-  const targetUrl = `${backendUrl()}/api/v1/${path.join('/')}${req.nextUrl.search}`;
+  // Refuse traversal/smuggling segments before anything reaches the backend.
+  const safe = backendPath(path);
+  if (safe === null) return NextResponse.json({ success: false, error: 'Request rejected.' }, { status: 400, headers: { 'Cache-Control': 'no-store' } });
+  const targetUrl = `${backendUrl()}/api/v1/${safe}${req.nextUrl.search}`;
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
   let body: Promise<string> | undefined;
   const backendRes = await withAdminSession(async token => fetch(targetUrl, {

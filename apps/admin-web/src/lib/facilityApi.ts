@@ -1,4 +1,5 @@
-import {request} from './api';
+import {clearSoftReads,request} from './api';
+import {adminFetch} from './adminQueue.mjs';
 import type {AdminFacility,FacilityContent,ServiceCategory} from './facilityContent';
 
 export const listFacilities=(query:URLSearchParams)=>request<{items:AdminFacility[];total:number}>(`/admin/facilities?${query}`);
@@ -12,7 +13,7 @@ export const transitionFacility=(id:string,version:number,action:'publish'|'unpu
 export const facilityImageUrl=(id:string,imageVersion:string|null)=>`/api/facility-media/${encodeURIComponent(id)}${imageVersion?`?v=${encodeURIComponent(imageVersion)}`:''}`;
 
 async function binary(id:string,method:'POST'|'DELETE',version:number,file?:File):Promise<AdminFacility>{
-  const res=await fetch(`/api/facility-media/${encodeURIComponent(id)}?version=${version}`,{method,credentials:'include',headers:file?{'Content-Type':file.type}:{},body:file});
+  const res=await adminFetch(`/api/facility-media/${encodeURIComponent(id)}?version=${version}`,{method,credentials:'include',headers:file?{'Content-Type':file.type}:{},body:file});clearSoftReads();
   const data=await res.json().catch(()=>({}));
   if(!res.ok||!data.success)throw new Error(data.error?.message||data.error||'Photo update failed.');
   return data.data;

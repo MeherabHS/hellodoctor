@@ -1,4 +1,5 @@
 pub mod admin_bootstrap_service;
+pub mod admin_invitation_service;
 pub mod agora_token_service;
 pub mod appointment_service;
 pub mod article_media_service;

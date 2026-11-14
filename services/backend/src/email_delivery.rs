@@ -296,6 +296,8 @@ pub enum TransactionalEmailKind {
     PaymentConfirmed,
     RefundProcessed,
     PasswordChanged,
+    /// Invitation to become an Admin (migrations/20261216000001).
+    AdminInvitation,
 }
 
 impl TransactionalEmailKind {
@@ -310,6 +312,7 @@ impl TransactionalEmailKind {
             Self::PaymentConfirmed => "PAYMENT_CONFIRMED",
             Self::RefundProcessed => "REFUND_PROCESSED",
             Self::PasswordChanged => "PASSWORD_CHANGED",
+            Self::AdminInvitation => "ADMIN_INVITATION",
         }
     }
 }

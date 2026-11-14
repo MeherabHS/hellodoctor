@@ -338,37 +338,73 @@ async fn patient_happy_path_via_a_freshly_registered_email_account(pool: PgPool)
     assert_eq!(new_login.status(), StatusCode::OK);
 }
 
+/// Admins can reset their own password too (product owner, 2026-11-14),
+/// through the same anti-enumeration OTP flow: the old password stops
+/// working, the new one signs in, and the response for an Admin looks like
+/// the response for any other request.
 #[sqlx::test(migrations = "./migrations")]
-async fn admin_accounts_are_excluded_and_indistinguishable_from_no_account_at_all(pool: PgPool) {
-    let (_, pool, mut state) = test_app_and_state(pool).await;
+async fn admin_can_reset_password_through_the_same_protected_flow(pool: PgPool) {
+    let (_, _pool, mut state) = test_app_and_state(pool).await;
     with_password_reset_enabled(&mut state);
     let redis = state.redis.clone();
     reset_owned_redis(&redis).await;
     let app = hellodoctor_backend::api::create_router(state);
+    let email = hellodoctor_backend::seed::SEED_ADMIN_EMAIL;
 
-    let admin_response = request_reset(&app, hellodoctor_backend::seed::SEED_ADMIN_EMAIL).await;
+    let requested = request_reset(&app, email).await;
     reset_owned_redis(&redis).await;
-    let nonexistent_response = request_reset(&app, "no-such-account@example.invalid").await;
-
-    // Same generic message, same absent debug code, for a real (but
-    // ineligible) account and an account that does not exist at all.
+    let nonexistent = request_reset(&app, "no-such-account@example.invalid").await;
     assert_eq!(
-        admin_response["data"]["message"],
-        nonexistent_response["data"]["message"]
+        requested["data"]["message"], nonexistent["data"]["message"],
+        "same generic message"
     );
-    assert!(admin_response["data"]["debug_otp_code"].is_null());
-    assert!(nonexistent_response["data"]["debug_otp_code"].is_null());
 
-    let admin_row = outbox_row_for(
-        &pool,
-        "PASSWORD_RESET_OTP",
-        hellodoctor_backend::seed::SEED_ADMIN_EMAIL,
+    let code = requested["data"]["debug_otp_code"]
+        .as_str()
+        .expect("development code")
+        .to_string();
+    let verified = verify_otp(&app, email, &code).await;
+    assert_eq!(verified.status(), StatusCode::OK);
+    let authorization = json_body(verified).await["data"]["reset_authorization"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    assert_eq!(
+        complete_reset(&app, &authorization, "Adm1n!NewPassw0rd")
+            .await
+            .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        complete_reset(&app, &authorization, "Adm1n!OtherPassw0rd")
+            .await
+            .status(),
+        StatusCode::UNAUTHORIZED,
+        "single use"
+    );
+
+    reset_owned_redis(&redis).await;
+    let old_login = post(
+        &app,
+        "/api/v1/auth/admin/login",
+        None,
+        &serde_json::json!({
+            "email": email, "password": hellodoctor_backend::seed::SEED_ADMIN_PASSWORD,
+        }),
     )
     .await;
-    assert_eq!(
-        admin_row, None,
-        "Admin must never receive a reset OTP email"
-    );
+    assert_eq!(old_login.status(), StatusCode::UNAUTHORIZED);
+    reset_owned_redis(&redis).await;
+    let new_login = post(
+        &app,
+        "/api/v1/auth/admin/login",
+        None,
+        &serde_json::json!({
+            "email": email, "password": "Adm1n!NewPassw0rd",
+        }),
+    )
+    .await;
+    assert_eq!(new_login.status(), StatusCode::OK);
 }
 
 #[sqlx::test(migrations = "./migrations")]

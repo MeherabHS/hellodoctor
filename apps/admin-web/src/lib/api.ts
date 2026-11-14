@@ -1,4 +1,5 @@
-import { createInflightReads } from './inflight.mjs';
+import { createSoftReads } from './inflight.mjs';
+import { adminFetch } from './adminQueue.mjs';
 // API client connecting HelloDoctor Admin Portal to the Axum Rust Backend.
 //
 // Every call goes through this Next.js server's own same-origin proxy
@@ -291,16 +292,29 @@ export interface AdminGrievance {
 
 // Network Request Helper
 let runtimeGeneration=0;
-const inflightReads=createInflightReads();
+// Identical reads share one request while in flight and reuse its answer for
+// 3 s (below every polling interval). Any write clears it, so the next read
+// after a change always comes from the server.
+const SOFT_READ_TTL_MS=3000;
+const inflightReads=createSoftReads(SOFT_READ_TTL_MS);
 export function clearAdminRuntime(){runtimeGeneration++;inflightReads.clear();}
+/** For writes that go around request() (media uploads). */
+export function clearSoftReads(){inflightReads.clear();}
 export function request<T>(path:string,options?:RequestInit):Promise<T>{
- return (options?.method??'GET').toUpperCase()==='GET'&&!options?.signal&&!options?.headers
-  ? inflightReads.run(`${runtimeGeneration}:${path}`,()=>performRequest<T>(path,options)) : performRequest<T>(path,options);
+ if((options?.method??'GET').toUpperCase()==='GET'){
+  return !options?.signal&&!options?.headers
+   ? inflightReads.run(`${runtimeGeneration}:${path}`,()=>performRequest<T>(path,options)) : performRequest<T>(path,options);
+ }
+ inflightReads.clear();
+ return performRequest<T>(path,options).finally(()=>inflightReads.clear());
 }
 async function performRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const generation=runtimeGeneration;
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
+  // Admin routes share the backend's two-request admission lane: queue them
+  // (and retry reads it turned away) rather than racing into 503s.
+  const send = path.startsWith("/admin") ? adminFetch : (input: string, init: RequestInit) => fetch(input, init);
+  const res = await send(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -532,19 +546,6 @@ export async function getAdminLogs(): Promise<AdminLog[]> {
   return request<AdminLog[]>("/admin/logs");
 }
 
-export async function simulateAdminLog(payload: {
-  action: string;
-  subsystem: string;
-  severity: string;
-  error_summary: string;
-  stack_trace?: string;
-}): Promise<any> {
-  return request<any>("/admin/logs/simulate", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
-
 // System Error Service — the dedicated `system_error_logs` admin surface
 // (distinct from `/admin/logs`'s audit trail above). This is where genuine
 // backend crashes/exceptions land, with a stable `trace_id`/`subsystem`/
@@ -616,17 +617,6 @@ export async function resolveSystemError(id: string, resolution_note?: string): 
   });
 }
 
-export async function simulateSystemError(payload: {
-  scenario: string;
-  severity: string;
-  custom_note?: string;
-  impacted_user_id?: string;
-}): Promise<SystemErrorLog> {
-  return request<SystemErrorLog>("/admin/system-errors/simulate", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
 
 export async function getAdminGrievances(): Promise<AdminGrievance[]> {
   return request<AdminGrievance[]>("/admin/grievances");

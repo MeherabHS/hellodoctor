@@ -28,7 +28,7 @@ test('sensitive author sees a disabled approval control and stays pending withou
     assert.equal(approve.props.disabled,true);
     assert.ok(JSON.stringify(view!.toJSON()).includes('Approval required from another Admin.'));
     await act(async()=>{approve.props.onClick();});
-    assert.equal(requests,0);assert.ok(JSON.stringify(view!.toJSON()).includes('PENDING REVIEW'));
+    assert.equal(requests,0);assert.ok(JSON.stringify(view!.toJSON()).includes('Pending review'));
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=previous;}
 });
 
@@ -40,7 +40,7 @@ test('authorized independent reviewer can approve through the existing endpoint'
   try{
     await act(async()=>{view=create(<ArticleEditor initial={{...article,status:'PENDING_REVIEW',can_approve:true,approval_block_reason:null}} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
     const approve=view!.root.findAllByType('button').find(b=>b.children.join('')==='Approve')!;assert.equal(approve.props.disabled,false);
-    await act(async()=>{approve.props.onClick();});assert.ok(requestPath.endsWith('/approve'));assert.ok(JSON.stringify(view!.toJSON()).includes('APPROVED'));
+    await act(async()=>{approve.props.onClick();});assert.ok(requestPath.endsWith('/approve'));assert.ok(JSON.stringify(view!.toJSON()).includes('Approved'));
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=previous;}
 });
 
@@ -52,7 +52,7 @@ test('server rejection remains readable and preserves pending review when permis
   try{
     await act(async()=>{view=create(<ArticleEditor initial={{...article,status:'PENDING_REVIEW',can_approve:true,approval_block_reason:null}} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
     await act(async()=>{view!.root.findAllByType('button').find(b=>b.children.join('')==='Approve')!.props.onClick();});
-    const output=JSON.stringify(view!.toJSON());assert.ok(output.includes('Approval required from another Admin.'));assert.ok(output.includes('PENDING REVIEW'));assert.ok(!output.includes('API Error'));assert.ok(!output.includes('FORBIDDEN'));
+    const output=JSON.stringify(view!.toJSON());assert.ok(output.includes('Approval required from another Admin.'));assert.ok(output.includes('Pending review'));assert.ok(!output.includes('API Error'));assert.ok(!output.includes('FORBIDDEN'));
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=previous;}
 });
 
@@ -71,8 +71,9 @@ test('failed cover upload preserves the saved draft and selection without report
     const output=JSON.stringify(view!.toJSON());
     assert.equal(requests.length,2);assert.ok(requests[1].endsWith(`/${article.id}?version=2`));assert.equal(refreshed,1);
     assert.ok(output.includes('Text draft saved.'));assert.ok(output.includes('awaiting Azure Blob integration'));assert.ok(output.includes('No cover was uploaded.'));
-    assert.ok(view!.root.findAllByType('button').some(button=>button.children.join('')==='Remove selected cover'));
-    assert.equal(view!.root.findAll(node=>node.props.className==='cms-notice').length,0);
+    // Icon-only button since the redesign: matched by its aria-label.
+    assert.ok(view!.root.findAllByType('button').some(button=>button.props['aria-label']==='Remove selected cover'));
+    assert.ok(!output.includes('Draft saved.'));
     assert.ok(!output.includes('API Error'));
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=windowBefore;globalThis.FileReader=readerBefore;}
 });

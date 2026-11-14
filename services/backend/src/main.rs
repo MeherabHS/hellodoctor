@@ -3,6 +3,7 @@ pub mod admission;
 pub mod api;
 pub mod auth_context;
 pub mod config;
+pub mod content_cache;
 pub mod crypto;
 pub mod domain;
 pub mod email_delivery;

@@ -299,7 +299,7 @@ impl AuthService {
         if let Some(phone) = phone {
             validation::validate_phone_number(phone)?;
         }
-        let email = email.trim().to_lowercase();
+        let email = crate::domain::validation::normalize_email(email);
         let existing = user_repo::find_by_email(&state.auth_db, &email).await?;
         let existing_id = existing.as_ref().map(|u| u.id);
         if register {
@@ -999,7 +999,26 @@ impl AuthService {
         tx.commit().await?;
         ip_jail::record_success(&state.redis, &account_key).await?;
 
-        Self::issue_login_response(state, &user).await
+        let response = Self::issue_login_response(state, &user).await?;
+        // Activity Log: every Admin sign-in (product owner, 2026-11-14). The
+        // session already exists, so a failed audit write is logged, not
+        // turned into a failed sign-in.
+        if let Err(error) = crate::services::AuditService::log_in_tx(
+            &state.auth_db,
+            crate::services::AuditLogEntry::new(
+                Some(user.id),
+                UserRole::Admin,
+                "ADMIN_SIGNED_IN",
+                "ADMIN_SIGN_IN",
+                Some(user.id.into_inner()),
+                "SUCCESS",
+            ),
+        )
+        .await
+        {
+            tracing::warn!(error = ?error, "Admin sign-in audit write failed");
+        }
+        Ok(response)
     }
 
     /// Consumes one refresh identity and inserts its successor atomically.

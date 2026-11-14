@@ -38,12 +38,18 @@ use std::sync::Arc;
 use tower::ServiceExt;
 use uuid::Uuid;
 
+#[path = "cases/admin_access_sweep.rs"]
+mod admin_access_sweep;
 #[path = "cases/admin_articles.rs"]
 mod admin_articles;
 #[path = "cases/admin_bootstrap.rs"]
 mod admin_bootstrap;
 #[path = "cases/admin_campaigns.rs"]
 mod admin_campaigns;
+#[path = "cases/admin_content_sanitization.rs"]
+mod admin_content_sanitization;
+#[path = "cases/admin_invitations.rs"]
+mod admin_invitations;
 #[path = "cases/admin_query_g20_investigation.rs"]
 mod admin_query_g20_investigation;
 #[path = "cases/admin_quizzes.rs"]
@@ -68,6 +74,8 @@ mod engagement_and_holiday_notifications;
 mod facilities;
 #[path = "cases/financial_module_deferment.rs"]
 mod financial_module_deferment;
+#[path = "cases/grievance_appeals.rs"]
+mod grievance_appeals;
 #[path = "cases/notification_localization_preferences.rs"]
 mod notification_localization_preferences;
 #[path = "cases/password_reset.rs"]
@@ -80,6 +88,8 @@ mod pool_pressure;
 mod profile_pictures;
 #[path = "cases/push_notification_delivery.rs"]
 mod push_notification_delivery;
+#[path = "cases/qna_audit.rs"]
+mod qna_audit;
 #[path = "cases/remediation_a.rs"]
 mod remediation_a;
 
@@ -286,6 +296,7 @@ fn test_config() -> AppConfig {
         email_asset_base_url: None,
         email_patient_app_url: Some("https://app.hellodoctor.asia".into()),
         email_doctor_portal_url: Some("https://doctor.hellodoctor.asia".into()),
+        email_admin_web_url: Some("https://admin.afyamkononi.app".into()),
     }
 }
 

@@ -231,6 +231,10 @@ pub struct AppConfig {
     pub email_asset_base_url: Option<String>,
     pub email_patient_app_url: Option<String>,
     pub email_doctor_portal_url: Option<String>,
+    /// Admin Web origin used for the link in Admin invitation emails, e.g.
+    /// `https://admin.example` (the email links to `{url}/invite?token=…`).
+    /// Required, with email delivery, to send invitations outside development.
+    pub email_admin_web_url: Option<String>,
 }
 
 /// Remediation E3: hand-written in place of `#[derive(Debug)]` so credential
@@ -428,6 +432,7 @@ impl std::fmt::Debug for AppConfig {
             .field("email_asset_base_url", &self.email_asset_base_url)
             .field("email_patient_app_url", &self.email_patient_app_url)
             .field("email_doctor_portal_url", &self.email_doctor_portal_url)
+            .field("email_admin_web_url", &self.email_admin_web_url)
             .finish()
     }
 }
@@ -716,6 +721,9 @@ impl AppConfig {
                 .ok()
                 .filter(|v| !v.trim().is_empty()),
             email_doctor_portal_url: env::var("EMAIL_DOCTOR_PORTAL_URL")
+                .ok()
+                .filter(|v| !v.trim().is_empty()),
+            email_admin_web_url: env::var("EMAIL_ADMIN_WEB_URL")
                 .ok()
                 .filter(|v| !v.trim().is_empty()),
         };
@@ -1498,6 +1506,7 @@ pub(crate) mod remediation_e3_tests {
             email_asset_base_url: None,
             email_patient_app_url: Some("https://app.hellodoctor.asia".into()),
             email_doctor_portal_url: Some("https://doctor.hellodoctor.asia".into()),
+            email_admin_web_url: Some("https://admin.afyamkononi.app".into()),
         }
     }
 

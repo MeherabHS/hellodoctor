@@ -1,0 +1,4 @@
+# sqlx checksums each migration file byte for byte. A Windows checkout with
+# core.autocrlf=true rewrites them with CRLF and the backend then refuses to
+# start (VersionMismatch). Keep migrations LF on every checkout.
+services/backend/migrations/*.sql text eol=lf

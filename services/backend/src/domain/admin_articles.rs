@@ -86,6 +86,11 @@ impl ArticleContent {
                 return Err(AppError::Validation("Titles must be 1–160 characters and content 1–30000 characters. Kiswahili title and content are optional together.".into()));
             }
         }
+        use crate::sanitize::{check_content, TextKind};
+        check_content("The English title", &self.title_en, TextKind::Line)?;
+        check_content("The Kiswahili title", &self.title_sw, TextKind::Line)?;
+        check_content("The English content", &self.body_en, TextKind::Markdown)?;
+        check_content("The Kiswahili content", &self.body_sw, TextKind::Markdown)?;
         if self.title_sw.is_empty() != self.body_sw.is_empty() || self.tags.len() > 10 {
             return Err(AppError::Validation(
                 "Provide both Kiswahili fields; use at most 10 tags.".into(),
@@ -98,6 +103,7 @@ impl ArticleContent {
                     "Tags must contain 1–40 characters.".into(),
                 ));
             }
+            check_content("A tag", tag, TextKind::Line)?;
         }
         self.tags.sort();
         self.tags.dedup();
@@ -142,6 +148,11 @@ impl CategoryContent {
                     "Both category names must contain 1–80 characters.".into(),
                 ));
             }
+            crate::sanitize::check_content(
+                "The category name",
+                value,
+                crate::sanitize::TextKind::Line,
+            )?;
         }
         Ok(())
     }

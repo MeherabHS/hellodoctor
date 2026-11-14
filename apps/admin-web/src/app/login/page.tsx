@@ -88,26 +88,37 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-white font-bold text-lg mb-3">
-            HD
+    <div className="afya-login">
+      <section className="afya-login-brand" aria-hidden="true">
+        <div className="afya-login-brand-top">
+          {/* eslint-disable-next-line @next/next/no-img-element -- static same-origin asset */}
+          <img src="/brand/afya_logo_white.png" alt="" />
+          <div>
+            <div className="afya-login-brand-name">AfyaMkononi</div>
+            <div className="afya-login-brand-sub">Health for You</div>
           </div>
-          <h1 className="text-xl font-semibold text-slate-900">AfyaMkononi Admin Portal</h1>
-          <p className="text-sm text-slate-500 mt-1">Central Hospital &amp; Operations Command</p>
         </div>
+        <div>
+          <h2>Admin console</h2>
+          <p>Content, people and care records, operations and campaigns for the AfyaMkononi platform.</p>
+        </div>
+        <p className="afya-login-brand-foot">Kenya deployment · English and Kiswahili</p>
+      </section>
 
-        {step === 'credentials' ? (
-          <form onSubmit={handleCredentialsSubmit} className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-            {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>
-            )}
+      <main className="afya-login-main">
+        <div className="afya-login-card">
+          <div className="afya-login-head">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static same-origin asset */}
+            <img src="/brand/afya_logo.png" alt="AfyaMkononi" className="afya-login-mobile-logo" />
+            <h1>{step === 'credentials' ? 'Sign in to Admin' : 'Check your email'}</h1>
+            <p>{step === 'credentials' ? 'Use your administrator email and password.' : <>We emailed a verification code to <strong>{email}</strong>.</>}</p>
+          </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-                Admin email
-              </label>
+          {step === 'credentials' ? (
+            <form onSubmit={handleCredentialsSubmit} className="afya-login-form">
+              {error && <div className="afya-login-error" role="alert">{error}</div>}
+
+              <label htmlFor="email">Admin email</label>
               <input
                 id="email"
                 type="email"
@@ -116,14 +127,9 @@ export default function AdminLoginPage() {
                 autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-            </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-1">
-                Password
-              </label>
+              <label htmlFor="password">Password</label>
               <input
                 id="password"
                 type="password"
@@ -131,40 +137,24 @@ export default function AdminLoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
-            </div>
 
-            <BotChallenge action="admin_login" reset={challengeReset} onToken={setChallengeToken} />
-            <button
-              type="submit"
-              disabled={submitting || challengeToken === null}
-              className="w-full rounded-lg bg-emerald-600 text-white font-medium py-2.5 text-sm hover:bg-emerald-700 disabled:opacity-60 transition-colors"
-            >
-              {submitting ? 'Checking…' : 'Continue'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleCodeSubmit} className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 space-y-4">
-            {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2">{error}</div>
-            )}
-
-            <div>
-              <p className="text-sm text-slate-700">
-                We emailed a verification code to <span className="font-medium">{email}</span>.
-              </p>
+              <a href="/forgot-password" className="afya-login-forgot">Forgot password?</a>
+              <BotChallenge action="admin_login" reset={challengeReset} onToken={setChallengeToken} />
+              <button type="submit" className="afya-btn-primary afya-login-submit" disabled={submitting || challengeToken === null}>
+                {submitting ? 'Checking…' : 'Continue'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleCodeSubmit} className="afya-login-form">
+              {error && <div className="afya-login-error" role="alert">{error}</div>}
               {debugCode && (
-                <p className="mt-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-2">
-                  Development mode — email delivery bypassed. Code: <span className="font-mono font-semibold">{debugCode}</span>
+                <p className="afya-login-debug">
+                  Development mode — email delivery bypassed. Code: <span>{debugCode}</span>
                 </p>
               )}
-            </div>
 
-            <div>
-              <label htmlFor="otp" className="block text-sm font-medium text-slate-700 mb-1">
-                Verification code
-              </label>
+              <label htmlFor="otp">Verification code</label>
               <input
                 id="otp"
                 type="text"
@@ -177,33 +167,21 @@ export default function AdminLoginPage() {
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                 placeholder="6-digit code"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="afya-login-otp"
               />
-            </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-lg bg-emerald-600 text-white font-medium py-2.5 text-sm hover:bg-emerald-700 disabled:opacity-60 transition-colors"
-            >
-              {submitting ? 'Verifying…' : 'Sign in'}
-            </button>
+              <button type="submit" className="afya-btn-primary afya-login-submit" disabled={submitting}>
+                {submitting ? 'Verifying…' : 'Sign in'}
+              </button>
+              <button type="button" className="afya-login-back" onClick={backToCredentials} disabled={submitting}>
+                ← Use a different account
+              </button>
+            </form>
+          )}
 
-            <button
-              type="button"
-              onClick={backToCredentials}
-              disabled={submitting}
-              className="w-full text-center text-sm text-slate-500 hover:text-slate-700 disabled:opacity-60"
-            >
-              ← Use a different account
-            </button>
-          </form>
-        )}
-
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Access is restricted to verified platform administrators. All sign-ins are audited.
-        </p>
-      </div>
+          <p className="afya-login-note">Access is restricted to verified platform administrators. All sign-ins are audited.</p>
+        </div>
+      </main>
     </div>
   );
 }

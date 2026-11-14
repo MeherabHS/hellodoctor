@@ -89,6 +89,10 @@ pub enum Action {
     ManageArticles,
     /// Facilities & Services directory: create, edit, photos, publish, archive.
     ManageFacilities,
+    /// Review (approve or flag) doctors' answers to patient questions.
+    ReviewQnaAnswers,
+    /// List Admins and invite, resend or revoke Admin invitations.
+    ManageAdminTeam,
 }
 
 pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
@@ -142,7 +146,9 @@ pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
         | ExecuteDataRightsAction
         | ManageCampaigns
         | ManageArticles
-        | ManageFacilities => matches!(ctx.role, Admin),
+        | ManageFacilities
+        | ReviewQnaAnswers
+        | ManageAdminTeam => matches!(ctx.role, Admin),
     };
 
     if allowed {

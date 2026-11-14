@@ -483,9 +483,53 @@ All authenticated endpoints employ Attribute-Based Access Control (ABAC) in addi
   }
   ```
 
+### Grievance appeals (2026-11-14)
+Recorded by an Admin on the patient's behalf (no Patient app endpoint). Migration `20261215000002_grievance_appeals` (reversible while no decision has been superseded). Writes run under the finance-worker role like adjudication; every step is audited (`GRIEVANCE_APPEAL_RECORDED`, `_UPHELD`, `_OVERTURNED`).
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/v1/admin/grievances/appeals` | Every appeal, newest first, with the grievance number, category, target, current grievance status and the appealed decision (`appealed_action` WARNING or DISMISS) |
+| `POST /api/v1/admin/grievances/{id}/appeals` `{reason}` | Record an appeal (reason 8–2000 chars). Only a WARNED or DISMISSED grievance; refund decisions are not appealable. One open appeal per grievance (409 otherwise). `201` with `appeal_id` |
+| `POST /api/v1/admin/grievance-appeals/{id}/decide` `{decision: "UPHOLD"\|"OVERTURN", note}` | UPHOLD keeps the decision. OVERTURN marks the decision superseded (kept as history; `grievance_adjudications.superseded_at`) and returns the grievance to `PENDING_REVIEW`, where it is decided again with the normal refund/warn/dismiss endpoints. A decided appeal returns 409 |
+
+Admin only (`AdjudicateGrievance` / `ViewGrievanceQueue`). The admin grievance list shows the current (non-superseded) decision.
+
 ---
 
 ## 8. Admin Oversight & Dossier Endpoints
+
+### Q&A answer audit (2026-11-14)
+Migration `20261215000001_qna_answer_audit` (reversible). Admin only (`ReviewQnaAnswers`). The patient who asked is never returned.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/v1/admin/qna/answers?status=UNREVIEWED\|APPROVED\|FLAGGED\|ALL&search=&limit=&offset=` | Answers with question text, doctor, dates, `audit_status`, `last_review`; plus `total` and per-status `counts` |
+| `GET /api/v1/admin/qna/answers/{id}/reviews` | Every review of an answer, newest first |
+| `POST /api/v1/admin/qna/answers/{id}/reviews` `{decision: "APPROVED"\|"FLAGGED", note}` | Record a review (note required, ≤1000 chars). FLAGGED hides the answer from `GET /api/v1/patients/me/qna/questions` until it is APPROVED again. A trigger stops an Admin update from changing anything but the audit columns. Audited (`QNA_ANSWER_FLAGGED` / `_APPROVED`) |
+
+### Admin team and invitations (2026-11-14)
+Migration `20261216000001_admin_invitations` (reversible). There is no Admin self-registration: an existing Admin invites by email. Only a SHA-256 hash of the 64-hex-character token is stored; the link (`EMAIL_ADMIN_WEB_URL` + `/invite?token=…`, production `https://admin.afyamkononi.app`) is **single use and valid for 5 minutes**. Table has RLS forced, column-level grants, and a trigger that keeps the identity columns immutable and blocks accepting an expired or revoked invitation. One open invitation per email.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/v1/admin/team` | `admins` (id, email, phone, is_active, created_at, `invited_by` email, `invited_at`) and the latest 200 `invitations` with status `PENDING`/`ACCEPTED`/`REVOKED`/`EXPIRED` |
+| `POST /api/v1/admin/team/invitations` `{email, current_password}` | Invite (strict email charset; 409 if already an account or an open invitation). Sends the `ADMIN_INVITATION` email. Audited |
+| `POST /api/v1/admin/team/invitations/{id}/resend` `{current_password}` | Replace the token, restart the 5 minutes, resend. Audited |
+| `POST /api/v1/admin/team/invitations/{id}/revoke` | Link stops working. Audited |
+| `POST /api/v1/auth/admin/invitations/lookup` `{token}` (public) | Email the invitation is for, if still valid. IP rate-limited and jailed after repeated bad tokens |
+| `POST /api/v1/auth/admin/invitations/accept` `{token, phone_number, password}` (public) | Creates the Admin account (Argon2id) and consumes the invitation in one transaction |
+
+**Password confirmation:** inviting and resending re-check the signed-in Admin's password (Argon2id), so a hijacked session alone cannot add Admins. A wrong password answers 403 (the session stays valid) and is audited as `ADMIN_REAUTH_FAILED`; after 5 wrong passwords in 15 minutes the check answers 429 (correct passwords never count). Revoking needs no password, since it only removes access.
+
+**Privilege sweep:** `tests/cases/admin_access_sweep.rs` reads every `/admin/...` route from the router and requires patient, doctor, missing and garbage tokens to be refused; a signed token whose role claim does not match the account's stored role is refused and audited (`AUTH_ROLE_MISMATCH`); deactivated or deleted Admins and revoked sessions lose access at once.
+
+Admin Web forwards the public routes through `/api/invite/{lookup,accept}` (Turnstile on accept); the token is removed from the address bar on load and only ever sent in POST bodies.
+
+### Admin password reset (2026-11-14)
+Admins use the same protected flow as patients and doctors (`POST /api/v1/auth/password-reset/request` → `/verify-otp` → `/complete`), gated by `PASSWORD_RESET_ENABLED`. The request answers identically whether or not the email has an account; the 6-digit code is single use; the reset authorization is single use and short lived; completing signs out every session. Admin Web: `/forgot-password`, BFF routes `/api/password-reset/{request,verify,complete}` (Turnstile action `admin_password_reset` on request; input shape checked before forwarding).
+
+### Activity log (2026-11-14)
+`GET /api/v1/admin/activity?limit=&before=&area=&search=&actor_id=&mine=` (Admin, `ViewLogs`). Newest first from `audit_events`; `limit` 1–100 (default 50); `before` is the cursor (`next_before` in the response). `area` = `content`, `people`, `operations`, `campaigns`, `finance`, `security` or `team`. `search` matches the action name (letters, digits, spaces, `_`). `mine=true` limits to the caller. Each item: `id, at, actor_role, actor_email` (Admins only; patients and doctors by role), `is_you, action, resource_type, resource_id, result`. Before/after data, reasons, IP hashes and request ids are never returned. Admin sign-ins are recorded as `ADMIN_SIGNED_IN`. Admin Web shows it as **Admin Team → Activity Log**, refreshed every 10 s.
 
 ### `GET /api/v1/admin/doctors/{id}/dossier`
 - **Purpose:** Comprehensive physician dossier including verified phone and residential address.
@@ -596,3 +640,56 @@ No new booking, payment or messaging endpoint is introduced. Existing response p
 - `GET /chat/:conversation_id/messages/:message_id/attachment`: authenticated conversation/document authorization on every view, including Doctor clinical-window check; returns `{mime_type, base64_content}` with no-store/private/nosniff headers. No public or bearer document URL is issued. Existing encrypted DocumentStorageService remains the only byte-storage path; unconfigured live storage fails honestly.
 
 No database migration or new business enum was introduced. Video/Agora media remains deferred.
+
+## Soft caching (2026-11-14)
+
+To keep repeated reads from loading the database, two short-lived caches sit in front of content that is the same for every reader. Nothing patient-specific, clinical, session or permission-related is cached.
+
+- **Backend (`services/backend/src/content_cache.rs`, one cache per running app in `AppState`):** `GET /api/v1/articles` and `/articles/{id}` (60 s), `GET /api/v1/facilities` and `/facilities/{id}` (30 s; `server_time` is always current, "open now" may lag by at most 30 s) and `/facilities/counties` (300 s). Only PUBLISHED rows are involved; keys include the caller's role and every query parameter; at most 1,024 entries. Any successful write under `/admin/articles`, `/admin/article-categories`, `/doctor/articles`, `/admin/facilities` or `/admin/facility-services`, and the scheduled-publish job (after its commit), clears the area at once on that instance; other instances catch up within the TTL. Metric: `content_cache_total{outcome=hit|miss|expired}`.
+- **Admin Web (`src/lib/inflight.mjs` `createSoftReads`, used by `src/lib/api.ts`):** identical GETs share one request in flight and reuse the answer for 3 s (below every polling interval). Each hit is a deep copy. Any write through `request()`, media uploads, sign-out and account changes clear it; failures are never cached. Memory only, never disk.
+
+## Admin upload sanitization (2026-11-14)
+
+Everything an Admin uploads is checked on the backend before it is stored, so every reader (Patient app, Doctor app, Admin Web, email, exports) receives safe content.
+
+- **Images** (article covers, facility photos): JPEG or PNG only; the declared type must match the file signature; at most 5 MB, 8192 px per side and 16 megapixels; decoded under memory limits and **re-encoded** to a fresh JPEG, which drops EXIF/GPS metadata and anything appended or embedded in the original. Admin Web checks type and size before forwarding and only relays image or JSON responses (`application/octet-stream` otherwise), with `nosniff`.
+- **Text** (`services/backend/src/sanitize.rs` `content_issue`): article titles, bodies and tags, category names, quiz questions, options and explanations (including CSV/JSON import), facility name, location and description, campaign titles and messages, and Admin notes and reasons (grievance audit notes and appeals, Q&A review notes, verification, recovery, release and reschedule reasons, via `validate_admin_text_field`). Refused with a 422 that names the field: control characters (line breaks only where several lines are allowed), Unicode direction overrides and isolates, zero-width space, byte-order mark and line/paragraph separators, HTML tags or comments (a plain `<` as in "CD4 < 200" is fine), and `javascript:`/`vbscript:` links. In article bodies, Markdown link and image targets must use https, http, mailto or tel. Patient and doctor text (chat, grievances) is not rewritten or refused by these rules; every client renders it as text.
+- **Rendering stays defensive too:** Admin Web renders Markdown without raw HTML and filters links through an allowlist; the Patient app ignores Markdown images and opens only allowlisted links.
+
+## Security checklist review (2026-11-14)
+
+Product-owner checklist, checked against the code. "Changed" items were fixed on this date.
+
+| Item | Status |
+|---|---|
+| HTTP/2 Rapid Reset | Not exposed: `h2` 0.4.19 / `hyper` 1.11.1 include the fix; per-IP and admission limits sit in front of every route. |
+| 52-char username (bcrypt 72-byte truncation) | Not exposed: Argon2id, no bcrypt, no username+password cache keys; passwords capped at 128. |
+| SAML bypass / nOAuth email spoof | Not exposed: no SAML or OAuth/OIDC sign-in; accounts are keyed by internal id, email is verified by OTP. |
+| GraphQL aliases | Not exposed: no GraphQL. |
+| 2FA code replay | Not exposed: OTP challenges are deleted in the verifying transaction; attempts are capped; reset codes and authorizations are single use. |
+| ReDoS | Not exposed: Rust `regex` is linear-time (no `fancy-regex`); no nested-quantifier patterns in Admin/Doctor Web. |
+| JWT alg confusion | Not exposed: verification pinned to EdDSA with issuer, audience and expiry; the role in a token must match the account's stored role. |
+| Request smuggling | Not exposed: hyper rejects ambiguous framing; Admin Web rebuilds every backend request. |
+| Cache poisoning | **Changed:** every backend response without its own policy now sends `Cache-Control: no-store` (images keep theirs); Admin Web BFF responses were already `private, no-store`; the content cache keys on role and all parameters, never on headers. |
+| Spoofed IP header | Not exposed: `X-Forwarded-For` is honoured only from `TRUSTED_PROXY_IPS`, as a single value; Admin Web forwards it only with the shared proxy secret (constant-time). |
+| Views bypass RLS | Reviewed: the one view, `doctor_public_directory`, intentionally exposes only public profile columns (no contact, identity or clinical data) with `security_barrier`. |
+| Math.random tokens | Not exposed: tokens and codes come from `OsRng`/`thread_rng` (CSPRNG); `Math.random` only jitters polling. |
+| Timing attack | Not exposed: OTP/token checks use `constant_time_eq`; unknown accounts still run a dummy Argon2 verification. |
+| Padding oracle | Not exposed: AES-GCM (authenticated), no CBC. |
+| Prototype pollution | Not exposed: Admin Web middleware refuses `__proto__`/`constructor`/`prototype` keys in JSON bodies; backend uses typed `deny_unknown_fields` payloads. |
+| Template injection | Not exposed: no template engine; email HTML is built in code with `html_escape`; Admin text refuses HTML. |
+| XXE file read | Not exposed: no XML parsing; uploads are JPEG/PNG only and re-encoded. |
+| WebSocket hijack | Not exposed: no WebSocket endpoints; real-time features use authenticated polling. |
+| Unicode = SPOTIFY | **Changed:** emails must be printable ASCII; every lookup and store uses `normalize_email` (ASCII lowercase only), so lookalikes such as the Kelvin sign or Cyrillic "е" can never map onto another account. |
+
+## Admin notifications (2026-11-14)
+
+`GET /api/v1/admin/notifications?since=` (Admin, `ViewLogs`). Returns `{items, server_time}`; the client passes the previous `server_time` as `since` (absent = last 24 hours; at most 7 days back). Items, newest first, at most 60:
+
+- `kind: "activity"` — other Admins' successful actions (not sign-ins or record views; never your own) plus `DOCTOR_PROFILE_CREATED`, `DATA_RIGHTS_ERASURE_REQUESTED`, `AUTH_ROLE_MISMATCH`, `CONCURRENT_LIVE_PARTICIPATION_DETECTED` and `LATE_PAYMENT_RECONCILIATION_REQUIRED`: `action`, `resource_type`, `result`, `actor_role`, `actor_email` (Admins only).
+- `kind: "grievance"` — new grievances: `grievance_number` only.
+- `kind: "incident"` — new app incidents: `severity` and `component` only.
+
+No patient names, complaint text, error messages or stack traces are returned. Admin Web (`components/shell/NotificationCenter.tsx`) polls every 15 s while visible, pops up each new item with a **View** link to its page, and keeps a bell list with an unread count (doctor applications still waiting are always listed first).
+
+The App Errors & Incidents page no longer offers "Simulate failure"; Admin Web has no client for `/admin/system-errors/simulate` or `/admin/logs/simulate`. Those backend routes remain refused in production and are used only by backend tests.

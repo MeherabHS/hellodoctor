@@ -413,6 +413,10 @@ impl FacilityContent {
                 return v("Text must not contain null characters.");
             }
         }
+        use crate::sanitize::{check_content, TextKind};
+        check_content("The facility name", &self.name, TextKind::Line)?;
+        check_content("The location", &self.location_text, TextKind::Line)?;
+        check_content("The description", &self.description, TextKind::Paragraphs)?;
         if !self.county.trim().is_empty() {
             match canonical_county(&self.county) {
                 Some(c) => self.county = c.to_owned(),
