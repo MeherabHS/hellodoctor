@@ -356,7 +356,7 @@ class AfyaCharacterCard extends StatelessWidget {
                             top: Radius.circular(14))))),
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Image.asset('assets/illustrations/$name.png',
+            child: Image.asset('assets/illustrations/$name.webp',
                 fit: BoxFit.contain,
                 alignment: Alignment.bottomCenter,
                 filterQuality: FilterQuality.medium,
@@ -384,7 +384,7 @@ class AfyaArt extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ClipRRect(
         borderRadius: BorderRadius.circular(radius),
-        child: Image.asset('assets/illustrations/$name.png',
+        child: Image.asset('assets/illustrations/$name.webp',
             width: width ?? (fit == BoxFit.fitWidth ? double.infinity : null),
             height: height,
             fit: fit,

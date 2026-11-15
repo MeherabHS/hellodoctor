@@ -347,7 +347,7 @@ class _DirectoryHeader extends StatelessWidget {
                   borderRadius:
                       const BorderRadius.only(topLeft: Radius.circular(18)),
                   child: Image.asset(
-                      'assets/illustrations/doctor_search_header.jpg',
+                      'assets/illustrations/doctor_search_header.webp',
                       height: 124,
                       fit: BoxFit.cover,
                       alignment: Alignment.bottomLeft,
@@ -379,7 +379,7 @@ class _DirectoryEmpty extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(28, 12, 28, 18),
                   child: Column(children: [
-                    Image.asset('assets/illustrations/doctor_search_empty.png',
+                    Image.asset('assets/illustrations/doctor_search_empty.webp',
                         height: 168,
                         fit: BoxFit.contain,
                         excludeFromSemantics: true),
@@ -414,7 +414,7 @@ class _DirectoryEmpty extends StatelessWidget {
                                 fontWeight: FontWeight.w700))),
                   ]),
                 ),
-                Image.asset('assets/illustrations/hills_footer.jpg',
+                Image.asset('assets/illustrations/hills_footer.webp',
                     width: double.infinity,
                     fit: BoxFit.fitWidth,
                     excludeFromSemantics: true),

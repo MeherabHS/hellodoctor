@@ -496,7 +496,7 @@ class _EmptyHistory extends StatelessWidget {
       decoration: _cardDecoration,
       padding: const EdgeInsets.fromLTRB(20, 49, 20, 42),
       child: Column(children: [
-        Image.asset('assets/history/history_empty_clipboard.png',
+        Image.asset('assets/history/history_empty_clipboard.webp',
             width: 265, height: 214, fit: BoxFit.contain),
         const SizedBox(height: 22),
         Text(title,
