@@ -25,7 +25,8 @@ void main() {
         .whereType<File>()
         .where((f) => f.path.endsWith('.dart'))) {
       final source = file.readAsStringSync();
-      for (final match in RegExp(r'FlutterSecureStorage\(').allMatches(source)) {
+      for (final match
+          in RegExp(r'FlutterSecureStorage\(').allMatches(source)) {
         final call = _balancedCall(source, match.end - 1);
         if (!call.contains('sharedPreferencesName')) {
           offenders.add('${file.path}:${_line(source, match.start)}');

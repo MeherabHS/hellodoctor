@@ -16,8 +16,21 @@ final _bracketed = RegExp(r'\([^)]*\)|\[[^\]]*\]|\{[^}]*\}|<[^>]*>');
 final _letter = RegExp(r'\p{L}', unicode: true);
 final _wordChars = RegExp(r"[\p{L}\p{M}'’-]+", unicode: true);
 const _titles = {
-  'dr', 'doctor', 'prof', 'professor', 'mr', 'mrs', 'ms', 'miss', 'mx',
-  'sr', 'sister', 'nurse', 'daktari', 'bw', 'bi',
+  'dr',
+  'doctor',
+  'prof',
+  'professor',
+  'mr',
+  'mrs',
+  'ms',
+  'miss',
+  'mx',
+  'sr',
+  'sister',
+  'nurse',
+  'daktari',
+  'bw',
+  'bi',
 };
 
 /// The name's words that can give an initial, each trimmed to start at its

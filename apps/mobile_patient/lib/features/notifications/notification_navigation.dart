@@ -95,8 +95,7 @@ Future<void> openNotificationDestination(BuildContext context,
                 peerName: chat.peerName,
                 requestStatus: chat.requestStatus,
                 myUserId: deps?.myUserId ??
-                    (await ProfileRepository(cubit.repo.api).profile())
-                        .userId);
+                    (await ProfileRepository(cubit.repo.api).profile()).userId);
             if (!context.mounted || !gate.current) return;
           case NotificationDestinationKind.article:
             page = BlogDetailPage(
