@@ -41,6 +41,14 @@ void main() {
         authenticated: () => signedIn, platform: 'android');
     ClientErrorReporter.current = reporter;
   });
+  // The hooks upload in the background; wait for it instead of a fixed
+  // sleep, which flaked on a busy CI runner.
+  Future<void> waitForSent([int count = 1]) async {
+    for (var i = 0; i < 200 && sent.length < count; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+  }
+
   tearDown(() {
     ClientErrorReporter.current = null;
     ClientErrorReporter.startupQueue = previousQueue;
@@ -54,7 +62,7 @@ void main() {
     final error = StateError('synthetic render failure');
     FlutterError.onError!(
         FlutterErrorDetails(exception: error, stack: stack, silent: true));
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await waitForSent();
     expect(sent.length, 1);
     expect((sent.single.data as Map)['operation'], 'render');
     await reporter.capture(error, stack);
@@ -71,14 +79,14 @@ void main() {
       done.complete();
     });
     await done.future;
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await waitForSent();
     expect(sent.length, 1);
     expect((sent.single.data as Map)['operation'], 'unhandled_async');
   });
   test('PlatformDispatcher hook invokes reporter', () async {
     expect(
         ClientErrorBoundaries.platform(StateError('synthetic'), stack), isTrue);
-    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await waitForSent();
     expect(sent.length, 1);
   });
   test('uses current authenticated session without client user identity',
