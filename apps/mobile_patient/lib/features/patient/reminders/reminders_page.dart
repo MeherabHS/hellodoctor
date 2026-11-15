@@ -634,7 +634,7 @@ class _Header extends StatelessWidget {
         Expanded(
           flex: 10,
           child: Stack(alignment: Alignment.center, children: [
-            Image.asset('assets/illustrations/woman_phone_bell.png',
+            Image.asset('assets/illustrations/woman_phone_bell.webp',
                 height: 138, fit: BoxFit.contain, excludeFromSemantics: true),
             Positioned(
               right: 0,

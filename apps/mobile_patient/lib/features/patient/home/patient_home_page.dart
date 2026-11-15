@@ -327,7 +327,7 @@ class _HeroArt extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(top: 6),
         child: Image.asset(
-          'assets/illustrations/home_hero_girl.png',
+          'assets/illustrations/home_hero_girl.webp',
           fit: BoxFit.cover,
           alignment: Alignment.topCenter,
           filterQuality: FilterQuality.medium,
@@ -524,7 +524,7 @@ class _OfflineBanner extends StatelessWidget {
         child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Expanded(
             flex: 9,
-            child: Image.asset('assets/illustrations/offline_hero.jpg',
+            child: Image.asset('assets/illustrations/offline_hero.webp',
                 fit: BoxFit.cover,
                 alignment: Alignment.bottomLeft,
                 excludeFromSemantics: true),

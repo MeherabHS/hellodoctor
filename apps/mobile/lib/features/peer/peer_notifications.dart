@@ -114,7 +114,7 @@ class _PeerNotificationsPageState extends State<PeerNotificationsPage> {
                                 padding: EdgeInsets.only(top: 90),
                                 child: PeerEmptyState(
                                     asset:
-                                        'assets/peer/empty_notifications.png',
+                                        'assets/peer/empty_notifications.webp',
                                     title: 'No notifications yet',
                                     body:
                                         'You\'ll see updates here for your support requests, sessions and messages.'));

@@ -286,7 +286,7 @@ class _EmptyNotifications extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
                     child: Column(children: [
-                      Image.asset('assets/illustrations/woman_phone_bell.png',
+                      Image.asset('assets/illustrations/woman_phone_bell.webp',
                           height: 210,
                           fit: BoxFit.contain,
                           excludeFromSemantics: true),
@@ -307,7 +307,7 @@ class _EmptyNotifications extends StatelessWidget {
                               color: PatientTokens.textSub)),
                     ]),
                   ),
-                  Image.asset('assets/illustrations/wave_footer.jpg',
+                  Image.asset('assets/illustrations/wave_footer.webp',
                       width: double.infinity,
                       fit: BoxFit.fitWidth,
                       excludeFromSemantics: true),

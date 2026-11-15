@@ -266,7 +266,7 @@ class _LoginState extends State<LoginPage> {
                             AspectRatio(
                                 aspectRatio: 941 / 562,
                                 child: Image.asset(
-                                    'assets/auth/signin_scene.jpg',
+                                    'assets/auth/signin_scene.webp',
                                     fit: BoxFit.cover,
                                     excludeFromSemantics: true)),
                             const SizedBox(height: 14),

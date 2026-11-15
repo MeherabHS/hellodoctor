@@ -47,7 +47,7 @@ class ConsultationHeader extends StatelessWidget {
             ]),
           ),
           if (wideArt)
-            Image.asset('assets/illustrations/$art.jpg',
+            Image.asset('assets/illustrations/$art.webp',
                 width: double.infinity,
                 fit: BoxFit.fitWidth,
                 excludeFromSemantics: true)
@@ -99,7 +99,7 @@ class ConsultationHeader extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius:
                         const BorderRadius.only(topLeft: Radius.circular(18)),
-                    child: Image.asset('assets/illustrations/$art.jpg',
+                    child: Image.asset('assets/illustrations/$art.webp',
                         height: 132,
                         fit: BoxFit.cover,
                         alignment: Alignment.bottomLeft,
@@ -295,7 +295,7 @@ class ConsultationTipsCard extends StatelessWidget {
               padding: const EdgeInsets.only(left: 6),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(10),
-                child: Image.asset('assets/illustrations/$art.jpg',
+                child: Image.asset('assets/illustrations/$art.webp',
                     width: 84, fit: BoxFit.contain, excludeFromSemantics: true),
               ),
             ),

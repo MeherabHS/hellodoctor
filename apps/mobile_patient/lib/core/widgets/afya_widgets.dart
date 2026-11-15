@@ -12,7 +12,7 @@ class AfyaLogoMark extends StatelessWidget {
   final double size;
   @override
   Widget build(BuildContext context) => Image.asset(
-        'assets/brand/afya_logo.png',
+        'assets/brand/afya_logo.webp',
         width: size,
         height: size,
         fit: BoxFit.contain,

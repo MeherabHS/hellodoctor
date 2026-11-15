@@ -46,7 +46,7 @@ class _Wave extends StatelessWidget {
   const _Wave();
   @override
   Widget build(BuildContext context) =>
-      Image.asset('assets/auth/wave_footer.jpg',
+      Image.asset('assets/auth/wave_footer.webp',
           width: double.infinity,
           height: 40,
           fit: BoxFit.fill,
@@ -82,7 +82,7 @@ class WelcomePage extends StatelessWidget {
                                 AspectRatio(
                                     aspectRatio: 827 / 520,
                                     child: Image.asset(
-                                        'assets/auth/welcome_scene.jpg',
+                                        'assets/auth/welcome_scene.webp',
                                         fit: BoxFit.cover,
                                         excludeFromSemantics: true)),
                                 const SizedBox(height: 8),
@@ -446,7 +446,7 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
                               AspectRatio(
                                   aspectRatio: 827 / 377,
                                   child: Image.asset(
-                                      'assets/auth/peer_scene.jpg',
+                                      'assets/auth/peer_scene.webp',
                                       fit: BoxFit.cover,
                                       excludeFromSemantics: true)),
                               const SizedBox(height: 6),
