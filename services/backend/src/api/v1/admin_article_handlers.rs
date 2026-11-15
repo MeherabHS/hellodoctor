@@ -87,13 +87,17 @@ pub async fn list(
             "Search is limited to 160 characters.".into(),
         ));
     }
-    let standalone = match q.kind.as_deref() {
-        None | Some("") => None,
-        Some("quiz") => Some(true),
-        Some("content") => Some(false),
+    // `content` = everything but standalone quizzes (kept for older Admin
+    // builds); `article` and `video` split it by whether there is a YouTube link.
+    let (standalone, video): (Option<bool>, Option<bool>) = match q.kind.as_deref() {
+        None | Some("") => (None, None),
+        Some("quiz") => (Some(true), None),
+        Some("content") => (Some(false), None),
+        Some("article") => (Some(false), Some(false)),
+        Some("video") => (Some(false), Some(true)),
         Some(_) => return Err(AppError::Validation("Unknown kind.".into())),
     };
-    let filter=" WHERE ($1::text IS NULL OR a.status=$1) AND ($2::uuid IS NULL OR a.category_id=$2) AND ($3::text IS NULL OR strpos(lower(a.title_en||' '||a.title_sw),lower($3))>0) AND ($6::bool IS NULL OR a.standalone_quiz=$6)";
+    let filter=" WHERE ($1::text IS NULL OR a.status=$1) AND ($2::uuid IS NULL OR a.category_id=$2) AND ($3::text IS NULL OR strpos(lower(a.title_en||' '||a.title_sw),lower($3))>0) AND ($6::bool IS NULL OR a.standalone_quiz=$6) AND ($7::bool IS NULL OR (a.video_url IS NOT NULL)=$7)";
     let rows: Vec<Value> = sqlx::query_scalar(&format!(
         "{}{filter} ORDER BY a.created_at DESC,a.id LIMIT $4 OFFSET $5",
         admin_article_repo::ADMIN_SELECT
@@ -104,6 +108,7 @@ pub async fn list(
     .bind(limit)
     .bind(offset)
     .bind(standalone)
+    .bind(video)
     .fetch_all(&mut *tx)
     .await?;
     // $4/$5 are unused here; bind them so $6 keeps its position.
@@ -114,6 +119,7 @@ pub async fn list(
         .bind(limit)
         .bind(offset)
         .bind(standalone)
+        .bind(video)
         .fetch_one(&mut *tx)
         .await?;
     tx.commit().await?;
