@@ -25,7 +25,7 @@ class AuthScene extends StatelessWidget {
       this.sideMargin = 20,
       this.overlap = 22});
 
-  /// Asset prefix: `assets/auth/<name>_header.jpg` and `_bg.jpg`.
+  /// Asset prefix: `assets/auth/<name>_header.webp` and `_bg.webp`.
   final String name;
 
   /// Height of the header artwork in pixels (it is 1024 wide).
@@ -53,7 +53,7 @@ class AuthScene extends StatelessWidget {
         return Stack(children: [
           Positioned.fill(child: ColoredBox(color: topColor)),
           Positioned.fill(
-            child: Image.asset('assets/auth/${name}_bg.jpg',
+            child: Image.asset('assets/auth/${name}_bg.webp',
                 fit: BoxFit.cover, excludeFromSemantics: true),
           ),
           SingleChildScrollView(
@@ -96,7 +96,7 @@ class AuthScene extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: [Colors.white, Colors.white, Colors.transparent],
             stops: [0, .86, 1]).createShader(rect),
-        child: Image.asset('assets/auth/${name}_header.jpg',
+        child: Image.asset('assets/auth/${name}_header.webp',
             width: double.infinity,
             fit: BoxFit.cover,
             alignment: Alignment.topCenter,

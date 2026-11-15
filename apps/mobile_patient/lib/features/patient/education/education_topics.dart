@@ -79,8 +79,8 @@ enum EducationTopic {
   /// Width of the banner artwork in dp at the reference scale.
   final double bannerArtWidth;
 
-  String get bannerAsset => 'assets/education/banner_$asset.png';
-  String get emptyAsset => 'assets/education/empty_$asset.png';
+  String get bannerAsset => 'assets/education/banner_$asset.webp';
+  String get emptyAsset => 'assets/education/empty_$asset.webp';
 
   static EducationTopic? fromApiKey(String? key) {
     for (final t in values) {

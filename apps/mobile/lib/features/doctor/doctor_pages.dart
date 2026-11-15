@@ -1213,7 +1213,7 @@ class _ScheduleTitle extends StatelessWidget {
             right: 0,
             top: 0,
             bottom: 0,
-            child: Image.asset('assets/doctor/schedule_header_stethoscope.png',
+            child: Image.asset('assets/doctor/schedule_header_stethoscope.webp',
                 fit: BoxFit.fitHeight, excludeFromSemantics: true)),
         const Padding(
             padding: EdgeInsets.fromLTRB(18, 6, 92, 0),
@@ -1451,7 +1451,7 @@ class _ScheduleEmptyCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: _schLine)),
       child: Column(children: [
-        Image.asset('assets/doctor/schedule_empty_illustration.jpg',
+        Image.asset('assets/doctor/schedule_empty_illustration.webp',
             height: 150, fit: BoxFit.contain, excludeFromSemantics: true),
         const SizedBox(height: 14),
         const Text('No consultations scheduled yet',

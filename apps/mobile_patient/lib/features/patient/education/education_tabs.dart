@@ -75,12 +75,12 @@ class _EduTabFeedState extends State<EduTabFeed> {
         if (items.isEmpty && !_feed.hasMore) {
           return videos
               ? EduEmptyCard(
-                  asset: 'assets/education/tab_empty_videos.png',
+                  asset: 'assets/education/tab_empty_videos.webp',
                   color: const Color(0xFFEAF6FE),
                   title: l.eduNoVideosTitle,
                   body: l.eduNoVideosBody)
               : EduEmptyCard(
-                  asset: 'assets/education/tab_empty_quizzes.png',
+                  asset: 'assets/education/tab_empty_quizzes.webp',
                   color: const Color(0xFFF1EDFE),
                   title: l.eduNoQuizzesTitle,
                   body: l.eduNoQuizzesBody);
@@ -132,7 +132,7 @@ class EduAudioEmpty extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     return EduEmptyCard(
-        asset: 'assets/education/tab_empty_audio.png',
+        asset: 'assets/education/tab_empty_audio.webp',
         color: const Color(0xFFFEECEF),
         title: l.eduNoAudioTitle,
         body: l.eduNoAudioBody);

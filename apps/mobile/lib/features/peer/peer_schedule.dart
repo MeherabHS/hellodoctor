@@ -588,8 +588,8 @@ class _Hero extends StatelessWidget {
                     width: 140,
                     child: Image.asset(
                         create
-                            ? 'assets/peer/calendar_create.png'
-                            : 'assets/peer/calendar_schedule.png',
+                            ? 'assets/peer/calendar_create.webp'
+                            : 'assets/peer/calendar_schedule.webp',
                         fit: BoxFit.contain,
                         alignment: Alignment.bottomRight))),
           ])));
