@@ -62,8 +62,13 @@ class PatientPeerRequestDto {
       required this.topic,
       required this.status,
       this.declineNote,
-      this.conversationId});
+      this.conversationId,
+      this.callClosed = false});
   final String id, peerId, peerName, supportType, topic, status;
+
+  /// Server-decided: the session's call window has passed or the call was
+  /// hung up, so no call can be started for it.
+  final bool callClosed;
   final String? declineNote, conversationId;
   final DateTime start, end;
   bool get isCall => supportType == 'CALL';
@@ -78,7 +83,8 @@ class PatientPeerRequestDto {
       topic: _text(j['topic']),
       status: _text(j['status']),
       declineNote: j['decline_note']?.toString(),
-      conversationId: j['conversation_id']?.toString());
+      conversationId: j['conversation_id']?.toString(),
+      callClosed: j['call_closed'] == true);
 }
 
 class PeerChatSummaryDto {
@@ -91,8 +97,12 @@ class PeerChatSummaryDto {
       required this.start,
       required this.unread,
       this.lastMessage,
-      this.lastMessageAt});
+      this.lastMessageAt,
+      this.callClosed = false});
   final String id, requestId, peerName, supportType, requestStatus;
+
+  /// See [PatientPeerRequestDto.callClosed].
+  final bool callClosed;
   final String? lastMessage;
   final DateTime start;
   final DateTime? lastMessageAt;
@@ -107,7 +117,8 @@ class PeerChatSummaryDto {
       lastMessage: j['last_message']?.toString(),
       lastMessageAt:
           j['last_message_at'] == null ? null : _time(j['last_message_at']),
-      unread: int.tryParse(_text(j['unread_count'])) ?? 0);
+      unread: int.tryParse(_text(j['unread_count'])) ?? 0,
+      callClosed: j['call_closed'] == true);
 }
 
 class PeerChatMessageDto {

@@ -34,6 +34,7 @@ class AppointmentSummaryDto {
     this.patientPresent,
     this.doctorPresent,
     this.join,
+    this.lapsed = false,
   });
 
   final String id,
@@ -53,6 +54,11 @@ class AppointmentSummaryDto {
   /// Server-derived join eligibility (authoritative policy); `null` from an
   /// older backend.
   final JoinEligibility? join;
+
+  /// Server-decided: the booking's time passed and nobody started it. It
+  /// still says CONFIRMED, but it is over: never upcoming, never a waiting
+  /// room.
+  final bool lapsed;
   final bool hasPhoto;
   final DateTime? photoUpdatedAt;
 
@@ -107,6 +113,7 @@ class AppointmentSummaryDto {
         patientPresent: j['patient_present'] as bool?,
         doctorPresent: j['doctor_present'] as bool?,
         join: JoinEligibility.tryParse(j['join']),
+        lapsed: j['lapsed'] == true,
         startTime: DateTime.tryParse(_textOf(j['start_time']))?.toLocal() ??
             DateTime.fromMillisecondsSinceEpoch(0),
         endTime: DateTime.tryParse(_textOf(j['end_time']))?.toLocal() ??

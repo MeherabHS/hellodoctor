@@ -49,8 +49,13 @@ class PeerInboxItem {
       required this.topic,
       required this.status,
       this.ageRange,
-      this.conversationId});
+      this.conversationId,
+      this.callClosed = false});
   final String id, patientName, supportType, topic, status;
+
+  /// Server-decided: the session's call window has passed or the call was
+  /// hung up, so no call can be started for it.
+  final bool callClosed;
   final String? ageRange, conversationId;
   final DateTime start, end;
   bool get isCall => supportType == 'CALL';
@@ -63,7 +68,8 @@ class PeerInboxItem {
       supportType: _text(j['support_type']),
       topic: _text(j['topic']),
       status: _text(j['status']),
-      conversationId: j['conversation_id']?.toString());
+      conversationId: j['conversation_id']?.toString(),
+      callClosed: j['call_closed'] == true);
 }
 
 class PeerSlot {
@@ -91,8 +97,12 @@ class PeerChatSummary {
       required this.start,
       required this.unread,
       this.lastMessage,
-      this.lastMessageAt});
+      this.lastMessageAt,
+      this.callClosed = false});
   final String id, requestId, name, supportType, requestStatus;
+
+  /// See [PeerInboxItem.callClosed].
+  final bool callClosed;
   final String? lastMessage;
   final DateTime start;
   final DateTime? lastMessageAt;
@@ -106,7 +116,8 @@ class PeerChatSummary {
       start: _time(j['start_time']) ?? DateTime.now(),
       lastMessage: j['last_message']?.toString(),
       lastMessageAt: _time(j['last_message_at']),
-      unread: int.tryParse(_text(j['unread_count'])) ?? 0);
+      unread: int.tryParse(_text(j['unread_count'])) ?? 0,
+      callClosed: j['call_closed'] == true);
 }
 
 class PeerChatMessage {

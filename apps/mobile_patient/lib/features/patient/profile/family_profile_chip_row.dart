@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/afya_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import 'profile_models.dart';
 
@@ -26,8 +27,9 @@ class FamilyProfileChipRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (profiles.isEmpty) return const SizedBox.shrink();
+    // Grows with the phone's text size so the chips never overflow.
     return SizedBox(
-      height: 92,
+      height: 64 + MediaQuery.textScalerOf(context).scale(30),
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -61,12 +63,12 @@ class _ProfileChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final label =
-        '${_firstName(profile.fullName)} (${profile.isSelf ? l10n.profileSelf : (profile.relationship ?? l10n.profileDependent)})';
+        '${_firstName(profile.fullName)}\n(${profile.isSelf ? l10n.profileSelf : (profile.relationship ?? l10n.profileDependent)})';
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(PatientTokens.cardRadius),
       child: Container(
-        width: 84,
+        width: 92,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
         decoration: BoxDecoration(
           color: active ? PatientTokens.primaryLight : PatientTokens.surface,
@@ -81,11 +83,8 @@ class _ProfileChip extends StatelessWidget {
                 color: active ? PatientTokens.primary : PatientTokens.textSub,
                 size: 24),
             const SizedBox(height: 6),
-            Text(
+            AfyaFitText(
               label,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
@@ -114,7 +113,7 @@ class _AddDependentChip extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(PatientTokens.cardRadius),
         child: Container(
-          width: 84,
+          width: 92,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(PatientTokens.cardRadius),
@@ -129,9 +128,11 @@ class _AddDependentChip extends StatelessWidget {
               Icon(Icons.add_circle_outline,
                   color: PatientTokens.primaryDark, size: 24),
               SizedBox(height: 6),
-              Text(
+              // Shrinks with large system text instead of breaking
+              // "Dependent" mid-word.
+              AfyaFitText(
                 '${AppLocalizations.of(context).dependentAdd.split(' ').first}\n${AppLocalizations.of(context).profileDependent}',
-                textAlign: TextAlign.center,
+                key: const ValueKey('add-dependent-label'),
                 style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,

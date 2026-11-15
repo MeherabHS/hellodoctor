@@ -86,6 +86,9 @@ class AppLocalizationsSw extends AppLocalizations {
   String get appointmentStatusCancelled => 'Imeghairiwa';
 
   @override
+  String get appointmentStatusLapsed => 'Muda umepita';
+
+  @override
   String get appointmentStatusExpired => 'Muda umeisha';
 
   @override

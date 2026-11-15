@@ -1063,10 +1063,15 @@ pub async fn create_request(
     notify_peer_event(&state, &mut tx, peer_user, "PEER_REQUEST_NEW", id).await?;
     let email =
         queue_session_email(&state, &mut tx, peer_user, "PEER_SESSION_REQUESTED", id).await?;
-    let created = peer_repo::patient_request(&mut *tx, ctx.user_id, id)
+    let mut created = peer_repo::patient_request(&mut *tx, ctx.user_id, id)
         .await?
         .ok_or_else(|| AppError::internal("Peer request could not be read back.".into()))?;
     tx.commit().await?;
+    peer_repo::mark_call_closed(
+        std::slice::from_mut(&mut created),
+        state.config.agora_token_window_after_mins,
+        Utc::now(),
+    );
     send_queued_emails(&state, email.into_iter().collect());
     Ok((StatusCode::CREATED, ok(created)))
 }
@@ -1078,8 +1083,13 @@ pub async fn list_my_requests(
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::PatientRead)?;
     let mut tx = state.begin_authed(&ctx).await?;
-    let requests = peer_repo::patient_requests(&mut *tx, ctx.user_id).await?;
+    let mut requests = peer_repo::patient_requests(&mut *tx, ctx.user_id).await?;
     tx.commit().await?;
+    peer_repo::mark_call_closed(
+        &mut requests,
+        state.config.agora_token_window_after_mins,
+        Utc::now(),
+    );
     Ok(ok(requests))
 }
 
@@ -1119,10 +1129,15 @@ pub async fn cancel_request(
         id,
     )
     .await?;
-    let updated = peer_repo::patient_request(&mut *tx, ctx.user_id, id)
+    let mut updated = peer_repo::patient_request(&mut *tx, ctx.user_id, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Request not found.".into()))?;
     tx.commit().await?;
+    peer_repo::mark_call_closed(
+        std::slice::from_mut(&mut updated),
+        state.config.agora_token_window_after_mins,
+        Utc::now(),
+    );
     send_queued_emails(&state, email.into_iter().collect());
     Ok(ok(updated))
 }
@@ -1147,7 +1162,12 @@ pub async fn list_inbox(
         Some(_) => return Err(AppError::Validation("Unknown request status.".into())),
     };
     let mut tx = state.begin_authed(&ctx).await?;
-    let requests = peer_repo::peer_inbox(&mut *tx, ctx.user_id, status.as_deref()).await?;
+    let mut requests = peer_repo::peer_inbox(&mut *tx, ctx.user_id, status.as_deref()).await?;
+    peer_repo::mark_call_closed(
+        &mut requests,
+        state.config.agora_token_window_after_mins,
+        Utc::now(),
+    );
     tx.commit().await?;
     Ok(ok(requests))
 }
@@ -1253,10 +1273,15 @@ pub async fn decide_request(
             .await?,
         );
     }
-    let updated = peer_repo::peer_request(&mut *tx, ctx.user_id, id)
+    let mut updated = peer_repo::peer_request(&mut *tx, ctx.user_id, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Request not found.".into()))?;
     tx.commit().await?;
+    peer_repo::mark_call_closed(
+        std::slice::from_mut(&mut updated),
+        state.config.agora_token_window_after_mins,
+        Utc::now(),
+    );
     send_queued_emails(&state, emails);
     Ok(ok(updated).into_response())
 }
@@ -1279,10 +1304,15 @@ async fn complete_request(
         ));
     }
     peer_repo::set_request_status(&mut *tx, id, "COMPLETED", None).await?;
-    let updated = peer_repo::peer_request(&mut *tx, ctx.user_id, id)
+    let mut updated = peer_repo::peer_request(&mut *tx, ctx.user_id, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Request not found.".into()))?;
     tx.commit().await?;
+    peer_repo::mark_call_closed(
+        std::slice::from_mut(&mut updated),
+        state.config.agora_token_window_after_mins,
+        Utc::now(),
+    );
     Ok(ok(updated))
 }
 
