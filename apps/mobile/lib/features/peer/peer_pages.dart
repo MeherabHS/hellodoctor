@@ -428,7 +428,7 @@ class _PeerHomeTabState extends State<PeerHomeTab> {
                                     ]))),
                         Expanded(
                             flex: 9,
-                            child: Image.asset('assets/peer/hero_people.png',
+                            child: Image.asset('assets/peer/hero_people.webp',
                                 fit: BoxFit.cover,
                                 alignment: Alignment.centerLeft)),
                       ]))),
@@ -500,7 +500,7 @@ class _PeerHomeTabState extends State<PeerHomeTab> {
                   padding: const EdgeInsets.fromLTRB(14, 16, 16, 18),
                   child: IntrinsicHeight(
                       child: Row(children: [
-                    Image.asset('assets/peer/mission_people.png',
+                    Image.asset('assets/peer/mission_people.webp',
                         width: 62, fit: BoxFit.contain),
                     const SizedBox(width: 10),
                     const VerticalDivider(

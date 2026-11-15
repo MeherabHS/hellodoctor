@@ -210,7 +210,7 @@ class PostConsultationPage extends StatelessWidget {
                   ),
                 ]),
           ),
-          Image.asset('assets/illustrations/hills_footer.jpg',
+          Image.asset('assets/illustrations/hills_footer.webp',
               width: double.infinity,
               fit: BoxFit.fitWidth,
               excludeFromSemantics: true),

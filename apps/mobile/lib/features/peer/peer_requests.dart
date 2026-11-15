@@ -183,7 +183,7 @@ class _PeerRequestsTabState extends State<PeerRequestsTab> {
                       onSelected: (i) => setState(() => tab = i)),
                   if (items.isEmpty)
                     PeerEmptyState(
-                        asset: 'assets/peer/empty_requests.png',
+                        asset: 'assets/peer/empty_requests.webp',
                         title: 'No support requests yet',
                         body:
                             'When patients send you a support request, it will appear here for your review.',

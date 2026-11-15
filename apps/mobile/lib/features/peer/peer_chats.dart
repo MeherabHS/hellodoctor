@@ -158,7 +158,7 @@ class _PeerChatsTabState extends State<PeerChatsTab> {
                   const SizedBox(height: 14),
                   if (chats.isEmpty)
                     PeerEmptyState(
-                        asset: 'assets/peer/empty_chats.png',
+                        asset: 'assets/peer/empty_chats.webp',
                         title: 'No conversations yet',
                         body:
                             'Your chats will appear here once you accept a support request or start a session.',

@@ -383,7 +383,7 @@ class FacilityEmptyState extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 18),
       child: Column(children: [
-        Image.asset('assets/facilities/facilities_empty.png',
+        Image.asset('assets/facilities/facilities_empty.webp',
             height: 170,
             fit: BoxFit.contain,
             filterQuality: FilterQuality.medium,
