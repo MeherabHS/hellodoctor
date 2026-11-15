@@ -10,20 +10,37 @@ import '../../core/video/agora_engine.dart';
 import '../../core/video/call_controller.dart';
 import '../../core/video/join_eligibility.dart';
 import '../../core/video/mint_failure.dart';
+import 'call_close_out_page.dart';
 import 'doctor_cubit.dart';
 import 'doctor_repository.dart';
 
 /// Real Agora RTC consultation call screen. Reuses the existing server
-/// contract (`POST /consultations/:id/rtc-token`) exclusively — this screen
+/// contract (`POST /consultations/:id/rtc-token`) exclusively â€” this screen
 /// never mints a token itself and never sees the Agora App Certificate
-/// (CLAUDE.md §1.10: Agora RTC SDK only, no custom signaling, certificate
+/// (CLAUDE.md Â§1.10: Agora RTC SDK only, no custom signaling, certificate
 /// stays server-side). Joining, leaving, muting, camera switching and
 /// connection-state handling are all delegated to [CallController], which is
 /// the directly unit-tested piece (`test/core/video/call_controller_test.dart`);
 /// this widget is responsible only for rendering whatever state it reports.
 class AgoraPage extends StatefulWidget {
-  const AgoraPage({super.key, required this.appointmentId});
+  const AgoraPage(
+      {super.key,
+      required this.appointmentId,
+      this.closeOutOnExit = false,
+      this.loadJoin,
+      this.loadToken});
   final String appointmentId;
+
+  /// Peer Navigator support calls pass their own join and token endpoints
+  /// (`/peer-requests/:id/call` and `/rtc-token`); the timing rules are the
+  /// same as a doctor consultation. Null for doctor consultations.
+  final Future<JoinEligibility?> Function()? loadJoin;
+  final Future<Map<String, dynamic>> Function()? loadToken;
+  bool get isPeerCall => loadToken != null;
+
+  /// Opened from the post-call close-out ("Rejoin call"): any exit returns
+  /// there, even if this attempt never connects.
+  final bool closeOutOnExit;
   @override
   State<AgoraPage> createState() => _AgoraPageState();
 }
@@ -40,6 +57,10 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
   bool _started = false;
   bool _checking = true;
 
+  /// The call reached "connected" at least once: ending it requires the
+  /// close-out (product-owner rule, 2026-11-13).
+  bool _everConnected = false;
+
   @override
   void initState() {
     super.initState();
@@ -48,20 +69,27 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
       engine: RealAgoraEngine(),
       mintToken: _mintToken,
       requestPermissions: _requestPermissions,
-      telemetrySubmit: (events) => context
-          .read<DoctorCubit>()
-          .repo
-          .telemetry(widget.appointmentId, events),
+      telemetrySubmit: (events) async {
+        if (widget.isPeerCall) return;
+        await context
+            .read<DoctorCubit>()
+            .repo
+            .telemetry(widget.appointmentId, events);
+      },
     )..addListener(_onControllerChanged);
     unawaited(_bootstrap());
   }
 
   DoctorRepository get _repo => context.read<DoctorCubit>().repo;
 
+  Future<JoinEligibility?> _loadJoin() async => widget.loadJoin != null
+      ? await widget.loadJoin!()
+      : await _repo.joinEligibility(widget.appointmentId);
+
   Future<void> _bootstrap() async {
     JoinEligibility? join;
     try {
-      join = await _repo.joinEligibility(widget.appointmentId);
+      join = await _loadJoin();
     } catch (_) {
       // Eligibility unknown (offline / older backend): do not invent a lock;
       // the token request below is still authoritative and its refusal is
@@ -84,7 +112,7 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
         _ticker?.cancel();
         JoinEligibility? fresh;
         try {
-          fresh = await _repo.joinEligibility(widget.appointmentId);
+          fresh = await _loadJoin();
         } catch (_) {}
         if (!mounted) return;
         if (joinIsOpen(fresh)) {
@@ -93,9 +121,9 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
           setState(() => _join = fresh);
           _ticker = Timer.periodic(const Duration(seconds: 5), (_) async {
             try {
-              final again = await _repo.joinEligibility(widget.appointmentId);
+              final again = await _loadJoin();
               if (!mounted || _started) return;
-              if (again.isOpen()) {
+              if (again != null && again.isOpen()) {
                 _ticker?.cancel();
                 _startCall();
               } else {
@@ -121,14 +149,15 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
   /// actionable failure using the backend's stable error `code` (not its text).
   Future<RtcTokenData> _mintToken() async {
     try {
-      final data = await _repo.rtcToken(widget.appointmentId);
+      final data = widget.loadToken != null
+          ? await widget.loadToken!()
+          : await _repo.rtcToken(widget.appointmentId);
       return RtcTokenData.fromJson(Map<String, dynamic>.from(data));
     } on ApiException catch (e) {
       DateTime? opensAt;
       if (e.code == 'NOT_YET_OPEN') {
         try {
-          opensAt =
-              (await _repo.joinEligibility(widget.appointmentId)).joinOpenAt;
+          opensAt = (await _loadJoin())?.joinOpenAt;
         } catch (_) {}
       }
       throw mapMintFailure(e, opensAt: opensAt);
@@ -141,6 +170,7 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
   }
 
   void _onControllerChanged() {
+    if (_controller.state == CallScreenState.connected) _everConnected = true;
     if (mounted) setState(() {});
   }
 
@@ -167,7 +197,15 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
 
   Future<void> _leaveAndPop() async {
     if (_started) await _controller.leave();
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    if (!widget.isPeerCall && (_everConnected || widget.closeOutOnExit)) {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => CallCloseOutPage(
+              appointment:
+                  CallCloseOutPage.resolve(context, widget.appointmentId))));
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -194,14 +232,14 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
     if (_checking) {
       return const _CenteredStatus(
         icon: Icons.lock_clock,
-        message: 'Checking the consultation room…',
+        message: 'Checking the consultation roomâ€¦',
         showSpinner: true,
       );
     }
     if (join == null) {
       return const _CenteredStatus(
           icon: Icons.lock_clock,
-          message: 'Preparing your call…',
+          message: 'Preparing your callâ€¦',
           showSpinner: true);
     }
     final gate = join.gate();
@@ -218,11 +256,7 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
       icon: Icons.lock_clock,
       message: message,
       actionLabel: gate == JoinGateState.locked ? null : 'Back',
-      onAction: gate == JoinGateState.locked
-          ? null
-          : () async {
-              if (mounted) Navigator.of(context).pop();
-            },
+      onAction: gate == JoinGateState.locked ? null : _leaveAndPop,
     );
   }
 
@@ -232,7 +266,7 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
       case CallScreenState.requestingPermissions:
         return const _CenteredStatus(
           icon: Icons.mic_none,
-          message: 'Requesting camera and microphone access…',
+          message: 'Requesting camera and microphone accessâ€¦',
           showSpinner: true,
         );
       case CallScreenState.permissionDenied:
@@ -246,13 +280,13 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
       case CallScreenState.authorizing:
         return const _CenteredStatus(
           icon: Icons.lock_outline,
-          message: 'Preparing your call…',
+          message: 'Preparing your callâ€¦',
           showSpinner: true,
         );
       case CallScreenState.connecting:
         return const _CenteredStatus(
           icon: Icons.sync,
-          message: 'Connecting…',
+          message: 'Connectingâ€¦',
           showSpinner: true,
         );
       case CallScreenState.connected:
@@ -293,7 +327,7 @@ class _InCallView extends StatelessWidget {
           )
         else
           const Center(
-            child: Text('Waiting for the other participant to join…',
+            child: Text('Waiting for the other participant to joinâ€¦',
                 style: TextStyle(color: Colors.white70)),
           ),
         Positioned(
@@ -319,7 +353,7 @@ class _InCallView extends StatelessWidget {
                 color: Colors.black54,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text('Reconnecting…',
+              child: const Text('Reconnectingâ€¦',
                   style: TextStyle(color: Colors.white)),
             ),
           ),

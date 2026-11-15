@@ -125,6 +125,75 @@ pub async fn upload_patient_intake(
     ))
 }
 
+/// Resolves the patient profile an appointment belongs to, authorised as the
+/// caller's own or a guardianed dependent's (same rule as intake upload).
+async fn intake_patient_for(
+    state: &AppState,
+    ctx: &AuthContext,
+    appointment_id: Uuid,
+) -> Result<crate::domain::ids::PatientProfileId, AppError> {
+    let appointment_patient_id = {
+        let mut lookup_tx = state.begin_authed(ctx).await?;
+        let appointment = appointment_repo::find_by_id(&mut *lookup_tx, appointment_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+        lookup_tx.commit().await?;
+        appointment.patient_id
+    };
+    ctx.acting_patient_profile_id(state, Some(appointment_patient_id))
+        .await
+}
+
+/// `GET /appointments/:id/prescriptions` — the patient's own uploads for this
+/// consultation (metadata only) and whether they can still be changed.
+pub async fn list_patient_intake(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::UploadPatientIntake)?;
+    let patient_id = intake_patient_for(&state, &ctx, id).await?;
+    let (documents, editable) =
+        PrescriptionService::list_patient_intake_documents(&state, &ctx, id, patient_id).await?;
+    let documents: Vec<serde_json::Value> = documents
+        .into_iter()
+        .map(|d| {
+            serde_json::json!({
+                "id": d.id,
+                "page_number": d.page_number,
+                "mime_type": d.mime_type,
+                "created_at": d.created_at,
+            })
+        })
+        .collect();
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({
+            "appointment_id": id,
+            "editable": editable,
+            "max_documents": prescription_service::PATIENT_MAX_IMAGES_PER_CONSULTATION,
+            "documents": documents,
+        }),
+    }))
+}
+
+/// `DELETE /appointments/:id/prescriptions/:document_id` — the patient removes
+/// one of their own uploads while the consultation can still take uploads.
+pub async fn remove_patient_intake(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path((id, document_id)): Path<(Uuid, Uuid)>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::UploadPatientIntake)?;
+    let patient_id = intake_patient_for(&state, &ctx, id).await?;
+    PrescriptionService::remove_patient_intake_document(&state, &ctx, id, patient_id, document_id)
+        .await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({ "appointment_id": id, "document_id": document_id, "removed": true }),
+    }))
+}
+
 pub async fn upload_doctor_prescription(
     State(state): State<AppState>,
     ctx: AuthContext,

@@ -12,13 +12,13 @@ export type AdminNotice =
 
 export type NoticeTone = 'info' | 'success' | 'warning' | 'urgent';
 /** Page ids from components/shell/AdminSidebar.tsx. */
-export type NoticePage = 'verification' | 'patients' | 'grievances' | 'logs' | 'blogs' | 'quizzes' | 'topics' | 'facilities' | 'campaigns' | 'finance' | 'team' | 'compliance' | 'activity';
+export type NoticePage = 'verification' | 'peers' | 'patients' | 'grievances' | 'logs' | 'blogs' | 'quizzes' | 'topics' | 'facilities' | 'campaigns' | 'finance' | 'team' | 'compliance' | 'activity';
 export interface NoticeView {title: string; body: string; page: NoticePage; tone: NoticeTone}
 
 const PAGE_BY_RESOURCE: Record<string, NoticePage> = {
   ADMIN_ARTICLE: 'blogs', ARTICLE_QUIZ: 'quizzes', ARTICLE_CATEGORY: 'topics', DOCTOR_ARTICLE: 'blogs',
   HEALTH_FACILITY: 'facilities', CAMPAIGN: 'campaigns', NOTIFICATION_CAMPAIGN: 'campaigns',
-  DOCTOR_PROFILE: 'verification', PATIENT_PROFILE: 'patients', PATIENT: 'patients', ERASURE_JOB: 'patients',
+  DOCTOR_PROFILE: 'verification', PEER_NAVIGATOR: 'peers', PATIENT_PROFILE: 'patients', PATIENT: 'patients', ERASURE_JOB: 'patients',
   DATA_RIGHTS_REQUEST: 'patients', PATIENT_DATA_REQUEST: 'patients',
   GRIEVANCE_REPORT: 'grievances', SYSTEM_ERROR: 'logs', SYSTEM_ERROR_LOG: 'logs', HEALTH_ANSWER: 'compliance',
   ADMIN_INVITATION: 'team', TRANSACTION: 'finance', DISBURSEMENT: 'finance', DISBURSEMENT_ITEM: 'finance',
@@ -31,6 +31,17 @@ const ACTION_TITLE: Record<string, string> = {
   DOCTOR_PROFESSIONAL_VERIFY: 'Doctor verified',
   DOCTOR_PROFESSIONAL_REJECT: 'Doctor application rejected',
   DOCTOR_PROFESSIONAL_REVOKE: 'Doctor verification revoked',
+  PEER_NAVIGATOR_CREATED: 'New Peer Navigator application',
+  PEER_NAVIGATOR_APPROVED: 'Peer Navigator approved',
+  PEER_NAVIGATOR_REJECTED: 'Peer Navigator application rejected',
+  PEER_NAVIGATOR_SUSPENDED: 'Peer Navigator suspended',
+  PEER_NAVIGATOR_HISTORY_VIEWED: 'Peer Navigator record viewed',
+  PEER_NAVIGATOR_RECORD_VIEWED: 'Peer Navigator application viewed',
+  PATIENT_RECORD_VIEWED: 'Patient record viewed',
+  DOCTOR_RECORD_VIEWED: 'Doctor record viewed',
+  DOCTOR_DOCUMENT_VIEWED: 'Doctor verification document viewed',
+  ADMIN_RECORD_VIEWED: 'Record details viewed',
+  ADMIN_ACTION: 'Admin action',
   DATA_RIGHTS_ERASURE_REQUESTED: 'Account deletion requested',
   DATA_RIGHTS_PATIENT_ERASED: 'Patient account deleted',
   DATA_RIGHTS_PATIENT_ANONYMIZED: 'Patient account anonymized',
@@ -55,8 +66,8 @@ const ACTION_TITLE: Record<string, string> = {
   SYSTEM_ERROR_RESOLVED: 'Incident resolved',
 };
 const URGENT = new Set(['AUTH_ROLE_MISMATCH', 'CONCURRENT_LIVE_PARTICIPATION_DETECTED', 'DATA_RIGHTS_ERASURE_REQUESTED']);
-const ATTENTION = new Set(['DOCTOR_PROFILE_CREATED', 'LATE_PAYMENT_RECONCILIATION_REQUIRED']);
-const ROLE: Record<string, string> = {ADMIN: 'an Admin', DOCTOR: 'a doctor', PATIENT: 'a patient', SYSTEM: 'the system'};
+const ATTENTION = new Set(['DOCTOR_PROFILE_CREATED', 'PEER_NAVIGATOR_CREATED', 'LATE_PAYMENT_RECONCILIATION_REQUIRED']);
+const ROLE: Record<string, string> = {ADMIN: 'an Admin', DOCTOR: 'a doctor', PEER: 'a Peer Navigator', PATIENT: 'a patient', SYSTEM: 'the system'};
 
 export function describeNotice(n: AdminNotice): NoticeView {
   if (n.kind === 'grievance') {
@@ -75,6 +86,7 @@ export function describeNotice(n: AdminNotice): NoticeView {
   const title = ACTION_TITLE[n.action] ?? humanize(n.action);
   const page = PAGE_BY_RESOURCE[n.resource_type] ?? 'activity';
   const tone: NoticeTone = URGENT.has(n.action) ? 'urgent' : ATTENTION.has(n.action) ? 'warning' : 'info';
-  const body = n.action === 'DOCTOR_PROFILE_CREATED' ? 'A doctor registered and is waiting for verification.' : `By ${who}.`;
+  const body = n.action === 'DOCTOR_PROFILE_CREATED' ? 'A doctor registered and is waiting for verification.'
+    : n.action === 'PEER_NAVIGATOR_CREATED' ? 'A Peer Navigator signed up and is waiting for approval.' : `By ${who}.`;
   return {title, body, page, tone};
 }

@@ -33,6 +33,7 @@ class FakeScheduler implements ReminderScheduler {
     if (!reminder.enabled) return;
     scheduled.add(reminder.id);
   }
+
   @override
   Future<void> cancel(String reminderId) async => cancelled.add(reminderId);
 }
@@ -324,10 +325,10 @@ void main() {
       final decoded = Reminder.decodeList(
           '[{"id":"x","category":"art","title":"T","note":"","at":"2026-11-20T08:00:00.000","repeat":"daily"}]');
       expect(decoded.single.enabled, isTrue);
-      expect(Reminder.decodeList(Reminder.encodeList(
-              [decoded.single.copyWith(enabled: false)]))
-          .single
-          .enabled, isFalse);
+      expect(
+          Reminder.decodeList(Reminder.encodeList(
+              [decoded.single.copyWith(enabled: false)])).single.enabled,
+          isFalse);
     });
 
     test('without exact alarms the state says alerts may be late', () async {

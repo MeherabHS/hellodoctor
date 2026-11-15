@@ -21,6 +21,7 @@ class _AuthEntryPageState extends State<AuthEntryPage> {
   final password = TextEditingController();
   final fullName = TextEditingController();
   final dateOfBirth = TextEditingController();
+  final address = TextEditingController();
   String gender = 'OTHER';
   @override
   void dispose() {
@@ -29,6 +30,7 @@ class _AuthEntryPageState extends State<AuthEntryPage> {
     password.dispose();
     fullName.dispose();
     dateOfBirth.dispose();
+    address.dispose();
     super.dispose();
   }
 
@@ -38,7 +40,8 @@ class _AuthEntryPageState extends State<AuthEntryPage> {
           email.text, phone.text, password.text,
           fullName: fullName.text,
           dateOfBirth: dateOfBirth.text,
-          gender: gender);
+          gender: gender,
+          residentialAddress: address.text);
     } else {
       widget.auth.requestPatientLogin(email.text, password.text);
     }
@@ -219,19 +222,21 @@ class _AuthEntryPageState extends State<AuthEntryPage> {
   /// "Create your AfyaMkononi account": cream card over the countryside scene.
   ///
   /// The supplied design shows four fields (name, phone, optional email,
-  /// password). Registration here still needs a required email, date of birth
-  /// and gender, because the existing account and email-code sign-in depend
-  /// on them; those fields are kept in the design's style.
+  /// password). Registration here also needs a required email, date of birth,
+  /// address (product-owner instruction 2026-11-14) and gender; those fields
+  /// are kept in the design's style. Every field is required and marked *.
   Widget _registerScene(BuildContext context, bool busy, String? error) {
     PatientField f(
             String label, TextEditingController c, String hint, IconData icon,
             {TextInputType? type,
             bool obscure = false,
             bool readOnly = false,
+            bool required = true,
             VoidCallback? onTap,
             Widget? suffix}) =>
         PatientField(
             label: label,
+            requiredMark: required,
             controller: c,
             hint: hint,
             keyboardType: type,
@@ -286,10 +291,21 @@ class _AuthEntryPageState extends State<AuthEntryPage> {
                   onTap: pickDate,
                   suffix: const Icon(Icons.calendar_today_outlined, size: 18)),
               const SizedBox(height: 12),
+              f('Address', address, 'Estate / street, town',
+                  Icons.home_outlined,
+                  type: TextInputType.streetAddress),
+              const SizedBox(height: 12),
               const Row(children: [
                 Icon(Icons.wc_rounded, size: 19, color: AuthColors.title),
                 SizedBox(width: 8),
-                Text('Gender',
+                Text.rich(
+                    TextSpan(text: 'Gender', children: [
+                      TextSpan(
+                          text: ' *',
+                          style: TextStyle(
+                              color: PatientTokens.danger,
+                              fontWeight: FontWeight.w800)),
+                    ]),
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,

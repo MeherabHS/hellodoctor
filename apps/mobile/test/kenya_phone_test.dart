@@ -94,10 +94,10 @@ void main() {
 
     Future<void> enterProfessionalFields(WidgetTester tester) async {
       final fields = find.byType(TextField);
-      await tester.enterText(fields.at(0), 'General Medicine'); // specialty
-      await tester.enterText(fields.at(1), 'KMPDC-12345'); // license
-      await tester.enterText(fields.at(2), '5'); // experience
-      await tester.enterText(fields.at(3), 'City Hospital'); // hospital
+      await tester.enterText(fields.at(0), 'KMPDC-12345'); // license
+      await tester.enterText(fields.at(1), '5'); // experience
+      await tester.enterText(fields.at(2), 'City Hospital'); // hospital
+      await tester.enterText(fields.at(3), 'General Medicine'); // specialty
       await tester.enterText(fields.at(4), 'MBChB'); // qualifications
       await tester.enterText(fields.at(5), '123 Main St'); // address
       await tester.tap(find.text('Next'));
@@ -159,6 +159,84 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byType(LegalConsentPage), findsOneWidget);
+    });
+  });
+
+  group('RegistrationPage required professional details', () {
+    Future<void> openProfessionalStep(WidgetTester tester) async {
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'Dr Jane Doe');
+      await tester.enterText(fields.at(1), 'jane.doe@example.com');
+      await tester.enterText(fields.at(2), 'Abcdefg1!');
+      await tester.enterText(fields.at(3), '0712345678');
+      await tester.tap(find.text('Create Account'));
+      await tester.pump();
+    }
+
+    Future<AuthCubit> pumpPage(WidgetTester tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+      await tester.binding.setSurfaceSize(const Size(800, 2000));
+      final auth = AuthCubit(ApiClient(dio: Dio()));
+      addTearDown(auth.close);
+      await tester.pumpWidget(MaterialApp(home: RegistrationPage(auth: auth)));
+      return auth;
+    }
+
+    testWidgets('fields are labelled in the agreed order', (tester) async {
+      await pumpPage(tester);
+      await openProfessionalStep(tester);
+      final labels = [
+        'KMPDC registration number',
+        'Years of experience',
+        'Hospital name',
+        'Specialty',
+        'Qualifications',
+        'Residential address',
+      ];
+      final tops = [
+        for (final l in labels) tester.getTopLeft(find.textContaining(l)).dy
+      ];
+      expect(tops, [...tops]..sort());
+    });
+
+    testWidgets('an empty KMPDC number blocks Next with a clear message',
+        (tester) async {
+      await pumpPage(tester);
+      await openProfessionalStep(tester);
+      await tester.tap(find.text('Next'));
+      await tester.pump();
+      expect(
+          find.text('KMPDC registration number is required.'), findsOneWidget);
+      expect(find.byType(LegalConsentPage), findsNothing);
+    });
+
+    testWidgets('years of experience must be 0 to 100', (tester) async {
+      await pumpPage(tester);
+      await openProfessionalStep(tester);
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), 'A12345');
+      await tester.enterText(fields.at(1), '150');
+      await tester.enterText(fields.at(2), 'City Hospital');
+      await tester.enterText(fields.at(3), 'General Practitioner');
+      await tester.enterText(fields.at(4), 'MBChB');
+      await tester.enterText(fields.at(5), 'Nairobi');
+      await tester.tap(find.text('Next'));
+      await tester.pump();
+      expect(find.textContaining('whole number from 0 to 100'), findsOneWidget);
+      expect(find.byType(LegalConsentPage), findsNothing);
+    });
+
+    testWidgets('a missing name stops the account step', (tester) async {
+      await pumpPage(tester);
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(1), 'jane.doe@example.com');
+      await tester.enterText(fields.at(2), 'Abcdefg1!');
+      await tester.enterText(fields.at(3), '0712345678');
+      await tester.tap(find.text('Create Account'));
+      await tester.pump();
+      expect(find.text('Full name is required.'), findsOneWidget);
+      expect(find.text('Next'), findsNothing);
     });
   });
 }

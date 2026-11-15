@@ -20,12 +20,6 @@ use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use uuid::Uuid;
 
-#[derive(Debug, Deserialize)]
-pub struct RegisterOtpRequest {
-    pub phone_number: String,
-    pub role: Option<String>,
-}
-
 #[derive(Deserialize)]
 pub struct PatientRegistrationRequest {
     #[serde(flatten)]
@@ -44,14 +38,6 @@ pub struct PatientLoginRequest {
 #[derive(Deserialize)]
 pub struct PatientVerifyOtpRequest {
     pub challenge_token: String,
-    pub otp_code: String,
-    #[serde(default)]
-    pub accepted_documents: Vec<AcceptedDocument>,
-}
-
-#[derive(Deserialize)]
-pub struct VerifyOtpRequest {
-    pub phone_number: String,
     pub otp_code: String,
     #[serde(default)]
     pub accepted_documents: Vec<AcceptedDocument>,
@@ -174,16 +160,6 @@ impl std::fmt::Debug for PatientVerifyOtpRequest {
     }
 }
 
-impl std::fmt::Debug for VerifyOtpRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("VerifyOtpRequest")
-            .field("phone_number", &self.phone_number)
-            .field("otp_code", &redacted(&self.otp_code))
-            .field("accepted_documents", &self.accepted_documents)
-            .finish()
-    }
-}
-
 impl std::fmt::Debug for DoctorLoginRequest {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DoctorLoginRequest")
@@ -273,55 +249,6 @@ impl std::fmt::Debug for RefreshRequest {
 pub struct ApiResponse<T> {
     pub success: bool,
     pub data: T,
-}
-
-pub async fn register_otp(
-    State(state): State<AppState>,
-    Json(payload): Json<RegisterOtpRequest>,
-) -> Result<impl IntoResponse, AppError> {
-    let _ = payload.role;
-    rate_limit::check_otp_request_limit(&state.redis, &payload.phone_number).await?;
-
-    let (session_token, expires_in, debug_otp_code) =
-        AuthService::request_patient_otp(&state, &payload.phone_number).await?;
-    Ok(Json(ApiResponse {
-        success: true,
-        data: serde_json::json!({
-            "session_token": session_token,
-            "expires_in": expires_in,
-            "debug_otp_code": debug_otp_code
-        }),
-    }))
-}
-
-pub async fn verify_otp_and_login(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    method: Method,
-    OriginalUri(uri): OriginalUri,
-    Json(payload): Json<VerifyOtpRequest>,
-) -> Result<impl IntoResponse, AppError> {
-    let device_key = crate::services::auth_service::device_proof::establishment_proof(
-        &state,
-        &headers,
-        &method,
-        &uri,
-        &payload.phone_number,
-    )
-    .await?;
-    let login_resp = AuthService::verify_otp_and_login_with_device(
-        &state,
-        &payload.phone_number,
-        &payload.otp_code,
-        &payload.accepted_documents,
-        device_key,
-    )
-    .await?;
-
-    Ok(Json(ApiResponse {
-        success: true,
-        data: login_resp,
-    }))
 }
 
 pub async fn patient_register(
@@ -988,22 +915,7 @@ async fn resolve_display_name_for_email(
     state: &AppState,
     user: &crate::domain::models::User,
 ) -> String {
-    let full_name = match user.role {
-        UserRole::Doctor => crate::repository::doctor_repo::find_by_user_id(&state.db, user.id)
-            .await
-            .ok()
-            .flatten()
-            .map(|d| d.full_name),
-        UserRole::Patient => crate::repository::patient_repo::find_by_user_id(&state.db, user.id)
-            .await
-            .ok()
-            .flatten()
-            .map(|p| p.full_name),
-        _ => None,
-    };
-    full_name
-        .and_then(|name| name.split_whitespace().next().map(str::to_owned))
-        .unwrap_or_default()
+    crate::services::password_reset_service::account_first_name(state, user).await
 }
 
 /// Phase 2 step 1 (public, unauthenticated): always returns the same
@@ -1133,6 +1045,7 @@ mod remediation_e4_debug_redaction_tests {
                 full_name: "Jane Doe".into(),
                 date_of_birth: chrono::NaiveDate::from_ymd_opt(1990, 1, 1).unwrap(),
                 gender: crate::domain::models::Gender::Female,
+                residential_address: "Kilimani, Nairobi".into(),
             },
             email: "jane@example.com".into(),
             phone_number: "+254700000000".into(),
@@ -1160,16 +1073,6 @@ mod remediation_e4_debug_redaction_tests {
         let out = format!("{req:?}");
         assert_redacted(&out, SYNTHETIC_TOKEN);
         assert_redacted(&out, SYNTHETIC_OTP);
-    }
-
-    #[test]
-    fn verify_otp_request_redacts_code() {
-        let req = VerifyOtpRequest {
-            phone_number: "+254700000000".into(),
-            otp_code: SYNTHETIC_OTP.into(),
-            accepted_documents: vec![],
-        };
-        assert_redacted(&format!("{req:?}"), SYNTHETIC_OTP);
     }
 
     #[test]

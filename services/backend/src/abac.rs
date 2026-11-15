@@ -93,6 +93,11 @@ pub enum Action {
     ReviewQnaAnswers,
     /// List Admins and invite, resend or revoke Admin invitations.
     ManageAdminTeam,
+
+    /// A Peer Navigator's own profile, slots and (later) requests and chats.
+    PeerSelf,
+    /// Admin review of Peer Navigators (approve, reject, suspend).
+    ManagePeerNavigators,
 }
 
 pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
@@ -148,7 +153,10 @@ pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
         | ManageArticles
         | ManageFacilities
         | ReviewQnaAnswers
-        | ManageAdminTeam => matches!(ctx.role, Admin),
+        | ManageAdminTeam
+        | ManagePeerNavigators => matches!(ctx.role, Admin),
+
+        PeerSelf => matches!(ctx.role, Peer),
     };
 
     if allowed {

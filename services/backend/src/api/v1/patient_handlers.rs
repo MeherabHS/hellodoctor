@@ -1,8 +1,8 @@
 //! Patient-facing profile and appointment-list endpoints.
 //!
 //! Added for the Patient Flutter client build: confirmed by direct router
-//! inspection that no `/patients/*` route existed before this file — OTP
-//! login (`auth_service.rs::verify_otp_and_login`) auto-creates a
+//! inspection that no `/patients/*` route existed before this file — the
+//! former phone-OTP login (removed 2026-11-14) auto-created a
 //! placeholder `patient_profiles` row (`full_name: "Patient User"`,
 //! `date_of_birth: 1995-01-01`, `gender: Other`) with no prior way for a
 //! patient to read or correct it, and no prior way for a patient to list
@@ -45,10 +45,14 @@ pub async fn get_own_profile(
     let profile = patient_repo::find_by_id(&mut *tx, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Patient profile not found.".into()))?;
+    let address = patient_repo::find_residential_address(&mut *tx, id).await?;
     tx.commit().await?;
+    let mut data = serde_json::to_value(profile)
+        .map_err(|_| AppError::internal("Patient profile could not be read.".into()))?;
+    data["residential_address"] = json!(address);
     Ok(Json(ApiResponse {
         success: true,
-        data: profile,
+        data,
     }))
 }
 
@@ -65,6 +69,8 @@ pub struct PatientProfileUpdate {
     /// written, but never read by anything) if sent against the caller's
     /// own self profile via `PATCH /patients/me`.
     pub relationship: Option<String>,
+    /// Self profile only (`PATCH /patients/me`); ignored for dependents.
+    pub residential_address: Option<String>,
 }
 
 /// Shared by `update_own_profile`, `create_dependent_profile`, and
@@ -152,11 +158,16 @@ pub async fn update_own_profile(
         body.relationship.as_deref(),
     )?;
 
+    let address = body
+        .residential_address
+        .as_deref()
+        .map(crate::domain::validation::validate_residential_address)
+        .transpose()?;
     let id = ctx.patient_profile_id(&state).await?;
     let mut tx = state.begin_authed(&ctx).await?;
     // `WELCOME_GREETING` fires on the genuine "account activation" event for
     // a Patient: the first time this profile actually leaves the OTP-login
-    // placeholder state (`auth_service::verify_otp_and_login`'s seeded
+    // placeholder state (the former phone-OTP login's seeded
     // `full_name: "Patient User"`, `date_of_birth: 1995-01-01`,
     // `gender: OTHER` — the exact triple `PatientProfileDto.isPlaceholder`
     // already checks client-side). Computed from the row as it stands
@@ -194,6 +205,9 @@ pub async fn update_own_profile(
     .await?;
     if rows != 1 {
         return Err(AppError::NotFound("Patient profile not found.".into()));
+    }
+    if let Some(address) = address {
+        patient_repo::update_residential_address(&mut *tx, id, &address).await?;
     }
     if was_placeholder && !will_still_be_placeholder {
         crate::services::NotificationService::notify_welcome_greeting(&mut tx, id).await?;

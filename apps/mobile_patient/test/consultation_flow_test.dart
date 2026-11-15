@@ -130,7 +130,13 @@ void main() {
       final repo = BookingRepository(api);
       final family = FamilyProfilesCubit(FamilyProfilesRepository(api));
       void expectNoPaymentText() {
-        for (final text in const ['KES', 'Payment', 'payment', 'Paid', 'M-Pesa']) {
+        for (final text in const [
+          'KES',
+          'Payment',
+          'payment',
+          'Paid',
+          'M-Pesa'
+        ]) {
           expect(find.textContaining(text), findsNothing, reason: text);
         }
       }

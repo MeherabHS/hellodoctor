@@ -1,3 +1,5 @@
+import 'features/peer/peer_pages.dart';
+import 'features/peer/peer_repository.dart';
 import 'core/notifications/notification_taps.dart';
 import 'features/notifications/notification_navigation.dart';
 import 'core/l10n/doctor_locale.dart';
@@ -164,6 +166,10 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
                       debugShowCheckedModeBanner: false,
                       theme: DoctorTokens.theme(),
                       home: home);
+                  if (state is SignedIn && state.isPeer) {
+                    // Peer Navigators get their own screens; no doctor data.
+                    return application(PeerApp(repo: PeerRepository(api!)));
+                  }
                   if (state is SignedIn) {
                     // Scope both the Navigator and all routed subflows to this account.
                     // Removing these providers on logout also disposes their route
@@ -435,7 +441,14 @@ class _RegistrationState extends State<RegistrationPage> {
       : null;
 
   void _continueFromAccount() {
-    final error = _passwordStrengthError(controllers['password']!.text) ??
+    final error = _requiredError(const {
+          'name': 'Full name',
+          'email': 'Email address',
+          'password': 'Password',
+          'phone': 'Phone number',
+        }) ??
+        _emailError(controllers['email']!.text) ??
+        _passwordStrengthError(controllers['password']!.text) ??
         _phoneError(controllers['phone']!.text);
     setState(() {
       _clientError = error;
@@ -443,10 +456,63 @@ class _RegistrationState extends State<RegistrationPage> {
     });
   }
 
+  /// First empty required field, in form order, as a readable message.
+  String? _requiredError(Map<String, String> fields) {
+    for (final entry in fields.entries) {
+      if (controllers[entry.key]!.text.trim().isEmpty) {
+        return '${entry.value} is required.';
+      }
+    }
+    return null;
+  }
+
+  String? _emailError(String raw) =>
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(raw.trim())
+          ? null
+          : 'Enter a valid email address.';
+
+  /// Mirrors the backend's `doctor_register` checks so an incomplete form is
+  /// caught here, before the agreements step, instead of after it.
+  String? _professionalError() {
+    final missing = _requiredError(const {
+      'license': 'KMPDC registration number',
+      'experience': 'Years of experience',
+      'hospital': 'Hospital name',
+      'specialty': 'Specialty',
+      'qualifications': 'Qualifications',
+      'address': 'Residential address',
+    });
+    if (missing != null) return missing;
+    if (controllers['license']!.text.trim().length < 3) {
+      return 'KMPDC registration number must be at least 3 characters.';
+    }
+    final years = int.tryParse(controllers['experience']!.text.trim());
+    if (years == null || years < 0 || years > 100) {
+      return 'Years of experience must be a whole number from 0 to 100.';
+    }
+    final qualifications = controllers['qualifications']!
+        .text
+        .split(',')
+        .map((q) => q.trim())
+        .where((q) => q.isNotEmpty)
+        .toList();
+    if (qualifications.isEmpty ||
+        qualifications.length > 10 ||
+        qualifications.any((q) => q.length > 150)) {
+      return 'List 1 to 10 qualifications, separated by commas.';
+    }
+    return null;
+  }
+
   void _continueToAgreements() {
     final normalizedPhone = normalizeKenyaPhone(controllers['phone']!.text);
     if (normalizedPhone == null) {
       setState(() => _step = 0);
+      return;
+    }
+    final error = _professionalError();
+    if (error != null) {
+      setState(() => _clientError = error);
       return;
     }
     setState(() => _clientError = null);
@@ -538,32 +604,38 @@ class _RegistrationState extends State<RegistrationPage> {
         ]),
       ];
 
+  /// Order and wording per product-owner instruction (2026-11-14): KMPDC
+  /// registration number, years of experience, hospital name, specialty,
+  /// then qualifications and residential address. All are required.
   List<Widget> _professionalStep(bool busy) => [
         AfyaLabeledField(
-            label: 'Specialization',
-            controller: controllers['specialty']!,
-            maxLength: 150),
-        AfyaLabeledField(
-            label: 'License / Registration No.',
-            hint: 'KMPDC registration number',
+            label: 'KMPDC registration number',
+            hint: 'e.g. A12345',
             controller: controllers['license']!,
             maxLength: 150),
         AfyaLabeledField(
-            label: 'Years of Experience',
+            label: 'Years of experience',
+            hint: '0 to 100',
             controller: controllers['experience']!,
             keyboardType: TextInputType.number,
             maxLength: 3),
         AfyaLabeledField(
-            label: 'Facility / Organization',
+            label: 'Hospital name',
+            hint: 'Where you currently practise',
             controller: controllers['hospital']!,
-            maxLength: 150),
+            maxLength: 200),
+        AfyaLabeledField(
+            label: 'Specialty',
+            hint: 'e.g. General Practitioner',
+            controller: controllers['specialty']!,
+            maxLength: 80),
         AfyaLabeledField(
             label: 'Qualifications',
-            hint: 'Comma separated',
+            hint: 'Comma separated, e.g. MBChB, MMed',
             controller: controllers['qualifications']!,
             maxLength: 300),
         AfyaLabeledField(
-            label: 'Residential Address',
+            label: 'Residential address',
             controller: controllers['address']!,
             maxLength: 300),
         const SizedBox(height: 6),
@@ -874,12 +946,11 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
     final pages = [
       HomePage(onOpenTab: selectTab),
       _schedule
-          ? const SchedulePage()
+          ? SchedulePage(header: DoctorTopBar(onMenu: () => selectTab(3)))
           : AppointmentsPage(
               onBack: () => selectTab(0), onOpenSchedule: openSchedule),
       ConsultationHistoryTab(
-          onBack: () => selectTab(0),
-          onOpenAppointments: () => selectTab(1)),
+          onBack: () => selectTab(0), onOpenAppointments: () => selectTab(1)),
       MorePage(onBack: () => selectTab(0)),
     ];
     return Scaffold(

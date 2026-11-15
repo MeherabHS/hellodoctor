@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { api, errorText } from '../lib/client';
+import { Icon } from './Icons';
 
 export function ClinicalAttachment({conversation,message,size}:{conversation:string;message:string;size?:number}) {
   const [image,setImage]=useState('');
@@ -15,7 +16,5 @@ export function ClinicalAttachment({conversation,message,size}:{conversation:str
       setImage(`data:${value.mime_type};base64,${value.base64_content}`);
     } catch(e){setError(errorText(e));} finally{setBusy(false);}
   }
-  return <div className="clinical-attachment"><strong>Clinical image</strong>{size!==undefined&&<span>{(size/1024).toFixed(1)} KiB</span>}<button type="button" className="dw-btn-outline-sm" disabled={busy} onClick={()=>void view()}>{busy?'Opening...':'View image'}</button>{error&&<p role="alert">{error}</p>}{image&&<div role="dialog" aria-modal="true" aria-label="Clinical image" className="clinical-image-dialog"><button type="button" autoFocus onClick={()=>setImage('')}>Close image</button><img src={image} alt="Clinical document shared in this consultation"/></div>}</div>;
+  return <div className="am-attachment"><Icon name="image" size={18}/><span className="am-grow"><strong style={{display:'block',fontSize:13}}>Clinical image</strong>{size!==undefined&&<span style={{fontSize:11.5,opacity:.8}}>{(size/1024).toFixed(1)} KB</span>}</span><button type="button" className="am-btn ghost sm" disabled={busy} onClick={()=>void view()}>{busy?'Opening…':'View'}</button>{error&&<p role="alert">{error}</p>}{image&&<div role="dialog" aria-modal="true" aria-label="Clinical image" className="am-image-view"><img src={image} alt="Clinical image shared in this consultation"/><button type="button" className="am-btn primary" autoFocus onClick={()=>setImage('')}><Icon name="close" size={16}/>Close image</button></div>}</div>;
 }
-
-export function PaperclipIcon(){return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m21 11-9 9a6 6 0 0 1-8.5-8.5l10-10a4 4 0 0 1 5.7 5.7L9 17.4a2 2 0 0 1-2.8-2.8l9.2-9.2"/></svg>;}

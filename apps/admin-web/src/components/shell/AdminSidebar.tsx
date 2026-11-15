@@ -11,6 +11,8 @@ export type AdminPageId =
   | 'slots'
   | 'patients'
   | 'verification'
+  | 'peers'
+  | 'peerDirectory'
   | 'compliance'
   | 'logs'
   | 'grievances'
@@ -42,6 +44,8 @@ export const ADMIN_NAV: NavGroup[] = [
     pages: [
       {id: 'patients', label: 'Patients Directory'},
       {id: 'verification', label: 'Doctor Verification'},
+      {id: 'peers', label: 'Peer Navigators'},
+      {id: 'peerDirectory', label: 'Peer Directory'},
     ],
   },
   {

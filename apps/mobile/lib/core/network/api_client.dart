@@ -381,8 +381,7 @@ class ApiClient {
   final Dio _dio;
   final DeviceProofSigner _proofSigner;
 
-  bool _isSessionEstablishment(String path) =>
-      path.endsWith('/verify-otp') || path.endsWith('/verify-otp-and-login');
+  bool _isSessionEstablishment(String path) => path.endsWith('/verify-otp');
 
   Future<void> _attachDeviceProof(RequestOptions options) async {
     if (!_proofSigner.enabled) return;

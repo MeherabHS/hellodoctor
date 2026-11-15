@@ -25,6 +25,7 @@ import { CampaignNotificationPreview } from './CampaignNotificationPreview';
 import { ArrowLeft, Megaphone, Pencil, Plus, Send } from 'lucide-react';
 import { Card, Chip, EmptyState, PageHead, SearchField, eatDate, type ChipTone } from '../ui/afya';
 import { CAMPAIGN_BODY_MAX, CAMPAIGN_TITLE_MAX, campaignFieldErrors } from '@/lib/campaignValidation';
+import { isUnpublished, stepsBeforePublish } from '@/lib/publishFlow';
 
 // Kenya has a single fixed UTC+3 offset year-round (no DST), so an
 // Africa/Nairobi wall-clock time entered in the schedule picker converts to
@@ -34,8 +35,8 @@ const NAIROBI_OFFSET = '+03:00';
 
 const STATUS_LABEL: Record<CampaignStatus, string> = {
   DRAFT: 'Draft',
-  PENDING_REVIEW: 'Pending review',
-  APPROVED: 'Approved',
+  PENDING_REVIEW: 'Draft',
+  APPROVED: 'Draft',
   SCHEDULED: 'Scheduled',
   SENDING: 'Sending',
   PAUSED: 'Paused',
@@ -44,8 +45,8 @@ const STATUS_LABEL: Record<CampaignStatus, string> = {
 };
 const STATUS_TONE: Record<CampaignStatus, ChipTone> = {
   DRAFT: 'warn',
-  PENDING_REVIEW: 'purple',
-  APPROVED: 'info',
+  PENDING_REVIEW: 'warn',
+  APPROVED: 'warn',
   SCHEDULED: 'info',
   SENDING: 'warn',
   PAUSED: 'neutral',
@@ -253,21 +254,27 @@ export function CampaignManager() {
     }
   }
 
-  /// Combined submit→approve→send-now path for an authorized Admin who does
-  /// not need another person's separate approval — campaigns have no
-  /// author-based approval restriction on the backend (unlike sensitive
-  /// articles), so any Admin holding ManageCampaigns may already approve
-  /// their own submission one step at a time; this only collapses that into
-  /// one click instead of three separate round trips. Each step re-reads
-  /// the freshest id/version the previous step returned, since every
-  /// transition is optimistic-concurrency-guarded server-side.
+  /// The Admin publishes directly; there is no review step in the UI
+  /// (lib/publishFlow). Runs the backend's remaining internal steps from the
+  /// campaign's current state; each step uses the freshest id/version the
+  /// previous one returned (every transition is version-guarded server-side).
+  async function readyToSchedule(campaign: Campaign): Promise<Campaign> {
+    let updated = campaign;
+    for (const step of stepsBeforePublish(updated.status)) {
+      updated = step === 'submit'
+        ? await submitCampaign(updated.id, updated.version)
+        : await approveCampaign(updated.id, updated.version);
+      setSelected(updated);
+    }
+    return updated;
+  }
+
   async function publishCampaignNow() {
     if (!selected) return;
     setBusy(true);
     setActionError('');
     try {
-      let updated = await submitCampaign(selected.id, selected.version);
-      updated = await approveCampaign(updated.id, updated.version);
+      let updated = await readyToSchedule(selected);
       updated = await scheduleCampaign(updated.id, updated.version, new Date().toISOString());
       setSelected(updated);
       setContent({
@@ -300,7 +307,8 @@ export function CampaignManager() {
     setBusy(true);
     setActionError('');
     try {
-      const updated = await scheduleCampaign(selected.id, selected.version, scheduledForUtc);
+      const ready = await readyToSchedule(selected);
+      const updated = await scheduleCampaign(ready.id, ready.version, scheduledForUtc);
       setSelected(updated);
       await loadList();
     } catch (e) {
@@ -424,21 +432,19 @@ export function CampaignManager() {
               )}
             </section>
 
-            {selected && ['APPROVED', 'SCHEDULED'].includes(selected.status) && (
+            {selected && (isUnpublished(selected.status) || selected.status === 'SCHEDULED') && (
               <Card title="Schedule" subtitle="Africa/Nairobi time (UTC+3).">
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input className="afya-input" style={{ width: 230 }} type="datetime-local" aria-label="Send at" value={scheduleLocal} onChange={(e) => setScheduleLocal(e.target.value)} />
                   <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void doSchedule(false)}>{selected.status === 'SCHEDULED' ? 'Reschedule' : 'Schedule for later'}</button>
-                  <button type="button" className="afya-btn-primary" disabled={busy} onClick={() => void doSchedule(true)}><Send size={15} aria-hidden />Send now</button>
+                  {selected.status === 'SCHEDULED' && <button type="button" className="afya-btn-primary" disabled={busy} onClick={() => void doSchedule(true)}><Send size={15} aria-hidden />Send now</button>}
                 </div>
               </Card>
             )}
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               {canEditContent && <button type="button" className="afya-btn-outline-green" disabled={busy} onClick={() => void saveDraft()}>{selectedId === 'new' ? 'Save Draft' : 'Save changes'}</button>}
-              {selected && selected.status === 'DRAFT' && <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void runTransition(submitCampaign)}>Submit for review</button>}
-              {selected && selected.status === 'DRAFT' && <button type="button" className="afya-btn-primary" disabled={busy} onClick={() => void publishCampaignNow()}><Send size={15} aria-hidden />Publish now</button>}
-              {selected && selected.status === 'PENDING_REVIEW' && <button type="button" className="afya-btn-primary" disabled={busy} onClick={() => void runTransition(approveCampaign)}>Approve</button>}
+              {selected && isUnpublished(selected.status) && <button type="button" className="afya-btn-primary" disabled={busy} onClick={() => void publishCampaignNow()}><Send size={15} aria-hidden />Publish now</button>}
               {selected && selected.status === 'PAUSED' && <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void runTransition(resumeCampaign)}>Resume</button>}
               {selected && ['SCHEDULED', 'SENDING'].includes(selected.status) && <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void runTransition(pauseCampaign)}>Pause</button>}
               {selected && !['COMPLETED', 'CANCELLED'].includes(selected.status) && <button type="button" className="afya-btn-danger" disabled={busy} onClick={() => void doCancel()}>Cancel campaign</button>}

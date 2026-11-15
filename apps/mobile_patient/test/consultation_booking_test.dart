@@ -87,11 +87,20 @@ void main() {
   final cases = <(String, String, String, String)>[
     ('CONFIRMED', 'CHAT', 'Consultation confirmed', 'Open chat waiting room'),
     ('CONFIRMED', 'VIDEO', 'Consultation confirmed', 'Open waiting room'),
-    ('IN_CONSULTATION', 'VIDEO', 'Consultation in progress', 'Open waiting room'),
+    (
+      'IN_CONSULTATION',
+      'VIDEO',
+      'Consultation in progress',
+      'Open waiting room'
+    ),
     ('COMPLETED', 'CHAT', 'Consultation completed', 'View outcome'),
     ('CANCELLED', 'CHAT', 'This consultation is closed', 'View messages'),
-    ('PENDING_PAYMENT', 'CHAT', 'This booking is not active',
-        'Book a new consultation'),
+    (
+      'PENDING_PAYMENT',
+      'CHAT',
+      'This booking is not active',
+      'Book a new consultation'
+    ),
   ];
   for (final (status, modality, title, action) in cases) {
     testWidgets('$status $modality shows its real state and no payment text',

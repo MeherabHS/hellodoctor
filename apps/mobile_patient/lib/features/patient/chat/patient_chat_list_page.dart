@@ -11,6 +11,8 @@ import '../directory/patient_directory_page.dart';
 import '../home/home_cubit.dart';
 import '../home/home_models.dart';
 import '../modules/afya_module_widgets.dart';
+import '../peer/peer_pages.dart';
+import '../peer/peer_repository.dart';
 import '../profile/family_profiles_cubit.dart';
 import '../profile/profile_cubit.dart';
 import 'chat_repository.dart';
@@ -24,6 +26,8 @@ Widget buildPatientMessagesTab(BuildContext context) {
   final userId = context.read<ProfileCubit>().state.profile?.userId;
   return PatientChatListPage(
       repo: ChatRepository(home.api, connectivity: home.connectivity),
+      peerRepo:
+          PatientPeerRepository(home.api, connectivity: home.connectivity),
       familyProfilesCubit: family,
       myUserId: userId,
       onBook: (context) => Navigator.push(
@@ -43,8 +47,13 @@ class PatientChatListPage extends StatefulWidget {
       required this.repo,
       required this.familyProfilesCubit,
       required this.onBook,
+      this.peerRepo,
       this.myUserId});
   final ChatRepository repo;
+
+  /// Peer Navigator chats, listed with the doctor chats (they never close,
+  /// so they always sit under Active).
+  final PatientPeerRepository? peerRepo;
   final FamilyProfilesCubit familyProfilesCubit;
   final void Function(BuildContext) onBook;
   final String? myUserId;
@@ -54,6 +63,7 @@ class PatientChatListPage extends StatefulWidget {
 
 class _PatientChatListPageState extends State<PatientChatListPage> {
   List<AppointmentSummaryDto> appointments = [];
+  List<PeerChatSummaryDto> peerChats = [];
   bool loading = true, past = false, hasMore = false, loadingMore = false;
   int pageDepth = 1;
   String? error;
@@ -90,6 +100,7 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
           hasMore = false;
           loadingMore = false;
           appointments = [];
+          peerChats = [];
           loading = true;
         });
         refresh();
@@ -123,8 +134,10 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
         more = batch.length == 100;
         if (!more) break;
       }
+      final peers = await _peerChats();
       if (mounted && version == generation) {
         setState(() {
+          peerChats = peers;
           appointments = next;
           pageDepth = (next.length / 100).ceil().clamp(1, depth);
           hasMore = more;
@@ -144,6 +157,94 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
       }
     }
   }
+
+  /// The account holder's peer chats; none while a dependant is active.
+  /// A peer-chat failure never hides the doctor chats.
+  Future<List<PeerChatSummaryDto>> _peerChats() async {
+    final peer = widget.peerRepo;
+    final active = widget.familyProfilesCubit.state.activeProfile;
+    if (peer == null || (active != null && !active.isSelf)) return const [];
+    try {
+      return await peer.chats();
+    } catch (_) {
+      return peerChats;
+    }
+  }
+
+  Future<void> _openPeer(PeerChatSummaryDto c) async {
+    await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => PatientPeerChatPage(
+                repo: widget.peerRepo!,
+                bookingRepo: BookingRepository(widget.repo.api,
+                    connectivity: widget.repo.connectivity),
+                chatId: c.id,
+                requestId: c.requestId,
+                peerName: c.peerName,
+                requestStatus: c.requestStatus,
+                myUserId: widget.myUserId)));
+    if (mounted) refresh();
+  }
+
+  Widget _peerCard(AppLocalizations l, PeerChatSummaryDto c) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: AfyaCard(
+          key: ValueKey('peer-chat-${c.id}'),
+          onTap: () => _openPeer(c),
+          padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
+          child: Row(children: [
+            AfyaInitialsAvatar(name: c.peerName, size: 46),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(c.peerName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w700,
+                            color: PatientTokens.navy)),
+                    if ((c.lastMessage ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(c.lastMessage!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12.5, color: PatientTokens.ink)),
+                    ],
+                    const SizedBox(height: 6),
+                    Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          StatusChip(peerStatusLabel(l, c.requestStatus)),
+                          Text(l.messagesPeerSupport,
+                              style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: PatientTokens.textSub)),
+                        ]),
+                  ]),
+            ),
+            if (c.unread > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                    color: PatientTokens.primaryDark,
+                    borderRadius: BorderRadius.circular(10)),
+                child: Text('${c.unread}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700)),
+              ),
+            const Icon(Icons.chevron_right_rounded, color: PatientTokens.navy),
+          ]),
+        ),
+      );
 
   @override
   void didChangeDependencies() {
@@ -231,11 +332,14 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
                       if (!loading &&
                           error == null &&
                           visible.isEmpty &&
+                          (past || peerChats.isEmpty) &&
                           !hasMore)
                         AfyaUnavailableNote(
                             icon: Icons.chat_bubble_outline_rounded,
                             title: l.messagesEmptyTitle,
                             body: l.messagesEmptyBody),
+                      if (!past)
+                        for (final c in peerChats) _peerCard(l, c),
                       for (final a in visible)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),

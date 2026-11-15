@@ -56,7 +56,8 @@ void main() {
     await family.close();
   });
 
-  testWidgets('a legacy paid consultation shows no fee either (payment-free app)',
+  testWidgets(
+      'a legacy paid consultation shows no fee either (payment-free app)',
       (tester) async {
     addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     final repo = _FixedChatRepository([

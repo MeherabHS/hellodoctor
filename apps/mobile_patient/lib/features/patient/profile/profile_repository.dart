@@ -75,6 +75,7 @@ class ProfileRepository {
     String? weightKg,
     String? emergencyContactPhone,
     String? emergencyContactRelation,
+    String? residentialAddress,
   }) async {
     try {
       requireOnline();
@@ -88,6 +89,8 @@ class ProfileRepository {
           'emergency_contact_phone': emergencyContactPhone,
         if (emergencyContactRelation != null)
           'emergency_contact_relation': emergencyContactRelation,
+        if (residentialAddress != null)
+          'residential_address': residentialAddress,
       });
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,

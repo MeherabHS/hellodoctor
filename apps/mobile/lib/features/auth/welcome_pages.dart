@@ -4,6 +4,8 @@ import '../../app.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/validation/kenya_phone.dart';
 import '../../core/widgets/afya_auth_widgets.dart';
+import '../../core/network/api_client.dart';
+import '../peer/peer_repository.dart';
 import 'auth_cubit.dart';
 
 /// Signed-out entry screen and the Peer Navigator application form, built to
@@ -119,8 +121,11 @@ class WelcomePage extends StatelessWidget {
                                           title: 'Register as Peer Navigator',
                                           subtitle:
                                               'Offer guidance, support and linkage to care services.',
-                                          onTap: () => _open(context,
-                                              const PeerRegistrationPage())),
+                                          onTap: () => _open(
+                                              context,
+                                              PeerRegistrationPage(
+                                                  repo: PeerRepository(
+                                                      auth.api)))),
                                     ])),
                                 const SizedBox(height: 14),
                                 const Padding(
@@ -267,7 +272,11 @@ const kenyaCounties = [
 /// asks for no KMPDC number, licence, specialty or any other clinical
 /// credential, by design.
 class PeerRegistrationPage extends StatefulWidget {
-  const PeerRegistrationPage({super.key});
+  const PeerRegistrationPage({super.key, required this.repo});
+
+  /// Peer sign-up and the three Peer documents (Terms, Privacy Notice,
+  /// Confidentiality, Conduct & Safeguarding Agreement).
+  final PeerRepository repo;
   @override
   State<PeerRegistrationPage> createState() => _PeerRegistrationState();
 }
@@ -281,6 +290,30 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
       facility = TextEditingController();
   String? location, error;
   bool agreed = false, hide = true, hideConfirm = true, checked = false;
+  bool busy = false;
+  List<Map<String, dynamic>>? documents;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.repo.peerDocuments().then((docs) {
+      if (mounted) setState(() => documents = docs);
+    }).catchError((Object _) {
+      if (mounted) setState(() => documents = const []);
+    });
+  }
+
+  void _readDocument(Map<String, dynamic> doc) => showDialog<void>(
+      context: context,
+      builder: (c) => AlertDialog(
+              title: Text(doc['title']?.toString() ?? 'Document'),
+              content: SingleChildScrollView(
+                  child: Text(doc['body']?.toString() ?? '')),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(c),
+                    child: const Text('Close'))
+              ]));
 
   @override
   void dispose() {
@@ -310,17 +343,38 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
     if (p != confirm.text) return 'Passwords do not match.';
     if (location == null) return 'Select your location.';
     if (!agreed) {
-      return 'Accept the Terms of Service and Privacy Policy to continue.';
+      return 'Read and accept the Peer Navigator documents to continue.';
     }
     return null;
   }
 
-  void _submit() {
-    final problem = _validate();
-    setState(() {
-      error = problem;
-      checked = problem == null;
-    });
+  Future<void> _submit() async {
+    final problem = _validate() ??
+        ((documents ?? const []).length < 3
+            ? 'The Peer Navigator documents could not be loaded. Check your connection and try again.'
+            : null);
+    setState(() => error = problem);
+    if (problem != null || busy) return;
+    setState(() => busy = true);
+    try {
+      await widget.repo.register(
+          fullName: name.text.trim(),
+          email: email.text.trim().toLowerCase(),
+          phone: normalizeKenyaPhone(phone.text)!,
+          password: password.text,
+          county: location!,
+          organization: facility.text,
+          acceptedDocuments: documents!);
+      if (mounted) setState(() => checked = true);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => error = e.userMessage);
+    } catch (_) {
+      if (mounted) {
+        setState(() => error = 'Unable to register right now. Please retry.');
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   Widget _label(String text, {String? suffix, bool required = false}) =>
@@ -352,9 +406,9 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
           backgroundColor: DoctorTokens.screen,
           body: AfyaReviewStatusView(
               icon: Icons.groups_outlined,
-              title: 'Applications are not open yet',
+              title: 'Application submitted',
               message:
-                  'Peer Navigator registration is being prepared. Nothing was submitted and no account was created. Please check back soon.',
+                  'Thank you. An AfyaMkononi Admin will review your Peer Navigator application. Sign in with your email and password to check its status.',
               steps: const [],
               primaryLabel: 'Back',
               onPrimary: () => Navigator.pop(context)));
@@ -500,7 +554,30 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
                                                 'Facility or organization name',
                                             icon: Icons.apartment_outlined,
                                             maxLength: 150),
-                                        const SizedBox(height: 8),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                            'Peer Navigator documents (required)',
+                                            style: TextStyle(
+                                                fontWeight: FontWeight.w800,
+                                                color: DoctorTokens.navy)),
+                                        if (documents == null)
+                                          const Padding(
+                                              padding: EdgeInsets.all(8),
+                                              child: LinearProgressIndicator())
+                                        else
+                                          for (final doc in documents!)
+                                            TextButton.icon(
+                                                style: TextButton.styleFrom(
+                                                    alignment:
+                                                        Alignment.centerLeft),
+                                                onPressed: () =>
+                                                    _readDocument(doc),
+                                                icon: const Icon(
+                                                    Icons.description_outlined,
+                                                    size: 18),
+                                                label: Text(
+                                                    doc['title']?.toString() ??
+                                                        '')),
                                         Row(children: [
                                           Checkbox(
                                               value: agreed,
@@ -510,29 +587,8 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
                                           const Expanded(
                                               child: Text.rich(
                                                   TextSpan(
-                                                      text: 'I agree to the ',
-                                                      children: [
-                                                        TextSpan(
-                                                            text:
-                                                                'Terms of Service',
-                                                            style: TextStyle(
-                                                                color: DoctorTokens
-                                                                    .primaryDark,
-                                                                decoration:
-                                                                    TextDecoration
-                                                                        .underline)),
-                                                        TextSpan(text: ' and '),
-                                                        TextSpan(
-                                                            text:
-                                                                'Privacy Policy',
-                                                            style: TextStyle(
-                                                                color: DoctorTokens
-                                                                    .primaryDark,
-                                                                decoration:
-                                                                    TextDecoration
-                                                                        .underline)),
-                                                        TextSpan(text: '.'),
-                                                      ]),
+                                                      text:
+                                                          'I have read and agree to the Peer Navigator Terms, Privacy Notice and Confidentiality, Conduct & Safeguarding Agreement.'),
                                                   style: TextStyle(
                                                       fontSize: 14.5,
                                                       color: DoctorTokens
@@ -541,7 +597,8 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
                                         const SizedBox(height: 8),
                                         AfyaPrimaryButton(
                                             label: 'Register as Peer Navigator',
-                                            onPressed: _submit),
+                                            busy: busy,
+                                            onPressed: busy ? null : _submit),
                                         if (error != null)
                                           AfyaFormError(error!),
                                       ])),

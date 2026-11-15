@@ -1,8 +1,24 @@
 # CHECKPOINT — exact resume point for a new Claude Code session
 
-Updated 2026-11-13 (evening). Read `progress.md` Task 8 first.
+Updated 2026-11-14. Read `progress.md` Task 9 first.
 
-## Latest: Facilities & Services, education topics, password reset (Task 8)
+## Latest: Admin Web complete and committed (Task 9) — next is Doctor Web
+
+Commit `54f8582` on `fix/p0-consultation-repair` holds the Admin Web redesign and everything added on 2026-11-14: Admin Team (invitations with password confirmation), Activity Log, pop-up notifications, Admin forgot password, Q&A audit, grievance appeals, removal of "Simulate failure", security hardening (privilege sweep, sanitization, ASCII emails, no-store default, proxy path guard, HSTS) and soft caching. Details: `progress.md` Task 9, `docs/admin-ui/ADMIN_REDESIGN_PLAN.md`, `docs/API_SPEC.md` (§8 and the 2026-11-14 sections at its end). Screenshots: `docs/admin-ui/screenshots/`.
+
+**Next: Doctor Web (`apps/doctor-web`).** Per CLAUDE.md rule 2 the `index.html` prototype stays its visual source of truth, unchanged: no redesign. Start by reading the prototype's Doctor Web screens, `docs/VISUAL_FIDELITY.md` and the Doctor Web parts of `docs/SCREEN_INVENTORY.md` / `docs/USER_FLOWS.md`, then compare with the running app before changing anything. Backend protections added for Admin (sanitization helpers, `normalize_email`, `Cache-Control: no-store`, content cache) already apply to Doctor Web traffic.
+
+**Still uncommitted (deliberately):** Doctor Flutter work in `apps/mobile/**`, the Doctor Rx dispatch changes in `consultation_service.rs` / `prescription_service.rs` and their test in `tests/api_tests.rs` (47-line hunk), `docs/doctor-ui/consultation-schedule.md`, two doctor schedule reference images, the stray Android project at the repo root (`app/`, `gradle*`, `.gradle/`, `local.properties`, `*.gradle.kts`), the Patient UI `.docx`, an empty `services/backend/abac.rs`, and these two docs.
+
+**Local environment:**
+- Backend: run the scratchpad launcher `run_backend_azurite.ps1` (sets Azurite storage, `FINANCIAL_MODULE_MODE=deferred`, `PASSWORD_RESET_ENABLED=true`, and `CARGO_TARGET_DIR` to the scratchpad `cargo-target` so it does not rebuild on C:). After adding a migration, restart it and run `services/backend/scripts/verify_backend_schema.ps1` (dev DB is at `20261216000001`).
+- Docker: `hellodoctor-postgres`, `hellodoctor-redis`, `hd-azurite`, and the test Redis `hd-test-redis-p0repair` (port 6390; must be running for integration tests; `TEST_REDIS_FIXTURE_ID=final-remediation-p0-20261113`). Run backend integration suites with `--test-threads=1`.
+- Admin Web dev server on `http://127.0.0.1:3000`; dev Admin `admin@hellodoctor.health`. Repeated scripted runs trip the per-IP login limit (5 per 15 minutes) and the invite reauth lockout by design.
+- Optional `EMAIL_ADMIN_WEB_URL` sets the invitation link base (production `https://admin.afyamkononi.app`).
+
+---
+
+## Earlier: Facilities & Services, education topics, password reset (Task 8, committed `4633445`)
 
 Everything is uncommitted on `fix/p0-consultation-repair`. Facilities & Services is implemented end to end (Admin Web, backend, Patient app) and verified on the emulator (tests A–F in `docs/facilities/FACILITIES_IMPLEMENTATION_REPORT.md`). The HIV Prevention & Sexual Health topics, videos and quizzes are in `docs/patient-ui/EDUCATION_TOPICS.md`. The re-checked gap list is `docs/patient-ui/PATIENT_REMEDIATION_GAP_MAP.md`.
 

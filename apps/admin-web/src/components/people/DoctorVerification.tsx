@@ -1,15 +1,17 @@
 'use client';
 import {useEffect,useMemo,useState,type ReactNode} from 'react';
-import {ArrowLeft,BadgeCheck,Building2,Clock,Eye,MapPin,Stethoscope,UserCheck,Users,XCircle} from 'lucide-react';
-import {getAdminDoctors,getDoctorDossier,type AdminDoctor,type PendingDoctorVerification} from '../../lib/api';
+import {ArrowLeft,BadgeCheck,Building2,Clock,Eye,FileText,MapPin,Stethoscope,UserCheck,Users,XCircle} from 'lucide-react';
+import {getAdminDoctors,getDoctorDossier,getVerificationSubmissions,type AdminDoctor,type PendingDoctorVerification,type VerificationSubmission} from '../../lib/api';
+import {buildSearchIndex,searchIndex} from '../../lib/searchIndex';
 import {Card,Chip,EmptyState,PageHead,Pagination,SearchField,StatTile,Tabs,eatDate,type ChipTone} from '../ui/afya';
 import {initialsOf} from './PatientsDirectory';
 
 /**
  * People & Care → Doctor Verification (People & Care board, panels 3–5):
  * queue, application review and clinician detail. Approval and rejection use
- * the existing handlers and endpoints. No document store, Request Changes,
- * messaging or photos exist, so none are shown (product owner, 2026-11-14).
+ * the existing handlers and endpoints. Doctors may upload supporting documents
+ * and resubmit after a rejection (Doctor Web redesign, 2026-11-14); those are
+ * shown read-only here. No Request Changes, messaging or photos exist.
  */
 type Status='PENDING'|'VERIFIED'|'REJECTED';
 type TabId=Status|'ALL';
@@ -34,10 +36,12 @@ export function DoctorVerification({queue,busy,onSelect,onDecide}:{queue:Pending
   const rows=useMemo(()=>{const pendingIds=new Set(queue.map(q=>q.id));
     return [...queue.map(fromPending),...(doctors??[]).filter(d=>!pendingIds.has(d.id)&&d.professional_verification_status!=='PENDING').map(fromDoctor)];},[queue,doctors]);
   const count=(s:Status)=>rows.filter(r=>r.status===s).length;
-  const filtered=rows.filter(r=>(tab==='ALL'||r.status===tab)&&(!search.trim()||`${r.name} ${r.license} ${r.hospital} ${r.specialty}`.toLowerCase().includes(search.trim().toLowerCase())));
+  // Indexed once per load: name, KMPDC number, hospital and specialty.
+  const index=useMemo(()=>buildSearchIndex(rows,r=>[r.name,r.license,r.hospital,r.specialty,r.phone]),[rows]);
+  const filtered=searchIndex(index,search).filter(r=>tab==='ALL'||r.status===tab);
   const open=rows.find(r=>r.id===openId)??null;
 
-  function openRow(r:Row){if(r.status==='PENDING')onSelect(r.id);setOpenId(r.id);}
+  function openRow(r:Row){if(r.status==='PENDING')onSelect(r.id);setOpenId(r.id)}
   async function decide(action:'approve'|'reject'){
     if(action==='reject'&&!window.confirm('Reject this application? The doctor will not be able to consult until a new review.'))return;
     await onDecide(action);setOpenId(null);setRevision(v=>v+1);
@@ -110,6 +114,7 @@ function ApplicationReview({row,busy,onBack,onDecide}:{row:Row;busy:boolean;onBa
     <button type="button" className="afya-back-link" onClick={onBack}><ArrowLeft size={16} aria-hidden/>Back to Verification Queue</button>
     <ProfileHead row={row}/>
     <RegistrationCards row={row}/>
+    <SubmittedDocuments doctorId={row.id}/>
     <p className="afya-stat-note" style={{margin:0}}>Submitted {eatDate(row.submitted)}. Check the registration number against the KMPDC register before approving.</p>
     <div style={{display:'flex',justifyContent:'flex-end',gap:10}}>
       <button type="button" className="afya-btn-danger" disabled={busy} onClick={()=>onDecide('reject')}><XCircle size={16} aria-hidden/>Reject</button>
@@ -131,11 +136,26 @@ function ClinicianDetail({row,onBack}:{row:Row;onBack:()=>void}){
       {tab==='overview'&&<><div className="afya-stat-grid" style={{marginBottom:16}}>
           <StatTile icon={Users} tone="green" value={d?.consultations_count??'—'} label="Completed consultations"/>
           <StatTile icon={UserCheck} tone={d?.is_on_duty?'green':'neutral'} value={d?.is_on_duty?'On duty':'Off duty'} label="Availability now"/>
-        </div><RegistrationCards row={row}/></>}
+        </div><RegistrationCards row={row}/><div style={{marginTop:16}}><SubmittedDocuments doctorId={row.id}/></div></>}
       {tab==='history'&&(failed?<EmptyState title="Consultation history could not be loaded"/>:!history?<EmptyState title="Loading…"/>:history.length?<ol className="afya-timeline">{history.map(e=><li key={e.appointment_id}>
         <div className="afya-timeline-head"><strong>{eatDate(e.created_at)} · {e.modality==='VIDEO'?'Video consultation':'24h chat consultation'}</strong><Chip tone={e.status==='COMPLETED'?'success':'neutral'}>{title(e.status)}</Chip></div>
         <div className="afya-stat-note">{e.patient_name}{e.appointment_number?` · ${e.appointment_number}`:''}{e.clinical_outcome?` · ${title(e.clinical_outcome)}`:''}</div>
       </li>)}</ol>:<EmptyState title="No consultations yet"/>)}
     </section>
   </div>;
+}
+
+/** Supporting documents and resubmission notes; files open through the audited binary route. */
+function SubmittedDocuments({doctorId}:{doctorId:string}){
+  const [rows,setRows]=useState<VerificationSubmission[]|null>(null);const [failed,setFailed]=useState(false);
+  useEffect(()=>{let active=true;getVerificationSubmissions(doctorId).then(r=>{if(active)setRows(r);}).catch(()=>{if(active)setFailed(true);});return()=>{active=false;};},[doctorId]);
+  return <Card title="Submitted documents">
+    {failed?<EmptyState title="Documents could not be loaded"/>:!rows?<EmptyState title="Loading…"/>:!rows.length?<EmptyState title="No documents uploaded">The doctor has not uploaded supporting documents.</EmptyState>:
+    <ol className="afya-timeline">{rows.map(s=><li key={s.id}>
+      <div className="afya-timeline-head"><strong>{eatDate(s.created_at)}</strong><Chip tone={s.previous_status==='REJECTED'?'warn':'neutral'}>{s.previous_status==='REJECTED'?'Resubmitted after rejection':'Added while pending'}</Chip></div>
+      {s.previous_note&&<div className="afya-stat-note">Earlier rejection reason: {s.previous_note}</div>}
+      {s.message&&<div className="afya-stat-note">Doctor&apos;s note: {s.message}</div>}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>{s.documents.map((d,i)=><a key={d.id} className="afya-btn-secondary" href={`/api/verification-documents?doctor_id=${encodeURIComponent(doctorId)}&document_id=${encodeURIComponent(d.id)}`} target="_blank" rel="noopener noreferrer"><FileText size={15} aria-hidden/>{d.mime_type==='application/pdf'?'PDF':'Image'} {i+1} · {Math.ceil(d.size_bytes/1024)} KB</a>)}</div>
+    </li>)}</ol>}
+  </Card>;
 }

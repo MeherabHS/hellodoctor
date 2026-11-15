@@ -244,6 +244,28 @@ async fn resolve_and_render(
                 &state.email_assets,
             )))
         }
+        "PEER_APPLICATION_RECEIVED"
+        | "PEER_APPROVED"
+        | "PEER_REJECTED"
+        | "PEER_SUSPENDED"
+        | "PEER_REINSTATED" => {
+            let Some(peer) =
+                crate::repository::peer_repo::find_by_id(&state.system_db, claim.related_entity_id)
+                    .await?
+            else {
+                return Ok(None);
+            };
+            let assets = &state.email_assets;
+            Ok(Some(match claim.email_type.as_str() {
+                "PEER_APPLICATION_RECEIVED" => {
+                    tmpl::render_peer_application_received(&peer.full_name, assets)
+                }
+                "PEER_APPROVED" => tmpl::render_peer_approved(&peer.full_name, assets),
+                "PEER_REJECTED" => tmpl::render_peer_rejected(&peer.full_name, assets),
+                "PEER_SUSPENDED" => tmpl::render_peer_suspended(&peer.full_name, assets),
+                _ => tmpl::render_peer_reinstated(&peer.full_name, assets),
+            }))
+        }
         "CONSULTATION_CONFIRMED" => {
             resolve_consultation_confirmed(state, claim.related_entity_id).await
         }

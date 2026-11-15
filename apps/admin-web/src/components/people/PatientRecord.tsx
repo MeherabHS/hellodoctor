@@ -1,7 +1,9 @@
 'use client';
-import {useState,type ReactNode} from 'react';
-import {ArrowLeft,Download,FileText,ShieldAlert} from 'lucide-react';
+import {useEffect,useMemo,useState,type ReactNode} from 'react';
+import {ArrowLeft,Download,FileText,HeartHandshake,ShieldAlert} from 'lucide-react';
 import type {PatientRecordItem} from '../../data/adminStore';
+import {getAdminPatientPeerSessions,type AdminPatientPeerSession} from '../../lib/api';
+import {SESSION_STATUS} from './PeerDirectory';
 import {Card,Chip,EmptyState,Tabs,eatDate,type ChipTone} from '../ui/afya';
 import {ACTIVITY_CHIP,activityOf,ageFrom,genderLabel,initialsOf} from './PatientsDirectory';
 
@@ -9,6 +11,10 @@ import {ACTIVITY_CHIP,activityOf,ageFrom,genderLabel,initialsOf} from './Patient
  * People & Care → patient record (People & Care board, panel 2): profile,
  * visit timeline, consultations and uploaded documents. No conditions, care
  * plan, risk level, prescriptions or chat (product owner, 2026-11-14).
+ * Peer Navigator sessions are listed with the doctor consultations
+ * (2026-11-15): date, peer, chat or call, status. Never the topic the patient
+ * wrote or any message. Opening the record is audited by the server when it
+ * loads the patient's dossier.
  */
 type Tab='timeline'|'consultations'|'attachments';
 const OUTCOME:Record<string,{tone:ChipTone;label:string}>={
@@ -21,16 +27,26 @@ const STATUS_TONE:Record<string,ChipTone>={COMPLETED:'success',CANCELLED:'neutra
 const title=(s:string)=>s?s.charAt(0)+s.slice(1).toLowerCase().replaceAll('_',' '):'—';
 const modality=(m:string)=>m==='VIDEO'?'Video consultation':m==='CHAT'?'24h chat consultation':title(m);
 
-export function PatientRecord({patient,onBack,onExport,onErase,busy}:{patient:PatientRecordItem;onBack:()=>void;onExport:()=>void;onErase:()=>void;busy:boolean}){
+export function PatientRecord({patient,onBack,onExport,onErase,busy,loadPeerSessions=getAdminPatientPeerSessions}:{patient:PatientRecordItem;onBack:()=>void;onExport:()=>void;onErase:()=>void;busy:boolean;loadPeerSessions?:(patientId:string)=>Promise<AdminPatientPeerSession[]>}){
   const [tab,setTab]=useState<Tab>('timeline');
+  const patientId=patient.backendId??patient.key;
+  const [peerSessions,setPeerSessions]=useState<AdminPatientPeerSession[]>([]);
+  const [peerError,setPeerError]=useState(false);
+  useEffect(()=>{let active=true;loadPeerSessions(patientId).then(r=>{if(active){setPeerSessions(r);setPeerError(false);}}).catch(()=>{if(active)setPeerError(true);});return()=>{active=false;};},[patientId,loadPeerSessions]);
   const visits=[...(patient.visits??[])].sort((a,b)=>(b.createdAt??'').localeCompare(a.createdAt??''));
+  // Doctor consultations and peer sessions on one timeline, newest first.
+  const timeline=useMemo(()=>[
+    ...visits.map(v=>({kind:'doctor' as const,at:v.createdAt??'',v})),
+    ...peerSessions.map(p=>({kind:'peer' as const,at:p.start_time,p})),
+  ].sort((a,b)=>b.at.localeCompare(a.at)),[visits,peerSessions]);
+  const peerDone=peerSessions.filter(p=>p.status==='COMPLETED').length;
   const docs=patient.vaultRecords??[];
   const [now]=useState(()=>Date.now());
   const age=ageFrom(patient.dateOfBirth,now);const activity=ACTIVITY_CHIP[activityOf(patient,now)];
   const summary:[string,ReactNode][]=[
     ['Patient ID',patient.id],['Gender',genderLabel(patient.gender)],['Date of birth',patient.dateOfBirth?`${eatDate(patient.dateOfBirth)}${age!==null?` (${age} years)`:''}`:'—'],
     ['Registered',eatDate(patient.registeredAt)],['Last visit',eatDate(patient.lastConsultAt)],
-    ['Consultations',`${patient.consultationsCount??0} (${patient.videoVisits??0} video, ${patient.chatSessions??0} chat)`],['Documents',String(docs.length)],
+    ['Consultations',`${patient.consultationsCount??0} (${patient.videoVisits??0} video, ${patient.chatSessions??0} chat)`],['Peer sessions',`${peerSessions.length} (${peerDone} completed)`],['Documents',String(docs.length)],
   ];
 
   return <div className="afya-stack">
@@ -52,15 +68,24 @@ export function PatientRecord({patient,onBack,onExport,onErase,busy}:{patient:Pa
         <dl className="afya-dl">{summary.map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
       </Card>
       <section className="admin-card">
-        <Tabs label="Patient record" value={tab} onChange={setTab} items={[{id:'timeline',label:'Visits & Timeline'},{id:'consultations',label:'Consultations',count:visits.length},{id:'attachments',label:'Attachments',count:docs.length}]}/>
-        {tab==='timeline'&&(visits.length?<ol className="afya-timeline">{visits.map(v=>{const out=v.outcome?OUTCOME[v.outcome]:null;return <li key={v.appointmentId}>
+        <Tabs label="Patient record" value={tab} onChange={setTab} items={[{id:'timeline',label:'Visits & Timeline'},{id:'consultations',label:'Consultations',count:visits.length+peerSessions.length},{id:'attachments',label:'Attachments',count:docs.length}]}/>
+        {tab==='timeline'&&(timeline.length?<ol className="afya-timeline">{timeline.map(item=>{if(item.kind==='peer'){const p=item.p;const st=SESSION_STATUS[p.status];return <li key={`peer-${p.request_id}`}>
+          <div className="afya-timeline-head"><strong style={{display:'inline-flex',alignItems:'center',gap:6}}><HeartHandshake size={15} aria-hidden/>{eatDate(p.start_time)} · Peer support {p.support_type==='CALL'?'call':'chat'}</strong><Chip tone={st.tone}>{st.label}</Chip></div>
+          <div className="afya-stat-note">With {p.peer_name} (Peer Navigator){p.messages?` · ${p.messages} messages`:''}</div>
+        </li>;}const v=item.v;const out=v.outcome?OUTCOME[v.outcome]:null;return <li key={v.appointmentId}>
           <div className="afya-timeline-head"><strong>{eatDate(v.createdAt)} · {modality(v.modality)}</strong>{out?<Chip tone={out.tone}>{out.label}</Chip>:<Chip tone={STATUS_TONE[v.status]??'neutral'}>{title(v.status)}</Chip>}</div>
           <div className="afya-stat-note">With {v.doctor}{v.appointmentNumber?` · ${v.appointmentNumber}`:''}</div>
-        </li>;})}</ol>:<EmptyState title="No visits yet">Consultations appear here once booked.</EmptyState>)}
+        </li>;})}</ol>:<EmptyState title="No visits yet">Consultations and peer support sessions appear here once booked.</EmptyState>)}
         {tab==='consultations'&&<div className="afya-table-wrap"><table className="admin-table">
           <thead><tr><th>Date</th><th>Reference</th><th>Doctor</th><th>Type</th><th>Status</th><th>Outcome</th></tr></thead>
           <tbody>{visits.map(v=><tr key={v.appointmentId}><td style={{whiteSpace:'nowrap'}}>{eatDate(v.createdAt)}</td><td>{v.appointmentNumber||'—'}</td><td>{v.doctor}</td><td>{v.modality==='VIDEO'?'Video':v.modality==='CHAT'?'Chat':title(v.modality)}</td><td><Chip tone={STATUS_TONE[v.status]??'neutral'}>{title(v.status)}</Chip></td><td>{v.outcome?OUTCOME[v.outcome]?.label??title(v.outcome):'—'}</td></tr>)}</tbody>
-        </table>{!visits.length&&<EmptyState title="No consultations yet"/>}</div>}
+        </table>{!visits.length&&<EmptyState title="No consultations yet"/>}
+        <h3 className="afya-subhead" style={{margin:'20px 0 8px',fontSize:15,fontWeight:800}}>Peer support sessions</h3>
+        {peerError&&<div className="afya-login-error" role="alert">Peer sessions could not be loaded.</div>}
+        <table className="admin-table">
+          <thead><tr><th>Date</th><th>Peer Navigator</th><th>Type</th><th>Status</th><th>Messages</th></tr></thead>
+          <tbody>{peerSessions.map(p=><tr key={p.request_id}><td style={{whiteSpace:'nowrap'}}>{eatDate(p.start_time)}</td><td>{p.peer_name}</td><td>{p.support_type==='CALL'?'Call':'Chat'}</td><td><Chip tone={SESSION_STATUS[p.status].tone}>{SESSION_STATUS[p.status].label}</Chip></td><td>{p.messages}</td></tr>)}</tbody>
+        </table>{!peerSessions.length&&!peerError&&<EmptyState title="No peer support sessions yet"/>}</div>}
         {tab==='attachments'&&(docs.length?<div className="afya-doc-grid">{docs.map(d=><div key={d.id} className="afya-doc">
           <FileText size={22} aria-hidden color="var(--afya-danger-fg)"/>
           <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700}}>{d.mimeType==='application/pdf'?'PDF document':'Image'} · {(d.fileSizeBytes/1024).toFixed(0)} KB</div>

@@ -320,8 +320,10 @@ class _ConsultationGroupHeader extends StatelessWidget {
                 color: PatientTokens.navy)),
         if (date != null || doc.appointmentNumber != null)
           Text(
-              [if (date != null) date, if (doc.appointmentNumber != null) doc.appointmentNumber]
-                  .join(' · '),
+              [
+                if (date != null) date,
+                if (doc.appointmentNumber != null) doc.appointmentNumber
+              ].join(' · '),
               style: const TextStyle(
                   fontSize: 11.5, color: PatientTokens.textSub)),
       ]),
@@ -343,6 +345,7 @@ class _SectionLabel extends StatelessWidget {
                 color: PatientTokens.textSub)),
       );
 }
+
 class _DocumentTile extends StatelessWidget {
   const _DocumentTile(
       {required this.doc, required this.opening, required this.onTap});

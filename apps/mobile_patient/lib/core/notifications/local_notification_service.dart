@@ -124,15 +124,14 @@ class LocalNotificationService {
             requestSoundPermission: false));
     await _plugin.initialize(initSettings,
         onDidReceiveNotificationResponse: (response) {
-          // Personal reminder alarms are local and never routed to the
-          // server-notification destinations (that would open the inbox).
-          if (ReminderAlarm.isReminderPayload(response.payload)) {
-            handleReminderAlarmAction(response);
-            return;
-          }
-          NotificationTaps.receive(response.payload);
-        },
-        onDidReceiveBackgroundNotificationResponse: handleReminderAlarmAction);
+      // Personal reminder alarms are local and never routed to the
+      // server-notification destinations (that would open the inbox).
+      if (ReminderAlarm.isReminderPayload(response.payload)) {
+        handleReminderAlarmAction(response);
+        return;
+      }
+      NotificationTaps.receive(response.payload);
+    }, onDidReceiveBackgroundNotificationResponse: handleReminderAlarmAction);
     final launch = await _plugin.getNotificationAppLaunchDetails();
     if (launch?.didNotificationLaunchApp == true &&
         !ReminderAlarm.isReminderPayload(

@@ -380,6 +380,9 @@ button, input, select, textarea { font-family: inherit; }
 .afya-avatar.lg { width: 64px; height: 64px; font-size: 22px; }
 .afya-back-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--afya-ink-2); font-size: 13.5px; font-weight: 650; cursor: pointer; padding: 0; }
 .afya-back-link:hover { color: var(--afya-green); }
+.afya-link-btn { border: 0; background: transparent; padding: 0; font: inherit; font-weight: 700; color: var(--afya-green); cursor: pointer; text-align: left; }
+.afya-link-btn:hover { text-decoration: underline; }
+.afya-link-btn:focus-visible { outline: 2px solid var(--afya-green); outline-offset: 2px; border-radius: 4px; }
 .afya-profile-head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .afya-profile-meta { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; color: var(--afya-muted); }
 .afya-profile-meta > span { display: inline-flex; align-items: center; gap: 5px; }

@@ -1,1260 +1,813 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/afya_auth_widgets.dart';
-import '../auth/welcome_pages.dart';
-import '../doctor/doctor_models.dart';
-import '../doctor/doctor_pages.dart';
-import '../home/home_pages.dart';
+import '../auth/auth_cubit.dart';
+import '../notifications/notification_repository.dart';
+import 'peer_chats.dart';
+import 'peer_notifications.dart';
+import 'peer_repository.dart';
+import 'peer_requests.dart';
+import 'peer_schedule.dart';
+import 'peer_ui.dart';
 
-/// Peer Navigator screens, built to the designs in docs/design/
-/// (afyamkononi-peer-*-reference.png).
-///
-/// STATUS: presentation only. The server has no Peer Navigator role,
-/// directory, request, conversation or call support yet, so nothing here
-/// loads or saves anything. Every screen is fed a [PeerData] value; the only
-/// place that builds one today is the design preview, with labelled sample
-/// content. The signed-in app cannot reach these screens.
+export 'peer_chats.dart';
+export 'peer_notifications.dart';
+export 'peer_requests.dart';
+export 'peer_schedule.dart';
 
-const _mint = Color(0xFFE6F5EE);
-const _blueTint = Color(0xFFE3EFFB);
-const _amberTint = Color(0xFFFDF3DC);
-const _violetTint = Color(0xFFEDE9FB);
+/// Peer Navigator side of the Care app, built to the Care-app peer
+/// references in `docs/design/peer-navigator/care-app/` (Home, Support
+/// Requests, Request Details, Schedule & Availability, Chats, Chat, Profile,
+/// Notifications) and backed by the Peer Navigator API. A peer sees a patient
+/// only as "Amina M.", an age band and the topic they wrote.
 
-class PeerRequest {
-  const PeerRequest(this.name, this.detail, this.age);
-  final String name, detail, age;
+// ---------------------------------------------------------------------------
+// Entry: approval gate, then the shell
+// ---------------------------------------------------------------------------
+
+/// Signed-in Peer Navigator: shows the approval state until an Admin
+/// approves the account, then the five tabs.
+class PeerApp extends StatefulWidget {
+  const PeerApp({super.key, required this.repo, this.notifications});
+  final PeerRepository repo;
+
+  /// The own-inbox notifications (defaults to the shared repository).
+  final NotificationRepository? notifications;
+  @override
+  State<PeerApp> createState() => _PeerAppState();
 }
 
-class PeerClient {
-  const PeerClient(
-      {required this.name,
-      required this.id,
-      required this.phone,
-      required this.status,
-      required this.next,
-      this.age,
-      this.sex,
-      this.location});
-  final String name, id, phone, status, next;
-  final String? age, sex, location;
+class _PeerAppState extends State<PeerApp> {
+  late Future<PeerProfile> _profile = widget.repo.profile();
+  late final NotificationRepository _notifications =
+      widget.notifications ?? NotificationRepository(widget.repo.api);
+  void _reload() => setState(() => _profile = widget.repo.profile());
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<PeerProfile>(
+      future: _profile,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
+        }
+        if (snap.hasError) {
+          return _Message(
+              icon: Icons.cloud_off_outlined,
+              title: 'Unable to load your account',
+              body: peerErrorText(snap.error!),
+              action: 'Retry',
+              onAction: _reload);
+        }
+        final profile = snap.data!;
+        if (!profile.approved) {
+          return _ApprovalGate(profile: profile, onRefresh: _reload);
+        }
+        return PeerShell(
+            repo: widget.repo, profile: profile, notifications: _notifications);
+      });
 }
 
-class PeerThread {
-  const PeerThread(
-      {required this.name,
-      required this.state,
-      required this.topic,
-      required this.preview,
-      required this.when,
-      required this.chat,
-      this.unread = 0});
-  final String name, state, topic, preview, when;
-  final int unread;
-
-  /// Opened with the doctor app's own chat thread screen.
-  final ChatDto chat;
+class _ApprovalGate extends StatelessWidget {
+  const _ApprovalGate({required this.profile, required this.onRefresh});
+  final PeerProfile profile;
+  final VoidCallback onRefresh;
+  @override
+  Widget build(BuildContext context) {
+    final (title, body) = switch (profile.approvalStatus) {
+      'REJECTED' => (
+          'Application not approved',
+          profile.approvalNote ??
+              'Your Peer Navigator application was not approved.'
+        ),
+      'SUSPENDED' => (
+          'Account paused',
+          profile.approvalNote ??
+              'Your Peer Navigator account is paused. Contact AfyaMkononi support.'
+        ),
+      _ => (
+          'Application under review',
+          'Thank you for registering as a Peer Navigator. An AfyaMkononi Admin '
+              'will review your application. You can start supporting people '
+              'once it is approved.'
+        ),
+    };
+    return _Message(
+        icon: profile.approvalStatus == 'PENDING'
+            ? Icons.hourglass_top_rounded
+            : Icons.info_outline,
+        title: title,
+        body: body,
+        action: 'Refresh status',
+        onAction: onRefresh,
+        secondary: 'Sign out',
+        onSecondary: () => context.read<AuthCubit>().logout());
+  }
 }
 
-class PeerData {
-  const PeerData(
-      {required this.name,
-      required this.location,
-      required this.peerId,
-      required this.bio,
-      required this.approved,
-      required this.requests,
-      required this.clients,
-      required this.threads,
-      required this.stats});
-  final String name, location, peerId, bio;
-  final bool approved;
-  final List<PeerRequest> requests;
-  final List<PeerClient> clients;
-  final List<PeerThread> threads;
-
-  /// Counters keyed by the label drawn under them.
-  final Map<String, String> stats;
+class _Message extends StatelessWidget {
+  const _Message(
+      {required this.icon,
+      required this.title,
+      required this.body,
+      required this.action,
+      required this.onAction,
+      this.secondary,
+      this.onSecondary});
+  final IconData icon;
+  final String title, body, action;
+  final VoidCallback onAction;
+  final String? secondary;
+  final VoidCallback? onSecondary;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+      backgroundColor: DoctorTokens.screen,
+      body: SafeArea(
+          child: Center(
+              child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const AfyaLogoMark(size: 58),
+                    const SizedBox(height: 22),
+                    Icon(icon, size: 42, color: PeerTokens.green),
+                    const SizedBox(height: 12),
+                    Text(title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
+                            color: PeerTokens.navy)),
+                    const SizedBox(height: 8),
+                    Text(body,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 14.5,
+                            height: 1.45,
+                            color: PeerTokens.grey)),
+                    const SizedBox(height: 22),
+                    AfyaPrimaryButton(label: action, onPressed: onAction),
+                    if (secondary != null)
+                      TextButton(
+                          onPressed: onSecondary, child: Text(secondary!)),
+                  ])))));
 }
 
-void _notConnected(BuildContext context) =>
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Not connected yet — Peer Navigator design preview.')));
-
-void _open(BuildContext context, Widget page) => Navigator.push(
-    context,
-    MaterialPageRoute(
-        builder: (_) => ColoredBox(color: DoctorTokens.screen, child: page)));
+// ---------------------------------------------------------------------------
+// Shell
+// ---------------------------------------------------------------------------
 
 class PeerShell extends StatefulWidget {
-  const PeerShell({super.key, required this.data});
-  final PeerData data;
+  const PeerShell(
+      {super.key,
+      required this.repo,
+      required this.profile,
+      required this.notifications});
+  final PeerRepository repo;
+  final PeerProfile profile;
+  final NotificationRepository notifications;
   @override
   State<PeerShell> createState() => _PeerShellState();
 }
 
 class _PeerShellState extends State<PeerShell> {
   int tab = 0;
-  static const _items = <(IconData, String)>[
-    (Icons.home_outlined, 'Home'),
-    (Icons.groups_outlined, 'Clients'),
-    (Icons.chat_bubble_outline, 'Messages'),
-    (Icons.notifications_none, 'Notifications'),
-    (Icons.person_outline, 'Profile'),
+
+  /// Bumped to make the Schedule tab open on "Create Slots" or "My Schedule".
+  int scheduleMode = 0, scheduleVersion = 0;
+  static const _items = <(IconData, IconData, String)>[
+    (Icons.home_outlined, Icons.home_rounded, 'Home'),
+    (Icons.mail_outline_rounded, Icons.mail_rounded, 'Requests'),
+    (Icons.calendar_month_outlined, Icons.calendar_month_rounded, 'Schedule'),
+    (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Chats'),
+    (Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
   ];
+
+  void go(int i) => setState(() => tab = i);
+  void openSchedule(int mode) => setState(() {
+        tab = 2;
+        scheduleMode = mode;
+        scheduleVersion++;
+      });
+
+  Future<void> openNotifications() =>
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => PeerNotificationsPage(
+              repo: widget.repo, notifications: widget.notifications)));
+
   @override
   Widget build(BuildContext context) {
-    final d = widget.data;
-    void go(int i) => setState(() => tab = i);
     final pages = [
-      PeerHomePage(data: d, onOpenTab: go),
-      PeerClientsPage(data: d, onOpenTab: go),
-      PeerMessagesPage(data: d, onOpenTab: go),
-      _PeerNotifications(onOpenTab: go),
-      PeerProfilePage(data: d, onOpenTab: go),
+      PeerHomeTab(
+          repo: widget.repo,
+          profile: widget.profile,
+          notifications: widget.notifications,
+          onOpenTab: go,
+          onOpenSchedule: openSchedule,
+          onOpenNotifications: openNotifications),
+      PeerRequestsTab(
+          repo: widget.repo, onSetAvailability: () => openSchedule(0)),
+      PeerScheduleTab(
+          key: ValueKey('schedule-$scheduleVersion'),
+          repo: widget.repo,
+          initialMode: scheduleMode),
+      PeerChatsTab(repo: widget.repo, onViewRequests: () => go(1)),
+      PeerProfileTab(
+          repo: widget.repo,
+          profile: widget.profile,
+          onManageSlots: () => openSchedule(1)),
     ];
     return Scaffold(
         backgroundColor: DoctorTokens.screen,
-        body: pages[tab],
+        body: SafeArea(bottom: false, child: pages[tab]),
         bottomNavigationBar: SafeArea(
             top: false,
             child: Container(
-                height: 76,
+                height: 84,
                 decoration: const BoxDecoration(
                     color: Colors.white,
-                    border: Border(
-                        top: BorderSide(color: DoctorTokens.fieldBorder))),
-                padding: const EdgeInsets.fromLTRB(6, 7, 6, 5),
+                    border: Border(top: BorderSide(color: PeerTokens.line))),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
                 child: Row(children: [
                   for (var i = 0; i < _items.length; i++)
                     Expanded(
-                        child: InkWell(
-                            onTap: () => go(i),
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                                decoration: BoxDecoration(
-                                    color: tab == i ? _mint : null,
-                                    borderRadius: BorderRadius.circular(14)),
-                                child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(_items[i].$1,
-                                          size: 25,
-                                          color: tab == i
-                                              ? DoctorTokens.primary
-                                              : DoctorTokens.fieldText),
-                                      const SizedBox(height: 3),
-                                      FittedBox(
-                                          fit: BoxFit.scaleDown,
-                                          child: Text(_items[i].$2,
+                        child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: Material(
+                                color: tab == i
+                                    ? PeerTokens.mint
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(20),
+                                child: InkWell(
+                                    key: ValueKey('peer-tab-${_items[i].$3}'),
+                                    onTap: () => go(i),
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                              tab == i
+                                                  ? _items[i].$2
+                                                  : _items[i].$1,
+                                              size: 27,
+                                              color: tab == i
+                                                  ? PeerTokens.green
+                                                  : PeerTokens.navy),
+                                          const SizedBox(height: 3),
+                                          Text(_items[i].$3,
+                                              maxLines: 1,
                                               style: TextStyle(
-                                                  fontSize: 11,
+                                                  fontSize: 12.5,
                                                   fontWeight: tab == i
                                                       ? FontWeight.w800
                                                       : FontWeight.w500,
                                                   color: tab == i
-                                                      ? DoctorTokens.primary
-                                                      : DoctorTokens
-                                                          .fieldText)))
-                                    ]))))
+                                                      ? PeerTokens.green
+                                                      : PeerTokens.grey)),
+                                        ])))))
                 ]))));
   }
 }
 
-class _BrandBar extends StatelessWidget {
-  const _BrandBar({required this.onProfile});
-  final VoidCallback onProfile;
-  @override
-  Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.fromLTRB(14, 6, 8, 2),
-      child: Row(children: [
-        const Flexible(
-            child: Align(
-                alignment: Alignment.centerLeft,
-                child: AfyaBrandLockup(scale: .62))),
-        const Spacer(),
-        IconButton(
-            onPressed: () => _notConnected(context),
-            tooltip: 'Notifications',
-            icon: const Icon(Icons.notifications_none,
-                size: 28, color: DoctorTokens.primaryDark)),
-        IconButton(
-            onPressed: onProfile,
-            tooltip: 'Profile',
-            icon: const Icon(Icons.account_circle_outlined,
-                size: 30, color: DoctorTokens.primaryDark)),
-      ]));
-}
+// ---------------------------------------------------------------------------
+// Home (reference 01)
+// ---------------------------------------------------------------------------
 
-class _Hero extends StatelessWidget {
-  const _Hero({required this.children});
-  final List<Widget> children;
-  @override
-  Widget build(BuildContext context) => Container(
-      decoration: const BoxDecoration(
-          gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.white, Color(0xFFDFF2EA)])),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-      child: Row(children: [
-        ClipOval(
-            child: Image.asset('assets/peer/peer_portrait.jpg',
-                width: 96,
-                height: 96,
-                fit: BoxFit.cover,
-                excludeFromSemantics: true)),
-        const SizedBox(width: 14),
-        Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: children))
-      ]));
-}
-
-const _heroBody =
-    TextStyle(fontSize: 14, height: 1.3, color: DoctorTokens.slate);
-
-class _RolePill extends StatelessWidget {
-  const _RolePill(this.text);
-  final String text;
-  @override
-  Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration:
-          BoxDecoration(color: _mint, borderRadius: BorderRadius.circular(20)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.groups_outlined,
-            size: 18, color: DoctorTokens.primaryDark),
-        const SizedBox(width: 6),
-        Flexible(
-            child: Text(text,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                    color: DoctorTokens.primaryDark)))
-      ]));
-}
-
-class _Card extends StatelessWidget {
-  const _Card({required this.child, this.padding = const EdgeInsets.all(14)});
-  final Widget child;
-  final EdgeInsets padding;
-  @override
-  Widget build(BuildContext context) => Container(
-      padding: padding,
-      decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: DoctorTokens.fieldBorder)),
-      child: child);
-}
-
-/// One counter. Every counter in the Peer screens is this widget, laid out
-/// by [_KpiRow], so sizes, padding and alignment are the same everywhere.
-class _Kpi extends StatelessWidget {
-  const _Kpi(this.icon, this.value, this.label,
-      {this.tint = Colors.white,
-      this.color = DoctorTokens.primary,
-      this.outlined = false,
-      this.lines = 0});
-  final IconData icon;
-  final String value;
-
-  /// One line per "\n". A line that is too wide shrinks instead of being
-  /// cut off, so four counters still fit across a narrow phone.
-  final String label;
-  final Color tint, color;
-  final bool outlined;
-
-  /// Label lines to reserve; set by [_KpiRow] so a row's tiles end level.
-  final int lines;
-
-  int get labelLines => label.split('\n').length;
-
-  _Kpi reserving(int count) => _Kpi(icon, value, label,
-      tint: tint, color: color, outlined: outlined, lines: count);
-
-  static const _lineHeight = 16.0;
-
-  @override
-  Widget build(BuildContext context) {
-    final parts = label.split('\n');
-    final reserved = lines > parts.length ? lines : parts.length;
-    return Container(
-        padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
-        decoration: BoxDecoration(
-            color: tint,
-            borderRadius: BorderRadius.circular(14),
-            border:
-                outlined ? Border.all(color: DoctorTokens.fieldBorder) : null),
-        child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                  height: 26,
-                  child: Row(children: [
-                    Icon(icon, size: 22, color: color),
-                    const SizedBox(width: 6),
-                    Expanded(
-                        child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(value,
-                                style: const TextStyle(
-                                    fontSize: 21,
-                                    height: 1.1,
-                                    fontWeight: FontWeight.w800,
-                                    color: DoctorTokens.navy))))
-                  ])),
-              const SizedBox(height: 4),
-              // Fixed-height lines: the tile is exactly as tall as its
-              // content, with no stretching.
-              for (var i = 0; i < reserved; i++)
-                SizedBox(
-                    height: _lineHeight,
-                    width: double.infinity,
-                    child: i < parts.length
-                        ? FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(parts[i],
-                                style: const TextStyle(
-                                    fontSize: 12.5,
-                                    height: 1.2,
-                                    color: DoctorTokens.fieldText)))
-                        : null),
-            ]));
-  }
-}
-
-/// Counters in one row: equal widths, one gap, and the same number of label
-/// lines reserved in each so they finish level.
-class _KpiRow extends StatelessWidget {
-  const _KpiRow(this.tiles);
-  final List<_Kpi> tiles;
-  @override
-  Widget build(BuildContext context) {
-    final lines =
-        tiles.map((t) => t.labelLines).reduce((a, b) => a > b ? a : b);
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      for (var i = 0; i < tiles.length; i++) ...[
-        if (i > 0) const SizedBox(width: 8),
-        Expanded(child: tiles[i].reserving(lines))
-      ]
-    ]);
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle(this.title, {this.action, this.onAction});
-  final String title;
-  final String? action;
-  final VoidCallback? onAction;
-  @override
-  Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 6, 8),
-      child: Row(children: [
-        Expanded(
-            child: Text(title,
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: DoctorTokens.navy))),
-        if (action != null)
-          TextButton(onPressed: onAction, child: Text(action!))
-        else
-          const SizedBox(height: 40)
-      ]));
-}
-
-class _Chips extends StatelessWidget {
-  const _Chips(this.labels);
-  final List<String> labels;
-  @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: Row(children: [
-        for (var i = 0; i < labels.length; i++)
-          Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-              decoration: BoxDecoration(
-                  color: i == 0 ? DoctorTokens.primaryDark : Colors.white,
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                      color: i == 0
-                          ? DoctorTokens.primaryDark
-                          : DoctorTokens.fieldBorder)),
-              child: Text(labels[i],
-                  style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w600,
-                      color: i == 0 ? Colors.white : DoctorTokens.fieldText)))
-      ]));
-}
-
-class _Search extends StatelessWidget {
-  const _Search(this.hint);
-  final String hint;
-  @override
-  Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-      child: TextField(
-          readOnly: true,
-          onTap: () => _notConnected(context),
-          decoration: InputDecoration(
-              hintText: hint,
-              hintStyle:
-                  const TextStyle(fontSize: 14.5, color: DoctorTokens.slate),
-              prefixIcon: const Icon(Icons.search, color: DoctorTokens.navy),
-              isDense: true,
-              filled: true,
-              fillColor: Colors.white,
-              enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide:
-                      const BorderSide(color: DoctorTokens.fieldBorder)))));
-}
-
-// ---------------------------------------------------------------- Home
-
-class PeerHomePage extends StatelessWidget {
-  const PeerHomePage({super.key, required this.data, required this.onOpenTab});
-  final PeerData data;
+class PeerHomeTab extends StatefulWidget {
+  const PeerHomeTab(
+      {super.key,
+      required this.repo,
+      required this.profile,
+      required this.notifications,
+      required this.onOpenTab,
+      required this.onOpenSchedule,
+      required this.onOpenNotifications});
+  final PeerRepository repo;
+  final PeerProfile profile;
+  final NotificationRepository notifications;
   final ValueChanged<int> onOpenTab;
+  final ValueChanged<int> onOpenSchedule;
+  final Future<void> Function() onOpenNotifications;
+  @override
+  State<PeerHomeTab> createState() => _PeerHomeTabState();
+}
+
+class _PeerHomeTabState extends State<PeerHomeTab> {
+  late Future<(List<PeerInboxItem>, List<PeerChatSummary>)> _load = _fetch();
+  int _unreadNotices = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUnread();
+  }
+
+  Future<void> _loadUnread() async {
+    try {
+      final n = await widget.notifications.unreadCount();
+      if (mounted) setState(() => _unreadNotices = n);
+    } catch (_) {/* the bell simply shows no dot */}
+  }
+
+  Future<(List<PeerInboxItem>, List<PeerChatSummary>)> _fetch() async =>
+      (await widget.repo.requests(), await widget.repo.chats());
+
+  Future<void> _refresh() async {
+    setState(() {
+      _load = _fetch();
+    });
+    _loadUnread();
+    await _load;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final d = data;
-    Widget action(IconData icon, String title, String sub, VoidCallback tap) =>
-        Expanded(
-            child: Material(
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(color: DoctorTokens.fieldBorder)),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                    onTap: tap,
-                    child: Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 12, 4, 12),
-                        child: Row(children: [
-                          Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                  color: _mint,
-                                  borderRadius: BorderRadius.circular(10)),
-                              child: Icon(icon,
-                                  size: 24, color: DoctorTokens.primary)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                              child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                Text(title,
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w800,
-                                        color: DoctorTokens.navy)),
-                                Text(sub,
-                                    style: const TextStyle(
-                                        fontSize: 11.5,
-                                        height: 1.25,
-                                        color: DoctorTokens.fieldText)),
-                              ])),
-                          const Icon(Icons.chevron_right,
-                              size: 20, color: DoctorTokens.primary)
-                        ])))));
-    return SafeArea(
-        bottom: false,
-        child: ListView(padding: EdgeInsets.zero, children: [
-          _BrandBar(onProfile: () => onOpenTab(4)),
-          const _Hero(children: [
-            Text('Welcome back,',
-                style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: DoctorTokens.navy)),
-            Text('Peer Navigator',
-                style: TextStyle(
-                    fontSize: 24,
-                    height: 1.15,
-                    fontWeight: FontWeight.w800,
-                    color: DoctorTokens.primaryDark)),
-            SizedBox(height: 4),
-            Text('Offer guidance, support and link patients to care services.',
-                style: _heroBody),
-          ]),
-          Transform.translate(
-              offset: const Offset(0, -8),
-              child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _Card(
-                      child: Row(children: [
+    final first = widget.profile.fullName.split(' ').first;
+    return RefreshIndicator(
+        onRefresh: _refresh,
+        child: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+          // Brand bar: logo, bell with unread dot, initials.
+          Padding(
+              padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
+              child: Row(children: [
+                const AfyaLogoMark(size: 44),
+                const SizedBox(width: 10),
+                const Expanded(
+                    child: Text('AfyaMkononi',
+                        style: TextStyle(
+                            fontSize: 25,
+                            fontWeight: FontWeight.w800,
+                            color: PeerTokens.navy))),
+                IconButton(
+                    key: const ValueKey('peer-bell'),
+                    tooltip: 'Notifications',
+                    onPressed: () async {
+                      await widget.onOpenNotifications();
+                      _loadUnread();
+                    },
+                    icon: Stack(clipBehavior: Clip.none, children: [
+                      const Icon(Icons.notifications_none_rounded,
+                          size: 30, color: PeerTokens.navy),
+                      if (_unreadNotices > 0)
+                        Positioned(
+                            right: 0,
+                            top: 0,
+                            child: Container(
+                                key: const ValueKey('peer-bell-dot'),
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                    color: const Color(0xFF16A34A),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 1.5)))),
+                    ])),
+                const SizedBox(width: 6),
+                CircleAvatar(
+                    radius: 23,
+                    backgroundColor: PeerTokens.green,
+                    child: Text(peerInitials(widget.profile.fullName),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16))),
+              ])),
+          // Welcome hero with the three-friends illustration.
+          Padding(
+              padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+              child: Container(
+                  height: 168,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(26),
+                      gradient: const LinearGradient(
+                          colors: [Color(0xFFE9F7EE), Color(0xFFDDF3E5)])),
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                            flex: 11,
+                            child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(20, 18, 4, 14),
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      FittedBox(
+                                          key: const ValueKey(
+                                              'peer-home-welcome'),
+                                          fit: BoxFit.scaleDown,
+                                          alignment: Alignment.centerLeft,
+                                          child: Text('Welcome,\n$first 👋',
+                                              style: const TextStyle(
+                                                  fontSize: 23,
+                                                  height: 1.2,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: PeerTokens.navy))),
+                                      const SizedBox(height: 8),
+                                      Container(
+                                          width: 34,
+                                          height: 4,
+                                          decoration: BoxDecoration(
+                                              color: const Color(0xFF14AD5D),
+                                              borderRadius:
+                                                  BorderRadius.circular(2))),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                          'Thank you for supporting others on their health journey.',
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 12.5,
+                                              height: 1.4,
+                                              color: PeerTokens.grey)),
+                                    ]))),
+                        Expanded(
+                            flex: 9,
+                            child: Image.asset('assets/peer/hero_people.png',
+                                fit: BoxFit.cover,
+                                alignment: Alignment.centerLeft)),
+                      ]))),
+          PeerLoader<(List<PeerInboxItem>, List<PeerChatSummary>)>(
+              future: _load,
+              onRetry: () => setState(() {
+                    _load = _fetch();
+                  }),
+              builder: (data) {
+                final (requests, chats) = data;
+                final now = DateTime.now();
+                final pending = requests.where((r) => r.status == 'PENDING');
+                final today = requests.where(
+                    (r) => r.status == 'ACCEPTED' && peerSameDay(r.start, now));
+                final unread = chats.fold<int>(0, (n, c) => n + c.unread);
+                Widget kpi(IconData icon, int value, String label, int tab) =>
                     Expanded(
+                        child: PeerCard(
+                            key: ValueKey('peer-kpi-$tab'),
+                            wave: true,
+                            padding: const EdgeInsets.fromLTRB(6, 16, 6, 18),
+                            onTap: () => widget.onOpenTab(tab),
+                            child: Column(children: [
+                              Container(
+                                  width: 52,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                      color: PeerTokens.mint,
+                                      borderRadius: BorderRadius.circular(14)),
+                                  child: Icon(icon,
+                                      size: 26, color: PeerTokens.green)),
+                              const SizedBox(height: 10),
+                              Text('$value',
+                                  style: const TextStyle(
+                                      fontSize: 32,
+                                      height: 1.1,
+                                      fontWeight: FontWeight.w800,
+                                      color: PeerTokens.navy)),
+                              const SizedBox(height: 4),
+                              Text(label,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontSize: 13.5,
+                                      height: 1.25,
+                                      color: PeerTokens.grey)),
+                            ])));
+                return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                    child: IntrinsicHeight(
+                        child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                          kpi(Icons.mail_outline_rounded, pending.length,
+                              'Pending\nRequests', 1),
+                          const SizedBox(width: 10),
+                          kpi(Icons.calendar_today_outlined, today.length,
+                              'Accepted\nSessions\nToday', 2),
+                          const SizedBox(width: 10),
+                          kpi(Icons.chat_bubble_outline_rounded, unread,
+                              'Unread\nChats', 3),
+                        ])));
+              }),
+          // Mission card.
+          Padding(
+              padding: const EdgeInsets.fromLTRB(14, 18, 14, 0),
+              child: PeerCard(
+                  color: const Color(0xFFE8F7EE),
+                  wave: true,
+                  padding: const EdgeInsets.fromLTRB(14, 16, 16, 18),
+                  child: IntrinsicHeight(
+                      child: Row(children: [
+                    Image.asset('assets/peer/mission_people.png',
+                        width: 62, fit: BoxFit.contain),
+                    const SizedBox(width: 10),
+                    const VerticalDivider(
+                        width: 1, thickness: 1.2, color: PeerTokens.mintLine),
+                    const SizedBox(width: 14),
+                    const Expanded(
                         child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                          Text(d.name,
-                              style: const TextStyle(
-                                  fontSize: 19,
-                                  fontWeight: FontWeight.w800,
-                                  color: DoctorTokens.navy)),
-                          const Text('Peer Navigator',
+                          Text('Support. Guide. Connect. Follow Up.',
                               style: TextStyle(
-                                  fontSize: 14, color: DoctorTokens.fieldText)),
-                          const SizedBox(height: 4),
-                          Row(children: [
-                            const Icon(Icons.location_on_outlined,
-                                size: 18, color: DoctorTokens.primaryDark),
-                            const SizedBox(width: 4),
-                            Flexible(
-                                child: Text(d.location,
-                                    style: const TextStyle(
-                                        fontSize: 14,
-                                        color: DoctorTokens.navy)))
-                          ])
-                        ])),
-                    Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                            color:
-                                d.approved ? _mint : DoctorTokens.warningLight,
-                            borderRadius: BorderRadius.circular(12)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(
-                              d.approved
-                                  ? Icons.check_circle
-                                  : Icons.hourglass_top,
-                              size: 18,
-                              color: d.approved
-                                  ? DoctorTokens.primary
-                                  : DoctorTokens.warning),
-                          const SizedBox(width: 6),
-                          Text(d.approved ? 'Approved' : 'Pending review',
-                              style: const TextStyle(
                                   fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: DoctorTokens.primaryDark))
-                        ]))
+                                  fontWeight: FontWeight.w800,
+                                  color: PeerTokens.navy)),
+                          SizedBox(height: 6),
+                          Text(
+                              'Be a trusted peer, share experiences, and help others stay on their health journey.',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  height: 1.4,
+                                  color: PeerTokens.grey)),
+                        ])),
                   ])))),
-          const _SectionTitle('Your Support Overview'),
+          const Padding(
+              padding: EdgeInsets.fromLTRB(18, 24, 18, 12),
+              child: Text('Quick Actions',
+                  style: TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w800,
+                      color: PeerTokens.navy))),
           Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _KpiRow([
-                _Kpi(Icons.forum_outlined, d.stats['Support Requests'] ?? '–',
-                    'Support\nRequests',
-                    tint: _mint),
-                _Kpi(
-                    Icons.groups_outlined,
-                    d.stats['Active Conversations'] ?? '–',
-                    'Active\nConversations',
-                    tint: _blueTint,
-                    color: DoctorTokens.info),
-                _Kpi(Icons.videocam_outlined, d.stats['Calls Completed'] ?? '–',
-                    'Calls\nCompleted',
-                    tint: _amberTint, color: DoctorTokens.warning),
-              ])),
-          _SectionTitle('New Support Requests',
-              action: 'View All →', onAction: () => _notConnected(context)),
-          for (final r in d.requests)
-            Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: _Card(
-                    padding: const EdgeInsets.all(10),
-                    child: Row(children: [
-                      InitialsAvatar(r.name, size: 46),
-                      const SizedBox(width: 10),
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Text(r.name,
-                                style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    color: DoctorTokens.navy)),
-                            Text(r.detail,
-                                style: const TextStyle(
-                                    fontSize: 12.5,
-                                    color: DoctorTokens.fieldText)),
-                            Text(r.age,
-                                style: const TextStyle(
-                                    fontSize: 12, color: DoctorTokens.slate)),
-                          ])),
-                      OutlinedButton(
-                          onPressed: () => _notConnected(context),
-                          style: OutlinedButton.styleFrom(
-                              foregroundColor: DoctorTokens.navy,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12)),
-                          child: const Text('Decline')),
-                      const SizedBox(width: 6),
-                      FilledButton(
-                          onPressed: () => _notConnected(context),
-                          style: FilledButton.styleFrom(
-                              minimumSize: const Size(0, 40),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 16),
-                              textStyle: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w700)),
-                          child: const Text('Accept')),
-                    ]))),
-          const _SectionTitle('Quick Actions'),
-          Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(children: [
-                Row(children: [
-                  action(
-                      Icons.mark_chat_unread_outlined,
-                      'Support Requests',
-                      'View and respond to new requests',
-                      () => _notConnected(context)),
-                  const SizedBox(width: 8),
-                  action(Icons.forum_outlined, 'My Conversations',
-                      'Continue ongoing support chats', () => onOpenTab(2)),
-                ]),
-                const SizedBox(height: 8),
-                Row(children: [
-                  action(
-                      Icons.videocam_outlined,
-                      'Start a Call',
-                      'Request or join an audio/video call',
-                      () => _notConnected(context)),
-                  const SizedBox(width: 8),
-                  action(Icons.person_outline, 'My Profile',
-                      'Update your details and location', () => onOpenTab(4)),
-                ]),
-              ])),
-          Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-              child: Container(
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                      color: _mint, borderRadius: BorderRadius.circular(18)),
-                  child: Row(children: [
-                    const Expanded(
-                        child: Padding(
-                            padding: EdgeInsets.fromLTRB(16, 14, 4, 14),
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Support, Guide, Connect',
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          height: 1.15,
-                                          fontWeight: FontWeight.w800,
-                                          color: DoctorTokens.navy)),
-                                  SizedBox(height: 6),
-                                  Text(
-                                      'Be a trusted companion on the patient’s health journey.',
-                                      style: TextStyle(
-                                          fontSize: 12.5,
-                                          color: DoctorTokens.fieldText)),
-                                ]))),
-                    Image.asset('assets/peer/peer_banner.jpg',
-                        width: 190,
-                        height: 100,
-                        fit: BoxFit.cover,
-                        excludeFromSemantics: true)
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: IntrinsicHeight(
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                    Expanded(
+                        child: _QuickAction(
+                            key: const ValueKey('peer-quick-availability'),
+                            icon: Icons.event_available_outlined,
+                            label: 'Manage\nAvailability',
+                            onTap: () => widget.onOpenSchedule(1))),
+                    const SizedBox(width: 10),
+                    Expanded(
+                        child: _QuickAction(
+                            key: const ValueKey('peer-quick-slots'),
+                            icon: Icons.add_circle_outline_rounded,
+                            label: 'Create\nSupport Slots',
+                            onTap: () => widget.onOpenSchedule(0))),
                   ]))),
         ]));
   }
 }
 
-// ------------------------------------------------------------- Clients
-
-(String, Color, Color, IconData) _clientPill(String status) => switch (status) {
-      'Active' => (
-          'Active',
-          _mint,
-          DoctorTokens.primaryDark,
-          Icons.check_circle
-        ),
-      'Needs Follow-up' => (
-          'Needs Follow-up',
-          _amberTint,
-          const Color(0xFFB45309),
-          Icons.event_note
-        ),
-      'In Support' => (
-          'In Support',
-          _blueTint,
-          DoctorTokens.info,
-          Icons.schedule
-        ),
-      _ => (
-          status,
-          DoctorTokens.surfaceSubtle,
-          DoctorTokens.fieldText,
-          Icons.pause_circle_outline
-        ),
-    };
-
-class PeerClientsPage extends StatelessWidget {
-  const PeerClientsPage(
-      {super.key, required this.data, required this.onOpenTab});
-  final PeerData data;
-  final ValueChanged<int> onOpenTab;
+class _QuickAction extends StatelessWidget {
+  const _QuickAction(
+      {super.key,
+      required this.icon,
+      required this.label,
+      required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) {
-    final clients = data.clients;
-    final active = clients.where((c) => c.status == 'Active').length;
-    final follow = clients.where((c) => c.status == 'Needs Follow-up').length;
-    return SafeArea(
-        bottom: false,
-        child: ListView(padding: EdgeInsets.zero, children: [
-          _BrandBar(onProfile: () => onOpenTab(4)),
-          const _Hero(children: [
-            _RolePill('Peer Navigator'),
-            SizedBox(height: 4),
-            Text('My Clients',
-                style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: DoctorTokens.navy)),
-            Text(
-                'Manage your clients, provide support and follow up on their care journey.',
-                style: _heroBody),
-          ]),
-          Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-              child: _KpiRow([
-                _Kpi(Icons.groups_outlined, '${clients.length}',
-                    'Total\nClients',
-                    outlined: true),
-                _Kpi(Icons.check_circle_outline, '$active', 'Active',
-                    outlined: true),
-                _Kpi(Icons.event_outlined, '$follow', 'Follow-ups',
-                    outlined: true),
-                _Kpi(Icons.person_add_alt, data.stats['New (This Week)'] ?? '–',
-                    'New\n(This Week)',
-                    outlined: true),
-              ])),
-          const _Search('Search clients by name, phone or client ID'),
-          _Chips([
-            'All Clients (${clients.length})',
-            'Active ($active)',
-            'Needs Follow-up ($follow)',
-            'More'
-          ]),
-          Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Row(children: [
-                Expanded(
-                    child: Text('Clients (${clients.length})',
-                        style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: DoctorTokens.navy))),
-                OutlinedButton.icon(
-                    onPressed: () => _notConnected(context),
-                    style: OutlinedButton.styleFrom(
-                        foregroundColor: DoctorTokens.primaryDark,
-                        side: const BorderSide(color: DoctorTokens.primary),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12))),
-                    icon: const Icon(Icons.person_add_alt),
-                    label: const Text('Add Client',
-                        style: TextStyle(fontWeight: FontWeight.w800)))
-              ])),
-          for (final cl in clients)
-            Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Material(
-                    color: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side:
-                            const BorderSide(color: DoctorTokens.fieldBorder)),
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                        onTap: () =>
-                            _open(context, PeerClientProfilePage(client: cl)),
-                        child: Padding(
-                            padding: const EdgeInsets.fromLTRB(10, 10, 4, 10),
-                            child: Row(children: [
-                              InitialsAvatar(cl.name, size: 46),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                    Text(cl.name,
-                                        style: const TextStyle(
-                                            fontSize: 15.5,
-                                            fontWeight: FontWeight.w800,
-                                            color: DoctorTokens.navy)),
-                                    Text('ID: ${cl.id}  |  ${cl.phone}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            color: DoctorTokens.fieldText)),
-                                    const SizedBox(height: 4),
-                                    Row(children: [
-                                      _StatusPill(cl.status),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                          child: Text(cl.next,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color:
-                                                      DoctorTokens.fieldText)))
-                                    ])
-                                  ])),
-                              const Icon(Icons.chevron_right,
-                                  color: DoctorTokens.primary)
-                            ]))))),
-          const SizedBox(height: 16),
-        ]));
-  }
-}
-
-class _StatusPill extends StatelessWidget {
-  const _StatusPill(this.status);
-  final String status;
-  @override
-  Widget build(BuildContext context) {
-    final (label, bg, fg, icon) = _clientPill(status);
-    return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration:
-            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 15, color: fg),
-          const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: fg))
-        ]));
-  }
-}
-
-// ------------------------------------------------------ Client profile
-
-class PeerClientProfilePage extends StatelessWidget {
-  const PeerClientProfilePage({super.key, required this.client});
-  final PeerClient client;
-  @override
-  Widget build(BuildContext context) {
-    final cl = client;
-    Widget fact(IconData icon, String text) =>
-        Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 17, color: DoctorTokens.fieldText),
-          const SizedBox(width: 5),
-          Text(text,
-              style: const TextStyle(fontSize: 13.5, color: DoctorTokens.navy))
-        ]);
-    Widget act(IconData icon, String label, {bool primary = false}) => Expanded(
-        child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3),
-            child: Material(
-                color: primary ? DoctorTokens.primaryDark : _mint,
-                borderRadius: BorderRadius.circular(14),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                    onTap: () => _notConnected(context),
-                    child: SizedBox(
-                        height: 66,
-                        child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(icon,
-                                  size: 24,
-                                  color: primary
-                                      ? Colors.white
-                                      : DoctorTokens.primaryDark),
-                              const SizedBox(height: 3),
-                              Text(label,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      fontSize: 11.5,
-                                      height: 1.1,
-                                      fontWeight: FontWeight.w700,
-                                      color: primary
-                                          ? Colors.white
-                                          : DoctorTokens.navy))
-                            ]))))));
-    Widget empty(IconData icon, String title, String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: _Card(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Icon(icon, size: 22, color: DoctorTokens.primary),
-            const SizedBox(width: 8),
-            Text(title,
+  Widget build(BuildContext context) => PeerCard(
+      wave: true,
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(14, 18, 10, 18),
+      child: Row(children: [
+        Icon(icon, size: 34, color: PeerTokens.green),
+        const SizedBox(width: 10),
+        Expanded(
+            child: Text(label,
                 style: const TextStyle(
-                    fontSize: 16.5,
-                    fontWeight: FontWeight.w800,
-                    color: DoctorTokens.navy))
-          ]),
-          const SizedBox(height: 8),
-          Text(text,
-              style: const TextStyle(
-                  fontSize: 14, height: 1.4, color: DoctorTokens.fieldText))
-        ])));
-    return Scaffold(
-        backgroundColor: DoctorTokens.screen,
-        body: SafeArea(
-            child: ListView(padding: EdgeInsets.zero, children: [
-          SizedBox(
-              height: 54,
-              child: Stack(alignment: Alignment.center, children: [
-                Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        tooltip: 'Back',
-                        icon: const Icon(Icons.arrow_back,
-                            color: DoctorTokens.navy))),
-                const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 60),
-                    child: AfyaBrandLockup(scale: .58)),
-              ])),
-          const Center(child: _RolePill('Peer Navigator • Client Support')),
-          Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-              child: _Card(
-                  child: Row(children: [
-                InitialsAvatar(cl.name, size: 76),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(cl.name,
-                          style: const TextStyle(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w800,
-                              color: DoctorTokens.navy)),
-                      Text('Client ID: ${cl.id}',
-                          style: const TextStyle(
-                              fontSize: 13, color: DoctorTokens.fieldText)),
-                      const SizedBox(height: 6),
-                      Wrap(spacing: 14, runSpacing: 4, children: [
-                        if (cl.age != null)
-                          fact(Icons.calendar_today_outlined, cl.age!),
-                        if (cl.sex != null) fact(Icons.person_outline, cl.sex!),
-                        if (cl.location != null)
-                          fact(Icons.location_on_outlined, cl.location!),
-                        fact(Icons.phone_outlined, cl.phone),
-                      ]),
-                      const SizedBox(height: 6),
-                      _StatusPill(cl.status),
-                    ]))
-              ]))),
-          Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 13),
-              child: Row(children: [
-                act(Icons.phone_outlined, 'Call', primary: true),
-                act(Icons.chat_outlined, 'Message'),
-                act(Icons.event_outlined, 'Schedule\nFollow-up'),
-                act(Icons.edit_outlined, 'Update\nSupport Status'),
-              ])),
-          const SizedBox(height: 6),
-          const _Chips(['Overview', 'Interactions', 'Notes', 'Care Plan']),
-          const SizedBox(height: 10),
-          // The design fills these cards with a care-progress checklist,
-          // session history and a written note. None of that exists to show
-          // yet, and sample clinical detail is not invented for a client.
-          empty(Icons.track_changes, 'Care Progress',
-              'Care-progress tracking will appear here once Peer Navigator support is connected.'),
-          empty(Icons.chat_outlined, 'Recent Interactions',
-              'No interactions recorded yet.'),
-          empty(Icons.note_alt_outlined, 'Latest Note', 'No notes yet.'),
-          const SizedBox(height: 10),
-        ])));
-  }
-}
-
-// ------------------------------------------------------------ Messages
-
-class PeerMessagesPage extends StatelessWidget {
-  const PeerMessagesPage(
-      {super.key, required this.data, required this.onOpenTab});
-  final PeerData data;
-  final ValueChanged<int> onOpenTab;
-  @override
-  Widget build(BuildContext context) {
-    final threads = data.threads;
-    final unread = threads.where((t) => t.unread > 0).length;
-    return Stack(children: [
-      SafeArea(
-          bottom: false,
-          child: ListView(padding: EdgeInsets.zero, children: [
-            _BrandBar(onProfile: () => onOpenTab(4)),
-            const _Hero(children: [
-              Text('Peer Navigator Messages',
-                  style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: DoctorTokens.navy)),
-              SizedBox(height: 2),
-              Text('Support conversations with patients in your care.',
-                  style: _heroBody),
-            ]),
-            const _Search('Search conversations, patients…'),
-            _Chips([
-              'All Messages  ${threads.length}',
-              'Unread  $unread',
-              'Active',
-              'Closed'
-            ]),
-            const SizedBox(height: 6),
-            for (final t in threads)
-              InkWell(
-                  // The conversation itself is the doctor app's chat thread.
-                  onTap: () => _open(context, ChatThreadPage(chat: t.chat)),
-                  child: Container(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                      decoration: BoxDecoration(
-                          color: t.unread > 1 ? _mint : null,
-                          border: const Border(
-                              bottom:
-                                  BorderSide(color: DoctorTokens.fieldBorder))),
-                      child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            InitialsAvatar(t.name, size: 48),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                  Text(t.name,
-                                      style: const TextStyle(
-                                          fontSize: 15.5,
-                                          fontWeight: FontWeight.w800,
-                                          color: DoctorTokens.navy)),
-                                  Row(children: [
-                                    Icon(Icons.circle,
-                                        size: 9,
-                                        color: t.state == 'Active'
-                                            ? DoctorTokens.primary
-                                            : DoctorTokens.slate),
-                                    const SizedBox(width: 6),
-                                    Text('${t.state}  ·  ${t.topic}',
-                                        style: const TextStyle(
-                                            fontSize: 12.5,
-                                            color: DoctorTokens.fieldText))
-                                  ]),
-                                  const SizedBox(height: 2),
-                                  Text(t.preview,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontSize: 13.5,
-                                          height: 1.3,
-                                          color: DoctorTokens.fieldText)),
-                                ])),
-                            const SizedBox(width: 8),
-                            Column(children: [
-                              Text(t.when,
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: DoctorTokens.fieldText)),
-                              const SizedBox(height: 8),
-                              if (t.unread > 0)
-                                Container(
-                                    width: 24,
-                                    height: 24,
-                                    alignment: Alignment.center,
-                                    decoration: const BoxDecoration(
-                                        color: DoctorTokens.primaryDark,
-                                        shape: BoxShape.circle),
-                                    child: Text('${t.unread}',
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.white)))
-                            ])
-                          ]))),
-            const Padding(
-                padding: EdgeInsets.fromLTRB(16, 14, 16, 96),
-                child: AfyaSecurityNote(
-                    'Secure & Confidential. Conversations follow AfyaMkononi’s data protection standards.')),
-          ])),
-      Positioned(
-          right: 14,
-          bottom: 14,
-          child: FilledButton.icon(
-              onPressed: () => _notConnected(context),
-              style: FilledButton.styleFrom(
-                  backgroundColor: DoctorTokens.primaryDark,
-                  shape: const StadiumBorder(),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 22, vertical: 14)),
-              icon: const Icon(Icons.edit_outlined),
-              label: const Text('Compose Message')))
-    ]);
-  }
-}
-
-class _PeerNotifications extends StatelessWidget {
-  const _PeerNotifications({required this.onOpenTab});
-  final ValueChanged<int> onOpenTab;
-  @override
-  Widget build(BuildContext context) => SafeArea(
-      bottom: false,
-      child: Column(children: [
-        _BrandBar(onProfile: () => onOpenTab(4)),
-        const Expanded(
-            child: Center(
-                child: Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Text(
-                        'No design was supplied for Peer Navigator notifications yet.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 15, color: DoctorTokens.slate)))))
+                    fontSize: 15,
+                    height: 1.25,
+                    fontWeight: FontWeight.w700,
+                    color: PeerTokens.navy))),
+        Container(
+            width: 30,
+            height: 30,
+            decoration: const BoxDecoration(
+                color: PeerTokens.mint, shape: BoxShape.circle),
+            child: const Icon(Icons.chevron_right_rounded,
+                size: 22, color: PeerTokens.navy)),
       ]));
 }
 
-// ------------------------------------------------------------- Profile
+// ---------------------------------------------------------------------------
+// Profile (reference 07)
+// ---------------------------------------------------------------------------
 
-class PeerProfilePage extends StatelessWidget {
-  const PeerProfilePage(
-      {super.key, required this.data, required this.onOpenTab});
-  final PeerData data;
-  final ValueChanged<int> onOpenTab;
+class PeerProfileTab extends StatefulWidget {
+  const PeerProfileTab(
+      {super.key,
+      required this.repo,
+      required this.profile,
+      required this.onManageSlots});
+  final PeerRepository repo;
+  final PeerProfile profile;
+  final VoidCallback onManageSlots;
   @override
-  Widget build(BuildContext context) {
-    final d = data;
-    Widget row(IconData icon, String title, String sub, {bool last = false}) =>
-        InkWell(
-            onTap: () => _notConnected(context),
-            child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                    border: last
-                        ? null
-                        : const Border(
-                            bottom:
-                                BorderSide(color: DoctorTokens.fieldBorder))),
-                child: Row(children: [
-                  Icon(icon, size: 30, color: DoctorTokens.primary),
-                  const SizedBox(width: 14),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        Text(title,
-                            style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                color: DoctorTokens.navy)),
-                        Text(sub,
-                            style: const TextStyle(
-                                fontSize: 13, color: DoctorTokens.fieldText)),
-                      ])),
-                  const Icon(Icons.chevron_right, color: DoctorTokens.primary)
-                ])));
-    return SafeArea(
-        bottom: false,
-        child: ListView(padding: EdgeInsets.zero, children: [
-          _BrandBar(onProfile: () {}),
-          BoardTitleBar('My Profile', onBack: () => onOpenTab(0)),
-          Container(
-              decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.white, Color(0xFFDFF2EA)])),
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 18),
-              child:
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                ClipOval(
-                    child: Image.asset('assets/peer/peer_profile_photo.jpg',
-                        width: 96,
-                        height: 96,
-                        fit: BoxFit.cover,
-                        excludeFromSemantics: true)),
+  State<PeerProfileTab> createState() => _PeerProfileTabState();
+}
+
+class _PeerProfileTabState extends State<PeerProfileTab> {
+  late PeerProfile p = widget.profile;
+
+  /// Edits one field in a dialog and saves it.
+  Future<void> _edit(
+      {required String title,
+      required String initial,
+      required int maxLength,
+      int lines = 1,
+      required Future<PeerProfile> Function(String value) save}) async {
+    final value = await peerPromptText(context,
+        title: title,
+        initial: initial,
+        maxLength: maxLength,
+        lines: lines,
+        fieldKey: const ValueKey('peer-profile-edit-field'));
+    if (value == null) return;
+    try {
+      final updated = await save(value.trim());
+      if (mounted) setState(() => p = updated);
+    } catch (e) {
+      if (mounted) peerToast(context, peerErrorText(e));
+    }
+  }
+
+  Widget _row(
+          {required Key key,
+          required IconData icon,
+          required String title,
+          required String value,
+          Widget? trailing,
+          VoidCallback? onTap,
+          Color color = Colors.white}) =>
+      Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: PeerCard(
+              key: key,
+              color: color,
+              radius: 20,
+              onTap: onTap,
+              padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+              child: Row(children: [
+                Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                        color: color == Colors.white
+                            ? PeerTokens.mintSoft
+                            : PeerTokens.mint,
+                        borderRadius: BorderRadius.circular(14)),
+                    child: Icon(icon, size: 26, color: PeerTokens.green)),
                 const SizedBox(width: 14),
                 Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                      Text(d.name,
+                      Text(title,
                           style: const TextStyle(
-                              fontSize: 21,
+                              fontSize: 16.5,
                               fontWeight: FontWeight.w800,
-                              color: DoctorTokens.navy)),
-                      const SizedBox(height: 4),
-                      const _RolePill('Peer Navigator'),
-                      const SizedBox(height: 6),
-                      Row(children: [
-                        const Icon(Icons.badge_outlined,
-                            size: 17, color: DoctorTokens.fieldText),
-                        const SizedBox(width: 5),
-                        Text(d.peerId,
-                            style: const TextStyle(
-                                fontSize: 13.5, color: DoctorTokens.fieldText))
-                      ]),
-                      const SizedBox(height: 4),
-                      Text(d.bio,
+                              color: PeerTokens.navy)),
+                      const SizedBox(height: 3),
+                      Text(value,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 13.5,
-                              height: 1.35,
-                              color: DoctorTokens.fieldText)),
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                          onPressed: () => _notConnected(context),
-                          style: OutlinedButton.styleFrom(
-                              foregroundColor: DoctorTokens.primaryDark,
-                              side: const BorderSide(
-                                  color: DoctorTokens.primary)),
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          label: const Text('Edit Profile',
-                              style: TextStyle(fontWeight: FontWeight.w800)))
-                    ]))
-              ])),
-          Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-              child: _Card(
-                  padding: const EdgeInsets.all(8),
-                  child: _KpiRow([
-                    _Kpi(Icons.groups_outlined,
-                        d.stats['People Supported'] ?? '–', 'People\nSupported',
-                        tint: _mint),
-                    _Kpi(
-                        Icons.chat_bubble_outline,
-                        d.stats['Support Conversations'] ?? '–',
-                        'Support\nConversations',
-                        tint: _blueTint,
-                        color: DoctorTokens.info),
-                    _Kpi(Icons.reply_outlined, d.stats['Referrals Made'] ?? '–',
-                        'Referrals\nMade',
-                        tint: _amberTint, color: DoctorTokens.warning),
-                    _Kpi(
-                        Icons.task_alt,
-                        d.stats['Client Follow-up Rate'] ?? '–',
-                        'Client\nFollow-up Rate',
-                        tint: _violetTint,
-                        color: const Color(0xFF6D4AE0)),
-                  ]))),
-          Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-              child: _Card(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Column(children: [
-                    row(Icons.person_outline, 'Account Information',
-                        'View and update your personal and work details'),
-                    row(Icons.verified_user_outlined, 'Verification & ID',
-                        'Your peer navigator verification and project affiliation'),
-                    row(Icons.settings_outlined, 'Settings',
-                        'Notifications, app preferences and security',
-                        last: true),
-                  ]))),
-        ]));
-  }
+                              fontSize: 14, color: PeerTokens.grey)),
+                    ])),
+                if (trailing != null) trailing,
+              ])));
+
+  Widget _pillButton(String label, IconData icon, VoidCallback onTap,
+          {Key? key}) =>
+      OutlinedButton.icon(
+          key: key,
+          style: OutlinedButton.styleFrom(
+              foregroundColor: PeerTokens.green,
+              backgroundColor: Colors.white,
+              side: const BorderSide(color: PeerTokens.green, width: 1.3),
+              shape: const StadiumBorder(),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              textStyle:
+                  const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
+          onPressed: onTap,
+          icon: Icon(icon, size: 19),
+          label: Text(label));
+
+  @override
+  Widget build(BuildContext context) =>
+      ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+        const PeerHeader(
+            title: 'My Profile',
+            subtitle: 'View and manage your peer navigator profile'),
+        Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: PeerCard(
+                color: const Color(0xFFEAF7EF),
+                wave: true,
+                padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+                child: Row(children: [
+                  Container(
+                      width: 72,
+                      height: 72,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                          color: Color(0xFFD6F1E1), shape: BoxShape.circle),
+                      child: Text(peerInitials(p.fullName),
+                          style: const TextStyle(
+                              fontSize: 27,
+                              fontWeight: FontWeight.w800,
+                              color: PeerTokens.green))),
+                  const SizedBox(width: 16),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(p.fullName,
+                            style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: PeerTokens.navy)),
+                        const SizedBox(height: 2),
+                        const Text('Peer Navigator',
+                            style: TextStyle(
+                                fontSize: 15, color: PeerTokens.grey)),
+                        const SizedBox(height: 8),
+                        const PeerStatusPill('ACCEPTED', label: 'Approved'),
+                      ])),
+                ]))),
+        _row(
+            key: const ValueKey('peer-profile-location'),
+            icon: Icons.location_on_outlined,
+            title: 'Location',
+            value: p.county,
+            trailing:
+                const Icon(Icons.chevron_right_rounded, color: PeerTokens.navy),
+            onTap: () => _edit(
+                title: 'Location (county)',
+                initial: p.county,
+                maxLength: 80,
+                save: (v) => widget.repo.updateProfile(county: v))),
+        _row(
+            key: const ValueKey('peer-profile-organization'),
+            icon: Icons.apartment_rounded,
+            title: 'Facility / Organization',
+            value: p.organization ?? 'Not set',
+            trailing:
+                const Icon(Icons.chevron_right_rounded, color: PeerTokens.navy),
+            onTap: () => _edit(
+                title: 'Facility / Organization',
+                initial: p.organization ?? '',
+                maxLength: 150,
+                save: (v) => widget.repo.updateProfile(organization: v))),
+        _row(
+            key: const ValueKey('peer-profile-about'),
+            icon: Icons.person_outline_rounded,
+            title: 'About You',
+            value: (p.bio ?? '').trim().isEmpty ? 'Not set' : p.bio!,
+            trailing: _pillButton(
+                'Edit',
+                Icons.edit_outlined,
+                key: const ValueKey('peer-profile-edit-about'),
+                () => _edit(
+                    title: 'About you (shown to patients)',
+                    initial: p.bio ?? '',
+                    maxLength: 500,
+                    lines: 4,
+                    save: (v) => widget.repo.updateProfile(bio: v)))),
+        _row(
+            key: const ValueKey('peer-profile-availability'),
+            icon: Icons.calendar_month_outlined,
+            title: 'Availability',
+            value: 'Create and manage your support slots.',
+            color: const Color(0xFFEDF8F1),
+            trailing: _pillButton(
+                'Manage Slots',
+                Icons.event_note_outlined,
+                key: const ValueKey('peer-profile-manage-slots'),
+                widget.onManageSlots)),
+        Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Material(
+                color: PeerTokens.redSoft,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: const BorderSide(color: Color(0xFFF3B7B7))),
+                child: InkWell(
+                    key: const ValueKey('peer-sign-out'),
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () => context.read<AuthCubit>().logout(),
+                    child: const Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                        child: Row(children: [
+                          Icon(Icons.logout_rounded,
+                              color: PeerTokens.red, size: 26),
+                          SizedBox(width: 16),
+                          Text('Sign Out',
+                              style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: PeerTokens.red)),
+                        ]))))),
+      ]);
 }

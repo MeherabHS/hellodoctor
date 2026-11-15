@@ -51,6 +51,19 @@ pub fn normalize_kenya_phone_number(phone: &str) -> Result<String, AppError> {
 /// lowercasing is deliberately not used: it maps lookalikes onto plain ASCII
 /// (e.g. the Kelvin sign U+212A becomes "k"), the "Unicode = SPOTIFY" class
 /// of account confusion.
+/// A patient's residential address: required at self-registration, 3-300
+/// characters after trimming, no control characters. Returns the trimmed value.
+pub fn validate_residential_address(address: &str) -> Result<String, AppError> {
+    let clean = address.trim();
+    let count = clean.chars().count();
+    if !(3..=300).contains(&count) || clean.chars().any(char::is_control) {
+        return Err(AppError::Validation(
+            "Enter your residential address (3 to 300 characters).".into(),
+        ));
+    }
+    Ok(clean.to_owned())
+}
+
 pub fn normalize_email(email: &str) -> String {
     let trimmed = email.trim();
     if trimmed.is_ascii() {
@@ -161,6 +174,10 @@ pub fn validate_text_field(
         .trim()
         .chars()
         .filter(|c| !c.is_control() || matches!(c, '\n' | '\r' | '\t'))
+        // Bidirectional embedding/override/isolate controls (2026-11-14 security
+        // review): they make displayed text differ from what was sent ("Trojan
+        // source" spoofing) and have no legitimate use in English or Kiswahili.
+        .filter(|c| !matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'))
         .collect();
     if cleaned.chars().count() > max_len {
         return Err(AppError::Validation(format!(
@@ -168,6 +185,21 @@ pub fn validate_text_field(
         )));
     }
     Ok(cleaned)
+}
+
+#[cfg(test)]
+mod bidi_tests {
+    use super::validate_text_field;
+    #[test]
+    fn text_fields_strip_bidirectional_overrides_but_keep_emoji_joiners() {
+        let cleaned = validate_text_field(
+            "pay\u{202E}gpj.exe \u{2066}x\u{2069} \u{1F469}\u{200D}\u{2695}",
+            "Message",
+            2000,
+        )
+        .unwrap();
+        assert_eq!(cleaned, "paygpj.exe x \u{1F469}\u{200D}\u{2695}");
+    }
 }
 
 /// `validate_text_field` for text an Admin writes (notes, reasons): also

@@ -330,7 +330,10 @@ impl PasswordResetService {
     /// IP jail, single-use authorization and full session revocation apply to
     /// every role alike.
     fn is_reset_eligible_role(role: UserRole) -> bool {
-        matches!(role, UserRole::Patient | UserRole::Doctor | UserRole::Admin)
+        matches!(
+            role,
+            UserRole::Patient | UserRole::Doctor | UserRole::Admin | UserRole::Peer
+        )
     }
 
     /// `None` covers every ineligible case uniformly (no account, wrong
@@ -368,24 +371,41 @@ impl PasswordResetService {
     /// content tables outside the auth worker's grant, exactly as the
     /// existing change-password flow already established.
     async fn first_name_for(state: &AppState, user: &crate::domain::models::User) -> String {
-        match user.role {
-            UserRole::Doctor => doctor_repo::find_by_user_id(&state.db, user.id)
-                .await
-                .ok()
-                .flatten()
-                .map(|d| d.full_name)
-                .unwrap_or_default(),
-            UserRole::Patient => patient_repo::find_by_user_id(&state.db, user.id)
-                .await
-                .ok()
-                .flatten()
-                .map(|p| p.full_name)
-                .unwrap_or_default(),
-            _ => String::new(),
-        }
-        .split_whitespace()
-        .next()
-        .unwrap_or_default()
-        .to_string()
+        account_first_name(state, user).await
     }
+}
+
+/// First name for an account email greeting, or "" (the templates then say
+/// "Hello there"). Read on the system-worker pool: the ordinary API pool
+/// runs under row-level security with no caller context here and sees no
+/// profile rows, which is how these emails used to lose the name.
+pub async fn account_first_name(state: &AppState, user: &crate::domain::models::User) -> String {
+    let full_name = match user.role {
+        UserRole::Doctor => doctor_repo::find_by_user_id(&state.system_db, user.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|d| d.full_name),
+        UserRole::Patient => patient_repo::find_by_user_id(&state.system_db, user.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|p| p.full_name),
+        UserRole::Peer => crate::repository::peer_repo::find_by_user_id(&state.system_db, user.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|p| p.full_name),
+        _ => None,
+    };
+    let name = full_name.unwrap_or_default();
+    let mut words = name.split_whitespace();
+    let first = words.next().unwrap_or_default();
+    // A doctor stored as "Dr. Jane Mwangi" is greeted "Jane", not "Dr.".
+    if user.role == UserRole::Doctor
+        && matches!(first.to_ascii_lowercase().as_str(), "dr" | "dr." | "doctor")
+    {
+        return words.next().unwrap_or_default().to_string();
+    }
+    first.to_string()
 }

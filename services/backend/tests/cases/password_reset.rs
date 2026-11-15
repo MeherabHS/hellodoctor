@@ -267,6 +267,7 @@ async fn patient_happy_path_via_a_freshly_registered_email_account(pool: PgPool)
             "full_name": "Reset Fixture Patient",
             "date_of_birth": "1992-04-01",
             "gender": "FEMALE",
+            "residential_address": "Kilimani, Nairobi",
         }),
     )
     .await;

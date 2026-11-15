@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {Archive,BookOpen,CalendarClock,CheckCircle2,FileEdit,Hourglass,Pencil,Plus} from 'lucide-react';
+import {Archive,BookOpen,CalendarClock,CheckCircle2,FileEdit,Pencil,Plus} from 'lucide-react';
 import type {AdminArticle,ArticleCategory,ArticleStatus} from '../../lib/blogContent';
 import {topicLabel} from '../../lib/blogContent';
 import {listArticles,listCategories,getArticle} from '../../lib/blogApi';
@@ -14,7 +14,7 @@ import './blogs.css';
 const PAGE=20;
 type StatusTab=''|ArticleStatus;
 const TABS:{id:StatusTab;label:string}[]=[
-  {id:'',label:'All'},{id:'DRAFT',label:'Draft'},{id:'PENDING_REVIEW',label:'Pending review'},{id:'APPROVED',label:'Approved'},
+  {id:'',label:'All'},{id:'DRAFT',label:'Draft'},
   {id:'SCHEDULED',label:'Scheduled'},{id:'PUBLISHED',label:'Published'},{id:'ARCHIVED',label:'Archived'},
 ];
 
@@ -60,7 +60,6 @@ export function BlogManager(){
       <StatTile icon={BookOpen} tone="green" value={counts['']??'—'} label="Total articles"/>
       <StatTile icon={CheckCircle2} tone="green" value={counts.PUBLISHED??'—'} label="Published"/>
       <StatTile icon={FileEdit} tone="amber" value={counts.DRAFT??'—'} label="Drafts"/>
-      <StatTile icon={Hourglass} tone="purple" value={counts.PENDING_REVIEW??'—'} label="Pending review"/>
       <StatTile icon={CalendarClock} tone="blue" value={counts.SCHEDULED??'—'} label="Scheduled"/>
       <StatTile icon={Archive} tone="neutral" value={counts.ARCHIVED??'—'} label="Archived"/>
     </div>

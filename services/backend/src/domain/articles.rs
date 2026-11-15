@@ -30,4 +30,10 @@ pub struct DoctorArticle {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub published_at: Option<DateTime<Utc>>,
+    /// Doctor Web redesign (2026-11-14): optional topic, complete Swahili version, cover.
+    pub topic_key: Option<String>,
+    pub title_sw: Option<String>,
+    pub summary_sw: Option<String>,
+    pub body_sw: Option<String>,
+    pub cover_image_id: Option<Uuid>,
 }

@@ -53,11 +53,11 @@ export function articleLanguage(c:ArticleContent,language:'en'|'sw'){
   const sw=language==='sw'&&Boolean(c.title_sw.trim()&&c.body_sw.trim());
   return {title:sw?c.title_sw:c.title_en,body:sw?c.body_sw:c.body_en,fallback:language==='sw'&&!sw};
 }
+/** Secondary actions in the Publication card. Publish and Schedule are their
+ *  own controls; there is no review step in the Admin UI (lib/publishFlow). */
 export function articleActions(status:ArticleStatus):string[]{
   switch(status){
-    case 'DRAFT':return ['submit','archive'];
-    case 'PENDING_REVIEW':return ['approve','return','archive'];
-    case 'APPROVED':return ['publish','schedule','unpublish','archive'];
+    case 'DRAFT':case 'PENDING_REVIEW':case 'APPROVED':return ['archive'];
     case 'SCHEDULED':case 'PUBLISHED':return ['unpublish','archive'];
     default:return [];
   }

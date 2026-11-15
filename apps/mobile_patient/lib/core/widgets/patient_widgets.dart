@@ -298,6 +298,7 @@ class PatientField extends StatelessWidget {
       this.labelIcon,
       this.labelColor = PatientTokens.text,
       this.labelSuffix,
+      this.requiredMark = false,
       this.prefixIcon,
       this.fillColor,
       this.borderColor,
@@ -317,6 +318,9 @@ class PatientField extends StatelessWidget {
   final IconData? labelIcon;
   final Color labelColor;
   final String? labelSuffix;
+
+  /// Shows a red " *" after the label for a required field.
+  final bool requiredMark;
   final IconData? prefixIcon;
   final Color? fillColor, borderColor;
   final double? borderRadius;
@@ -343,6 +347,12 @@ class PatientField extends StatelessWidget {
                   TextSpan(
                       text: ' $labelSuffix',
                       style: const TextStyle(fontWeight: FontWeight.w400)),
+                if (requiredMark)
+                  const TextSpan(
+                      text: ' *',
+                      style: TextStyle(
+                          color: PatientTokens.danger,
+                          fontWeight: FontWeight.w800)),
               ]),
               style: TextStyle(
                   fontSize: 13,

@@ -48,8 +48,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       _hasError = false;
     });
     try {
-      final prefs =
-          await widget.repo.getPreferences();
+      final prefs = await widget.repo.getPreferences();
       if (!mounted) return;
       setState(() {
         _prefs = prefs;

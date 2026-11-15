@@ -3,10 +3,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/emergency_contact.dart';
+import '../../../core/config/support_whatsapp.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/afya_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../blogs/blogs_page.dart';
+import '../booking/booking_repository.dart';
 import '../blogs/blogs_repository.dart';
 import '../education/education_tabs.dart';
 import '../education/education_topics.dart';
@@ -14,6 +16,8 @@ import '../education/topic_articles_page.dart';
 import '../home/brand_header.dart';
 import '../home/home_cubit.dart';
 import '../home/upcoming_consultation_section.dart';
+import '../peer/peer_pages.dart';
+import '../peer/peer_repository.dart';
 import '../profile/data_rights_page.dart';
 import '../profile/family_profiles_cubit.dart';
 import '../qna/qna_ask_sheet.dart';
@@ -262,7 +266,9 @@ class _SupportChatPageState extends State<SupportChatPage> {
             onPressed: () => showAskQuestionSheet(context,
                 cubit: _cubit,
                 familyProfilesCubit: widget.familyProfilesCubit)),
-        const SizedBox(height: 22),
+        const SizedBox(height: 16),
+        const SupportWhatsAppCard(),
+        const SizedBox(height: 16),
         AfyaInfoCard(
             icon: Icons.lock_rounded,
             title: l.supportPrivacyTitle,
@@ -272,15 +278,118 @@ class _SupportChatPageState extends State<SupportChatPage> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Panel 4 — Peer Navigator (no backend: layout only, action disabled)
-// ---------------------------------------------------------------------------
+/// "Need immediate assistance? Text us on WhatsApp", with the configured
+/// number beneath ([SupportWhatsApp]). Until a number is supplied it shows a
+/// "coming soon" placeholder and does nothing when tapped.
+class SupportWhatsAppCard extends StatelessWidget {
+  const SupportWhatsAppCard({super.key, this.number = SupportWhatsApp.number});
 
-class PeerNavigatorPage extends StatelessWidget {
-  const PeerNavigatorPage({super.key, required this.nav});
-  final PatientShellNav nav;
+  /// Overridable for tests; defaults to the build-time configuration.
+  final String number;
+
+  static const _green = Color(0xFF25D366);
+
+  String get _digits => number.replaceAll(RegExp(r'[^0-9]'), '');
+  bool get _configured => _digits.length >= 9;
+
+  Future<void> _open(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    var opened = false;
+    try {
+      opened = await launchUrl(Uri.parse('https://wa.me/$_digits'),
+          mode: LaunchMode.externalApplication);
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened) {
+      messenger
+          ?.showSnackBar(SnackBar(content: Text(l.supportWhatsAppOpenError)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AfyaCard(
+      key: const ValueKey('support-whatsapp-card'),
+      onTap: _configured ? () => _open(context) : null,
+      padding: const EdgeInsets.fromLTRB(12, 14, 10, 14),
+      child: Row(children: [
+        Container(
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: _green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.chat_rounded, color: _green, size: 26)),
+        const SizedBox(width: 14),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(l.supportWhatsAppTitle,
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: PatientTokens.navy)),
+            const SizedBox(height: 2),
+            Text(l.supportWhatsAppBody,
+                style:
+                    const TextStyle(fontSize: 12.5, color: PatientTokens.ink)),
+            const SizedBox(height: 4),
+            Text(_configured ? number : l.supportWhatsAppPending,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: _configured ? FontWeight.w800 : FontWeight.w600,
+                    color: _configured
+                        ? PatientTokens.navy
+                        : PatientTokens.textSub)),
+          ]),
+        ),
+        if (_configured)
+          const Icon(Icons.chevron_right_rounded, color: PatientTokens.navy),
+      ]),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Panel 4 — Peer Navigator. "Start Chat" opens the peer list and booking
+// (docs/peer-navigator/PEER_NAVIGATOR_PLAN.md); the patient's own requests
+// sit under the button.
+// ---------------------------------------------------------------------------
+
+class PeerNavigatorPage extends StatefulWidget {
+  const PeerNavigatorPage(
+      {super.key,
+      required this.nav,
+      required this.repo,
+      required this.bookingRepo,
+      this.myUserId});
+  final PatientShellNav nav;
+  final PatientPeerRepository repo;
+  final BookingRepository bookingRepo;
+  final String? myUserId;
+  @override
+  State<PeerNavigatorPage> createState() => _PeerNavigatorPageState();
+}
+
+class _PeerNavigatorPageState extends State<PeerNavigatorPage> {
+  int _refresh = 0;
+
+  Future<void> _start() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => PeerNavigatorListPage(
+            repo: widget.repo,
+            bookingRepo: widget.bookingRepo,
+            nav: widget.nav)));
+    if (mounted) setState(() => _refresh++);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nav = widget.nav;
     final l = AppLocalizations.of(context);
     Widget feature(IconData icon, Color c, Color bg, String t, String d) =>
         Padding(
@@ -330,12 +439,15 @@ class PeerNavigatorPage extends StatelessWidget {
                 color: PatientTokens.navy)),
         const SizedBox(height: 14),
         AfyaPillButton(
-            label: l.peerStartChat, icon: Icons.sms_rounded, onPressed: null),
-        const SizedBox(height: 8),
-        Text(l.peerNotAvailable,
-            textAlign: TextAlign.center,
-            style:
-                const TextStyle(fontSize: 12.5, color: PatientTokens.textSub)),
+            key: const ValueKey('peer-start-chat'),
+            label: l.peerStartChat,
+            icon: Icons.sms_rounded,
+            onPressed: _start),
+        PatientPeerRequestsSection(
+            repo: widget.repo,
+            bookingRepo: widget.bookingRepo,
+            myUserId: widget.myUserId,
+            refreshToken: _refresh),
         const SizedBox(height: 16),
         feature(
             Icons.shield_outlined,
@@ -380,7 +492,8 @@ class PeerNavigatorPage extends StatelessWidget {
 /// Health Records landing. Rows exist only for what the backend holds:
 /// doctor-issued prescriptions and patient uploads. The panel's HIV Care
 /// Summary, Lab Results and Appointments rows have no data source and are
-/// not shown. Share Access has no backend and says so.
+/// not shown. The panel's Share Access tab is omitted by product-owner
+/// decision (2026-11-14).
 class HealthRecordsHubPage extends StatefulWidget {
   const HealthRecordsHubPage(
       {super.key,
@@ -395,8 +508,6 @@ class HealthRecordsHubPage extends StatefulWidget {
 }
 
 class _HealthRecordsHubPageState extends State<HealthRecordsHubPage> {
-  int _tab = 0;
-
   void _open(String kind) => Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => HealthVaultPage(
           repo: widget.repo,
@@ -446,39 +557,27 @@ class _HealthRecordsHubPageState extends State<HealthRecordsHubPage> {
       title: l.moduleHealthRecords,
       nav: widget.nav,
       child: ListView(padding: _pagePadding, children: [
-        AfyaSegmentedTabs(
-            expand: true,
-            labels: [l.recordsTabMine, l.recordsTabShare],
-            selected: _tab,
-            onSelected: (i) => setState(() => _tab = i)),
-        const SizedBox(height: 18),
-        if (_tab == 0) ...[
-          row(Icons.verified_user_outlined, PatientTokens.tileGreen,
-              PatientTokens.tileGreenBg, l.recordsAll, l.recordsAllDesc, 'all'),
-          row(
-              Icons.event_note_rounded,
-              PatientTokens.tileRed,
-              PatientTokens.tileRedBg,
-              l.recordsPrescriptions,
-              l.recordsPrescriptionsDesc,
-              'PRESCRIPTION'),
-          row(
-              Icons.description_rounded,
-              PatientTokens.tealCta,
-              PatientTokens.infoCard,
-              l.recordsDocuments,
-              l.recordsDocumentsDesc,
-              'INTAKE'),
-          const SizedBox(height: 4),
-          AfyaInfoCard(
-              icon: Icons.lock_rounded,
-              title: l.recordsAccessTitle,
-              body: '${l.recordsAccess1}\n${l.recordsAccess2}'),
-        ] else
-          AfyaUnavailableNote(
-              icon: Icons.share_outlined,
-              title: l.moduleUnavailableTitle,
-              body: l.recordsShareUnavailable),
+        row(Icons.verified_user_outlined, PatientTokens.tileGreen,
+            PatientTokens.tileGreenBg, l.recordsAll, l.recordsAllDesc, 'all'),
+        row(
+            Icons.event_note_rounded,
+            PatientTokens.tileRed,
+            PatientTokens.tileRedBg,
+            l.recordsPrescriptions,
+            l.recordsPrescriptionsDesc,
+            'PRESCRIPTION'),
+        row(
+            Icons.description_rounded,
+            PatientTokens.tealCta,
+            PatientTokens.infoCard,
+            l.recordsDocuments,
+            l.recordsDocumentsDesc,
+            'INTAKE'),
+        const SizedBox(height: 4),
+        AfyaInfoCard(
+            icon: Icons.lock_rounded,
+            title: l.recordsAccessTitle,
+            body: '${l.recordsAccess1}\n${l.recordsAccess2}'),
       ]),
     );
   }

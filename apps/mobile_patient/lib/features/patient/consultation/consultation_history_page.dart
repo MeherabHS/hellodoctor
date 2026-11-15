@@ -106,15 +106,17 @@ class _ConsultationHistoryPageState extends State<ConsultationHistoryPage> {
             child: RefreshIndicator(
               onRefresh: _load,
               child: _loading
-                  ? ListView(padding: const EdgeInsets.all(18), children: const [
-                      SkeletonBlock(height: 84),
-                      SizedBox(height: 10),
-                      SkeletonBlock(height: 84),
-                    ])
-                  : _error != null
-                      ? ListView(padding: const EdgeInsets.all(18), children: [
-                          InlineError(_error!, onRetry: _load)
+                  ? ListView(
+                      padding: const EdgeInsets.all(18),
+                      children: const [
+                          SkeletonBlock(height: 84),
+                          SizedBox(height: 10),
+                          SkeletonBlock(height: 84),
                         ])
+                  : _error != null
+                      ? ListView(
+                          padding: const EdgeInsets.all(18),
+                          children: [InlineError(_error!, onRetry: _load)])
                       : _items.isEmpty
                           ? ListView(
                               padding: const EdgeInsets.all(24),
@@ -128,8 +130,7 @@ class _ConsultationHistoryPageState extends State<ConsultationHistoryPage> {
                                           color: PatientTokens.textSub)),
                                 ])
                           : ListView.separated(
-                              padding:
-                                  const EdgeInsets.fromLTRB(18, 4, 18, 24),
+                              padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
                               itemCount: _items.length,
                               separatorBuilder: (_, __) =>
                                   const SizedBox(height: 10),
@@ -206,7 +207,8 @@ class _HistoryCard extends StatelessWidget {
   }
 }
 
-String historyStatusLabel(AppLocalizations l, String status) => switch (status) {
+String historyStatusLabel(AppLocalizations l, String status) =>
+    switch (status) {
       'PENDING_PAYMENT' => l.apptStatusPendingPayment,
       'CONFIRMED' => l.apptStatusConfirmed,
       'WAITING' => l.apptStatusWaiting,

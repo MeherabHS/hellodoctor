@@ -9,6 +9,7 @@ import 'article_content.dart';
 import 'article_quiz_section.dart';
 import '../education/education_topics.dart';
 import '../education/education_widgets.dart';
+import '../../../core/utils/initials.dart';
 
 /// Existing article detail flow: Doctor plain text/references are preserved;
 /// Admin content uses safe Markdown, localized metadata and authenticated covers.
@@ -199,16 +200,5 @@ class _BlogDetailPageState extends State<BlogDetailPage> {
     );
   }
 
-  String _initialsOf(String name) {
-    final words = name
-        .replaceAll('Dr.', '')
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .toList();
-    if (words.isEmpty) return '?';
-    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-    return (words.first.substring(0, 1) + words.last.substring(0, 1))
-        .toUpperCase();
-  }
+  String _initialsOf(String name) => nameInitials(name);
 }

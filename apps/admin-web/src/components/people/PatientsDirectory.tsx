@@ -2,6 +2,7 @@
 import {useMemo,useState} from 'react';
 import {Activity,Eye,MessageSquare,Users,Video} from 'lucide-react';
 import type {PatientRecordItem} from '../../data/adminStore';
+import {buildSearchIndex,searchIndex} from '../../lib/searchIndex';
 import {Chip,EmptyState,PageHead,Pagination,SearchField,StatTile,eatDate,type ChipTone} from '../ui/afya';
 
 /**
@@ -38,14 +39,14 @@ export function PatientsDirectory({patients,onOpen}:{patients:PatientRecordItem[
   // Activity is judged against the time the directory was opened.
   const [now]=useState(()=>Date.now());
   const genders=useMemo(()=>[...new Set(patients.map(p=>p.gender).filter((g):g is string=>Boolean(g)))].sort(),[patients]);
-  const rows=useMemo(()=>patients.filter(p=>{
-    const q=search.trim().toLowerCase();
-    if(q&&!`${p.name} ${p.id}`.toLowerCase().includes(q))return false;
+  // Indexed once per list: name, patient ID (with or without "#PT-").
+  const index=useMemo(()=>buildSearchIndex(patients,p=>[p.name,p.id,p.backendId]),[patients]);
+  const rows=useMemo(()=>searchIndex(index,search).filter(p=>{
     if(gender&&p.gender!==gender)return false;
     if(ageGroup){const g=AGE_GROUPS.find(a=>a.id===ageGroup)!;const age=ageFrom(p.dateOfBirth,now);if(age===null||age<g.min||age>g.max)return false;}
     if(activity&&activityOf(p,now)!==activity)return false;
     return true;
-  }).sort((a,b)=>(b.lastConsultAt??'').localeCompare(a.lastConsultAt??'')||a.name.localeCompare(b.name)),[patients,search,gender,ageGroup,activity,now]);
+  }).sort((a,b)=>(b.lastConsultAt??'').localeCompare(a.lastConsultAt??'')||a.name.localeCompare(b.name)),[index,search,gender,ageGroup,activity,now]);
   const page=rows.slice(offset,offset+PAGE);
   const active=patients.filter(p=>activityOf(p,now)==='active').length;
   const video=patients.reduce((s,p)=>s+(p.videoVisits??0),0);const chat=patients.reduce((s,p)=>s+(p.chatSessions??0),0);

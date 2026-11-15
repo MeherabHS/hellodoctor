@@ -4,15 +4,17 @@ import {ArrowLeft,Bold,Heading2,ImagePlus,Italic,Link2,List,ListOrdered,Quote,Tr
 import type {AdminArticle,ArticleContent,ArticleCategory} from '../../lib/blogContent';
 import {articleActions,articleErrors,blankArticle,editableArticle,nairobiSchedule,topicLabel} from '../../lib/blogContent';
 import {saveArticle,transitionArticle,uploadCover,getArticle} from '../../lib/blogApi';
+import {MAX_ADMIN_IMAGE_UPLOAD} from '../../lib/imageLimits';
 import {ArticlePreview} from './ArticlePreview';
 import {McqBuilder} from './McqBuilder';
 import {useAdminNavigation,useUnsavedChanges} from '../navigation/NavigationGuard';
 import type {QuizContent} from '../../lib/quizContent';
-import {blogErrorMessage,independentApprovalMessage} from '../../lib/blogErrors';
+import {blogErrorMessage} from '../../lib/blogErrors';
+import {isUnpublished,stepsBeforePublish} from '../../lib/publishFlow';
 import {Card,Chip} from '../ui/afya';
 import {STATUS_CHIP} from './statusChip';
 
-const ACTION_LABEL:Record<string,string>={submit:'Submit for review',approve:'Approve',return:'Return for revision',publish:'Publish now',schedule:'Schedule publication',unpublish:'Return to draft / unpublish',archive:'Archive'};
+const ACTION_LABEL:Record<string,string>={unpublish:'Unpublish (back to draft)',archive:'Archive'};
 
 /** Markdown formatting applied to the current selection of a textarea. */
 type Format={label:string;icon:typeof Bold;wrap?:[string,string];prefix?:string;placeholder:string};
@@ -65,28 +67,26 @@ export function ArticleEditor({initial,categories,onSaved,onClose,mode='article'
   }
   async function act(action:string){
     if(!article||dirty||cover)return;
-    if(action==='approve'&&article.can_approve!==true){setError(article.approval_block_reason==='INDEPENDENT_REVIEW_REQUIRED'?independentApprovalMessage:'Approval permissions are unavailable. Reload the article.');return;}
     setBusy(true);setError('');setNotice('');
-    try{const updated=await transitionArticle(article.id,article.version,action,action==='schedule'?nairobiSchedule(schedule):undefined);setArticle(updated);setContent(editableArticle(updated));setSchedule('');setNotice(`${action==='return'?'Returned to draft':updated.status.toLowerCase().replaceAll('_',' ')}. No announcement was sent.`);onSaved();}
+    try{const updated=await transitionArticle(article.id,article.version,action,action==='schedule'?nairobiSchedule(schedule):undefined);setArticle(updated);setContent(editableArticle(updated));setSchedule('');setNotice(`${action==='unpublish'?'Back to draft':updated.status.toLowerCase().replaceAll('_',' ')}. No announcement was sent.`);onSaved();}
     catch(e){setError(blogErrorMessage(e));}finally{setBusy(false);}
   }
-  /// Combined submit→approve→publish for one Admin (single-Admin approval,
-  /// CLAUDE.md rule 7). The backend authorizes each step; if approval or
-  /// publication does not complete, the entry honestly stays in review.
-  async function publishNow(){
+  /// The Admin publishes (or schedules) directly; there is no review step in
+  /// the UI (lib/publishFlow). Runs the backend's remaining internal steps
+  /// from the current state, so a part-finished attempt resumes next time.
+  async function publish(target:'publish'|'schedule'){
     if(!article||dirty||cover)return;
+    let when:string|undefined;
+    if(target==='schedule'){try{when=nairobiSchedule(schedule);}catch(e){setError(e instanceof Error?e.message:'Choose a publication date.');return;}}
     setBusy(true);setError('');setNotice('');
+    let updated=article;
     try{
-      let updated=await transitionArticle(article.id,article.version,'submit');
-      try{
-        updated=await transitionArticle(updated.id,updated.version,'approve');
-        updated=await transitionArticle(updated.id,updated.version,'publish');
-        setNotice('Published. No announcement was sent.');
-      }catch{
-        setNotice('Submitted for review, but approval or publication did not complete. Use Approve and Publish below.');
-      }
-      setArticle(updated);setContent(editableArticle(updated));onSaved();
-    }catch(e){setError(blogErrorMessage(e));}finally{setBusy(false);}
+      for(const step of stepsBeforePublish(updated.status))updated=await transitionArticle(updated.id,updated.version,step);
+      updated=await transitionArticle(updated.id,updated.version,target,when);
+      setSchedule('');
+      setNotice(target==='publish'?'Published. No announcement was sent.':'Scheduled. No announcement was sent.');
+    }catch(e){setError(`${target==='publish'?'Not published':'Not scheduled'}: ${blogErrorMessage(e)} Try again.`);}
+    finally{setArticle(updated);setContent(editableArticle(updated));onSaved();setBusy(false);}
   }
   async function reload(){setBusy(true);try{const updated=await getArticle(id);setArticle(updated);setContent(editableArticle(updated));baseline.current=JSON.stringify(editableArticle(updated));setDirty(false);setCover(null);setError('');}catch(e){setError(blogErrorMessage(e));}finally{setBusy(false);}}
   function close(){requestNavigation(onClose);}
@@ -153,9 +153,9 @@ export function ArticleEditor({initial,categories,onSaved,onClose,mode='article'
                 <button type="button" className="afya-btn-secondary" onClick={()=>fileRef.current?.click()}>{coverSrc?'Change':'Upload'}</button>
                 {cover&&<button type="button" className="afya-icon-btn" aria-label="Remove selected cover" onClick={()=>setCover(null)}><Trash2 size={16} color="var(--afya-danger-fg)"/></button>}
               </div>
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png" hidden aria-label="Cover image file" onChange={e=>{const file=e.target.files?.[0]||null;e.target.value='';if(file&&(!['image/jpeg','image/png'].includes(file.type)||file.size>5*1024*1024)){setError('Choose JPEG/PNG up to 5 MB.');return;}setCover(file);}}/>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png" hidden aria-label="Cover image file" onChange={e=>{const file=e.target.files?.[0]||null;e.target.value='';if(file&&(!['image/jpeg','image/png'].includes(file.type)||file.size>MAX_ADMIN_IMAGE_UPLOAD)){setError('Choose a JPEG or PNG up to 25 MB.');return;}setCover(file);}}/>
             </div>
-            <span className="afya-stat-note">JPEG or PNG, up to 5 MB.</span>
+            <span className="afya-stat-note">JPEG or PNG, any size up to 25 MB. Compressed automatically to 1 MB when saved.</span>
 
             <label htmlFor="art-cat">Topic / Category *</label>
             <select id="art-cat" value={content.category_id} onChange={e=>change('category_id',e.target.value)}><option value="">Choose category</option>{categories.map(c=><option key={c.id} value={c.id}>{c.topic_key?`${topicLabel(c.topic_key)} · `:''}{c.name_en} / {c.name_sw}</option>)}</select>
@@ -168,26 +168,25 @@ export function ArticleEditor({initial,categories,onSaved,onClose,mode='article'
 
             <label className="afya-switch-row"><span>Featured {quiz?'quiz':'article'}</span><input type="checkbox" role="switch" checked={content.featured} onChange={e=>change('featured',e.target.checked)}/></label>
             <label className="afya-switch-row"><span>Sensitive health content</span><input type="checkbox" role="switch" checked={content.sensitive} onChange={e=>change('sensitive',e.target.checked)}/></label>
-            <span className="afya-stat-note">A content label only: you can submit, approve and publish your own work.</span>
+            <span className="afya-stat-note">A content label only. It does not change who can publish.</span>
 
             {errors.length>0&&<ul className="afya-stat-note" style={{margin:'10px 0 0',paddingLeft:18}}>{errors.map(e=><li key={e}>{e}</li>)}</ul>}
             <div style={{display:'flex',gap:10,marginTop:14}}>
               <button type="button" className="afya-btn-outline-green" style={{flex:1}} disabled={errors.length>0||(!dirty&&!cover)} onClick={save}>{busy?'Saving…':'Save draft'}</button>
-              {article?.status==='DRAFT'&&<button type="button" className="afya-btn-primary" style={{flex:1}} disabled={dirty||Boolean(cover)} onClick={()=>void publishNow()}>Publish</button>}
+              {article&&isUnpublished(article.status)&&<button type="button" className="afya-btn-primary" style={{flex:1}} disabled={busy||dirty||Boolean(cover)} onClick={()=>void publish('publish')}>Publish</button>}
             </div>
-            <span className="afya-stat-note">Saving changes returns reviewed or published content to draft and clears its approval and schedule.</span>
+            <span className="afya-stat-note">Saving changes to published or scheduled content returns it to draft and clears its schedule; publish again to update what patients see.</span>
           </fieldset>
         </Card>
 
-        {article&&!archived&&<Card title="Review & publication">
+        {article&&!archived&&<Card title="Publication">
           <fieldset disabled={busy||quizBusy||dirty||Boolean(cover)} className="afya-form" style={{border:0,padding:0,margin:0}}>
-            {article.approved_at&&<span className="afya-stat-note">Approved content version {article.approved_version} · {new Date(article.approved_at).toLocaleString('en-KE',{timeZone:'Africa/Nairobi'})} EAT</span>}
             {article.scheduled_for&&<span className="afya-stat-note">Scheduled: {new Date(article.scheduled_for).toLocaleString('en-KE',{timeZone:'Africa/Nairobi'})} EAT</span>}
-            {article.status==='APPROVED'&&<><label htmlFor="art-schedule">Publication date · Africa/Nairobi (UTC+3)</label><input id="art-schedule" type="datetime-local" value={schedule} onChange={e=>setSchedule(e.target.value)}/></>}
+            {isUnpublished(article.status)&&<><label htmlFor="art-schedule">Publish later · Africa/Nairobi (UTC+3)</label><input id="art-schedule" type="datetime-local" value={schedule} onChange={e=>setSchedule(e.target.value)}/><button type="button" className="afya-btn-secondary" style={{alignSelf:'flex-start'}} disabled={!schedule} onClick={()=>void publish('schedule')}>Schedule publication</button></>}
             <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:6}}>
-              {articleActions(article.status).map(action=><button type="button" key={action} className={action==='archive'?'afya-btn-danger':action==='publish'||action==='approve'?'afya-btn-primary':'afya-btn-secondary'} disabled={action==='approve'&&article.can_approve!==true} title={action==='approve'&&article.approval_block_reason==='INDEPENDENT_REVIEW_REQUIRED'?independentApprovalMessage:undefined} onClick={()=>{if(action!=='archive'||window.confirm('Archive this article? Archived articles cannot be edited.'))void act(action);}}>{ACTION_LABEL[action]}</button>)}
+              {articleActions(article.status).map(action=><button type="button" key={action} className={action==='archive'?'afya-btn-danger':'afya-btn-secondary'} onClick={()=>{if(action!=='archive'||window.confirm('Archive this article? Archived articles cannot be edited.'))void act(action);}}>{ACTION_LABEL[action]}</button>)}
             </div>
-            {(dirty||cover)&&<span className="afya-stat-note">Save changes before review or publication.</span>}
+            {(dirty||cover)&&<span className="afya-stat-note">Save changes before publishing.</span>}
           </fieldset>
         </Card>}
       </div>

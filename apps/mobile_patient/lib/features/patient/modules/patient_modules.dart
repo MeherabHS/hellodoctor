@@ -12,6 +12,7 @@ import '../facilities/facility_directory_page.dart';
 import '../facilities/facility_repository.dart';
 import '../home/brand_header.dart';
 import '../home/home_cubit.dart';
+import '../peer/peer_repository.dart';
 import '../profile/family_profiles_cubit.dart';
 import '../profile/profile_cubit.dart';
 import '../qna/qna_repository.dart';
@@ -132,7 +133,18 @@ List<PatientModule> patientModules(BuildContext context, PatientShellNav nav) {
         background: PatientTokens.tileGreenBg,
         label: l.modulePeerNavigator,
         description: l.modulePeerNavigatorDesc,
-        open: (c) => push(c, PeerNavigatorPage(nav: nav))),
+        open: (c) {
+          final homeRepo = c.read<HomeCubit>().repo;
+          push(
+              c,
+              PeerNavigatorPage(
+                  nav: nav,
+                  repo: PatientPeerRepository(homeRepo.api,
+                      connectivity: homeRepo.connectivity),
+                  bookingRepo: BookingRepository(homeRepo.api,
+                      connectivity: homeRepo.connectivity),
+                  myUserId: c.read<ProfileCubit>().state.profile?.userId));
+        }),
     PatientModule(
         icon: Icons.notifications_rounded,
         color: PatientTokens.tileAmber,

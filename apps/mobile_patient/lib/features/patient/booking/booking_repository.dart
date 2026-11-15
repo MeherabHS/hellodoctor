@@ -194,6 +194,37 @@ class BookingRepository {
     }
   }
 
+  /// `GET /appointments/:id/prescriptions` — this consultation's uploaded
+  /// pages (metadata only) and whether they can still be changed. Never
+  /// cached: a stale list could offer to remove a page that is already gone.
+  Future<IntakeUploads> intakeUploads(String appointmentId) async {
+    try {
+      requireOnline();
+      final raw =
+          _data(await api.get('/appointments/$appointmentId/prescriptions'));
+      return IntakeUploads.fromJson(Map<String, dynamic>.from(raw as Map));
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Booking', operation: 'list_intake');
+      rethrow;
+    }
+  }
+
+  /// `DELETE /appointments/:id/prescriptions/:documentId` — removes one of
+  /// the patient's own uploaded pages while the consultation still accepts
+  /// uploads, so the right page can be uploaded instead.
+  Future<void> removeIntake(String appointmentId, String documentId) async {
+    try {
+      requireOnline();
+      _data(await api
+          .delete('/appointments/$appointmentId/prescriptions/$documentId'));
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Booking', operation: 'remove_intake');
+      rethrow;
+    }
+  }
+
   /// `GET /appointments/:id` — used by the Waiting Room to poll for a status
   /// change while a patient waits (e.g. cancelled elsewhere). No caching:
   /// a stale read here could mislead a patient into waiting for a

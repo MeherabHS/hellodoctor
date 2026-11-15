@@ -537,6 +537,39 @@
   "@intakeAttachContinue": {
     "description": "Intake modal submit button."
   },
+  "intakeUploadedPages": "Already uploaded",
+  "@intakeUploadedPages": {
+    "description": "Intake modal header for pages already sent to the doctor for this consultation."
+  },
+  "intakeUploadedPage": "Page {page}",
+  "@intakeUploadedPage": {
+    "description": "Label of one uploaded intake page.",
+    "placeholders": {
+      "page": {
+        "type": "int"
+      }
+    }
+  },
+  "intakeRemoveUploadedTitle": "Remove this page?",
+  "@intakeRemoveUploadedTitle": {
+    "description": "Confirm dialog title for removing an uploaded intake page."
+  },
+  "intakeRemoveUploadedBody": "Your doctor will no longer see it. You can upload the right page afterwards.",
+  "@intakeRemoveUploadedBody": {
+    "description": "Confirm dialog body for removing an uploaded intake page."
+  },
+  "intakeRemoveConfirm": "Remove",
+  "@intakeRemoveConfirm": {
+    "description": "Confirm button for removing an uploaded intake page."
+  },
+  "intakeRemoveError": "Unable to remove this page.",
+  "@intakeRemoveError": {
+    "description": "Generic failure removing an uploaded intake page."
+  },
+  "intakeUploadsLocked": "Uploads for this consultation can no longer be changed.",
+  "@intakeUploadsLocked": {
+    "description": "Shown when the consultation is past the window for changing uploads."
+  },
   "intakeSkipPrompt": "First consultation? Continue without existing reports",
   "@intakeSkipPrompt": {
     "description": "Intake modal skip-upload link."
@@ -937,7 +970,8 @@
   "chatAttachInvalid": "Choose a JPEG or PNG image.",
   "chatAttachTooLarge": "Choose an image smaller than 10 MB.",
   "chatAttachFailed": "The image was not sent. Check your connection and retry.",
-  "chatAttachRetry": "Retry sending image",  "chatInputHint": "Type your message",
+  "chatAttachRetry": "Retry sending image",
+  "chatInputHint": "Type your message",
   "@chatInputHint": {
     "description": "Chat message input placeholder."
   },
@@ -1208,6 +1242,14 @@
   "profileSave": "Save",
   "@profileSave": {
     "description": "Patient interface: profileSave"
+  },
+  "profileAddress": "Address",
+  "@profileAddress": {
+    "description": "Patient profile residential address field."
+  },
+  "profileAddressInvalid": "Enter your address (3 to 300 characters).",
+  "@profileAddressInvalid": {
+    "description": "Validation message for the patient address."
   },
   "profileBloodGroup": "Blood group (optional)",
   "@profileBloodGroup": {
@@ -2038,6 +2080,22 @@
   "supportCatStigma": "Stigma & Mental Health",
   "supportCatStigmaDesc": "Coping, support, someone to talk to.",
   "supportAskAnonymous": "Ask a question (anonymous)",
+  "supportWhatsAppTitle": "Need immediate assistance?",
+  "@supportWhatsAppTitle": {
+    "description": "HIV Support Chat WhatsApp card title."
+  },
+  "supportWhatsAppBody": "Text us on WhatsApp",
+  "@supportWhatsAppBody": {
+    "description": "HIV Support Chat WhatsApp card prompt."
+  },
+  "supportWhatsAppPending": "WhatsApp number coming soon",
+  "@supportWhatsAppPending": {
+    "description": "Shown in place of the WhatsApp number until one is configured."
+  },
+  "supportWhatsAppOpenError": "WhatsApp could not be opened on this device.",
+  "@supportWhatsAppOpenError": {
+    "description": "Shown when the WhatsApp link cannot be opened."
+  },
   "supportPrivacyTitle": "Your privacy matters",
   "supportPrivacyBody": "Questions are posted anonymously. A clinician answers later; this is not a live chat.",
   "peerTitle": "Peer Navigator",
@@ -2061,8 +2119,6 @@
   "remindersEmptyBody": "Personal reminders are not available in this version. When they are, your medication, testing and appointment reminders will appear here.",
   "remindersPrivacy1": "Your reminders are private.",
   "remindersPrivacy2": "On a locked screen the reminder's text is hidden. It appears after you unlock your phone.",
-  "recordsTabMine": "My Records",
-  "recordsTabShare": "Share Access",
   "recordsAll": "All Records",
   "recordsAllDesc": "Everything in your health vault",
   "recordsPrescriptions": "Prescriptions",
@@ -2072,7 +2128,6 @@
   "recordsAccessTitle": "Access control",
   "recordsAccess1": "Your records are private.",
   "recordsAccess2": "Only you and the doctors you consult can see them.",
-  "recordsShareUnavailable": "Sharing access to your records is not available yet.",
   "facilitiesSearchHint": "Search by location or service…",
   "facilitiesChipTesting": "Testing",
   "facilitiesChipPrepArt": "PrEP/ART",
@@ -2305,7 +2360,13 @@
   "eduBannerStigma": "Reduce HIV-related stigma, know your rights and make safe, informed choices about disclosure.",
   "eduBannerRelationships": "Build respectful, safe and supportive relationships that are good for your health and well-being.",
   "eduArticlesCount": "Articles ({count})",
-  "@eduArticlesCount": {"placeholders": {"count": {"type": "int"}}},
+  "@eduArticlesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "eduNoArticlesTitle": "No articles yet",
   "eduNoArticlesHivBasics": "We’re preparing helpful HIV Basics content for you. Please check back soon.",
   "eduNoArticlesPrep": "We’re preparing helpful PrEP content for you. Please check back soon.",
@@ -2320,14 +2381,26 @@
   "eduNoAudioTitle": "No audio yet",
   "eduNoAudioBody": "We're working on adding audio content for this topic. Check back soon!",
   "eduMinRead": "{minutes} min read",
-  "@eduMinRead": {"placeholders": {"minutes": {"type": "int"}}},
+  "@eduMinRead": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "eduLoadError": "We couldn't load this content. Check your connection and try again.",
   "eduRetry": "Try again",
   "eduLoadMore": "Show more",
   "eduWatchOnYouTube": "Watch on YouTube",
   "eduVideoOpenFailed": "Couldn't open YouTube. Please try again.",
   "eduQuizQuestions": "{count, plural, =1{1 question} other{{count} questions}}",
-  "@eduQuizQuestions": {"placeholders": {"count": {"type": "int"}}},
+  "@eduQuizQuestions": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "facilitiesTitle": "Facility Services",
   "facilitiesSubtitle": "Find youth-friendly facilities, testing, PrEP/ART services and get directions or contact details.",
   "facilitiesNoMatchTitle": "No matching facilities",
@@ -2342,18 +2415,54 @@
   "facilitiesAbout": "About",
   "facilitiesYouthFriendly": "Youth Friendly",
   "facilitiesOpenCloses": "Open · Closes {time}",
-  "@facilitiesOpenCloses": {"placeholders": {"time": {"type": "String"}}},
+  "@facilitiesOpenCloses": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "facilitiesOpenClosesOn": "Open · Closes {day} {time}",
-  "@facilitiesOpenClosesOn": {"placeholders": {"day": {"type": "String"}, "time": {"type": "String"}}},
+  "@facilitiesOpenClosesOn": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "facilitiesOpen": "Open",
   "facilitiesOpen24": "Open 24 hours",
   "facilitiesClosed": "Closed",
   "facilitiesClosedOpensToday": "Closed · Opens today at {time}",
-  "@facilitiesClosedOpensToday": {"placeholders": {"time": {"type": "String"}}},
+  "@facilitiesClosedOpensToday": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "facilitiesClosedOpensTomorrow": "Closed · Opens tomorrow at {time}",
-  "@facilitiesClosedOpensTomorrow": {"placeholders": {"time": {"type": "String"}}},
+  "@facilitiesClosedOpensTomorrow": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "facilitiesClosedOpensOn": "Closed · Opens {day} at {time}",
-  "@facilitiesClosedOpensOn": {"placeholders": {"day": {"type": "String"}, "time": {"type": "String"}}},
+  "@facilitiesClosedOpensOn": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
   "facilitiesHoursNotAvailable": "Opening hours not available",
   "facilitiesDayClosed": "Closed",
   "facilitiesDayAllDay": "Open 24 hours",
@@ -2361,8 +2470,120 @@
   "facilitiesToday": "Today",
   "facilitiesActionFailed": "Couldn't open this on your phone. Please try again.",
   "facilitiesPhotoOf": "Photo of {name}",
-  "@facilitiesPhotoOf": {"placeholders": {"name": {"type": "String"}}},
+  "@facilitiesPhotoOf": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "facilitiesOpenDetails": "Open details for {name}",
-  "@facilitiesOpenDetails": {"placeholders": {"name": {"type": "String"}}},
-  "facilitiesLoadMore": "Show more"
+  "@facilitiesOpenDetails": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "facilitiesLoadMore": "Show more",
+  "peerMyRequests": "My support requests",
+  "peerStatusPending": "Waiting for acceptance",
+  "peerStatusAccepted": "Accepted",
+  "peerStatusDeclined": "Declined",
+  "peerStatusCancelled": "Cancelled",
+  "peerStatusCompleted": "Completed",
+  "peerCancelRequest": "Cancel request",
+  "peerCancelConfirmTitle": "Cancel this request?",
+  "peerCancelConfirmBody": "The time will be freed for others.",
+  "peerKeepRequest": "Keep request",
+  "peerOpenChat": "Open Chat",
+  "peerSupportChat": "Chat Support",
+  "peerSupportCall": "Voice/Video Support",
+  "peerChooseTitle": "Choose a Peer Navigator",
+  "peerTrained": "Trained Peer Navigator",
+  "peerRole": "Peer Navigator",
+  "peerNextAvailable": "Next available: {time}",
+  "@peerNextAvailable": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "peerNoSlotsYet": "No open times yet",
+  "peerNoneTitle": "No Peer Navigators available yet",
+  "peerNoneBody": "Please check back soon.",
+  "peerLoadError": "Unable to load Peer Navigators. Check your connection and retry.",
+  "peerBookTitle": "Book Peer Support",
+  "peerBookBannerTitle": "Peer Navigator Support",
+  "peerBookBannerBody": "A confidential, non-clinical support session with a trained peer navigator.",
+  "peerSupportType": "Support Type",
+  "peerAvailableSlots": "Available Slots",
+  "peerNoOpenSlots": "This Peer Navigator has no open times right now. Please check back later.",
+  "peerTopicLabel": "Topic / Reason for Support",
+  "peerTopicHint": "What would you like to talk about?",
+  "peerTopicTooShort": "Write at least 3 characters about your topic.",
+  "peerChooseSlot": "Choose a time.",
+  "peerRequestSupport": "Request Support",
+  "peerToday": "Today",
+  "peerTomorrow": "Tomorrow",
+  "peerSentTitle": "Request Sent",
+  "peerSentHeadline": "Support Request Sent!",
+  "peerSentBody": "Your request for peer support has been sent. Please wait for the peer navigator to accept it before the session starts.",
+  "peerWaitingTitle": "Waiting for peer acceptance",
+  "peerWaitingBody": "We'll notify you as soon as {name} accepts your request.",
+  "@peerWaitingBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "peerDetails": "Appointment Details",
+  "peerRequestedSlot": "Requested Slot",
+  "peerYourTopic": "Your Topic",
+  "peerNotifyNote": "You'll get a notification when your request is accepted.",
+  "peerBackToServices": "Back to Services",
+  "peerChatSubtitle": "Peer Support Chat",
+  "peerChatActiveTitle": "Peer support conversation active",
+  "peerChatActiveBody": "You're connected with {name} for peer support, guidance, and follow-up.",
+  "@peerChatActiveBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "peerStartCall": "Start Call",
+  "peerTypeMessage": "Type a message...",
+  "peerChatEmpty": "No messages yet. Say hello.",
+  "peerSendError": "Message not sent. Please retry.",
+  "peerImageShared": "Image shared",
+  "peerGenericError": "Something went wrong. Please retry.",
+  "peerChatLoadError": "Unable to load this conversation. Check your connection and retry.",
+  "messagesPeerSupport": "Peer support",
+  "peerNameWithRole": "{name} (Peer Navigator)",
+  "@peerNameWithRole": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "peerYesterday": "Yesterday",
+  "peerAttachTooltip": "Attach photo",
+  "peerAttachTitle": "Share a photo",
+  "peerAttachSubtitle": "A JPEG or PNG photo to share with your peer navigator.",
+  "peerPhoto": "Photo",
+  "peerViewPhoto": "View photo",
+  "peerPhotoOpenError": "Unable to open this photo.",
+  "peerSendPhotoError": "The photo was not sent. Check your connection and retry.",
+  "peerMoreOptions": "More options",
+  "peerSessionDetails": "Session details",
+  "peerSessionWhen": "Date & time",
+  "peerRefresh": "Refresh",
+  "peerMessageRead": "Read",
+  "peerMessageSent": "Sent",
+  "peerSendTooltip": "Send",
+  "peerVerified": "Verified Peer"
 }
