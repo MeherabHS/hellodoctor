@@ -53,6 +53,19 @@ pub struct PeerChatSummary {
     pub last_message_at: Option<DateTime<Utc>>,
     pub last_message: Option<String>,
     pub unread_count: i64,
+    #[serde(skip)]
+    pub call_ended: bool,
+    #[sqlx(default)]
+    pub call_closed: bool,
+}
+
+impl crate::repository::peer_repo::PeerCallWindow for PeerChatSummary {
+    fn call_window(&self) -> (&str, DateTime<Utc>, bool) {
+        (&self.request_status, self.end_time, self.call_ended)
+    }
+    fn set_call_closed(&mut self, closed: bool) {
+        self.call_closed = closed;
+    }
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -98,14 +111,16 @@ pub async fn list(
         "p.full_name"
     };
     let mut tx = state.begin_authed(&ctx).await?;
-    let rows = sqlx::query_as::<_, PeerChatSummary>(&format!(
+    let mut rows = sqlx::query_as::<_, PeerChatSummary>(&format!(
         "SELECT c.id, c.request_id, {counterpart} AS counterpart_name, r.support_type, \
                 r.status AS request_status, s.start_time, s.end_time, c.last_message_at, \
                 (SELECT CASE WHEN m.content <> '' THEN left(m.content, 120) ELSE '[Image]' END \
                    FROM peer_messages m WHERE m.conversation_id = c.id \
                    ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS last_message, \
                 (SELECT count(*) FROM peer_messages m WHERE m.conversation_id = c.id \
-                   AND NOT m.is_read AND m.sender_id <> $1) AS unread_count \
+                   AND NOT m.is_read AND m.sender_id <> $1) AS unread_count, \
+                EXISTS (SELECT 1 FROM peer_call_sessions pc WHERE pc.request_id = r.id \
+                   AND pc.status = 'ENDED') AS call_ended \
          FROM peer_conversations c \
          JOIN peer_requests r ON r.id = c.request_id \
          JOIN peer_slots s ON s.id = r.slot_id \
@@ -116,6 +131,11 @@ pub async fn list(
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;
+    crate::repository::peer_repo::mark_call_closed(
+        &mut rows,
+        state.config.agora_token_window_after_mins,
+        chrono::Utc::now(),
+    );
     Ok(ok(rows))
 }
 

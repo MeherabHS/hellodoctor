@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
@@ -117,8 +119,13 @@ class AfyaServiceTile extends StatelessWidget {
       required this.label,
       required this.onTap,
       this.enabled = true,
-      this.badge});
+      this.badge,
+      this.labelWidth});
   final IconData icon;
+
+  /// The label's width, from a parent grid that knows it (rows here use
+  /// IntrinsicHeight). Without it the label measures itself.
+  final double? labelWidth;
   final Color color, background;
   final String label;
   final VoidCallback onTap;
@@ -154,10 +161,11 @@ class AfyaServiceTile extends StatelessWidget {
                     background: enabled ? background : const Color(0xFFE6E9EB),
                     size: 52),
                 const SizedBox(height: 9),
-                Text(label,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                // Up to three lines, never splitting a word: longer Swahili
+                // labels and large system text shrink to fit.
+                AfyaFitText(label,
+                    maxLines: 3,
+                    maxWidth: labelWidth,
                     style: TextStyle(
                         fontSize: 13,
                         height: 1.25,
@@ -222,4 +230,64 @@ class AfyaBackHeader extends StatelessWidget {
           ...actions,
         ]),
       );
+}
+
+/// A short label for a fixed-width tile. With large system text or long
+/// Swahili words it shrinks just enough that no word is split across lines
+/// and nothing is cut off, down to [minScale] of its size; past that it
+/// ellipsizes.
+class AfyaFitText extends StatelessWidget {
+  const AfyaFitText(this.text,
+      {super.key,
+      required this.style,
+      this.maxLines = 2,
+      this.textAlign = TextAlign.center,
+      this.minScale = 0.7,
+      this.maxWidth});
+  final String text;
+
+  /// The width the label gets. Pass it where a parent measures intrinsic
+  /// sizes (e.g. IntrinsicHeight), which cannot host a LayoutBuilder.
+  final double? maxWidth;
+  final TextStyle style;
+  final int maxLines;
+  final TextAlign textAlign;
+  final double minScale;
+
+  @override
+  Widget build(BuildContext context) => maxWidth != null
+      ? _fit(context, maxWidth!)
+      : LayoutBuilder(builder: (context, c) => _fit(context, c.maxWidth));
+
+  Widget _fit(BuildContext context, double available) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    final base = DefaultTextStyle.of(context).style.merge(style);
+    final size = base.fontSize ?? 14;
+    final width = available - 0.5;
+    TextPainter paint(String t, double f, {int? lines}) => TextPainter(
+        text: TextSpan(text: t, style: base.copyWith(fontSize: size * f)),
+        textDirection: direction,
+        textScaler: scaler,
+        maxLines: lines)
+      ..layout(maxWidth: lines == null ? double.infinity : width);
+    var factor = 1.0;
+    if (width.isFinite && width > 0) {
+      for (final word in text.split(RegExp(r'\s+'))) {
+        if (word.isEmpty) continue;
+        final w = paint(word, 1).width;
+        if (w > width) factor = math.min(factor, width / w);
+      }
+      while (factor > minScale &&
+          paint(text, factor, lines: maxLines).didExceedMaxLines) {
+        factor -= 0.04;
+      }
+      factor = math.max(factor, minScale);
+    }
+    return Text(text,
+        textAlign: textAlign,
+        maxLines: maxLines,
+        overflow: TextOverflow.ellipsis,
+        style: style.copyWith(fontSize: size * factor));
+  }
 }

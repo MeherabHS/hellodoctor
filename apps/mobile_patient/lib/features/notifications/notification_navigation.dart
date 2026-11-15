@@ -94,6 +94,7 @@ Future<void> openNotificationDestination(BuildContext context,
                 requestId: chat.requestId,
                 peerName: chat.peerName,
                 requestStatus: chat.requestStatus,
+                callClosed: chat.callClosed,
                 myUserId: deps?.myUserId ??
                     (await ProfileRepository(cubit.repo.api).profile()).userId);
             if (!context.mounted || !gate.current) return;
