@@ -2,6 +2,7 @@ pub mod admin_articles;
 pub mod article_quizzes;
 pub mod articles;
 pub mod campaigns;
+pub mod facilities;
 pub mod ids;
 pub mod join_window;
 pub mod models;

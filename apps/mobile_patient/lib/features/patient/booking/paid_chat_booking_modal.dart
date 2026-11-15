@@ -137,14 +137,6 @@ class _PaidChatBookingModal extends StatelessWidget {
                       fontSize: 10.5, color: PatientTokens.textSub)),
             ]),
           ),
-          const SizedBox(height: 12),
-          Wrap(spacing: 16, runSpacing: 8, children: [
-            Text(l10n.paidChatFeeLabel,
-                style: const TextStyle(
-                    fontSize: 11.5, color: PatientTokens.textSub)),
-            Text(l10n.bookingFeeAmount(doctor.consultationFeeChat),
-                style: const TextStyle(fontWeight: FontWeight.w700)),
-          ]),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,

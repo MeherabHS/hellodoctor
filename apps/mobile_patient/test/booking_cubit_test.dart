@@ -37,8 +37,10 @@ class FakeBookingRepository extends BookingRepository {
   Map<String, dynamic>? lastBookArgs;
   int uploadCallCount = 0;
   int? uploadResult;
+  // The product is payment-free; a payment-requiring server is tested
+  // explicitly as a blocked configuration.
   BookingPolicyDto bookingPolicyResult =
-      const BookingPolicyDto(paymentRequired: true);
+      const BookingPolicyDto(paymentRequired: false);
   Object? bookingPolicyError;
 
   @override
@@ -157,19 +159,24 @@ void main() {
     });
   });
 
-  group('canProceed — real date/slot/payment-method-required validation', () {
-    test('false until a date, a slot, and a payment method are all selected',
+  group('canProceed — payment-free date/slot validation', () {
+    test('false until the policy is known and a date and slot are selected',
         () async {
       repo.slotsResult = [DoctorSlotDto.fromJson(_slotJsonDay1Morning)];
       await cubit.loadSlots();
-      // A date is auto-selected by loadSlots, but no slot yet.
+      cubit.selectSlot('slot-1');
+      // The server policy has not been read yet.
+      expect(cubit.state.canProceed, isFalse);
+      await cubit.loadBookingPolicy();
+      expect(cubit.state.canProceed, isTrue);
+    });
+
+    test('a date auto-selected without a slot cannot proceed', () async {
+      repo.slotsResult = [DoctorSlotDto.fromJson(_slotJsonDay1Morning)];
+      await cubit.loadBookingPolicy();
+      await cubit.loadSlots();
       expect(cubit.state.selectedDate, isNotNull);
       expect(cubit.state.canProceed, isFalse);
-      cubit.selectSlot('slot-1');
-      // A slot is now selected, but there is still no payment method.
-      expect(cubit.state.canProceed, isFalse);
-      cubit.selectPaymentMethod('pm-1');
-      expect(cubit.state.canProceed, isTrue);
     });
 
     test('selecting a new date clears the previously selected slot', () async {
@@ -177,13 +184,41 @@ void main() {
         DoctorSlotDto.fromJson(_slotJsonDay1Morning),
         DoctorSlotDto.fromJson(_slotJsonDay2),
       ];
+      await cubit.loadBookingPolicy();
       await cubit.loadSlots();
       cubit.selectSlot('slot-1');
-      cubit.selectPaymentMethod('pm-1');
       expect(cubit.state.canProceed, isTrue);
       cubit.selectDate(cubit.state.availableDates.last);
       expect(cubit.state.selectedSlotId, isNull);
       expect(cubit.state.canProceed, isFalse);
+    });
+
+    test('a server that requires payment blocks booking; no checkout exists',
+        () async {
+      repo.bookingPolicyResult = const BookingPolicyDto(paymentRequired: true);
+      repo.slotsResult = [DoctorSlotDto.fromJson(_slotJsonDay1Morning)];
+      await cubit.loadBookingPolicy();
+      await cubit.loadSlots();
+      cubit.selectSlot('slot-1');
+      expect(cubit.state.paymentBlocked, isTrue);
+      expect(cubit.state.canProceed, isFalse);
+      expect(await cubit.submit(), isFalse);
+      expect(repo.lastBookArgs, isNull);
+    });
+
+    test('an unreadable policy blocks booking until a retry succeeds',
+        () async {
+      repo.bookingPolicyError = const ApiException(null, 'offline');
+      repo.slotsResult = [DoctorSlotDto.fromJson(_slotJsonDay1Morning)];
+      await cubit.loadBookingPolicy();
+      await cubit.loadSlots();
+      cubit.selectSlot('slot-1');
+      expect(cubit.state.policyLoadFailed, isTrue);
+      expect(cubit.state.paymentBlocked, isFalse);
+      expect(cubit.state.canProceed, isFalse);
+      repo.bookingPolicyError = null;
+      await cubit.loadBookingPolicy();
+      expect(cubit.state.canProceed, isTrue);
     });
   });
 
@@ -194,45 +229,35 @@ void main() {
       expect(repo.lastBookArgs, isNull);
     });
 
-    test('does nothing when a slot is selected but no payment method is chosen',
-        () async {
-      repo.slotsResult = [DoctorSlotDto.fromJson(_slotJsonDay1Morning)];
-      await cubit.loadSlots();
-      cubit.selectSlot('slot-1');
-      final ok = await cubit.submit();
-      expect(ok, isFalse);
-      expect(repo.lastBookArgs, isNull);
-    });
-
     test(
-        'books with the selected slot, modality, payment method, and profile id on success',
+        'books with the selected slot, modality and profile id, never a payment method',
         () async {
       repo.slotsResult = [DoctorSlotDto.fromJson(_slotJsonDay1Morning)];
+      await cubit.loadBookingPolicy();
       await cubit.loadSlots();
       cubit.selectSlot('slot-1');
-      cubit.selectPaymentMethod('pm-1');
       repo.bookResult = const BookingResultDto(
         appointmentId: 'apt-1',
         appointmentNumber: 'APT-20261102-ABC12345',
-        status: 'PENDING_PAYMENT',
-        paymentPolicy: 'REQUIRED',
-        amount: '630.00',
+        status: 'CONFIRMED',
+        paymentPolicy: 'NOT_REQUIRED',
+        amount: '0',
       );
       final ok = await cubit.submit(profileId: 'dep-1');
       expect(ok, isTrue);
       expect(cubit.state.result?.appointmentId, 'apt-1');
       expect(repo.lastBookArgs?['slotId'], 'slot-1');
       expect(repo.lastBookArgs?['modality'], 'VIDEO');
-      expect(repo.lastBookArgs?['paymentMethodId'], 'pm-1');
+      expect(repo.lastBookArgs?['paymentMethodId'], isNull);
       expect(repo.lastBookArgs?['profileId'], 'dep-1');
     });
 
     test('a slot-conflict failure surfaces as state.submitError, not thrown',
         () async {
       repo.slotsResult = [DoctorSlotDto.fromJson(_slotJsonDay1Morning)];
+      await cubit.loadBookingPolicy();
       await cubit.loadSlots();
       cubit.selectSlot('slot-1');
-      cubit.selectPaymentMethod('pm-1');
       repo.bookError = const ApiException(
           409, 'Selected time slot is already locked or booked.');
       final ok = await cubit.submit();
@@ -322,15 +347,15 @@ void main() {
 
     test('uploads against the booked appointment id on success', () async {
       repo.slotsResult = [DoctorSlotDto.fromJson(_slotJsonDay1Morning)];
+      await cubit.loadBookingPolicy();
       await cubit.loadSlots();
       cubit.selectSlot('slot-1');
-      cubit.selectPaymentMethod('pm-1');
       repo.bookResult = const BookingResultDto(
         appointmentId: 'apt-1',
         appointmentNumber: 'APT-20261102-ABC12345',
-        status: 'PENDING_PAYMENT',
-        paymentPolicy: 'REQUIRED',
-        amount: '630.00',
+        status: 'CONFIRMED',
+        paymentPolicy: 'NOT_REQUIRED',
+        amount: '0',
       );
       await cubit.submit();
       final ok = await cubit.uploadIntake(const [

@@ -204,3 +204,37 @@ Map<String, dynamic> telemetryEvent(String eventType, DateTime occurredAt) => {
       'event_type': eventType,
       'occurred_at': occurredAt.toUtc().toIso8601String(),
     };
+
+/// One page the patient already uploaded for a consultation (metadata only).
+class IntakeUploadDto {
+  const IntakeUploadDto(
+      {required this.id, required this.pageNumber, this.mimeType});
+  final String id;
+  final int pageNumber;
+  final String? mimeType;
+
+  bool get isPdf => mimeType == 'application/pdf';
+
+  factory IntakeUploadDto.fromJson(Json j) => IntakeUploadDto(
+        id: j['id']?.toString() ?? '',
+        pageNumber: int.tryParse(j['page_number']?.toString() ?? '') ?? 0,
+        mimeType: j['mime_type']?.toString(),
+      );
+}
+
+/// `GET /appointments/:id/prescriptions`: uploaded pages, and whether the
+/// consultation still accepts changes (upload or remove).
+class IntakeUploads {
+  const IntakeUploads({required this.documents, required this.editable});
+  final List<IntakeUploadDto> documents;
+  final bool editable;
+
+  factory IntakeUploads.fromJson(Json j) => IntakeUploads(
+        documents: (j['documents'] is List ? j['documents'] as List : const [])
+            .whereType<Map>()
+            .map((e) => IntakeUploadDto.fromJson(Map<String, dynamic>.from(e)))
+            .where((d) => d.id.isNotEmpty)
+            .toList(),
+        editable: j['editable'] == true,
+      );
+}

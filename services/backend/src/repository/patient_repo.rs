@@ -170,6 +170,66 @@ pub async fn insert<'e, E: PgExecutor<'e>>(
     Ok(())
 }
 
+/// Self-registration insert: the profile plus the residential address the
+/// patient gave at sign-up. A single INSERT, because the auth worker that
+/// runs registration may insert patient profiles but not update them.
+pub async fn insert_with_address<'e, E: PgExecutor<'e>>(
+    executor: E,
+    p: &PatientProfile,
+    residential_address: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO patient_profiles (id, user_id, full_name, date_of_birth, gender, blood_group, weight_kg, emergency_contact_phone, emergency_contact_relation, guardian_patient_id, relationship, created_at, updated_at, residential_address) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
+    )
+    .bind(p.id)
+    .bind(p.user_id)
+    .bind(&p.full_name)
+    .bind(p.date_of_birth)
+    .bind(p.gender)
+    .bind(&p.blood_group)
+    .bind(&p.weight_kg)
+    .bind(&p.emergency_contact_phone)
+    .bind(&p.emergency_contact_relation)
+    .bind(p.guardian_patient_id)
+    .bind(&p.relationship)
+    .bind(p.created_at)
+    .bind(p.updated_at)
+    .bind(residential_address)
+    .execute(executor)
+    .await?;
+    Ok(())
+}
+
+/// The patient's own residential address (sensitive; self and own data
+/// export only). `None` for accounts created before it was collected.
+pub async fn find_residential_address<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: PatientProfileId,
+) -> Result<Option<String>, sqlx::Error> {
+    let row: Option<Option<String>> =
+        sqlx::query_scalar("SELECT residential_address FROM patient_profiles WHERE id = $1")
+            .bind(id)
+            .fetch_optional(executor)
+            .await?;
+    Ok(row.flatten())
+}
+
+pub async fn update_residential_address<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: PatientProfileId,
+    residential_address: &str,
+) -> Result<u64, sqlx::Error> {
+    Ok(sqlx::query(
+        "UPDATE patient_profiles SET residential_address = $2, updated_at = clock_timestamp() WHERE id = $1",
+    )
+    .bind(id)
+    .bind(residential_address)
+    .execute(executor)
+    .await?
+    .rows_affected())
+}
+
 /// Partial update — every field is `Option`; `None` leaves the existing
 /// column value unchanged (`COALESCE`), matching
 /// `doctor_handlers::update_own_profile`'s single-field precedent, extended

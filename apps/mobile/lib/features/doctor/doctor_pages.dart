@@ -33,6 +33,12 @@ import '../../core/video/call_screen_guard.dart';
 /// instance, not one per call site.
 final _callScreenGuard = CallScreenGuard();
 
+/// Opens the video call for [appointmentId] through the same single guard as
+/// every other entry point in this file, for screens that live elsewhere.
+void openConsultationCall(BuildContext context, String appointmentId) =>
+    _callScreenGuard.push(
+        context, (_) => AgoraPage(appointmentId: appointmentId));
+
 /// Shared bell builder so every tab constructs the same `onTap` navigation
 /// and reads the same live `NotificationCubit` unread count, without
 /// duplicating that wiring five times.
@@ -226,7 +232,7 @@ class _ConsultationHistoryState extends State<ConsultationHistoryPage> {
                     leading: const Icon(Icons.assignment_outlined),
                     title: Text(a.patientName ?? 'Patient'),
                     subtitle: Text(
-                        '${a.modality} consultation ? ${a.start ?? ''} ? ${a.status}'),
+                        '${a.isChat ? 'Chat' : 'Video'} consultation · ${_mediumDateTime(a.start?.toIso8601String())} · ${a.status.replaceAll('_', ' ').toLowerCase()}'),
                     onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -244,20 +250,114 @@ class _ConsultationHistoryState extends State<ConsultationHistoryPage> {
               ]))));
 }
 
+/// The server accepts a doctor's prescription pages until 24 hours after a
+/// consultation ends (`doctor_history_context_allowed`). The button is
+/// offered only inside that window; the server still decides.
+bool rxWindowOpen(AppointmentDto a, [DateTime? now]) {
+  if (a.status != 'COMPLETED' || a.rxDecided) return false;
+  final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
+  if (ended == null) return false;
+  return (now ?? DateTime.now())
+      .toUtc()
+      .isBefore(ended.toUtc().add(const Duration(hours: 24)));
+}
+
+/// "Gap Audit Tester · Video · Nov 13 · 11:27 AM": tells apart several
+/// consultations with the same patient.
+String rxConsultationLabel(AppointmentDto a) =>
+    '${a.patientName ?? 'Patient'} · ${a.isChat ? 'Chat' : 'Video'} · ${_mediumDateTime(a.start?.toIso8601String())}';
+
 class EncounterHistoryPage extends StatefulWidget {
-  const EncounterHistoryPage({super.key, required this.appointment});
+  const EncounterHistoryPage(
+      {super.key, required this.appointment, this.previous});
   final AppointmentDto appointment;
+
+  /// The doctor's other consultations with this patient, when the caller
+  /// already has them; otherwise they are loaded from the history list.
+  final List<AppointmentDto>? previous;
   @override
   State<EncounterHistoryPage> createState() => _EncounterHistoryState();
 }
 
 class _EncounterHistoryState extends State<EncounterHistoryPage> {
   late final Future<Json> details;
+  late final Future<List<AppointmentDto>> others;
   @override
   void initState() {
     super.initState();
-    details = context.read<DoctorCubit>().repo.summary(widget.appointment.id);
+    final repo = context.read<DoctorCubit>().repo;
+    details = repo.summary(widget.appointment.id);
+    final a = widget.appointment;
+    others = widget.previous != null
+        ? Future.value(widget.previous)
+        : a.patientId == null
+            ? Future.value(const <AppointmentDto>[])
+            : repo.consultationHistory().then((rows) => rows
+                .where((x) => x.patientId == a.patientId && x.id != a.id)
+                .toList());
   }
+
+  /// Consultations with this patient that started before this one,
+  /// newest first.
+  List<AppointmentDto> _earlier(List<AppointmentDto> all) {
+    final start = widget.appointment.start;
+    final list = all
+        .where((x) =>
+            x.id != widget.appointment.id &&
+            (start == null || x.start == null || x.start!.isBefore(start)))
+        .toList()
+      ..sort(
+          (a, b) => (b.start ?? DateTime(0)).compareTo(a.start ?? DateTime(0)));
+    return list;
+  }
+
+  Widget _previousSection() => FutureBuilder<List<AppointmentDto>>(
+      future: others,
+      builder: (context, snap) {
+        final children = <Widget>[
+          const Padding(
+              padding: EdgeInsets.only(top: 20, bottom: 8),
+              child: Text('Previous consultations with this patient',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: DoctorTokens.navy))),
+        ];
+        if (snap.connectionState != ConnectionState.done) {
+          children.add(const LinearProgressIndicator());
+        } else if (snap.hasError) {
+          children.add(const Text('Unable to load previous consultations.'));
+        } else {
+          final earlier = _earlier(snap.data ?? const []);
+          if (earlier.isEmpty) {
+            children.add(const Text('No previous consultations.',
+                style: TextStyle(color: DoctorTokens.slate)));
+          }
+          for (final p in earlier) {
+            children.add(Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                    leading: Icon(p.isChat ? Icons.chat_bubble_outline : Icons.videocam_outlined,
+                        color: DoctorTokens.primary),
+                    title: Text(
+                        '${p.isChat ? 'Chat' : 'Video'} consultation · ${_mediumDateTime(p.start?.toIso8601String())}'),
+                    subtitle: Text([
+                      p.status.replaceAll('_', ' ').toLowerCase(),
+                      if (p.number != null) p.number!
+                    ].join(' · ')),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => EncounterHistoryPage(appointment: p, previous: [
+                                  ...snap.data!.where((x) => x.id != p.id),
+                                  widget.appointment
+                                ]))))));
+          }
+        }
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.start, children: children);
+      });
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -283,8 +383,9 @@ class _EncounterHistoryState extends State<EncounterHistoryPage> {
                   Text(widget.appointment.patientName ?? 'Patient',
                       style: Theme.of(context).textTheme.titleLarge),
                   Text(
-                      '${widget.appointment.modality} consultation - ${widget.appointment.status}'),
-                  Text('${widget.appointment.start ?? ''}'),
+                      '${widget.appointment.isChat ? 'Chat' : 'Video'} consultation · ${widget.appointment.status.replaceAll('_', ' ').toLowerCase()}'),
+                  Text(_mediumDateTime(
+                      widget.appointment.start?.toIso8601String())),
                   if (data['chief_complaint'] != null)
                     ListTile(
                         title: const Text('Presenting concern'),
@@ -314,15 +415,35 @@ class _EncounterHistoryState extends State<EncounterHistoryPage> {
                           if (context.mounted) showError(context, e);
                         }
                       }),
+                  if (rxWindowOpen(widget.appointment)) ...[
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                        icon: const Icon(Icons.receipt_long),
+                        label: const Text('Send prescription'),
+                        onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => ScannerPage(
+                                    initialAppointment: widget.appointment)))),
+                    const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                            'You can send a prescription up to 24 hours after the consultation ends.',
+                            style: TextStyle(
+                                fontSize: 12, color: DoctorTokens.textSub))),
+                  ],
                   const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Text('Clinical attachments and prescriptions')),
                   if (documents.isEmpty)
-                    const Text('No clinical documents recorded.'),
+                    Text(filesAccessEnded(data)
+                        ? kFilesAccessEnded
+                        : 'No clinical documents recorded.'),
                   ...documents.map((doc) => DocumentButton(
                       appointmentId: widget.appointment.id,
                       documentId: doc.id,
                       mimeType: doc.mimeType)),
+                  _previousSection(),
                 ]);
               })));
 }
@@ -719,7 +840,10 @@ String _timeRange(DateTime? start, DateTime? end) {
 }
 
 class SchedulePage extends StatefulWidget {
-  const SchedulePage({super.key});
+  const SchedulePage({super.key, this.header});
+
+  /// The Home logo bar (DoctorTopBar), supplied by the shell.
+  final Widget? header;
   @override
   State<SchedulePage> createState() => _ScheduleState();
 }
@@ -801,28 +925,37 @@ class _ScheduleState extends State<SchedulePage> {
             x.bookable)
         .length;
 
-    // No AppBar here, so without this the custom DoctorPageHeader below
-    // renders straight under the status bar (confirmed on-device).
+    final dayCount = allSlots
+        .where((x) =>
+            x.start != null &&
+            _sameDate(kenyaTime(x.start!), selectedDate) &&
+            x.status != 'CANCELLED')
+        .length;
+    final bookedToday = todaySlots
+        .where((x) => x.status == 'BOOKED' || x.status == 'LOCKED_IN_PAYMENT')
+        .length;
+    void setFilter(String v) => setState(() => filter = v);
+
+    // No AppBar here, so without this the header below renders straight
+    // under the status bar (confirmed on-device).
     return SafeArea(
         bottom: false,
         child: Scaffold(
-            backgroundColor: DoctorTokens.bg,
+            backgroundColor: _schBg,
             body: s.loading && s.slots.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: () =>
                         c.read<DoctorCubit>().refreshSlots(day: selectedDate),
                     child: ListView(padding: EdgeInsets.zero, children: [
-                      DoctorPageHeader('Consultation Schedule',
-                          'Manage your live availability & calendar slots',
-                          onRefresh: () => c
-                              .read<DoctorCubit>()
-                              .refreshSlots(day: selectedDate),
-                          actions: _notificationBellActions(c)),
+                      if (widget.header != null) widget.header!,
+                      const _ScheduleTitle(),
+                      // The references have no "last updated" line; the
+                      // time is still shown when offline, as on Home.
                       CacheStatusBar(
                           offline: s.offline,
                           refreshing: s.refreshing,
-                          lastUpdated: s.lastUpdatedAt),
+                          lastUpdated: s.offline ? s.lastUpdatedAt : null),
                       if (s.error != null)
                         InlineError(s.error!,
                             onRetry: () => c
@@ -831,54 +964,77 @@ class _ScheduleState extends State<SchedulePage> {
                       _ScheduleSummaryBanner(
                           leftToday: leftToday,
                           completedToday: completedToday,
+                          bookedToday: bookedToday,
                           busy: busy,
                           onCreateSlots: createBulkSlots),
                       Padding(
-                          padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
                           child: Row(children: [
                             const Expanded(
                                 child: Text('Select Date',
                                     style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w800))),
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w800,
+                                        color: _schInk))),
                             TextButton.icon(
                                 onPressed: busy ? null : createSlot,
-                                icon: const Icon(Icons.add, size: 14),
+                                style: TextButton.styleFrom(
+                                    foregroundColor: _schGreen),
+                                icon: const Icon(Icons.add, size: 22),
                                 label: const Text('Add Slot',
-                                    style: TextStyle(fontSize: 11)))
+                                    style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700)))
                           ])),
                       _DateSlider(
-                          slots: allSlots,
                           selected: selectedDate,
                           onSelected: (d) {
                             setState(() => selectedDate = d);
                             unawaited(
                                 c.read<DoctorCubit>().refreshSlots(day: d));
                           }),
-                      SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.only(
-                              left: 18, right: 18, bottom: 10),
+                      Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                           child: Row(children: [
-                            _QueueFilter(
-                                'All Slots (${allSlots.where((x) => x.start != null && _sameDate(kenyaTime(x.start!), selectedDate) && x.status != 'CANCELLED').length})',
-                                'all',
-                                filter,
-                                (v) => setState(() => filter = v)),
-                            _QueueFilter('Blocked', 'blocked', filter,
-                                (v) => setState(() => filter = v)),
-                            _QueueFilter('Booked ($dayBooked)', 'booked',
-                                filter, (v) => setState(() => filter = v)),
-                            _QueueFilter(
-                                'Available ($dayAvailable)',
-                                'available',
-                                filter,
-                                (v) => setState(() => filter = v)),
+                            Expanded(
+                                flex: 12,
+                                child: _SchedulePill('All Slots ($dayCount)',
+                                    filter == 'all', () => setFilter('all'))),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                flex: 9,
+                                child: _SchedulePill(
+                                    'Blocked',
+                                    filter == 'blocked',
+                                    () => setFilter('blocked'))),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                flex: 10,
+                                child: _SchedulePill(
+                                    dayBooked > 0
+                                        ? 'Booked ($dayBooked)'
+                                        : 'Booked',
+                                    filter == 'booked',
+                                    () => setFilter('booked'))),
+                            const SizedBox(width: 8),
+                            Expanded(
+                                flex: 11,
+                                child: _SchedulePill(
+                                    dayAvailable > 0
+                                        ? 'Available ($dayAvailable)'
+                                        : 'Available',
+                                    filter == 'available',
+                                    () => setFilter('available'))),
+                          ])),
+                      const Padding(
+                          padding: EdgeInsets.fromLTRB(18, 0, 18, 16),
+                          child: Wrap(spacing: 24, runSpacing: 6, children: [
+                            _SlotLegend('Available', _schAvailable),
+                            _SlotLegend('Booked', _schBooked),
+                            _SlotLegend('Blocked', _schBlocked),
                           ])),
                       if (visible.isEmpty)
-                        const Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Center(child: Text('No slots on this date')))
+                        _ScheduleEmptyCard(busy: busy, onAddSlot: createSlot)
                       else
                         ...visible.map((slot) => _ScheduleSlotCard(
                             slot: slot,
@@ -1026,146 +1182,302 @@ class _ScheduleState extends State<SchedulePage> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Consultation Schedule, built to the product-owner references (2026-11-13):
+// docs/design/afyamkononi-doctor-schedule-empty-reference.png and
+// docs/design/afyamkononi-doctor-schedule-populated-reference.png.
+// Colours are sampled from those images.
+// ---------------------------------------------------------------------------
+
+const _schBg = Color(0xFFF4F9F7);
+const _schSummaryBg = Color(0xFFDFF2ED);
+const _schGreen = Color(0xFF027E52);
+const _schGreenDark = Color(0xFF006441);
+const _schInk = Color(0xFF0D1B26);
+const _schMuted = Color(0xFF4A5565);
+const _schLine = Color(0xFFE1EAE6);
+const _schLink = Color(0xFF0A7040);
+const _schAvailable = Color(0xFFFDEBB1);
+const _schBooked = Color(0xFFCBE1FB);
+const _schBlocked = Color(0xFFE7EEEE);
+
+/// Title block: "Consultation Schedule", its subtitle and the stethoscope
+/// artwork extracted from the reference.
+class _ScheduleTitle extends StatelessWidget {
+  const _ScheduleTitle();
+  @override
+  Widget build(BuildContext context) => SizedBox(
+      height: 84,
+      child: Stack(children: [
+        Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Image.asset('assets/doctor/schedule_header_stethoscope.png',
+                fit: BoxFit.fitHeight, excludeFromSemantics: true)),
+        const Padding(
+            padding: EdgeInsets.fromLTRB(18, 6, 92, 0),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Consultation Schedule',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 25,
+                      height: 1.15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.4,
+                      color: _schInk)),
+              SizedBox(height: 6),
+              Text(
+                  'Manage your live availability and calendar slots for patient consultations.',
+                  maxLines: 2,
+                  style:
+                      TextStyle(fontSize: 13.5, height: 1.3, color: _schMuted)),
+            ])),
+      ]));
+}
+
+/// "TODAY'S SCHEDULE" card. With nothing on today's calendar it reads
+/// "0 Booked / Consultations" (empty reference); otherwise
+/// "N Left To See (M Completed)" (populated reference).
 class _ScheduleSummaryBanner extends StatelessWidget {
   const _ScheduleSummaryBanner(
       {required this.leftToday,
       required this.completedToday,
+      required this.bookedToday,
       required this.busy,
       required this.onCreateSlots});
-  final int leftToday, completedToday;
+  final int leftToday, completedToday, bookedToday;
   final bool busy;
   final VoidCallback onCreateSlots;
   @override
-  Widget build(BuildContext c) => Container(
-      margin: const EdgeInsets.fromLTRB(18, 10, 18, 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-          gradient: const LinearGradient(
-              colors: [Color(0xFF1E293B), Color(0xFF0F172A)]),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: const [
-            BoxShadow(
-                color: Color(0x2E0F172A), blurRadius: 12, offset: Offset(0, 3))
-          ]),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-        Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text("TODAY'S SCHEDULE",
-              style: TextStyle(
-                  fontSize: 10.5,
-                  letterSpacing: .5,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white70)),
-          const SizedBox(height: 2),
-          Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Flexible(
-                    child: Text('$leftToday Left Today',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF34D399)))),
-                const SizedBox(width: 6),
-                Flexible(
-                    child: Text('($completedToday Completed)',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 11, color: Colors.white60)))
-              ])
-        ])),
-        const SizedBox(width: 10),
-        SizedBox(
-            width: 108,
-            child: FilledButton(
-                onPressed: busy ? null : onCreateSlots,
-                style: FilledButton.styleFrom(
-                    backgroundColor: DoctorTokens.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 36),
-                    textStyle: const TextStyle(
-                        fontSize: 10.5, fontWeight: FontWeight.w700)),
-                child: const FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text('⚡ Create 10-Min Slots',
-                        maxLines: 1, softWrap: false))))
-      ]));
+  Widget build(BuildContext c) {
+    final empty = leftToday == 0 && completedToday == 0;
+    return Container(
+        margin: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+        padding: const EdgeInsets.fromLTRB(16, 13, 12, 13),
+        decoration: BoxDecoration(
+            color: _schSummaryBg, borderRadius: BorderRadius.circular(18)),
+        child: Row(children: [
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                const Text("TODAY'S SCHEDULE",
+                    style: TextStyle(
+                        fontSize: 11,
+                        letterSpacing: .6,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF3E4252))),
+                const SizedBox(height: 4),
+                if (empty) ...[
+                  Text('$bookedToday Booked',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 22,
+                          height: 1.1,
+                          fontWeight: FontWeight.w800,
+                          color: _schInk)),
+                  const SizedBox(height: 2),
+                  const Text('Consultations',
+                      style: TextStyle(fontSize: 14.5, color: _schMuted)),
+                ] else
+                  // "(N Completed)" drops under the count when the
+                  // phone is too narrow for both on one line.
+                  Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.end,
+                      spacing: 8,
+                      children: [
+                        Text('$leftToday Left To See',
+                            style: const TextStyle(
+                                fontSize: 20,
+                                height: 1.15,
+                                fontWeight: FontWeight.w800,
+                                color: _schInk)),
+                        Padding(
+                            padding: const EdgeInsets.only(bottom: 2),
+                            child: Text('($completedToday Completed)',
+                                style: const TextStyle(
+                                    fontSize: 12.5, color: _schMuted))),
+                      ]),
+              ])),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+              onPressed: busy ? null : onCreateSlots,
+              style: FilledButton.styleFrom(
+                  backgroundColor: _schGreen,
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  minimumSize: const Size(0, 38),
+                  textStyle: const TextStyle(
+                      fontSize: 12.5, fontWeight: FontWeight.w700)),
+              icon: const Icon(Icons.bolt, size: 17, color: Color(0xFFF0D330)),
+              label: const Text('Create 10-Min Slots')),
+        ]));
+  }
 }
 
+/// Today and the next five days, filling the width (both references).
 class _DateSlider extends StatelessWidget {
-  const _DateSlider(
-      {required this.slots, required this.selected, required this.onSelected});
-  final List<SlotDto> slots;
+  const _DateSlider({required this.selected, required this.onSelected});
   final DateTime selected;
   final ValueChanged<DateTime> onSelected;
   static const _days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   @override
   Widget build(BuildContext c) {
-    final today = kenyaTime(DateTime.now());
-    final base = _calendarDate(today);
-    final dates = List.generate(7, (i) => base.add(Duration(days: i)));
-    return SizedBox(
-        height: 72,
-        child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            itemCount: dates.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemBuilder: (_, i) {
-              final d = dates[i];
-              final isSelected = _sameDate(d, selected);
-              final hasSlots = slots.any(
-                  (s) => s.start != null && _sameDate(kenyaTime(s.start!), d));
-              return InkWell(
-                  onTap: () => onSelected(d),
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                      width: 54,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                          color: isSelected
-                              ? DoctorTokens.primary
-                              : DoctorTokens.surface,
-                          border: Border.all(
-                              color: isSelected
-                                  ? DoctorTokens.primary
-                                  : DoctorTokens.border),
-                          borderRadius: BorderRadius.circular(14)),
-                      child: Column(children: [
-                        Text(i == 0 ? 'Today' : _days[d.weekday % 7],
-                            style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: isSelected
-                                    ? Colors.white70
-                                    : DoctorTokens.textSub)),
-                        const SizedBox(height: 2),
-                        Text('${d.day}',
-                            style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: isSelected
-                                    ? Colors.white
-                                    : DoctorTokens.text)),
-                        const SizedBox(height: 2),
-                        Container(
-                            width: 4,
-                            height: 4,
-                            decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: !hasSlots
-                                    ? Colors.transparent
-                                    : isSelected
-                                        ? Colors.white
-                                        : const Color(0xFF10B981)))
-                      ])));
-            }));
+    final base = _calendarDate(kenyaTime(DateTime.now()));
+    final dates = List.generate(6, (i) => base.add(Duration(days: i)));
+    return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(children: [
+          for (var i = 0; i < dates.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            Expanded(child: _chip(dates[i], i)),
+          ]
+        ]));
   }
+
+  Widget _chip(DateTime d, int i) {
+    final on = _sameDate(d, selected);
+    return InkWell(
+        onTap: () => onSelected(d),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            decoration: BoxDecoration(
+                color: on ? _schGreen : Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: on ? _schGreen : _schLine),
+                boxShadow: on
+                    ? null
+                    : const [
+                        BoxShadow(
+                            color: Color(0x0A0F3D2E),
+                            blurRadius: 6,
+                            offset: Offset(0, 2))
+                      ]),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(i == 0 ? 'Today' : _days[d.weekday % 7],
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: on ? Colors.white : const Color(0xFF415263))),
+              const SizedBox(height: 2),
+              Text('${d.day}',
+                  style: TextStyle(
+                      fontSize: 20,
+                      height: 1.1,
+                      fontWeight: FontWeight.w800,
+                      color: on ? Colors.white : _schInk)),
+              const SizedBox(height: 3),
+              // Marks today, as in both references.
+              Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: i != 0
+                          ? Colors.transparent
+                          : on
+                              ? Colors.white
+                              : _schGreen)),
+            ])));
+  }
+}
+
+class _SchedulePill extends StatelessWidget {
+  const _SchedulePill(this.label, this.selected, this.onTap);
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+          height: 34,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+              color: selected ? _schGreen : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: selected ? _schGreen : _schLine)),
+          child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label,
+                  maxLines: 1,
+                  style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected
+                          ? Colors.white
+                          : const Color(0xFF29494D))))));
+}
+
+class _SlotLegend extends StatelessWidget {
+  const _SlotLegend(this.label, this.color);
+  final String label;
+  final Color color;
+  @override
+  Widget build(BuildContext context) =>
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+            width: 12,
+            height: 12,
+            decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(3),
+                border:
+                    Border.all(color: Colors.black.withValues(alpha: .04)))),
+        const SizedBox(width: 8),
+        Text(label,
+            style: const TextStyle(fontSize: 13, color: Color(0xFF495565)))
+      ]);
+}
+
+/// Empty state from the empty reference: illustration, message, Add Slot.
+class _ScheduleEmptyCard extends StatelessWidget {
+  const _ScheduleEmptyCard({required this.busy, required this.onAddSlot});
+  final bool busy;
+  final VoidCallback onAddSlot;
+  @override
+  Widget build(BuildContext context) => Container(
+      margin: const EdgeInsets.fromLTRB(14, 4, 14, 20),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _schLine)),
+      child: Column(children: [
+        Image.asset('assets/doctor/schedule_empty_illustration.jpg',
+            height: 150, fit: BoxFit.contain, excludeFromSemantics: true),
+        const SizedBox(height: 14),
+        const Text('No consultations scheduled yet',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
+                color: _schInk)),
+        const SizedBox(height: 6),
+        const Text(
+            'Create new time slots or wait for patient bookings to appear here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, height: 1.35, color: _schMuted)),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+            onPressed: busy ? null : onAddSlot,
+            style: FilledButton.styleFrom(
+                backgroundColor: _schGreen,
+                shape: const StadiumBorder(),
+                minimumSize: const Size(176, 44),
+                textStyle:
+                    const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            icon: const Icon(Icons.add, size: 20),
+            label: const Text('Add Slot')),
+      ]));
 }
 
 class _ScheduleSlotCard extends StatelessWidget {
@@ -1185,6 +1497,13 @@ class _ScheduleSlotCard extends StatelessWidget {
   final AppointmentDto? appointment;
   final ChatDto? chat;
 
+  String get _range {
+    final s = slot.start, e = slot.end;
+    if (s == null || e == null) return 'Time unavailable';
+    return '${_shortTime(kenyaTime(s).toIso8601String())} – '
+        '${_shortTime(kenyaTime(e).toIso8601String())}';
+  }
+
   @override
   Widget build(BuildContext c) {
     final now = kenyaTime(DateTime.now());
@@ -1197,161 +1516,427 @@ class _ScheduleSlotCard extends StatelessWidget {
         now.isAfter(slot.start!) &&
         now.isBefore(slot.end!);
     final past = slot.end != null && !slot.end!.isAfter(now);
-    final (pillLabel, pillColor, pillText) = blocked
-        ? ('Blocked', DoctorTokens.surfaceSubtle, DoctorTokens.textSub)
+    final done =
+        booked && (appointment?.status == 'COMPLETED' || (past && !live));
+    // (label, icon, accent, row tint, pill bg, pill text)
+    final (label, icon, accent, tint, pillBg, pillText) = blocked
+        ? (
+            'Blocked',
+            Icons.block,
+            const Color(0xFF9CA3AF),
+            const Color(0xFFF5F7F7),
+            _schBlocked,
+            const Color(0xFF5B656B)
+          )
         : !booked
             ? (
-                slot.bookable ? 'Open for Booking' : 'Past opening',
+                // Named as in the legend; the body line says it is open
+                // on the patient booking calendar.
+                slot.bookable ? 'Available' : 'Past opening',
+                Icons.event_available_outlined,
+                const Color(0xFFF5B83D),
+                const Color(0xFFFFFBEF),
                 const Color(0xFFFEF3C7),
                 const Color(0xFFB45309)
               )
-            : live
+            : done
                 ? (
-                    'In Progress',
-                    const Color(0xFFECFDF5),
-                    const Color(0xFF047857)
+                    'Completed',
+                    Icons.check_circle,
+                    const Color(0xFF22C052),
+                    const Color(0xFFF0FBF7),
+                    const Color(0xFFD0FCD6),
+                    const Color(0xFF0B7A35)
                   )
-                : past
+                : live
                     ? (
-                        'Completed',
-                        DoctorTokens.surfaceSubtle,
-                        DoctorTokens.textSub
+                        'In Progress',
+                        Icons.videocam,
+                        const Color(0xFF22C052),
+                        const Color(0xFFF0FBF7),
+                        const Color(0xFFD0FCD6),
+                        const Color(0xFF0B7A35)
                       )
                     : (
                         'Upcoming',
-                        const Color(0xFFEFF6FF),
+                        Icons.calendar_month_outlined,
+                        const Color(0xFF5CA7FD),
+                        const Color(0xFFF4F9FE),
+                        const Color(0xFFD9EBFE),
                         const Color(0xFF1D4ED8)
                       );
+    final minutes = slot.start != null && slot.end != null
+        ? slot.end!.difference(slot.start!).inMinutes
+        : null;
     return Container(
-        margin: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-        child: DoctorCard(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Expanded(
-                child: Row(children: [
-              const Icon(Icons.access_time,
-                  size: 14, color: DoctorTokens.textSub),
-              const SizedBox(width: 6),
-              Flexible(
-                  child: Text(_timeRange(slot.start, slot.end),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 12.5, fontWeight: FontWeight.w600)))
-            ])),
-            StatusChip(pillLabel, color: pillColor, textColor: pillText)
-          ]),
-          if (booked) ...[
-            const SizedBox(height: 10),
-            Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
-                decoration: BoxDecoration(
-                    color: DoctorTokens.surfaceSubtle,
-                    borderRadius: BorderRadius.circular(12)),
-                child: Row(children: [
-                  Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                          color: DoctorTokens.primaryLight,
-                          borderRadius: BorderRadius.circular(10)),
-                      alignment: Alignment.center,
-                      child: Text(
-                          _personInitials(slot.patientName ?? 'Patient'),
-                          style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: DoctorTokens.primaryDark))),
-                  const SizedBox(width: 10),
-                  Expanded(
-                      child: Text(slot.patientName ?? 'Patient',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w700)))
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 12),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x140F3D2E),
+                  blurRadius: 14,
+                  offset: Offset(0, 4))
+            ]),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Time row with the coloured accent bar.
+          Container(
+              height: 40,
+              decoration: BoxDecoration(
+                  color: tint, borderRadius: BorderRadius.circular(14)),
+              child: Row(children: [
+                Container(
+                    width: 3.5,
+                    height: 28,
+                    decoration: BoxDecoration(
+                        color: accent, borderRadius: BorderRadius.circular(4))),
+                const SizedBox(width: 11),
+                // Time and length take the space left of the status pill,
+                // which stays pinned right as in the reference.
+                Expanded(
+                    child: Row(children: [
+                  const Icon(Icons.schedule,
+                      size: 18, color: Color(0xFF0B6D3E)),
+                  const SizedBox(width: 8),
+                  // Scales down rather than cutting the time off.
+                  Flexible(
+                      child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(_range,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: _schInk)))),
+                  if (minutes != null) ...[
+                    Container(
+                        width: 1,
+                        height: 18,
+                        margin: const EdgeInsets.symmetric(horizontal: 7),
+                        color: const Color(0xFFCBD5D1)),
+                    Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFDDF0E2),
+                            borderRadius: BorderRadius.circular(10)),
+                        child: Text('${minutes}m',
+                            style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: _schInk))),
+                  ],
                 ])),
-            const Padding(
-                padding: EdgeInsets.only(top: 6),
-                child: Row(children: [
-                  Icon(Icons.lock_outline,
-                      size: 12, color: DoctorTokens.textSub),
-                  SizedBox(width: 4),
-                  Expanded(
-                      child: Text(
-                          'Booked — cannot be self-cancelled. Contact patient support to reschedule.',
+                const SizedBox(width: 6),
+                Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: pillBg, borderRadius: BorderRadius.circular(14)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(icon,
+                          size: 15,
+                          color: label == 'Completed'
+                              ? const Color(0xFF0BB63C)
+                              : pillText),
+                      const SizedBox(width: 5),
+                      Text(label,
                           style: TextStyle(
-                              fontSize: 10.5, color: DoctorTokens.textSub)))
-                ])),
-            const SizedBox(height: 10),
-            if (appointment != null)
-              ConsultationActions(appointment: appointment!)
-            else
-              const Text('Refresh appointments to load consultation details.')
-          ] else if (blocked) ...[
-            const Padding(
-                padding: EdgeInsets.only(top: 6, bottom: 10),
-                child: Text('Blocked ? unavailable for patient booking',
-                    style: TextStyle(
-                        fontSize: 11.5, color: DoctorTokens.textSub))),
-            SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                    onPressed: busy ? null : onUnblock,
-                    style: OutlinedButton.styleFrom(
-                        foregroundColor: DoctorTokens.primaryDark,
-                        side: const BorderSide(color: DoctorTokens.primary)),
-                    child: const Text('Unblock Slot')))
-          ] else ...[
-            const Padding(
-                padding: EdgeInsets.only(top: 6, bottom: 10),
-                child: Text(
-                    '10-minute slot open on the patient booking calendar',
-                    style: TextStyle(
-                        fontSize: 11.5, color: DoctorTokens.textSub))),
-            Row(children: [
-              Expanded(
-                  child: OutlinedButton(
-                      onPressed: busy
-                          ? null
-                          : () async {
-                              final confirmed = await showDialog<bool>(
-                                  context: c,
-                                  builder: (dialogContext) => AlertDialog(
-                                          title:
-                                              const Text('Cancel this slot?'),
-                                          content: Text(
-                                              'This removes the open ${_timeRange(slot.start, slot.end)} slot from the patient booking calendar. This cannot be undone.'),
-                                          actions: [
-                                            TextButton(
-                                                onPressed: () => Navigator.pop(
-                                                    dialogContext, false),
-                                                child: const Text('Keep slot')),
-                                            FilledButton(
-                                                onPressed: () => Navigator.pop(
-                                                    dialogContext, true),
-                                                style: FilledButton.styleFrom(
-                                                    backgroundColor:
-                                                        DoctorTokens.danger),
-                                                child:
-                                                    const Text('Cancel slot')),
-                                          ]));
-                              if (confirmed == true) onCancel();
-                            },
-                      child: const Text('Cancel Slot ✕'))),
-              const SizedBox(width: 8),
-              Expanded(
-                  child: OutlinedButton(
-                      onPressed: busy ? null : onBlock,
-                      style: OutlinedButton.styleFrom(
-                          foregroundColor: DoctorTokens.textSub,
-                          side: const BorderSide(
-                              color: DoctorTokens.surfaceSubtle)),
-                      child: const Text('Block')))
-            ])
-          ]
-        ])));
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: pillText)),
+                    ])),
+              ])),
+          Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              child: booked
+                  ? _bookedBody(c)
+                  : blocked
+                      ? _blockedBody()
+                      : _openBody(c)),
+        ]));
+  }
+
+  Widget _bookedBody(BuildContext c) {
+    final a = appointment;
+    final name = slot.patientName ?? 'Patient';
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      InkWell(
+          onTap: a == null
+              ? null
+              : () => Navigator.push(
+                  c,
+                  MaterialPageRoute(
+                      builder: (_) => ConsultationPage(appointment: a))),
+          borderRadius: BorderRadius.circular(12),
+          child: Row(children: [
+            Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFE6FDEE), Color(0xFFCBF5DD)]),
+                    borderRadius: BorderRadius.circular(11)),
+                child: Text(_personInitials(name),
+                    style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF0A5B35)))),
+            Container(
+                width: 1,
+                height: 26,
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+                color: _schLine),
+            Expanded(
+                child: Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: _schInk))),
+            if (a != null)
+              const Icon(Icons.chevron_right,
+                  size: 24, color: Color(0xFF60676D)),
+          ])),
+      const SizedBox(height: 10),
+      const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+            padding: EdgeInsets.only(top: 1),
+            child:
+                Icon(Icons.lock_outline, size: 16, color: Color(0xFF5B656B))),
+        SizedBox(width: 8),
+        Expanded(
+            child: Text(
+                'Booked — cannot be self-cancelled. Contact patient support to reschedule.',
+                style: TextStyle(
+                    fontSize: 12.5, height: 1.35, color: Color(0xFF5B656B)))),
+      ]),
+      const SizedBox(height: 10),
+      const Divider(height: 1, color: Color(0xFFE3E7E8)),
+      const SizedBox(height: 10),
+      if (a != null)
+        _SlotConsultationActions(appointment: a)
+      else
+        const Text('Refresh appointments to load consultation details.',
+            style: TextStyle(fontSize: 12.5, color: _schMuted)),
+    ]);
+  }
+
+  Widget _blockedBody() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Blocked — unavailable for patient booking',
+            style: TextStyle(fontSize: 13, color: Color(0xFF5B656B))),
+        const SizedBox(height: 10),
+        OutlinedButton(
+            onPressed: busy ? null : onUnblock,
+            style: OutlinedButton.styleFrom(
+                foregroundColor: _schGreen,
+                side: const BorderSide(color: _schGreen),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                minimumSize: const Size(0, 42)),
+            child: const Text('Unblock Slot')),
+      ]);
+
+  Widget _openBody(BuildContext c) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('10-minute slot open on the patient booking calendar',
+            style: TextStyle(fontSize: 13, color: Color(0xFF5B656B))),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(
+              child: OutlinedButton(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          final confirmed = await showDialog<bool>(
+                              context: c,
+                              builder: (dialogContext) => AlertDialog(
+                                      title: const Text('Cancel this slot?'),
+                                      content: Text(
+                                          'This removes the open ${_timeRange(slot.start, slot.end)} slot from the patient booking calendar. This cannot be undone.'),
+                                      actions: [
+                                        TextButton(
+                                            onPressed: () => Navigator.pop(
+                                                dialogContext, false),
+                                            child: const Text('Keep slot')),
+                                        FilledButton(
+                                            onPressed: () => Navigator.pop(
+                                                dialogContext, true),
+                                            style: FilledButton.styleFrom(
+                                                backgroundColor:
+                                                    DoctorTokens.danger),
+                                            child: const Text('Cancel slot')),
+                                      ]));
+                          if (confirmed == true) onCancel();
+                        },
+                  style: OutlinedButton.styleFrom(
+                      foregroundColor: DoctorTokens.danger,
+                      side: const BorderSide(color: Color(0xFFF3C7C7)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      minimumSize: const Size(0, 42)),
+                  child: const Text('Cancel Slot ✕'))),
+          const SizedBox(width: 10),
+          Expanded(
+              child: OutlinedButton(
+                  onPressed: busy ? null : onBlock,
+                  style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF5B656B),
+                      side: const BorderSide(color: _schLine),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      minimumSize: const Size(0, 42)),
+                  child: const Text('Block'))),
+        ]),
+      ]);
+}
+
+/// The booked-slot actions of the populated reference. Same behaviour as
+/// [ConsultationActions]: start (video or chat) and Write prescription while
+/// the consultation can start; afterwards Follow-up messages and the
+/// consultation history.
+class _SlotConsultationActions extends StatefulWidget {
+  const _SlotConsultationActions({required this.appointment});
+  final AppointmentDto appointment;
+  @override
+  State<_SlotConsultationActions> createState() =>
+      _SlotConsultationActionsState();
+}
+
+class _SlotConsultationActionsState extends State<_SlotConsultationActions> {
+  bool busy = false;
+
+  Future<void> openChat() async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      final chat = await context
+          .read<DoctorCubit>()
+          .repo
+          .conversationForAppointment(widget.appointment);
+      if (mounted) {
+        await Navigator.push(context,
+            MaterialPageRoute(builder: (_) => ChatThreadPage(chat: chat)));
+      }
+    } catch (e) {
+      if (mounted) showError(context, e);
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Widget _link(IconData icon, String label, VoidCallback? onTap) => InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 19, color: _schLink),
+            const SizedBox(width: 7),
+            Flexible(
+                child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(label,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: _schLink)))),
+          ])));
+
+  @override
+  Widget build(BuildContext context) {
+    final a = widget.appointment;
+    if (a.canStart) {
+      return Row(children: [
+        Expanded(
+            flex: 11,
+            child: FilledButton.icon(
+                onPressed: busy || !a.isQueueActionable || a.joinBlocked
+                    ? null
+                    : a.isChat
+                        ? openChat
+                        : () => _callScreenGuard.push(
+                            context, (_) => AgoraPage(appointmentId: a.id)),
+                style: FilledButton.styleFrom(
+                    backgroundColor: _schGreenDark,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    minimumSize: const Size(0, 46),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    textStyle: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700)),
+                icon: Icon(
+                    a.isChat ? Icons.chat_outlined : Icons.videocam_outlined,
+                    size: 20),
+                label: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(busy
+                        ? 'Opening consultation...'
+                        : (a.joinLockedLabel ?? a.startLabel))))),
+        const SizedBox(width: 10),
+        Expanded(
+            flex: 8,
+            child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => ScannerPage(initialAppointment: a))),
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0A5B35),
+                    backgroundColor: const Color(0xFFF3FBF7),
+                    side: const BorderSide(color: Color(0xFFCFE3DA)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    minimumSize: const Size(0, 46),
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    textStyle: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700)),
+                icon: const Icon(Icons.description_outlined, size: 19),
+                label: const FittedBox(
+                    fit: BoxFit.scaleDown, child: Text('Write prescription')))),
+      ]);
+    }
+    final followUp = a.modality == 'VIDEO' && a.conversationId != null;
+    final chatHistory = a.isChat && a.conversationId != null;
+    final links = <Widget>[
+      if (followUp)
+        _link(Icons.chat_bubble_outline, 'Follow-up messages',
+            busy ? null : openChat),
+      _link(
+          Icons.history,
+          'View consultation history',
+          busy
+              ? null
+              : chatHistory
+                  ? openChat
+                  : () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => HistoryPage(appointmentId: a.id)))),
+    ];
+    return Row(children: [
+      for (var i = 0; i < links.length; i++) ...[
+        if (i > 0)
+          Container(
+              width: 1,
+              height: 26,
+              margin: const EdgeInsets.symmetric(horizontal: 8),
+              color: const Color(0xFFE3E7E8)),
+        Expanded(
+            flex: links.length == 2 && i == 1 ? 6 : 5,
+            child: Center(child: links[i])),
+      ]
+    ]);
   }
 }
 
@@ -2891,7 +3476,7 @@ class _ChatThreadState extends State<ChatThreadPage> {
 
   Future<void> pickAttachment() async {
     if (uploadingAttachment || widget.chat.isClosed || serverClosed) return;
-    final select = await showModalBottomSheet<bool>(
+    final select = await showModalBottomSheet<String>(
         context: context,
         builder: (context) => SafeArea(
             child: Padding(
@@ -2903,15 +3488,29 @@ class _ChatThreadState extends State<ChatThreadPage> {
                       const Text('Attach to consultation',
                           style: TextStyle(
                               fontSize: 20, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 4),
+                      const Text('A JPEG or PNG clinical image',
+                          style: TextStyle(color: DoctorTokens.textSub)),
+                      const SizedBox(height: 8),
+                      ListTile(
+                          leading: const Icon(Icons.photo_camera_outlined),
+                          title: const Text('Take a photo'),
+                          onTap: () => Navigator.pop(context, 'camera')),
+                      ListTile(
+                          leading: const Icon(Icons.photo_library_outlined),
+                          title: const Text('Choose from gallery'),
+                          onTap: () => Navigator.pop(context, 'gallery')),
                       ListTile(
                           leading: const Icon(Icons.description_outlined),
-                          title: const Text('Clinical image'),
-                          subtitle:
-                              const Text('JPEG or PNG medical document photo'),
-                          onTap: () => Navigator.pop(context, true)),
+                          title: const Text('Choose a file'),
+                          onTap: () => Navigator.pop(context, 'file')),
                     ]))));
-    if (select != true || !mounted) return;
+    if (select == null || !mounted) return;
+    if (select != 'file') {
+      await _attachPhoto(
+          select == 'camera' ? ImageSource.camera : ImageSource.gallery);
+      return;
+    }
     try {
       final result = await FilePicker.platform.pickFiles(
           type: FileType.custom,
@@ -2945,6 +3544,50 @@ class _ChatThreadState extends State<ChatThreadPage> {
         setState(() => attachmentError = e is ApiException
             ? e.userMessage
             : 'Unable to select this image. Please retry.');
+      }
+    }
+  }
+
+  /// Camera or gallery. The picker's own copy is deleted once read, so the
+  /// clinical photo is not left in a generic disk cache.
+  Future<void> _attachPhoto(ImageSource source) async {
+    try {
+      final file =
+          await ImagePicker().pickImage(source: source, imageQuality: 85);
+      if (file == null || !mounted) return;
+      final name = file.name.toLowerCase();
+      final png = name.endsWith('.png');
+      final jpeg = name.endsWith('.jpg') || name.endsWith('.jpeg');
+      Uint8List? bytes;
+      try {
+        if (!png && !jpeg) {
+          throw const ApiException(422, 'Select a JPEG or PNG image.');
+        }
+        if (await file.length() > 10 * 1024 * 1024) {
+          throw const ApiException(413, 'Select an image smaller than 10 MB.');
+        }
+        bytes = await file.readAsBytes();
+      } finally {
+        try {
+          final copy = File(file.path);
+          if (await copy.exists()) await copy.delete();
+        } catch (_) {/* best-effort cleanup */}
+      }
+      if (!mounted) return;
+      pendingAttachment = bytes;
+      pendingMime = png ? 'image/png' : 'image/jpeg';
+      pendingUploadKey = List.generate(
+          16,
+          (_) => Random.secure()
+              .nextInt(256)
+              .toRadixString(16)
+              .padLeft(2, '0')).join();
+      await uploadAttachment();
+    } catch (e) {
+      if (mounted) {
+        setState(() => attachmentError = e is ApiException
+            ? e.userMessage
+            : 'Unable to use this image. Please retry.');
       }
     }
   }
@@ -3080,7 +3723,8 @@ class _ChatThreadState extends State<ChatThreadPage> {
                                 height: 20,
                                 child:
                                     CircularProgressIndicator(strokeWidth: 2))
-                            : const Icon(Icons.attach_file),
+                            : const Icon(Icons.attach_file,
+                                color: DoctorTokens.primary),
                         constraints:
                             const BoxConstraints(minWidth: 48, minHeight: 48)),
                     Expanded(
@@ -3101,6 +3745,9 @@ class _ChatThreadState extends State<ChatThreadPage> {
                                 decoration: const InputDecoration(
                                     filled: false,
                                     border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
                                     hintText: 'Type your message',
                                     isDense: true,
                                     counterText: '',
@@ -3225,8 +3872,18 @@ class _ChatTopBar extends StatelessWidget {
             _ChatIconBtn(
                 icon: Icons.medical_services_outlined,
                 tooltip: 'Snap & Send Rx',
+                // Opens with this chat's own consultation selected.
                 onTap: () => Navigator.push(
-                    c, MaterialPageRoute(builder: (_) => const ScannerPage())))
+                    c,
+                    MaterialPageRoute(
+                        builder: (_) => ScannerPage(
+                            initialAppointment: c
+                                .read<DoctorCubit>()
+                                .state
+                                .queue
+                                .whereType<AppointmentDto>()
+                                .where((a) => a.id == chat.appointmentId)
+                                .firstOrNull))))
         ]));
   }
 }
@@ -3368,9 +4025,22 @@ Future<void> _clearFilePickerTempFiles() async {
 
 const _maxRxPages = 5;
 
+/// Whether a prescription can still be dispatched for [a]: a live
+/// consultation, or a completed one inside the 24-hour late-Rx window whose
+/// Rx decision is not yet recorded. Once dispatched (or "no Rx needed"),
+/// never again.
+bool rxDispatchAllowed(AppointmentDto a, [DateTime? now]) =>
+    const ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].contains(a.status) ||
+    rxWindowOpen(a, now);
+
 class ScannerPage extends StatefulWidget {
-  const ScannerPage({super.key, this.initialAppointment});
+  const ScannerPage(
+      {super.key, this.initialAppointment, this.closeOnDispatch = false});
   final AppointmentDto? initialAppointment;
+
+  /// Pops with `true` after a successful dispatch (used by the post-call
+  /// close-out, which then closes too).
+  final bool closeOnDispatch;
   @override
   State<ScannerPage> createState() => _ScannerState();
 }
@@ -3380,10 +4050,21 @@ class _ScannerState extends State<ScannerPage> {
   final notes = TextEditingController();
   AppointmentDto? appointment;
   bool dispatching = false;
+
+  /// Opened for a consultation whose Rx decision is already final.
+  bool decidedNotice = false;
+
+  /// Consultations dispatched from this screen instance.
+  final Set<String> _dispatched = {};
   @override
   void initState() {
     super.initState();
-    appointment = widget.initialAppointment;
+    final initial = widget.initialAppointment;
+    if (initial != null && !rxDispatchAllowed(initial)) {
+      decidedNotice = true;
+    } else {
+      appointment = initial;
+    }
   }
 
   @override
@@ -3505,6 +4186,8 @@ class _ScannerState extends State<ScannerPage> {
       return;
     }
     setState(() => dispatching = true);
+    final doctorCubit = context.read<DoctorCubit>();
+    var sealed = false;
     try {
       // Every page is attempted even if an earlier one fails — a doctor
       // must be able to see exactly which pages went through and retry
@@ -3512,9 +4195,53 @@ class _ScannerState extends State<ScannerPage> {
       for (final page in pages) {
         if (page.status != _PageStatus.done) await _uploadPage(page);
       }
+      if (!mounted || pages.any((p) => p.status != _PageStatus.done)) return;
+      // Every page is on the server: dispatching completes a live
+      // consultation as COMPLETED_WITH_RX, after which the server refuses
+      // further pages. (A late Rx for an already-completed consultation
+      // keeps that consultation's recorded outcome.) Completion is
+      // idempotent, so "Finish dispatch" can safely retry it.
+      final a = appointment!;
+      if (a.status != 'COMPLETED') {
+        await doctorCubit.repo.complete(a.id, 'COMPLETED_WITH_RX');
+      }
+      sealed = true;
+    } catch (e) {
+      if (mounted) showError(context, e);
     } finally {
       if (mounted) setState(() => dispatching = false);
     }
+    if (sealed && mounted) await _finishDispatch(doctorCubit);
+  }
+
+  /// Resets the screen after a successful dispatch: the consultation leaves
+  /// the picker (its Rx decision is final) and the form starts empty.
+  Future<void> _finishDispatch(DoctorCubit doctorCubit) async {
+    final patient = appointment?.patientName ?? 'the patient';
+    setState(() {
+      if (appointment != null) _dispatched.add(appointment!.id);
+      pages.clear();
+      notes.clear();
+      appointment = null;
+      decidedNotice = false;
+    });
+    unawaited(doctorCubit.loadAll());
+    await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+                icon: const Icon(Icons.check_circle,
+                    size: 56, color: DoctorTokens.primary),
+                title: const Text('Prescription Submitted!',
+                    textAlign: TextAlign.center),
+                content: Text(
+                    'The prescription has been added to $patient’s health record.',
+                    textAlign: TextAlign.center),
+                actions: [
+                  FilledButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: const Text('Done'))
+                ]));
+    if (mounted && widget.closeOnDispatch) Navigator.pop(context, true);
   }
 
   void remove(_RxPage page) {
@@ -3526,7 +4253,12 @@ class _ScannerState extends State<ScannerPage> {
   @override
   Widget build(BuildContext c) {
     final state = c.watch<DoctorCubit>().state;
-    final appointments = [...state.queue.cast<AppointmentDto>()];
+    // Only consultations whose Rx can still be dispatched; one dispatched
+    // in this screen leaves at once, before the queue reload lands.
+    final appointments = state.queue
+        .cast<AppointmentDto>()
+        .where((a) => rxDispatchAllowed(a) && !_dispatched.contains(a.id))
+        .toList();
     if (appointment != null &&
         !appointments.any((a) => a.id == appointment!.id)) {
       appointments.add(appointment!);
@@ -3554,6 +4286,26 @@ class _ScannerState extends State<ScannerPage> {
                     CacheStatusBar(
                         offline: c.read<DoctorCubit>().repo.isOffline,
                         refreshing: false),
+                    if (decidedNotice)
+                      Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                              color: DoctorTokens.noticeBg,
+                              borderRadius: BorderRadius.circular(14)),
+                          child: Row(children: [
+                            const Icon(Icons.lock_outline,
+                                color: DoctorTokens.primaryDark),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Text(
+                                    'The prescription decision for ${widget.initialAppointment?.patientName ?? 'this consultation'} is already recorded and cannot be changed.',
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        height: 1.4,
+                                        color: DoctorTokens.fieldText)))
+                          ])),
                     DoctorCard(
                         child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3568,7 +4320,9 @@ class _ScannerState extends State<ScannerPage> {
                               items: appointments
                                   .map((a) => DropdownMenuItem(
                                       value: a.id,
-                                      child: Text(a.patientName ?? 'Patient')))
+                                      child: Text(rxConsultationLabel(a),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis)))
                                   .toList(),
                               onChanged: uploading
                                   ? null
@@ -3686,8 +4440,7 @@ class _ScannerState extends State<ScannerPage> {
                           SizedBox(
                               width: double.infinity,
                               child: FilledButton(
-                                  onPressed:
-                                      dispatching || allDone ? null : dispatch,
+                                  onPressed: dispatching ? null : dispatch,
                                   child: dispatching
                                       ? const SizedBox(
                                           width: 18,
@@ -3695,8 +4448,12 @@ class _ScannerState extends State<ScannerPage> {
                                           child: CircularProgressIndicator(
                                               strokeWidth: 2,
                                               color: Colors.white))
+                                      // allDone here means every page is
+                                      // stored but completion did not go
+                                      // through yet (the screen resets on
+                                      // success).
                                       : Text(allDone
-                                          ? 'Dispatched to patient'
+                                          ? 'Finish dispatch'
                                           : failedCount > 0
                                               ? 'Retry failed pages'
                                               : 'Dispatch Prescription to Patient'))),
@@ -4310,6 +5067,106 @@ class _QnaOpenCardState extends State<_QnaOpenCard> {
   }
 }
 
+/// The no-prescription reason choices (product-owner rule, 2026-11-13).
+const noRxFollowUpReason = 'Follow-up — no prescription needed';
+const _noRxOtherReason = 'Other reason';
+
+/// Asks why no prescription is needed: a dropdown of "Follow-up" or "Other
+/// reason"; "Other reason" must be explained in the text box. Returns the
+/// reason to record, or null when cancelled.
+Future<String?> askNoRxReason(BuildContext context) => showDialog<String>(
+    context: context, builder: (_) => const _NoRxReasonDialog());
+
+class _NoRxReasonDialog extends StatefulWidget {
+  const _NoRxReasonDialog();
+  @override
+  State<_NoRxReasonDialog> createState() => _NoRxReasonDialogState();
+}
+
+class _NoRxReasonDialogState extends State<_NoRxReasonDialog> {
+  String? choice;
+  final other = TextEditingController();
+  bool showError = false;
+
+  @override
+  void dispose() {
+    other.dispose();
+    super.dispose();
+  }
+
+  void submit() {
+    if (choice == null) {
+      setState(() => showError = true);
+      return;
+    }
+    if (choice == noRxFollowUpReason) {
+      Navigator.pop(context, noRxFollowUpReason);
+      return;
+    }
+    final text = other.text.trim();
+    if (text.isEmpty) {
+      setState(() => showError = true);
+      return;
+    }
+    Navigator.pop(context, text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isOther = choice == _noRxOtherReason;
+    return AlertDialog(
+        title: const Text('Reason for no prescription'),
+        content: SingleChildScrollView(
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              DropdownButtonFormField<String>(
+                  initialValue: choice,
+                  isExpanded: true,
+                  hint: const Text('Select a reason'),
+                  decoration: InputDecoration(
+                      isDense: true,
+                      errorText: showError && choice == null
+                          ? 'Select a reason.'
+                          : null),
+                  items: const [
+                    DropdownMenuItem(
+                        value: noRxFollowUpReason,
+                        child: Text(noRxFollowUpReason)),
+                    DropdownMenuItem(
+                        value: _noRxOtherReason, child: Text(_noRxOtherReason)),
+                  ],
+                  onChanged: (v) => setState(() {
+                        choice = v;
+                        showError = false;
+                      })),
+              if (isOther) ...[
+                const SizedBox(height: 12),
+                TextField(
+                    controller: other,
+                    autofocus: true,
+                    maxLines: 3,
+                    maxLength: 1000,
+                    onChanged: (_) {
+                      if (showError) setState(() => showError = false);
+                    },
+                    decoration: InputDecoration(
+                        hintText: 'Explain why no prescription is needed',
+                        errorText: showError && other.text.trim().isEmpty
+                            ? 'Please explain the reason.'
+                            : null)),
+              ]
+            ])),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(onPressed: submit, child: const Text('Continue')),
+        ]);
+  }
+}
+
 class ConsultationPage extends StatefulWidget {
   const ConsultationPage({super.key, required this.appointment});
   final AppointmentDto appointment;
@@ -4442,29 +5299,20 @@ class _ConsultationState extends State<ConsultationPage> {
                 ]));
     if (!mounted || choice == null) return;
     if (choice == 'COMPLETED_NO_RX') {
-      final reason = TextEditingController();
-      String? value;
-      try {
-        value = await showDialog<String>(
-            context: context,
-            builder: (dialogContext) => AlertDialog(
-                    title: const Text('Reason for no prescription'),
-                    content: TextField(
-                        controller: reason, maxLines: 3, maxLength: 1000),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(dialogContext),
-                          child: const Text('Cancel')),
-                      FilledButton(
-                          onPressed: () =>
-                              Navigator.pop(dialogContext, reason.text.trim()),
-                          child: const Text('Continue')),
-                    ]));
-      } finally {
-        reason.dispose();
-      }
-      if (value == null || value.isEmpty) return;
+      final value = await askNoRxReason(context);
+      if (value == null) return;
       await complete(choice, noRxReason: value);
+    } else if (choice == 'COMPLETED_WITH_RX') {
+      // "With Rx" means the Rx is dispatched: the scanner sends the pages
+      // and completes the consultation itself, so it is never completed
+      // WITH_RX without a prescription on the server.
+      final sent = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(
+              builder: (_) => ScannerPage(
+                  initialAppointment: widget.appointment,
+                  closeOnDispatch: true)));
+      if (sent == true && mounted) Navigator.pop(context);
     } else {
       await complete(choice);
     }
@@ -4479,11 +5327,11 @@ class _ConsultationState extends State<ConsultationPage> {
     }
     if (error != null) {
       return Scaffold(
-          appBar: AppBar(title: const Text('Consultation Detail')),
+          appBar: AppBar(title: const Text('Consultation Notes')),
           body: ErrorPanel(error!, onRetry: load));
     }
     return Scaffold(
-        appBar: AppBar(title: const Text('Consultation Detail')),
+        appBar: AppBar(title: const Text('Consultation Notes')),
         body: ListView(padding: const EdgeInsets.all(18), children: [
           CacheStatusBar(
               offline: offline,
@@ -4501,7 +5349,23 @@ class _ConsultationState extends State<ConsultationPage> {
                 if (summary?['chief_complaint'] != null)
                   Text('Chief complaint: ${summary!['chief_complaint']}'),
                 if (summary?['clinical_notes'] != null)
-                  Text('Clinical notes: ${summary!['clinical_notes']}'),
+                  Text('Patient intake note: ${summary!['clinical_notes']}'),
+                const SizedBox(height: 12),
+                // Panel 7 also draws clinical notes, diagnosis, plan and
+                // follow-up fields. Nothing on the server stores them, so
+                // they are not offered: typing them here would lose them.
+                Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                        color: DoctorTokens.noticeBg,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: const Text(
+                        'Record the consultation outcome below. Written clinical notes, diagnosis, plan and follow-up cannot be saved in the app yet.',
+                        style: TextStyle(
+                            fontSize: 13.5,
+                            height: 1.4,
+                            color: DoctorTokens.fieldText))),
                 const SizedBox(height: 14),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   OutlinedButton.icon(
@@ -4517,7 +5381,7 @@ class _ConsultationState extends State<ConsultationPage> {
                           : () => _callScreenGuard.push(
                               c, (_) => AgoraPage(appointmentId: a.id)),
                       icon: const Icon(Icons.video_call),
-                      label: Text(a.joinLockedLabel ?? 'Join Agora')),
+                      label: Text(a.joinLockedLabel ?? 'Join video call')),
                   OutlinedButton.icon(
                       onPressed: () => Navigator.push(
                           c,
@@ -4624,7 +5488,8 @@ Future<void> openHistoryDetail(
     final detail =
         await c.read<DoctorCubit>().repo.historyDetail(appointment, episode);
     if (c.mounted) {
-      final documents = findDocumentIds(detail);
+      final ended = filesAccessEnded(detail);
+      final documents = ended ? const <DocumentRef>[] : findDocumentIds(detail);
       final historicalAppointment = textOf(detail['historical_appointment_id']);
       showDialog(
           context: c,
@@ -4635,6 +5500,7 @@ Future<void> openHistoryDetail(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                     Text(const JsonEncoder.withIndent('  ').convert(detail)),
+                    if (ended) const Text(kFilesAccessEnded),
                     for (final doc in documents)
                       DocumentButton(
                           appointmentId: historicalAppointment,
@@ -4677,6 +5543,14 @@ String? findDocumentId(dynamic value) {
 /// (Remediation E2) — carried through so [DocumentButton] can route to a
 /// safe in-app viewer instead of an external application, the same way the
 /// Patient app's Health Vault already routes on its own declared `mimeType`.
+/// A doctor can open a consultation's files for 20 days after it ends; after
+/// that the server withholds them and reports `files_access_ended`.
+const kFilesAccessEnded =
+    'Access to this consultation’s files ended 20 days after it.';
+
+bool filesAccessEnded(Map<String, dynamic> data) =>
+    data['files_access_ended'] == true;
+
 class DocumentRef {
   const DocumentRef(this.id, this.mimeType);
   final String id;

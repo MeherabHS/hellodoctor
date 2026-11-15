@@ -12,8 +12,12 @@ class ArticleQuizSection extends StatefulWidget {
       required this.articleId,
       required this.publication,
       required this.repository,
-      required this.onRefreshArticle});
+      required this.onRefreshArticle,
+      this.standalone = false});
   final String articleId;
+
+  /// A standalone quiz has no article to read first, so its intro differs.
+  final bool standalone;
   final QuizPublication publication;
   final ArticleQuizRepository repository;
   final VoidCallback onRefreshArticle;
@@ -91,7 +95,7 @@ class _ArticleQuizSectionState extends State<ArticleQuizSection> {
                   padding: EdgeInsets.only(top: 12),
                   child: LinearProgressIndicator()),
           ] else if (c.phase == QuizPhase.introduction) ...[
-            Text(l10n.quizIntro),
+            Text(widget.standalone ? l10n.quizIntroStandalone : l10n.quizIntro),
             Text(l10n.quizQuestionCount(c.total)),
             const SizedBox(height: 12),
             FilledButton(

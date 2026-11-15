@@ -60,6 +60,9 @@ export async function middleware(req: NextRequest) {
   // `frame-ancestors`/`form-action` directives already set above.
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
   response.headers.set('Cross-Origin-Resource-Policy', 'same-origin');
+  // HTTPS-only for two years once deployed (2026-11-14 security review); never on
+  // local http development, where it would pin localhost to HTTPS.
+  if (!dev) response.headers.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
   return response;
 }
 

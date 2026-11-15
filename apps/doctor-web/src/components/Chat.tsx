@@ -1,12 +1,13 @@
 'use client';
 import { startScheduleSync } from '../lib/schedule-sync';
-import { ClinicalAttachment, PaperclipIcon } from './ClinicalAttachment';
+import { ClinicalAttachment } from './ClinicalAttachment';
 import { compressRxPhoto } from '../lib/rx-compression';
 import { useEffect, useRef, useState } from 'react';
 import { api, errorText, post, useResource, runtimeGeneration } from '../lib/client';
-import { Appointment, Conversation, Message, Profile, chatLocked, chatActionLabel, messageSide, consultationContext, compareMessageInstants } from '../lib/contracts';
-import { State } from './Common';
-import { ClinicalAction, date, initials, time } from './Queue';
+import { Appointment, Conversation, Message, Profile, chatLocked, messageSide, consultationContext, compareMessageInstants } from '../lib/contracts';
+import { Avatar, Badge, PageHeader, State, demographics } from './Common';
+import { Icon } from './Icons';
+import { ClinicalAction, date, time } from './Queue';
 
 export function Chat({ profile, appointments, selectedAppointment, focusAppointment, visible=true, action, gap }: { profile: Profile; appointments: Appointment[]; selectedAppointment?: string; focusAppointment?: Appointment; visible?:boolean; action: ClinicalAction; gap: (message:string)=>void }) {
   const list = useResource<Conversation[]>('doctor/chats?limit=100&offset=0');
@@ -41,24 +42,36 @@ export function Chat({ profile, appointments, selectedAppointment, focusAppointm
   const filtered = (list.data??[]).filter(c=>c.patient_display_name.toLowerCase().includes(search.toLowerCase()) && (filter==='all' || filter==='active'&&!chatLocked(c,now) || filter==='locked'&&chatLocked(c,now)));
   const current=selected?(list.data?.find(c=>c.id===selected.id)??selected):null;
   const appointment=consultationContext(appointments,current?.appointment_id,focusAppointment);
-  return <section className="web-chat-page">
-    <header className="dw-page-header"><div className="dw-page-title-group"><h2>Patient Chats</h2><p>Consultation conversations and follow-up messages</p></div><button className="dw-btn-outline" disabled={list.loading} onClick={()=>void list.refresh()}>Refresh inbox</button></header>
-    <div className="web-chat-workspace" id="webChatWorkspace">
-      <aside className="dw-section-card web-chat-list" aria-label="Patient conversations"><div className="dw-section-header"><h3 className="dw-section-title">Conversations</h3></div><div className="web-section-body">
-        <input className="auth-input" aria-label="Search conversations" placeholder="Search patient conversations..." value={search} onChange={e=>setSearch(e.target.value)}/>
-        <div className="dw-filter-pills">{[['all','All'],['active','Active'],['locked','Read-only']].map(([value,label])=><button key={value} className={`dw-filter-pill ${filter===value?'active':''}`} onClick={()=>setFilter(value)}>{label}</button>)}</div>
-        <State loading={list.loading} error={list.error||moreError} retry={()=>void list.refresh()}/>
-        {!list.loading&&!list.error&&!filtered.length&&<div className="web-chat-list-empty" role="status"><ChatIcon/><strong>{!search&&filter==='all'?'No conversations yet':'No matching conversations'}</strong><p>Consultation conversations will appear here.</p></div>}
-        {filtered.map(c=>{const context=appointments.find(a=>a.id===c.appointment_id);return <button className="dw-pt-card web-conversation-card" key={c.id} aria-pressed={current?.id===c.id} data-conversation-id={c.id} onClick={()=>setSelected(c)}><div className="web-action-row"><div className="dw-doc-avatar-img">{initials(c.patient_display_name)}</div><strong>{c.patient_display_name}</strong></div><span className={`badge ${chatLocked(c,now)?'badge-slate':'badge-green'}`}>{chatLocked(c,now)?'Read-only':'Active'}</span><span className="sheet-desc">{context?<>{context.appointment_number} &middot; {date(context.start_time)}</>:'Consultation conversation'}</span><span className="sheet-desc">{chatActionLabel(c,now)}</span><span className="sheet-desc">{c.last_message_at?<>Last message &middot; {date(c.last_message_at)} {time(c.last_message_at)}</>:'No messages yet'}</span></button>;})}
-        {hasMore&&<button className="dw-btn-outline" disabled={moreBusy} onClick={()=>void loadMore()}>{moreBusy?'Loading...':'Load more conversations'}</button>}
-      </div></aside>
-      <div className="web-chat-thread">{current?<ChatThread visible={visible} key={current.id} chat={current} profile={profile} appointment={appointment} onBack={()=>setSelected(null)} action={action} gap={gap}/>:<div className="web-chat-welcome" role="status"><ChatIcon/><h3>Select a conversation</h3><p>Choose a patient conversation from the list to view messages.</p></div>}</div>
+  return <>
+    <PageHeader title="Patient chats" subtitle="Consultation conversations and follow-up messages. Each chat closes when its consultation window ends.">
+      <button className="am-btn ghost" disabled={list.loading} onClick={()=>void list.refresh()}><Icon name="refresh" size={16}/>Refresh</button>
+    </PageHeader>
+    <div className={`am-chat${current?' has-thread':''}`} id="webChatWorkspace">
+      <section className="am-card am-chat-list" aria-label="Patient conversations">
+        <div className="am-card-body am-stack" style={{gap:12,paddingBottom:10}}>
+          <label className="am-search" style={{maxWidth:'none'}}><Icon name="search" size={16}/><span className="am-sr">Search conversations</span><input value={search} placeholder="Search by patient name" onChange={e=>setSearch(e.target.value)}/></label>
+          <div className="am-tabs" aria-label="Conversation filter">{[['all','All'],['active','Active'],['locked','Read-only']].map(([value,label])=><button key={value} className="am-tab" aria-pressed={filter===value} onClick={()=>setFilter(value)}>{label}<span className="am-tab-count">{(list.data??[]).filter(c=>value==='all'||(value==='active')!==chatLocked(c,now)).length}</span></button>)}</div>
+        </div>
+        <div className="am-scroll">
+          <State compact loading={list.loading} error={list.error||moreError} retry={()=>void list.refresh()}/>
+          {!list.loading&&!list.error&&!filtered.length&&<State compact icon="chat" empty={!search&&filter==='all'?'No conversations yet':'No matching conversations'} hint="Consultation chats appear here once a patient books you."/>}
+          {filtered.map(c=>{const context=appointments.find(a=>a.id===c.appointment_id);const locked=chatLocked(c,now);return <button className="am-convo" key={c.id} aria-pressed={current?.id===c.id} data-conversation-id={c.id} onClick={()=>setSelected(c)}>
+            <Avatar name={c.patient_display_name}/>
+            <span className="am-grow" style={{minWidth:0}}>
+              <span className="am-row between" style={{flexWrap:'nowrap'}}><strong className="am-strong" style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.patient_display_name}</strong><span className="am-faint" style={{flexShrink:0}}>{c.last_message_at?(dayKeyOf(c.last_message_at)===dayKeyOf(new Date(now).toISOString())?time(c.last_message_at):date(c.last_message_at)):''}</span></span>
+              <span className="am-faint" style={{display:'block'}}>{context?`${context.appointment_number} · ${date(context.start_time)}`:c.modality==='VIDEO'?'Video consultation follow-up':'Chat consultation'}</span>
+              <span className="am-row" style={{marginTop:6,gap:6}}><Badge tone={locked?'slate':'green'} dot>{locked?'Read-only':'Active'}</Badge>{!c.last_message_at&&<span className="am-faint">No messages yet</span>}</span>
+            </span>
+          </button>;})}
+          {hasMore&&<div className="am-row" style={{justifyContent:'center',padding:10}}><button className="am-btn ghost sm" disabled={moreBusy} onClick={()=>void loadMore()}>{moreBusy?'Loading…':'Load more'}</button></div>}
+        </div>
+      </section>
+      <section className="am-card am-thread">{current?<ChatThread visible={visible} key={current.id} chat={current} profile={profile} appointment={appointment} onBack={()=>setSelected(null)} action={action} gap={gap}/>:<div style={{margin:'auto'}}><State icon="chat" empty="Select a conversation" hint="Choose a patient on the left to read and reply."/></div>}</section>
     </div>
-  </section>;
-
+  </>;
 }
 
-export function ChatThread({ chat, profile, appointment, onBack, action, gap, visible=true }: { chat:Conversation; profile:Profile; appointment?:Appointment; onBack:()=>void; action:ClinicalAction; gap:(message:string)=>void;visible?:boolean }) {
+export function ChatThread({ chat, profile, appointment, onBack, action, gap, visible=true, compact=false }: { chat:Conversation; profile:Profile; appointment?:Appointment; onBack:()=>void; action:ClinicalAction; gap:(message:string)=>void;visible?:boolean;compact?:boolean }) {
   const latest=useResource<Message[]>(`chat/${chat.id}/messages`);
   const [thread,setThread]=useState<Message[]>([]);
   const [hasOlder,setHasOlder]=useState(true);
@@ -162,13 +175,38 @@ export function ChatThread({ chat, profile, appointment, onBack, action, gap, vi
     } catch(e) { setError(errorText(e)); if(e instanceof Error && 'status' in e && (e.status===403 || e.status===409)) setServerLocked(true); }
     finally {busyRef.current=false;setSending(false);}
   }
-  function clinical(which:'history'|'documents'|'call'|'rx') {if(appointment)action(which,appointment);else gap('No authorized appointment context is available for this conversation.');}
+  function clinical(which:'history'|'documents'|'call'|'rx') {if(appointment)action(which,appointment);else gap('This conversation is not linked to a consultation you can open right now.');}
+  const minutesLeft=Math.max(0,Math.ceil((Date.parse(chat.expires_at)-tick)/60000));
   return <>
-    <header className="web-chat-header"><div className="web-action-row"><div className="dw-doc-avatar-img">{initials(chat.patient_display_name)}</div><div><h2 className="dw-section-title">{chat.patient_display_name}</h2>{appointment&&<p className="sheet-desc">{appointment.appointment_number} &middot; {date(appointment.start_time)} &middot; {time(appointment.start_time)}</p>}<p className="sheet-desc">{locked?'Read-only - Consultation window closed':`Follow-up ends ${date(chat.expires_at)} ? ${time(chat.expires_at)} (${Math.max(0,Math.ceil((Date.parse(chat.expires_at)-tick)/60000))} min remaining)`}</p></div><button className="dw-btn-mini" onClick={onBack}>All chats</button></div><div className="web-action-row" style={{marginTop:10}}>{[['history','Patient History'],['documents','Documents'],...(chat.modality==='VIDEO'&&!locked?[['call','Start video consultation']]:[]),...(!locked?[['rx','Write Rx']]:[])].map(([which,label])=><button className="dw-btn-outline-sm" key={which} disabled={!appointment} onClick={()=>clinical(which as 'history'|'documents'|'call'|'rx')}>{label}</button>)}<button className="dw-btn-outline-sm" onClick={()=>gap(`The server controls chat expiry. This conversation expires at ${time(chat.expires_at)}.`)}>24-hour window</button></div></header>
-    <div ref={feed} className="dw-meet-chat-feed" id="dwChatMsgStream">{hasOlder&&thread.length>0&&<button className="dw-btn-mini" disabled={loadingOlder} onClick={()=>void olderMessages()}>{loadingOlder?'Loading history...':'Load earlier messages'}</button>}<State loading={messages.loading} error={messages.error||error} retry={()=>void messages.refresh()}/>{messages.data?.map(m=><div key={m.id} data-message-id={m.id} data-incoming={m.sender_id!==profile.user_id} className={`dw-chat-bubble-row ${messageSide(m,profile.user_id)}`} data-sender-side={messageSide(m,profile.user_id)}><div className={`dw-chat-avatar ${m.sender_id===profile.user_id?'doc':'pt'}`}>{initials(m.sender_id===profile.user_id?profile.full_name:chat.patient_display_name)}</div><div className="dw-chat-bubble-content"><div className="dw-chat-author-line"><span>{m.sender_id===profile.user_id?profile.full_name:chat.patient_display_name}</span><time>{time(m.sent_at)}</time></div>{m.content&&<p className="web-clinical-text">{m.content}</p>}{m.attachment_id&&<ClinicalAttachment conversation={chat.id} message={m.id} size={m.attachment?.size_bytes}/>}</div></div>)}{messages.data?.length===0&&<State empty="No messages yet"/>}<button className="dw-btn-mini" onClick={()=>void messages.refresh()}>Refresh messages</button></div>
-    {locked&&<p className="web-gap" role="status">Consultation window closed. This conversation is read-only.</p>}
-    {!locked&&<form className="dw-meet-chat-input-bar" onSubmit={e=>{e.preventDefault();void send();}}><input ref={picker} type="file" accept="image/jpeg,image/png" hidden aria-label="Clinical image file" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void uploadImage(file);}}/><button className="clinical-attach-button" type="button" disabled={locked||uploading} aria-label="Attach clinical image" onClick={()=>picker.current?.click()}><PaperclipIcon/></button>{pendingImage.current&&!uploading&&<button type="button" className="dw-btn-mini" onClick={()=>void uploadImage()}>Retry image upload</button>}<div className="dw-meet-input-box"><textarea rows={1} id="dwChatInputField" aria-label="Chat message" value={content} disabled={locked||sending} placeholder={locked?'Conversation is read-only':'Message...'} maxLength={2000} onChange={e=>setContent(e.target.value)}/></div><button className="dw-meet-send-btn" type="submit" disabled={locked||sending||!content.trim()}>{sending?'Sending...':'Send'}</button></form>}
+    <header className="am-thread-head">
+      <div className="am-row between" style={{flexWrap:'nowrap'}}>
+        <div className="am-person" style={{minWidth:0}}>{!compact&&<button className="am-btn ghost sm" aria-label="All chats" onClick={onBack}><Icon name="arrowLeft" size={15}/></button>}<Avatar name={chat.patient_display_name}/><div style={{minWidth:0}}><strong>{chat.patient_display_name}</strong><span>{appointment?`${[demographics(appointment),appointment.appointment_number].filter(Boolean).join(' · ')}`:'Consultation conversation'}</span></div></div>
+        <Badge tone={locked?'slate':'green'} dot>{locked?'Read-only':minutesLeft>90?`Open until ${time(chat.expires_at)}`:`${minutesLeft} min left`}</Badge>
+      </div>
+      {!compact&&<div className="am-row" style={{marginTop:12,gap:8}}>
+        <button className="am-btn ghost sm" disabled={!appointment} onClick={()=>clinical('history')}><Icon name="history" size={15}/>History</button>
+        <button className="am-btn ghost sm" disabled={!appointment} onClick={()=>clinical('documents')}><Icon name="file" size={15}/>Documents</button>
+        {chat.modality==='VIDEO'&&!locked&&<button className="am-btn ghost sm" disabled={!appointment} onClick={()=>clinical('call')}><Icon name="video" size={15}/>Consultation room</button>}
+        {!locked&&<button className="am-btn soft sm" disabled={!appointment} onClick={()=>clinical('rx')}><Icon name="rx" size={15}/>Prescription</button>}
+      </div>}
+    </header>
+    <div ref={feed} className="am-feed" id="dwChatMsgStream">
+      {hasOlder&&thread.length>0&&<button className="am-btn ghost sm" style={{alignSelf:'center'}} disabled={loadingOlder} onClick={()=>void olderMessages()}>{loadingOlder?'Loading…':'Load earlier messages'}</button>}
+      <State compact loading={messages.loading&&!thread.length} error={messages.error||error} retry={()=>void messages.refresh()}/>
+      {messages.data?.map(m=>{const side=messageSide(m,profile.user_id);return <div key={m.id} data-message-id={m.id} data-incoming={m.sender_id!==profile.user_id} className={`am-bubble-row ${side}`} data-sender-side={side}>
+        <Avatar name={side==='doctor'?profile.full_name:chat.patient_display_name} size="sm"/>
+        <div className="am-bubble">{m.content&&<p className="am-pre">{m.content}</p>}{m.attachment_id&&<ClinicalAttachment conversation={chat.id} message={m.id} size={m.attachment?.size_bytes}/>}<time>{date(m.sent_at)} · {time(m.sent_at)}</time></div>
+      </div>;})}
+      {messages.data?.length===0&&<State compact icon="chat" empty="No messages yet" hint={locked?undefined:'Say hello to start the conversation.'}/>}
+    </div>
+    {locked?<p className="am-callout" role="status" style={{margin:14}}><Icon name="lock"/>This consultation window has closed, so the conversation is read-only.</p>
+    :<form className="am-composer" onSubmit={e=>{e.preventDefault();void send();}}>
+      <input ref={picker} type="file" accept="image/jpeg,image/png" hidden aria-label="Clinical image file" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void uploadImage(file);}}/>
+      <button className="am-icon-btn" type="button" disabled={locked||uploading} aria-label="Attach clinical image" title="Attach image" onClick={()=>picker.current?.click()}><Icon name="paperclip"/></button>
+      {pendingImage.current&&!uploading&&<button type="button" className="am-btn ghost sm" onClick={()=>void uploadImage()}>Retry image</button>}
+      <textarea className="am-textarea" rows={1} id="dwChatInputField" aria-label="Chat message" value={content} disabled={locked||sending} placeholder={uploading?'Uploading image…':'Write a message…'} maxLength={2000} onChange={e=>setContent(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void send();}}}/>
+      <button className="am-btn primary" type="submit" disabled={locked||sending||!content.trim()} aria-label="Send message"><Icon name="send" size={16}/>{sending?'Sending…':'Send'}</button>
+    </form>}
   </>;
 }
-
-function ChatIcon(){return <svg className="web-chat-empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6A8.4 8.4 0 0 1 12.5 3H13a8.5 8.5 0 0 1 8 8v.5Z"/></svg>;}
+function dayKeyOf(value:string){return new Intl.DateTimeFormat('en-CA',{timeZone:'Africa/Nairobi',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));}

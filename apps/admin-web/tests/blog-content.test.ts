@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {articleErrors,blankArticle,articleLanguage,safeArticleLink,articleActions,nairobiSchedule} from '../src/lib/blogContent.ts';
+import {articleErrors,blankArticle,articleLanguage,safeArticleLink,articleActions,nairobiSchedule,isYouTubeLink,topicLabel} from '../src/lib/blogContent.ts';
 const valid=()=>({...blankArticle(),title_en:'Title',body_en:'## Body',category_id:'category'});
 test('article validation accepts English fallback and paired bilingual content',()=>{
   assert.deepEqual(articleErrors(valid()),[]);
@@ -18,9 +18,24 @@ test('article links allow explicit HTTP(S) and reject active, local and credenti
   assert.equal(safeArticleLink('https://example.org/path'),'https://example.org/path');
   for(const url of ['javascript:alert(1)','JaVaScRiPt:alert(1)','data:text/html,hi','file:///etc/passwd','//example.org','https://user:password@example.org','https://example.org\n','https:\\evil.example','mailto:a@example.org'])assert.equal(safeArticleLink(url),'');
 });
-test('status actions require review before publication and archive is terminal',()=>{
-  assert.ok(!articleActions('DRAFT').includes('publish'));assert.ok(articleActions('PENDING_REVIEW').includes('return'));assert.ok(articleActions('APPROVED').includes('publish'));assert.ok(!articleActions('SCHEDULED').includes('approve'));assert.deepEqual(articleActions('ARCHIVED'),[]);
+test('Admins publish directly: no review actions, archive is terminal',()=>{
+  for(const s of ['DRAFT','PENDING_REVIEW','APPROVED','SCHEDULED','PUBLISHED'] as const){
+    for(const review of ['submit','approve','return'])assert.ok(!articleActions(s).includes(review),`${s} offers ${review}`);
+  }
+  assert.deepEqual(articleActions('DRAFT'),['archive']);assert.deepEqual(articleActions('PUBLISHED'),['unpublish','archive']);assert.deepEqual(articleActions('ARCHIVED'),[]);
 });
 test('Nairobi schedule produces UTC independent of browser timezone',()=>{
   assert.equal(nairobiSchedule('2099-01-01T12:30'),'2099-01-01T09:30:00.000Z');assert.throws(()=>nairobiSchedule('bad'));assert.throws(()=>nairobiSchedule('2020-01-01T12:30'));
+});
+test('video link accepts YouTube shapes only, and is optional',()=>{
+  assert.deepEqual(articleErrors(valid()),[]);
+  for(const ok of ['https://www.youtube.com/watch?v=dQw4w9WgXcQ','https://youtu.be/dQw4w9WgXcQ?si=x','https://m.youtube.com/watch?feature=share&v=dQw4w9WgXcQ','https://www.youtube.com/shorts/dQw4w9WgXcQ']){
+    assert.ok(isYouTubeLink(ok),ok);assert.deepEqual(articleErrors({...valid(),video_url:ok}),[]);
+  }
+  for(const bad of ['https://evil.example/watch?v=dQw4w9WgXcQ','https://youtube.com.evil.example/watch?v=dQw4w9WgXcQ','javascript:alert(1)','https://www.youtube.com/watch?v=short']){
+    assert.ok(!isYouTubeLink(bad),bad);assert.ok(articleErrors({...valid(),video_url:bad}).length,bad);
+  }
+});
+test('topic labels match the Patient app topics',()=>{
+  assert.equal(topicLabel('SRH'),'Sexual & Reproductive Health');assert.equal(topicLabel(null),'');
 });

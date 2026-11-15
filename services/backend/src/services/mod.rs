@@ -1,4 +1,5 @@
 pub mod admin_bootstrap_service;
+pub mod admin_invitation_service;
 pub mod agora_token_service;
 pub mod appointment_service;
 pub mod article_media_service;
@@ -20,6 +21,7 @@ pub mod notification_service;
 pub mod notification_transport;
 pub mod password_reset_service;
 pub mod payment_provider_verification;
+pub mod peer_call_service;
 pub mod prescription_service;
 pub mod profile_picture_service;
 pub mod upload_security_service;

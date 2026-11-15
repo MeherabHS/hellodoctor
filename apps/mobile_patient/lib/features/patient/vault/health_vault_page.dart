@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/l10n/kenya_time.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../profile/family_profiles_cubit.dart';
@@ -26,7 +28,11 @@ class HealthVaultPage extends StatefulWidget {
     super.key,
     required this.repo,
     required this.familyProfilesCubit,
+    this.initialKind = 'all',
   });
+
+  /// Initial tab: `all`, `PRESCRIPTION` or `INTAKE`.
+  final String initialKind;
   final VaultRepository repo;
   final FamilyProfilesCubit familyProfilesCubit;
 
@@ -36,7 +42,7 @@ class HealthVaultPage extends StatefulWidget {
 
 class _HealthVaultPageState extends State<HealthVaultPage> {
   late final VaultCubit _cubit;
-  String _kindFilter = 'all';
+  late String _kindFilter = widget.initialKind;
   final Set<String> _openingIds = {};
 
   @override
@@ -245,40 +251,99 @@ class _VaultList extends StatelessWidget {
       );
     }
 
+    // Grouped by consultation (product owner, 2026-11-13): each
+    // consultation's documents together, newest consultation first, with
+    // what the doctor sent kept apart from what the patient uploaded.
     final groups = <String, List<PatientDocumentDto>>{};
     for (final doc in visible) {
-      final key = DateFormat.yMMMM(AppLocalizations.of(context).localeName)
-          .format(doc.createdAt);
-      groups.putIfAbsent(key, () => []).add(doc);
+      groups.putIfAbsent(doc.appointmentId, () => []).add(doc);
     }
+    DateTime when(List<PatientDocumentDto> docs) =>
+        docs.first.consultationStart ?? docs.first.createdAt;
+    final ordered = groups.values.toList()
+      ..sort((a, b) => when(b).compareTo(when(a)));
+    final l10n = AppLocalizations.of(context);
+
+    Widget tile(PatientDocumentDto doc) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _DocumentTile(
+            doc: doc,
+            opening: openingIds.contains(doc.id),
+            onTap: () => onOpen(doc),
+          ),
+        );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
       children: [
         if (state.offline)
           const CacheStatusBar(offline: true, refreshing: false),
-        for (final entry in groups.entries) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(entry.key,
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: PatientTokens.textSub)),
-          ),
-          for (final doc in entry.value)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _DocumentTile(
-                doc: doc,
-                opening: openingIds.contains(doc.id),
-                onTap: () => onOpen(doc),
-              ),
-            ),
+        for (final docs in ordered) ...[
+          _ConsultationGroupHeader(doc: docs.first),
+          if (docs.any((d) => d.isPrescription)) ...[
+            _SectionLabel(l10n.vaultFromDoctor),
+            for (final doc in docs.where((d) => d.isPrescription)) tile(doc),
+          ],
+          if (docs.any((d) => !d.isPrescription)) ...[
+            _SectionLabel(l10n.vaultMyUploads),
+            for (final doc in docs.where((d) => !d.isPrescription)) tile(doc),
+          ],
+          const SizedBox(height: 8),
         ],
       ],
     );
   }
+}
+
+/// "Video consultation · Dr X · Fri, 13 Nov 2026 9:07 AM EAT · APT-…".
+class _ConsultationGroupHeader extends StatelessWidget {
+  const _ConsultationGroupHeader({required this.doc});
+  final PatientDocumentDto doc;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final start = doc.consultationStart;
+    final type = doc.modality == 'CHAT' ? l10n.consultChat : l10n.consultVideo;
+    final date = start == null
+        ? null
+        : '${DateFormat('EEE, d MMM y', l10n.localeName).format(kenyaTime(start))} '
+            '${formatTimeEat(start)}';
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(
+            [type, if (doc.doctorDisplayName != null) doc.doctorDisplayName]
+                .join(' · '),
+            style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w800,
+                color: PatientTokens.navy)),
+        if (date != null || doc.appointmentNumber != null)
+          Text(
+              [
+                if (date != null) date,
+                if (doc.appointmentNumber != null) doc.appointmentNumber
+              ].join(' · '),
+              style: const TextStyle(
+                  fontSize: 11.5, color: PatientTokens.textSub)),
+      ]),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 6),
+        child: Text(text.toUpperCase(),
+            style: const TextStyle(
+                fontSize: 11,
+                letterSpacing: 0.4,
+                fontWeight: FontWeight.w800,
+                color: PatientTokens.textSub)),
+      );
 }
 
 class _DocumentTile extends StatelessWidget {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hellodoctor_mobile_patient/l10n/app_localizations.dart';
 import 'package:hellodoctor_mobile_patient/core/l10n/kenya_time.dart';
 import 'package:hellodoctor_mobile_patient/core/network/api_client.dart';
 import 'package:hellodoctor_mobile_patient/core/network/availability_refresh.dart';
@@ -61,7 +62,8 @@ void main() {
         slots: [slot],
         selectedDate: slot.startTime,
         selectedSlotId: slot.id,
-        selectedPaymentMethodId: 'pm-1',
+        loadingPolicy: false,
+        paymentRequired: false,
       ),
     );
     expect(cubit.state.canProceed, isTrue);
@@ -97,7 +99,8 @@ void main() {
           slots: [today, tomorrow],
           selectedDate: tomorrow.startTime,
           selectedSlotId: 'tomorrow',
-          selectedPaymentMethodId: 'pm-1',
+          loadingPolicy: false,
+          paymentRequired: false,
         ),
       );
       final refresh = cubit.loadSlots();
@@ -177,7 +180,7 @@ void main() {
   );
   for (final width in [320.0, 360.0, 390.0, 412.0]) {
     testWidgets(
-      'unpaid consultation has one payment CTA, no fake success, and safe layout at $width',
+      'a legacy unpaid booking offers no payment, no fake success, safe layout at $width',
       (tester) async {
         tester.view.physicalSize = Size(width, 850);
         tester.view.devicePixelRatio = 1;
@@ -190,6 +193,8 @@ void main() {
         final now = DateTime.now().toUtc();
         await tester.pumpWidget(
           MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
             home: ConsultationStatusPage(
               appointment: AppointmentSummaryDto(
                 id: 'a',
@@ -209,34 +214,12 @@ void main() {
           ),
         );
         await tester.pump();
-        expect(find.byType(FilledButton), findsOneWidget);
-        expect(find.text('Proceed to payment method'), findsOneWidget);
-        expect(find.text('Open waiting room'), findsNothing);
-        expect(find.text('Open consultation'), findsNothing);
-        expect(find.textContaining('development environment'), findsNothing);
-        await tester.tap(find.text('Proceed to payment method'));
-        await tester.pump();
-        expect(repo.calls, 1);
-        expect(
-          tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-          isNull,
-        );
-        repo.payment.completeError(
-          const ApiException(
-            409,
-            'Payment service is currently unavailable. Please try again later.',
-          ),
-        );
-        await tester.pump();
-        expect(
-          find.text(
-            'Payment service is currently unavailable. Please try again later.',
-          ),
-          findsOneWidget,
-        );
+        for (final text in const ['payment', 'Payment', 'KES', '500']) {
+          expect(find.textContaining(text), findsNothing, reason: text);
+        }
         expect(find.text('Consultation confirmed'), findsNothing);
-        expect(find.text('Open consultation'), findsNothing);
-        expect(repo.calls, 1);
+        expect(find.text('Open chat waiting room'), findsNothing);
+        expect(repo.calls, 0);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox.shrink());
         await family.close();

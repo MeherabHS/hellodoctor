@@ -1,0 +1,768 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../core/config/emergency_contact.dart';
+import '../../../core/config/support_whatsapp.dart';
+import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/afya_widgets.dart';
+import '../../../l10n/app_localizations.dart';
+import '../blogs/blogs_page.dart';
+import '../booking/booking_repository.dart';
+import '../blogs/blogs_repository.dart';
+import '../education/education_tabs.dart';
+import '../education/education_topics.dart';
+import '../education/topic_articles_page.dart';
+import '../home/brand_header.dart';
+import '../home/home_cubit.dart';
+import '../home/upcoming_consultation_section.dart';
+import '../peer/peer_pages.dart';
+import '../peer/peer_repository.dart';
+import '../profile/data_rights_page.dart';
+import '../profile/family_profiles_cubit.dart';
+import '../qna/qna_ask_sheet.dart';
+import '../qna/qna_cubit.dart';
+import '../qna/qna_page.dart';
+import '../qna/qna_repository.dart';
+import '../vault/health_vault_page.dart';
+import '../vault/vault_repository.dart';
+import 'afya_module_widgets.dart';
+import 'patient_modules.dart';
+
+const _pagePadding = EdgeInsets.fromLTRB(20, 6, 20, 24);
+
+// ---------------------------------------------------------------------------
+// Panel 2 — HIV Prevention & Sexual Health
+// ---------------------------------------------------------------------------
+
+/// Education hub. Learn lists the six topics; a topic opens its own page with
+/// the topic's published articles (server `?topic=` filter) or its empty state.
+/// Videos lists published YouTube entries, Quizzes lists published articles
+/// that carry a quiz, and Audio has no content model yet, so it shows its
+/// empty state. "Browse all articles" keeps the existing route to every
+/// article, including Doctor-written ones that belong to no topic.
+class EducationHubPage extends StatefulWidget {
+  const EducationHubPage(
+      {super.key,
+      required this.nav,
+      required this.repo,
+      this.initialTab = 0,
+      this.appHeader});
+  final PatientShellNav nav;
+  final BlogsRepository repo;
+  final int initialTab;
+  final AppHeaderDeps? appHeader;
+  @override
+  State<EducationHubPage> createState() => _EducationHubPageState();
+}
+
+class _EducationHubPageState extends State<EducationHubPage> {
+  late int _tab = widget.initialTab;
+
+  void _openArticles() => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => BlogsPage(repo: widget.repo)));
+
+  void _openTopic(EducationTopic topic) =>
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => TopicArticlesPage(
+              topic: topic,
+              repo: widget.repo,
+              nav: widget.nav,
+              appHeader: widget.appHeader)));
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AfyaModuleScaffold(
+      title: l.moduleHivPrevention,
+      nav: widget.nav,
+      appHeader: widget.appHeader,
+      child: ListView(padding: _pagePadding, children: [
+        AfyaSegmentedTabs(labels: [
+          l.eduTabLearn,
+          l.eduTabVideos,
+          l.eduTabQuizzes,
+          l.eduTabAudio
+        ], selected: _tab, onSelected: (i) => setState(() => _tab = i)),
+        const SizedBox(height: 18),
+        if (_tab == 0) ...[
+          for (final t in EducationTopic.values)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: AfyaCard(
+                color: PatientTokens.cardTint,
+                shadow: false,
+                padding: EdgeInsets.zero,
+                onTap: () => _openTopic(t),
+                child: Row(children: [
+                  AfyaArt(t.thumbnail, width: 104, height: 104),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(t.title(l),
+                                style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: PatientTokens.navy)),
+                            const SizedBox(height: 6),
+                            Text(t.listDescription(l),
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    height: 1.4,
+                                    color: PatientTokens.ink)),
+                          ]),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Icon(Icons.chevron_right_rounded,
+                        color: PatientTokens.navy),
+                  ),
+                ]),
+              ),
+            ),
+          const SizedBox(height: 4),
+          OutlinedButton(
+              onPressed: _openArticles, child: Text(l.eduAllArticles)),
+        ] else if (_tab == 1)
+          EduTabFeed(
+              key: const ValueKey('videos'),
+              kind: EduTabKind.videos,
+              repo: widget.repo)
+        else if (_tab == 2)
+          EduTabFeed(
+              key: const ValueKey('quizzes'),
+              kind: EduTabKind.quizzes,
+              repo: widget.repo)
+        else
+          const EduAudioEmpty(),
+      ]),
+    );
+  }
+}
+// ---------------------------------------------------------------------------
+// Panel 3 — HIV Support Chat (the existing anonymous Q&A)
+// ---------------------------------------------------------------------------
+
+/// Support landing over the existing anonymous Q&A. Category rows open the
+/// existing question feed; the call-to-action opens the existing ask form.
+/// Nothing here is live messaging, and the privacy card says so.
+class SupportChatPage extends StatefulWidget {
+  const SupportChatPage(
+      {super.key,
+      required this.nav,
+      required this.repo,
+      required this.familyProfilesCubit});
+  final PatientShellNav nav;
+  final QnaRepository repo;
+  final FamilyProfilesCubit familyProfilesCubit;
+  @override
+  State<SupportChatPage> createState() => _SupportChatPageState();
+}
+
+class _SupportChatPageState extends State<SupportChatPage> {
+  late final QnaCubit _cubit = QnaCubit(widget.repo);
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
+
+  void _openFeed() => Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => QnaPage(
+          repo: widget.repo, familyProfilesCubit: widget.familyProfilesCubit)));
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    const green = [Color(0xFF22B886), Color(0xFF0C9A6C)];
+    const teal = [Color(0xFF16A7A2), Color(0xFF0B8389)];
+    const red = [Color(0xFFF4697A), Color(0xFFE23A50)];
+    const purple = [Color(0xFFA176EA), Color(0xFF7C4FD2)];
+    const indigo = [Color(0xFF6578EC), Color(0xFF3F51C9)];
+    final cats = <(Widget, String, String)>[
+      (
+        const AfyaGradientIcon(colors: green, icon: Icons.science_rounded),
+        l.supportCatTesting,
+        l.supportCatTestingDesc
+      ),
+      (
+        const AfyaGradientIcon(colors: teal, icon: Icons.medication_rounded),
+        l.supportCatPrep,
+        l.supportCatPrepDesc
+      ),
+      (
+        const AfyaGradientIcon(colors: red, ribbon: true),
+        l.supportCatArt,
+        l.supportCatArtDesc
+      ),
+      (
+        const AfyaGradientIcon(colors: purple, icon: Icons.favorite_rounded),
+        l.supportCatSexualHealth,
+        l.supportCatSexualHealthDesc
+      ),
+      (
+        const AfyaGradientIcon(colors: indigo, icon: Icons.psychology_rounded),
+        l.supportCatStigma,
+        l.supportCatStigmaDesc
+      ),
+    ];
+    return AfyaModuleScaffold(
+      title: l.moduleSupportChat,
+      nav: widget.nav,
+      child: ListView(padding: _pagePadding, children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+          decoration: BoxDecoration(
+              color: PatientTokens.cardTint,
+              borderRadius: BorderRadius.circular(12)),
+          child: Text('${l.supportIntro1}\n${l.supportIntro2}',
+              style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.55,
+                  fontWeight: FontWeight.w700,
+                  color: PatientTokens.introBlue)),
+        ),
+        const SizedBox(height: 16),
+        for (final c in cats)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 14),
+            child: AfyaCard(
+              onTap: _openFeed,
+              padding: const EdgeInsets.fromLTRB(10, 10, 6, 10),
+              child: Row(children: [
+                c.$1,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(c.$2,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: PatientTokens.navy)),
+                        const SizedBox(height: 4),
+                        Text(c.$3,
+                            style: const TextStyle(
+                                fontSize: 12.5, color: PatientTokens.ink)),
+                      ]),
+                ),
+                const Icon(Icons.chevron_right_rounded,
+                    color: PatientTokens.navy),
+              ]),
+            ),
+          ),
+        const SizedBox(height: 4),
+        AfyaPillButton(
+            label: l.supportAskAnonymous,
+            icon: Icons.sms_rounded,
+            color: PatientTokens.tealCta,
+            onPressed: () => showAskQuestionSheet(context,
+                cubit: _cubit,
+                familyProfilesCubit: widget.familyProfilesCubit)),
+        const SizedBox(height: 16),
+        const SupportWhatsAppCard(),
+        const SizedBox(height: 16),
+        AfyaInfoCard(
+            icon: Icons.lock_rounded,
+            title: l.supportPrivacyTitle,
+            body: l.supportPrivacyBody),
+      ]),
+    );
+  }
+}
+
+/// "Need immediate assistance? Text us on WhatsApp", with the configured
+/// number beneath ([SupportWhatsApp]). Until a number is supplied it shows a
+/// "coming soon" placeholder and does nothing when tapped.
+class SupportWhatsAppCard extends StatelessWidget {
+  const SupportWhatsAppCard({super.key, this.number = SupportWhatsApp.number});
+
+  /// Overridable for tests; defaults to the build-time configuration.
+  final String number;
+
+  static const _green = Color(0xFF25D366);
+
+  String get _digits => number.replaceAll(RegExp(r'[^0-9]'), '');
+  bool get _configured => _digits.length >= 9;
+
+  Future<void> _open(BuildContext context) async {
+    final l = AppLocalizations.of(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    var opened = false;
+    try {
+      opened = await launchUrl(Uri.parse('https://wa.me/$_digits'),
+          mode: LaunchMode.externalApplication);
+    } catch (_) {
+      opened = false;
+    }
+    if (!opened) {
+      messenger
+          ?.showSnackBar(SnackBar(content: Text(l.supportWhatsAppOpenError)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AfyaCard(
+      key: const ValueKey('support-whatsapp-card'),
+      onTap: _configured ? () => _open(context) : null,
+      padding: const EdgeInsets.fromLTRB(12, 14, 10, 14),
+      child: Row(children: [
+        Container(
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: _green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.chat_rounded, color: _green, size: 26)),
+        const SizedBox(width: 14),
+        Expanded(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(l.supportWhatsAppTitle,
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: PatientTokens.navy)),
+            const SizedBox(height: 2),
+            Text(l.supportWhatsAppBody,
+                style:
+                    const TextStyle(fontSize: 12.5, color: PatientTokens.ink)),
+            const SizedBox(height: 4),
+            Text(_configured ? number : l.supportWhatsAppPending,
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: _configured ? FontWeight.w800 : FontWeight.w600,
+                    color: _configured
+                        ? PatientTokens.navy
+                        : PatientTokens.textSub)),
+          ]),
+        ),
+        if (_configured)
+          const Icon(Icons.chevron_right_rounded, color: PatientTokens.navy),
+      ]),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Panel 4 — Peer Navigator. "Start Chat" opens the peer list and booking
+// (docs/peer-navigator/PEER_NAVIGATOR_PLAN.md); the patient's own requests
+// sit under the button.
+// ---------------------------------------------------------------------------
+
+class PeerNavigatorPage extends StatefulWidget {
+  const PeerNavigatorPage(
+      {super.key,
+      required this.nav,
+      required this.repo,
+      required this.bookingRepo,
+      this.myUserId});
+  final PatientShellNav nav;
+  final PatientPeerRepository repo;
+  final BookingRepository bookingRepo;
+  final String? myUserId;
+  @override
+  State<PeerNavigatorPage> createState() => _PeerNavigatorPageState();
+}
+
+class _PeerNavigatorPageState extends State<PeerNavigatorPage> {
+  int _refresh = 0;
+
+  Future<void> _start() async {
+    await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => PeerNavigatorListPage(
+            repo: widget.repo,
+            bookingRepo: widget.bookingRepo,
+            nav: widget.nav)));
+    if (mounted) setState(() => _refresh++);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nav = widget.nav;
+    final l = AppLocalizations.of(context);
+    Widget feature(IconData icon, Color c, Color bg, String t, String d) =>
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: AfyaCard(
+            child: Row(children: [
+              AfyaIconTile(icon: icon, color: c, background: bg, size: 46),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t,
+                          style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: PatientTokens.navy)),
+                      const SizedBox(height: 3),
+                      Text(d,
+                          style: const TextStyle(
+                              fontSize: 12.5, color: PatientTokens.ink)),
+                    ]),
+              ),
+            ]),
+          ),
+        );
+    return AfyaModuleScaffold(
+      title: l.peerTitle,
+      nav: nav,
+      child: ListView(padding: _pagePadding, children: [
+        const AfyaCharacterCard('peer_navigator_hero',
+            background: PatientTokens.mintCard),
+        const SizedBox(height: 14),
+        Text(l.peerHeadline,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: PatientTokens.navy)),
+        const SizedBox(height: 8),
+        Text(l.peerBody,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                fontWeight: FontWeight.w600,
+                color: PatientTokens.navy)),
+        const SizedBox(height: 14),
+        AfyaPillButton(
+            key: const ValueKey('peer-start-chat'),
+            label: l.peerStartChat,
+            icon: Icons.sms_rounded,
+            onPressed: _start),
+        PatientPeerRequestsSection(
+            repo: widget.repo,
+            bookingRepo: widget.bookingRepo,
+            myUserId: widget.myUserId,
+            refreshToken: _refresh),
+        const SizedBox(height: 16),
+        feature(
+            Icons.shield_outlined,
+            PatientTokens.tileGreen,
+            PatientTokens.tileGreenBg,
+            l.peerFeatReminders,
+            l.peerFeatRemindersDesc),
+        feature(
+            Icons.people_alt_rounded,
+            PatientTokens.tileGreen,
+            PatientTokens.tileGreenBg,
+            l.peerFeatFollowUp,
+            l.peerFeatFollowUpDesc),
+        feature(
+            Icons.groups_rounded,
+            PatientTokens.tileSlateBlue,
+            PatientTokens.tileSlateBlueBg,
+            l.peerFeatLinkage,
+            l.peerFeatLinkageDesc),
+        feature(
+            Icons.favorite_border_rounded,
+            PatientTokens.tileRed,
+            PatientTokens.tileRedBg,
+            l.peerFeatEmotional,
+            l.peerFeatEmotionalDesc),
+        const SizedBox(height: 4),
+        AfyaInfoCard(
+            icon: Icons.phone_rounded,
+            title: l.peerHereTitle,
+            body: l.peerHereBody,
+            background: PatientTokens.mintCard,
+            accent: PatientTokens.primaryDark),
+      ]),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Panel 6 — Health Records (over the existing vault)
+// ---------------------------------------------------------------------------
+
+/// Health Records landing. Rows exist only for what the backend holds:
+/// doctor-issued prescriptions and patient uploads. The panel's HIV Care
+/// Summary, Lab Results and Appointments rows have no data source and are
+/// not shown. The panel's Share Access tab is omitted by product-owner
+/// decision (2026-11-14).
+class HealthRecordsHubPage extends StatefulWidget {
+  const HealthRecordsHubPage(
+      {super.key,
+      required this.nav,
+      required this.repo,
+      required this.familyProfilesCubit});
+  final PatientShellNav nav;
+  final VaultRepository repo;
+  final FamilyProfilesCubit familyProfilesCubit;
+  @override
+  State<HealthRecordsHubPage> createState() => _HealthRecordsHubPageState();
+}
+
+class _HealthRecordsHubPageState extends State<HealthRecordsHubPage> {
+  void _open(String kind) => Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => HealthVaultPage(
+          repo: widget.repo,
+          familyProfilesCubit: widget.familyProfilesCubit,
+          initialKind: kind)));
+
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    Widget row(IconData icon, Color c, Color bg, String t, String d,
+            String kind) =>
+        Padding(
+          padding: const EdgeInsets.only(bottom: 14),
+          child: AfyaCard(
+            onTap: () => _open(kind),
+            padding: const EdgeInsets.fromLTRB(12, 14, 6, 14),
+            child: Row(children: [
+              Container(
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                      color: bg, borderRadius: BorderRadius.circular(14)),
+                  child: Icon(icon, color: c, size: 30)),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: PatientTokens.navy)),
+                      const SizedBox(height: 4),
+                      Text(d,
+                          style: const TextStyle(
+                              fontSize: 12.5, color: PatientTokens.ink)),
+                    ]),
+              ),
+              const Icon(Icons.chevron_right_rounded,
+                  color: PatientTokens.navy),
+            ]),
+          ),
+        );
+    return AfyaModuleScaffold(
+      title: l.moduleHealthRecords,
+      nav: widget.nav,
+      child: ListView(padding: _pagePadding, children: [
+        row(Icons.verified_user_outlined, PatientTokens.tileGreen,
+            PatientTokens.tileGreenBg, l.recordsAll, l.recordsAllDesc, 'all'),
+        row(
+            Icons.event_note_rounded,
+            PatientTokens.tileRed,
+            PatientTokens.tileRedBg,
+            l.recordsPrescriptions,
+            l.recordsPrescriptionsDesc,
+            'PRESCRIPTION'),
+        row(
+            Icons.description_rounded,
+            PatientTokens.tealCta,
+            PatientTokens.infoCard,
+            l.recordsDocuments,
+            l.recordsDocumentsDesc,
+            'INTAKE'),
+        const SizedBox(height: 4),
+        AfyaInfoCard(
+            icon: Icons.lock_rounded,
+            title: l.recordsAccessTitle,
+            body: '${l.recordsAccess1}\n${l.recordsAccess2}'),
+      ]),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Panel 8 — Video Consultation landing (entry to the real booking flow)
+// ---------------------------------------------------------------------------
+
+/// Landing for Book Consultation. The panel's "Start Video Call" implies an
+/// instant call; calls here are slot-booked and join-window gated, so the
+/// button reads "Book a Video Consultation" and opens doctor discovery. The
+/// urgent card dials the configured emergency number, not the panel's 11663.
+class VideoConsultationPage extends StatelessWidget {
+  const VideoConsultationPage(
+      {super.key,
+      required this.nav,
+      required this.onFindDoctor,
+      this.onHistory});
+  final PatientShellNav nav;
+
+  /// Opens doctor discovery filtered to `'video'` or `'chat'`.
+  final ValueChanged<String> onFindDoctor;
+
+  /// Opens the patient's consultation history (current and completed).
+  final VoidCallback? onHistory;
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AfyaModuleScaffold(
+      title: l.consultTitle,
+      nav: nav,
+      child: ListView(padding: _pagePadding, children: [
+        const AfyaCharacterCard('doctor_consult_hero',
+            background: PatientTokens.doctorCard,
+            panel: PatientTokens.doctorPanel),
+        const SizedBox(height: 18),
+        Text(l.consultHeadline,
+            style: const TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: PatientTokens.navy)),
+        const SizedBox(height: 8),
+        Text(l.consultBody,
+            style: const TextStyle(
+                fontSize: 15, height: 1.5, color: PatientTokens.ink)),
+        const SizedBox(height: 10),
+        AfyaCheckRow(l.consultCheck1),
+        AfyaCheckRow(l.consultCheck2),
+        AfyaCheckRow(l.consultCheck3),
+        const SizedBox(height: 14),
+        AfyaPillButton(
+            label: l.consultCta,
+            icon: Icons.videocam_rounded,
+            onPressed: () => onFindDoctor('video')),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+            onPressed: () => onFindDoctor('chat'),
+            icon: const Icon(Icons.chat_bubble_outline_rounded),
+            label: Text(l.consultCtaChat),
+            style: OutlinedButton.styleFrom(
+                foregroundColor: PatientTokens.primaryDark,
+                side: const BorderSide(
+                    color: PatientTokens.primaryDark, width: 1.5),
+                minimumSize: const Size.fromHeight(52),
+                shape: const StadiumBorder())),
+        if (onHistory != null)
+          Align(
+            alignment: Alignment.center,
+            child: TextButton.icon(
+                onPressed: onHistory,
+                icon: const Icon(Icons.history_rounded, size: 18),
+                label: Text(l.consultHistoryLink)),
+          ),
+        const _MyUpcomingConsultation(),
+        const SizedBox(height: 18),
+        AfyaCard(
+          color: PatientTokens.urgentCard,
+          shadow: false,
+          onTap: () => launchUrl(Uri.parse(EmergencyContact.kenyaTelUri)),
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+          child: Row(children: [
+            const AfyaIconTile(
+                icon: Icons.phone_rounded,
+                color: Colors.white,
+                background: PatientTokens.urgentIcon,
+                size: 46),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(l.consultUrgentTitle,
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: PatientTokens.urgentIcon)),
+                    const SizedBox(height: 4),
+                    Text(l.consultUrgentBody(EmergencyContact.kenyaNumber),
+                        style: const TextStyle(
+                            fontSize: 13.5,
+                            height: 1.45,
+                            color: PatientTokens.ink)),
+                  ]),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+/// The patient's nearest upcoming consultation and its waiting-room entry.
+/// Renders nothing when there is none, so the landing matches the reference.
+class _MyUpcomingConsultation extends StatelessWidget {
+  const _MyUpcomingConsultation();
+  @override
+  Widget build(BuildContext context) =>
+      BlocBuilder<HomeCubit, HomeState>(builder: (context, state) {
+        final next = state.nextUpcoming;
+        if (next == null) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: UpcomingConsultationSection(
+              state: state, onManage: () => openWaitingRoomFor(context, next)),
+        );
+      });
+}
+
+// ---------------------------------------------------------------------------
+// Panel 11 — Privacy & Security
+// ---------------------------------------------------------------------------
+
+/// Privacy information page. Each line is limited to what the app does
+/// today; the panel's "Anonymous questions and chat" is narrowed to
+/// questions, because consultation chat is not anonymous.
+class PrivacySecurityPage extends StatelessWidget {
+  const PrivacySecurityPage({super.key, required this.nav});
+  final PatientShellNav nav;
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return AfyaModuleScaffold(
+      title: l.privacyTitle,
+      nav: nav,
+      selectedTab: 3,
+      child: ListView(padding: _pagePadding, children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
+          decoration: BoxDecoration(
+              color: PatientTokens.mintCard.withValues(alpha: .6),
+              borderRadius: BorderRadius.circular(14)),
+          child: Column(children: [
+            const AfyaIconTile(
+                icon: Icons.lock_rounded,
+                color: Colors.white,
+                background: PatientTokens.tealCta,
+                size: 46),
+            const SizedBox(height: 14),
+            Text(l.privacyHeadline,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: PatientTokens.navy)),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        AfyaCheckRow(l.privacyCheck1),
+        AfyaCheckRow(l.privacyCheck2),
+        AfyaCheckRow(l.privacyCheck3),
+        AfyaCheckRow(l.privacyCheck4),
+        AfyaCheckRow(l.privacyCheck5),
+        AfyaCheckRow(l.privacyCheck6),
+        const SizedBox(height: 16),
+        AfyaInfoCard(
+            icon: Icons.verified_user_outlined,
+            title: l.privacyChoiceTitle,
+            body: l.privacyChoiceBody),
+        const SizedBox(height: 16),
+        OutlinedButton(
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const DataRightsPage())),
+            child: Text(l.privacyDataRights)),
+      ]),
+    );
+  }
+}

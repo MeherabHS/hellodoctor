@@ -1,4 +1,5 @@
 import 'notification_taps.dart';
+import 'reminder_alarm.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
@@ -122,10 +123,19 @@ class LocalNotificationService {
             requestBadgePermission: false,
             requestSoundPermission: false));
     await _plugin.initialize(initSettings,
-        onDidReceiveNotificationResponse: (response) =>
-            NotificationTaps.receive(response.payload));
+        onDidReceiveNotificationResponse: (response) {
+      // Personal reminder alarms are local and never routed to the
+      // server-notification destinations (that would open the inbox).
+      if (ReminderAlarm.isReminderPayload(response.payload)) {
+        handleReminderAlarmAction(response);
+        return;
+      }
+      NotificationTaps.receive(response.payload);
+    }, onDidReceiveBackgroundNotificationResponse: handleReminderAlarmAction);
     final launch = await _plugin.getNotificationAppLaunchDetails();
-    if (launch?.didNotificationLaunchApp == true) {
+    if (launch?.didNotificationLaunchApp == true &&
+        !ReminderAlarm.isReminderPayload(
+            launch?.notificationResponse?.payload)) {
       NotificationTaps.receive(launch?.notificationResponse?.payload);
     }
     final androidImpl = _plugin.resolvePlatformSpecificImplementation<
@@ -145,6 +155,16 @@ class LocalNotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     final granted = await androidImpl?.requestNotificationsPermission() ?? true;
     return granted;
+  }
+
+  /// Whether exact alarm-clock scheduling is allowed; asks once (Android 12+
+  /// shows the system "Alarms & reminders" setting) when it is not.
+  static Future<bool> requestExactAlarms() async {
+    if (await ReminderAlarm.exactAlarmsAllowed(_plugin)) return true;
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidImpl?.requestExactAlarmsPermission();
+    return ReminderAlarm.exactAlarmsAllowed(_plugin);
   }
 
   static Future<bool> areNotificationsEnabled() async {

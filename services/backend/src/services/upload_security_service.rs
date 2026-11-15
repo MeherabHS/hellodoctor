@@ -339,15 +339,86 @@ impl UploadSecurityService {
                 "Encrypted PDFs are not accepted.".into(),
             ));
         }
-        for marker in PDF_DANGEROUS_MARKERS {
-            if contains_subsequence(&normalized, marker) {
+        let active = || {
+            AppError::UnprocessableEntity(
+                "This PDF contains active content (scripts, actions, or embedded files) and cannot be accepted.".into(),
+            )
+        };
+        if PDF_DANGEROUS_MARKERS
+            .iter()
+            .any(|marker| contains_subsequence(&normalized, marker))
+        {
+            return Err(active());
+        }
+        // Scripts and actions can also hide inside compressed (Flate) streams,
+        // e.g. object streams, where the raw bytes show nothing. Inflate each
+        // stream within a fixed budget and scan it too; a file that inflates
+        // past the budget is refused (decompression bomb).
+        let mut budget = PDF_INFLATE_BUDGET;
+        for stream in pdf_stream_bodies(bytes) {
+            let mut inflated = Vec::new();
+            let decoder = flate2::read::ZlibDecoder::new(stream);
+            use std::io::Read;
+            let read = decoder.take(budget as u64 + 1).read_to_end(&mut inflated);
+            if read.is_err() {
+                // Not a Flate stream (images, plain text): nothing to inflate.
+                continue;
+            }
+            if inflated.len() > budget {
                 return Err(AppError::UnprocessableEntity(
-                    "This PDF contains active content (scripts, actions, or embedded files) and cannot be accepted.".into(),
+                    "This PDF is too complex to check and cannot be accepted.".into(),
                 ));
+            }
+            budget -= inflated.len();
+            let inflated = normalize_pdf_name_escapes(&inflated);
+            if contains_subsequence(&inflated, b"/Encrypt")
+                || PDF_DANGEROUS_MARKERS
+                    .iter()
+                    .any(|marker| contains_subsequence(&inflated, marker))
+            {
+                return Err(active());
             }
         }
         Ok(())
     }
+}
+
+/// Total bytes a PDF's compressed streams may inflate to while being checked.
+const PDF_INFLATE_BUDGET: usize = 32 * 1024 * 1024;
+
+/// The raw bytes between each `stream` keyword's end-of-line and the next
+/// `endstream`.
+fn pdf_stream_bodies(bytes: &[u8]) -> Vec<&[u8]> {
+    let mut out = Vec::new();
+    let mut at = 0;
+    while let Some(found) = find_from(bytes, b"stream", at) {
+        let mut start = found + b"stream".len();
+        // `endstream` itself contains "stream": skip it.
+        if found >= 3 && &bytes[found - 3..found] == b"end" {
+            at = start;
+            continue;
+        }
+        if bytes.get(start) == Some(&b'\r') {
+            start += 1;
+        }
+        if bytes.get(start) == Some(&b'\n') {
+            start += 1;
+        }
+        let Some(end) = find_from(bytes, b"endstream", start) else {
+            break;
+        };
+        out.push(&bytes[start..end]);
+        at = end + b"endstream".len();
+    }
+    out
+}
+
+fn find_from(haystack: &[u8], needle: &[u8], from: usize) -> Option<usize> {
+    haystack
+        .get(from..)?
+        .windows(needle.len())
+        .position(|w| w == needle)
+        .map(|i| i + from)
 }
 
 fn contains_subsequence(haystack: &[u8], needle: &[u8]) -> bool {
@@ -602,6 +673,67 @@ mod tests {
     // name objects permit `#xx` hex-escaping (ISO 32000-1 §7.3.5); every one
     // of these is spec-valid and must be caught exactly like its unescaped
     // literal form.
+
+    fn flate(data: &[u8]) -> Vec<u8> {
+        use std::io::Write;
+        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+        e.write_all(data).unwrap();
+        e.finish().unwrap()
+    }
+
+    fn pdf_with_stream(body: &[u8]) -> Vec<u8> {
+        let mut inner = b"4 0 obj << /Type /ObjStm /Filter /FlateDecode >>\r\nstream\r\n".to_vec();
+        inner.extend_from_slice(&flate(body));
+        inner.extend_from_slice(b"\r\nendstream\nendobj");
+        minimal_pdf(&inner)
+    }
+
+    #[test]
+    fn rejects_javascript_hidden_in_a_compressed_stream() {
+        let pdf = pdf_with_stream(b"<< /S /JavaScript /JS (app.alert('x')) >>");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_err());
+        let pdf = pdf_with_stream(b"<< /Type /Catalog /O#70enAction 5 0 R >>");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_err());
+    }
+
+    #[test]
+    fn accepts_an_ordinary_compressed_page() {
+        let pdf = pdf_with_stream(b"BT /F1 12 Tf 72 712 Td (Lab result) Tj ET");
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_ok());
+    }
+
+    #[test]
+    fn rejects_a_decompression_bomb() {
+        let pdf = pdf_with_stream(&vec![b'0'; PDF_INFLATE_BUDGET + 1024]);
+        assert!(UploadSecurityService::validate_and_sanitize(&pdf, "application/pdf").is_err());
+    }
+
+    #[test]
+    fn text_or_script_disguised_as_an_image_is_rejected() {
+        for (body, mime) in [
+            (b"<script>alert(1)</script>".as_slice(), "image/png"),
+            (b"plain text renamed to photo.jpg".as_slice(), "image/jpeg"),
+            (b"'; DROP TABLE users; --".as_slice(), "image/jpeg"),
+            (b"MZ\x90\x00 executable".as_slice(), "image/png"),
+        ] {
+            assert!(
+                UploadSecurityService::validate_and_sanitize(body, mime).is_err(),
+                "{mime}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_payload_appended_to_a_real_png_does_not_survive() {
+        let mut png = Vec::new();
+        image::DynamicImage::new_rgb8(32, 32)
+            .write_to(&mut Cursor::new(&mut png), ImageFormat::Png)
+            .unwrap();
+        png.extend_from_slice(b"<?php system($_GET['c']); ?><script>alert(1)</script>");
+        let out = UploadSecurityService::validate_and_sanitize(&png, "image/png").unwrap();
+        assert!(!contains_subsequence(&out, b"<script>"));
+        assert!(!contains_subsequence(&out, b"<?php"));
+    }
 
     #[test]
     fn rejects_hex_escaped_javascript_name() {

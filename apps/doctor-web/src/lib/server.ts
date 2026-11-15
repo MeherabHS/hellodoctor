@@ -19,6 +19,8 @@ const ACCESS = 'hd_doctor_access';
 const REFRESH = 'hd_doctor_refresh';
 const CHALLENGE = 'hd_doctor_challenge';
 const SCOPE = 'hd_doctor_scope';
+/** Password reset authorization (2026-11-14): server-held, never sent to the browser. */
+const RESET = 'hd_doctor_reset';
 const cookieOptions = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict' as const, path: '/api' };
 const rotations = new Map<string, Promise<{ access_token: string; refresh_token: string } | null>>();
 const revoked = new Map<string, number>();
@@ -204,6 +206,41 @@ export async function handleAuth(req: NextRequest, action: string) {
       }
       delete body.turnstile_token;
     }
+    // Forgot password (Doctor Web redesign, 2026-11-14). Same backend flow as the apps:
+    // email code -> verify -> new password. The backend answers identically whether or not
+    // the email has an account. The reset authorization stays in an HttpOnly cookie.
+    if (action === 'reset-request') {
+      const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      if (!/^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{3,253}$/.test(email)) return failure(422, 'VALIDATION_FAILED', 'Enter a valid email address.');
+      const challenge = await verifyChallenge(body.turnstile_token, 'doctor_password_reset', {
+        environment: process.env.ENVIRONMENT, origin: process.env.DOCTOR_WEB_ORIGIN, secret: process.env.TURNSTILE_SECRET_KEY,
+      });
+      if (!challenge.ok) return failure(challenge.status, 'RESET_UNAVAILABLE', "We couldn't verify this browser. Please try again.");
+      const res = await upstream('auth/password-reset/request', 'POST', JSON.stringify({ email }));
+      if (!res.ok) return responseFor(res);
+      const data = (await res.json()).data;
+      (await cookies()).delete({ name: RESET, path: '/api' });
+      return NextResponse.json({ success: true, data: { message: data?.message, development_otp: developmentOtpAllowed({ environment: process.env.ENVIRONMENT, devOtp: process.env.DEV_AUTH_OTP_ENABLED }) ? data?.debug_otp_code ?? null : null } });
+    }
+    if (action === 'reset-verify') {
+      const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      if (!email || typeof body.otp_code !== 'string' || !/^[0-9]{6}$/.test(body.otp_code)) return failure(422, 'VALIDATION_FAILED', 'Enter the 6-digit code.');
+      const res = await upstream('auth/password-reset/verify-otp', 'POST', JSON.stringify({ email, otp_code: body.otp_code }));
+      if (!res.ok) return responseFor(res);
+      const data = (await res.json()).data;
+      if (typeof data?.reset_authorization !== 'string') return failure(502, 'RESPONSE_INVALID', 'The service returned an unexpected response.');
+      const maxAge = Math.min(900, Math.max(60, Number(data.expires_in) || 600));
+      (await cookies()).set(RESET, data.reset_authorization, { ...cookieOptions, maxAge });
+      return NextResponse.json({ success: true, data: { verified: true } });
+    }
+    if (action === 'reset-complete') {
+      const authorization = (await cookies()).get(RESET)?.value;
+      if (!authorization) return failure(401, 'RESET_EXPIRED', 'Your reset session expired. Request a new code.');
+      if (typeof body.new_password !== 'string' || body.new_password.length < 12 || body.new_password.length > 128) return failure(422, 'VALIDATION_FAILED', 'Use a password of 12 to 128 characters.');
+      const res = await upstream('auth/password-reset/complete', 'POST', JSON.stringify({ reset_authorization: authorization, new_password: body.new_password }));
+      if (res.ok) (await cookies()).delete({ name: RESET, path: '/api' });
+      return responseFor(res);
+    }
     if (action === 'register') {
       const allowed = ['full_name','license_number','phone_number','email','password','primary_specialty','experience_years','current_hospital','qualifications','residential_address','accepted_documents'];
       if (Object.keys(body).some(key => !allowed.includes(key))) return failure(422, 'VALIDATION_FAILED', 'Registration contains unsupported fields.');
@@ -294,4 +331,30 @@ export async function handleDocument(req: NextRequest, appointment: string, docu
     if (!['image/png','image/jpeg','image/webp','application/pdf'].includes(mime)) return failure(422, 'DOCUMENT_TYPE_UNSUPPORTED', 'This file type cannot be displayed.');
     return new NextResponse(await file.arrayBuffer(), { headers: { 'Content-Type': mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'attachment; filename="clinical-document"', 'X-Doctor-Scope': session.scope } });
   } catch { return failure(503, 'DOCUMENT_UNAVAILABLE', 'Document service is temporarily unavailable.'); }
+}
+/** Binary images the JSON proxy cannot carry (Doctor Web redesign 2026-11-14): the
+ * Doctor's own profile photo and article covers. Mirrors handleDocument's session,
+ * refresh and revocation checks; images are never cached. */
+async function handleImage(path: string) {
+  try {
+    let session = await access();
+    if (!session) return failure(401, 'SESSION_EXPIRED', 'Please sign in again.');
+    let res = await upstream(path, 'GET', undefined, session.token);
+    if (res.status === 401) {
+      const refreshed = await rotate(session.scope);
+      if (!refreshed) { await clearSession(); return failure(401, 'SESSION_EXPIRED', 'Please sign in again.'); }
+      session = { token: refreshed.access_token, scope: session.scope };
+      res = await upstream(path, 'GET', undefined, session.token);
+    }
+    if (!res.ok) return responseFor(res);
+    if (isRevoked(session.scope)) return failure(401, 'SESSION_EXPIRED', 'Please sign in again.');
+    const mime = res.headers.get('content-type')?.split(';')[0] ?? '';
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(mime)) return failure(422, 'IMAGE_TYPE_UNSUPPORTED', 'This image cannot be displayed.');
+    return new NextResponse(await res.arrayBuffer(), { headers: { 'Content-Type': mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'X-Doctor-Scope': session.scope } });
+  } catch { return failure(503, 'IMAGE_UNAVAILABLE', 'Image service is temporarily unavailable.'); }
+}
+export async function handlePhoto() { return handleImage('doctor/profile/photo'); }
+export async function handleArticleCover(id: string) {
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return failure(404, 'NOT_FOUND', 'Cover not found.');
+  return handleImage(`articles/${id}/cover`);
 }

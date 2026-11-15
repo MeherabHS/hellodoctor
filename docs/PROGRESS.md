@@ -1,3 +1,16 @@
+## Doctor Web full redesign — 2026-11-14
+
+Product-owner instruction: full Doctor Web UI redesign from six proposal boards, plus
+approved backend additions (patient age/sex, article topic/Swahili/cover, verification
+resubmission), forgot password, Admin-style sidebar selection and a security review.
+Details, decisions, omissions and the security table:
+[doctor-web-ui/DOCTOR_WEB_REDESIGN_PLAN.md](doctor-web-ui/DOCTOR_WEB_REDESIGN_PLAN.md).
+Screenshots: [doctor-web-ui/screenshots/](doctor-web-ui/screenshots/).
+
+Verification: Doctor Web typecheck, lint, source checks and 149 unit tests pass;
+production build passes; 6 new and 1 extended backend tests pass; patient article tests and
+`flutter analyze` pass. The full backend suite was started but stopped by the machine running low on memory before it finished; it still needs a complete run.
+
 ## B-01 prevention control (migration/deployment integrity) — 2026-10-07 (follow-up pass)
 
 Direct follow-up to the four-agent audit below, scoped to exactly one finding: B-01, where a

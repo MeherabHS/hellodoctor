@@ -106,8 +106,11 @@ pub async fn adjudicate_refund(
     Json(payload): Json<AdjudicateRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::AdjudicateGrievance)?;
-    let audit_notes =
-        crate::domain::validation::validate_text_field(&payload.audit_notes, "Audit notes", 1000)?;
+    let audit_notes = crate::domain::validation::validate_admin_text_field(
+        &payload.audit_notes,
+        "Audit notes",
+        1000,
+    )?;
     let report =
         GrievanceService::adjudicate_refund(&state, &ctx, id, ctx.user_id, audit_notes).await?;
 
@@ -132,8 +135,11 @@ pub async fn adjudicate_warn(
     Json(payload): Json<AdjudicateRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::AdjudicateGrievance)?;
-    let audit_notes =
-        crate::domain::validation::validate_text_field(&payload.audit_notes, "Audit notes", 1000)?;
+    let audit_notes = crate::domain::validation::validate_admin_text_field(
+        &payload.audit_notes,
+        "Audit notes",
+        1000,
+    )?;
     let report =
         GrievanceService::adjudicate_warning(&state, &ctx, id, ctx.user_id, audit_notes).await?;
 
@@ -176,7 +182,9 @@ pub async fn transition_refund_request(
     abac::authorize(&ctx, Action::InitiateDisbursement)?;
     let provider_reference = payload
         .provider_reference
-        .map(|r| crate::domain::validation::validate_text_field(&r, "Provider reference", 300))
+        .map(|r| {
+            crate::domain::validation::validate_admin_text_field(&r, "Provider reference", 300)
+        })
         .transpose()?;
     let updated = GrievanceService::transition_refund_request(
         &state,
@@ -193,6 +201,90 @@ pub async fn transition_refund_request(
     }))
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecordAppealRequest {
+    pub reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DecideAppealRequest {
+    /// "UPHOLD" or "OVERTURN".
+    pub decision: String,
+    pub note: String,
+}
+
+/// Appeal reasons and decision notes: 8–2000 characters after trimming.
+fn appeal_text(value: &str, field: &str) -> Result<String, AppError> {
+    let text = crate::domain::validation::validate_admin_text_field(value, field, 2000)?;
+    if text.chars().count() < 8 {
+        return Err(AppError::Validation(format!(
+            "{field} must be at least 8 characters."
+        )));
+    }
+    Ok(text)
+}
+
+/// GET /api/v1/admin/grievances/appeals
+pub async fn list_appeals(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ViewGrievanceQueue)?;
+    let appeals = GrievanceService::list_appeals(&state, &ctx).await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: appeals,
+    }))
+}
+
+/// POST /api/v1/admin/grievances/:id/appeals — recorded by an Admin on the
+/// patient's behalf.
+pub async fn record_appeal(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<RecordAppealRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AdjudicateGrievance)?;
+    let reason = appeal_text(&payload.reason, "Appeal reason")?;
+    let appeal = GrievanceService::record_appeal(&state, &ctx, id, ctx.user_id, reason).await?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(ApiResponse {
+            success: true,
+            data: appeal,
+        }),
+    ))
+}
+
+/// POST /api/v1/admin/grievance-appeals/:id/decide
+pub async fn decide_appeal(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(id): Path<Uuid>,
+    Json(payload): Json<DecideAppealRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AdjudicateGrievance)?;
+    let overturn = match payload.decision.as_str() {
+        "UPHOLD" => false,
+        "OVERTURN" => true,
+        _ => {
+            return Err(AppError::Validation(
+                "decision must be UPHOLD or OVERTURN.".into(),
+            ))
+        }
+    };
+    let note = appeal_text(&payload.note, "Decision note")?;
+    let result =
+        GrievanceService::decide_appeal(&state, &ctx, id, ctx.user_id, overturn, note).await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: result,
+    }))
+}
+
 pub async fn adjudicate_dismiss(
     State(state): State<AppState>,
     ctx: AuthContext,
@@ -200,8 +292,11 @@ pub async fn adjudicate_dismiss(
     Json(payload): Json<AdjudicateRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::AdjudicateGrievance)?;
-    let audit_notes =
-        crate::domain::validation::validate_text_field(&payload.audit_notes, "Audit notes", 1000)?;
+    let audit_notes = crate::domain::validation::validate_admin_text_field(
+        &payload.audit_notes,
+        "Audit notes",
+        1000,
+    )?;
     let report =
         GrievanceService::adjudicate_dismiss(&state, &ctx, id, ctx.user_id, audit_notes).await?;
 

@@ -1,4 +1,3 @@
-use crate::auth_context::AuthContext;
 use crate::crypto;
 use crate::domain::ids::{PatientProfileId, UserId};
 use crate::domain::models::*;
@@ -6,15 +5,14 @@ use crate::domain::validation;
 use crate::error::AppError;
 use crate::ip_jail;
 use crate::repository::{
-    doctor_repo, email_outbox_repo, legal_repo, notification_repo, otp_repo, patient_auth_repo,
-    patient_repo, session_repo, user_repo, AppState,
+    doctor_repo, email_outbox_repo, legal_repo, notification_repo, patient_auth_repo, patient_repo,
+    session_repo, user_repo, AppState,
 };
 use chrono::{Datelike, Duration, Utc};
 use rand::RngCore;
 use serde::Serialize;
 use uuid::Uuid;
 
-const OTP_TTL_SECONDS: i64 = 120;
 const OTP_MAX_ATTEMPTS: i16 = 3;
 const REFRESH_TOKEN_TTL_DAYS: i64 = 7;
 const MFA_CHALLENGE_TTL_SECONDS: i64 = 300;
@@ -39,216 +37,41 @@ pub struct LoginResponseDto {
     pub user: LoginUserDto,
 }
 
+/// The two Care-app roles that sign in with email + password + emailed code.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CareRole {
+    Doctor,
+    Peer,
+}
+
+impl CareRole {
+    pub fn user_role(self) -> UserRole {
+        match self {
+            CareRole::Doctor => UserRole::Doctor,
+            CareRole::Peer => UserRole::Peer,
+        }
+    }
+
+    /// Abuse-control and account-jail namespace (`doctor:` keeps its
+    /// existing keys, so live jails are unaffected).
+    pub fn scope(self) -> &'static str {
+        match self {
+            CareRole::Doctor => "doctor",
+            CareRole::Peer => "peer",
+        }
+    }
+
+    fn email_kind(self) -> crate::email_delivery::OtpEmailKind {
+        match self {
+            CareRole::Doctor => crate::email_delivery::OtpEmailKind::Doctor,
+            CareRole::Peer => crate::email_delivery::OtpEmailKind::Peer,
+        }
+    }
+}
+
 pub struct AuthService;
 
 impl AuthService {
-    /// Step 1 of patient login: generate, hash, and persist a real one-time code.
-    /// In `development`, the plaintext code is also returned so test/local clients without a
-    /// real SMS gateway can complete the flow; this is never populated in any other environment.
-    pub async fn request_patient_otp(
-        state: &AppState,
-        phone: &str,
-    ) -> Result<(String, i64, Option<String>), AppError> {
-        validation::validate_phone_number(phone)?;
-        if user_repo::find_by_phone(&state.auth_db, phone)
-            .await?
-            .is_some_and(|u| u.password_hash.is_some())
-        {
-            return Err(AppError::Unauthorized(
-                "Use email, password and email verification to sign in.".into(),
-            ));
-        }
-        if state.config.environment != "development" || !state.config.dev_auth_otp_enabled {
-            return Err(AppError::Conflict(
-                "SMS delivery is not configured. No verification code was dispatched.".into(),
-            ));
-        }
-
-        abuse::otp_delivery(state, phone).await?;
-        let code = crypto::generate_numeric_code(6);
-        let code_hash = crypto::hash_code(&code);
-        let expires_at = Utc::now() + Duration::seconds(OTP_TTL_SECONDS);
-        otp_repo::upsert(&state.auth_db, phone, &code_hash, expires_at).await?;
-
-        // Real deployments dispatch this via an SMS gateway. Never log the code itself.
-        tracing::info!("Development patient OTP generated; SMS delivery bypassed");
-
-        let debug_code = (state.config.environment == "development"
-            && state.config.dev_auth_otp_enabled)
-            .then_some(code);
-        Ok((Uuid::new_v4().to_string(), OTP_TTL_SECONDS, debug_code))
-    }
-
-    /// Step 2 of patient login: verify the real OTP, find-or-create the patient, issue tokens.
-    pub async fn verify_otp_and_login(
-        state: &AppState,
-        phone: &str,
-        otp_code: &str,
-        accepted_documents: &[crate::api::v1::auth_handlers::AcceptedDocument],
-    ) -> Result<LoginResponseDto, AppError> {
-        Self::verify_otp_and_login_with_device(state, phone, otp_code, accepted_documents, None)
-            .await
-    }
-
-    pub async fn verify_otp_and_login_with_device(
-        state: &AppState,
-        phone: &str,
-        otp_code: &str,
-        accepted_documents: &[crate::api::v1::auth_handlers::AcceptedDocument],
-        device_key: Option<String>,
-    ) -> Result<LoginResponseDto, AppError> {
-        if user_repo::find_by_phone(&state.auth_db, phone)
-            .await?
-            .is_some_and(|u| u.password_hash.is_some())
-        {
-            return Err(AppError::Unauthorized(
-                "Use email, password and email verification to sign in.".into(),
-            ));
-        }
-        let mut otp_tx = state.auth_db.begin().await?;
-        let record = otp_repo::find_for_update(&mut otp_tx, phone)
-            .await?
-            .ok_or_else(|| {
-                AppError::Unauthorized(
-                    "No OTP was requested for this number, or it has expired.".into(),
-                )
-            })?;
-
-        if Utc::now() >= record.expires_at {
-            otp_repo::delete(&mut *otp_tx, phone).await?;
-            otp_tx.commit().await?;
-            return Err(AppError::Unauthorized(
-                "OTP has expired. Please request a new code.".into(),
-            ));
-        }
-
-        if record.attempts >= OTP_MAX_ATTEMPTS {
-            return Err(AppError::RateLimitExceeded(
-                "Too many incorrect attempts. Please request a new OTP.".into(),
-            ));
-        }
-
-        if !crypto::verify_code(otp_code, &record.code_hash) {
-            otp_repo::increment_attempts(&mut *otp_tx, phone).await?;
-            otp_tx.commit().await?;
-            return Err(AppError::Unauthorized("Incorrect OTP code.".into()));
-        }
-
-        otp_repo::delete(&mut *otp_tx, phone).await?;
-        // Commit the single-use consumption before account/profile bootstrap,
-        // matching the Doctor MFA pattern. A waiting verifier sees no OTP and
-        // cannot create a second account or login session with the same code.
-        otp_tx.commit().await?;
-
-        // Account and profile are one bootstrap transaction. Never leave a new
-        // canonical Patient identity behind if profile creation fails.
-        let mut tx = state.auth_db.begin().await?;
-        let (user, new_patient) = match user_repo::find_by_phone(&mut *tx, phone).await? {
-            Some(u) => (u, false),
-            None => {
-                // The admission cap only gates brand-new activation, never an
-                // existing user's own login — this branch is reached only
-                // for a phone number with no account yet.
-                let active_count = user_repo::count_active(&mut *tx).await?;
-                if active_count as u32 >= state.config.max_active_users {
-                    return Err(AppError::CapacityLimitReached(
-                        "AfyaMkononi is at its current controlled pilot capacity. Please try again later.".into(),
-                    ));
-                }
-                (user_repo::create_patient_user(&mut *tx, phone).await?, true)
-            }
-        };
-
-        let patient_consent = if new_patient {
-            let current_documents = legal_repo::list_current(&mut *tx).await?;
-            let patient_consent = current_documents
-                .iter()
-                .find(|doc| doc.document_type.as_str() == "PATIENT_DATA_SHARING_CONSENT")
-                .ok_or_else(|| {
-                    AppError::internal("Patient consent document is not configured.".to_string())
-                })?;
-            if !accepted_documents.iter().any(|doc| {
-                doc.document_type == patient_consent.document_type.as_str()
-                    && doc.version == patient_consent.version
-            }) {
-                return Err(AppError::Validation(
-                "The current Patient data-sharing consent must be accepted before registration."
-                    .into(),
-            ));
-            }
-
-            Some(patient_consent.clone())
-        } else {
-            None
-        };
-
-        // No JWT exists yet at this point in the login flow — the OTP check just above
-        // *is* the authentication event, so a pseudo-context for this now-verified user
-        // is what RLS sees, not a real bearer token. Both the existence check and the
-        // insert must run under that same context, or the check would always see "no
-        // profile" (RLS hides the row with no GUC set) and re-insert on every login.
-        if user.role != UserRole::Patient || !user.is_active {
-            return Err(AppError::Unauthorized(
-                "Patient account unavailable.".into(),
-            ));
-        }
-        let self_ctx = AuthContext {
-            user_id: user.id,
-            role: user.role,
-            permissions: crypto::default_permissions_for_role(user.role.as_str()),
-            session_id: None,
-            request_id: None,
-        };
-        // patient_profiles INSERT is auth-worker-only (self-registration happens
-        // at the login/bootstrap boundary, not as an ordinary API write) — see
-        // migrations/20261003000001_rls_hardening.
-        sqlx::query("SELECT set_config('app.current_user_id',$1,true),set_config('app.current_role','PATIENT',true)")
-            .bind(self_ctx.user_id.to_string()).execute(&mut *tx).await?;
-        sqlx::query("SELECT set_config('app.current_patient_id',COALESCE((SELECT id::text FROM patient_profiles WHERE user_id=$1),''),true),set_config('app.current_doctor_id','',true),set_config('app.current_session_id','',true),set_config('app.current_request_id','',true)")
-            .bind(self_ctx.user_id).execute(&mut *tx).await?;
-        if !patient_repo::exists_for_user_id(&mut *tx, user.id).await? {
-            let now = Utc::now();
-            let profile = PatientProfile {
-                id: PatientProfileId::new(),
-                user_id: Some(user.id),
-                full_name: "Patient User".into(),
-                date_of_birth: chrono::NaiveDate::from_ymd_opt(1995, 1, 1).unwrap(),
-                gender: Gender::Other,
-                blood_group: None,
-                weight_kg: None,
-                emergency_contact_phone: None,
-                emergency_contact_relation: None,
-                guardian_patient_id: None,
-                relationship: None,
-                created_at: now,
-                updated_at: now,
-            };
-            patient_repo::insert(&mut *tx, &profile).await?;
-        }
-        if let Some(patient_consent) = patient_consent {
-            let now = Utc::now();
-            let acceptance = LegalAcceptance {
-                id: Uuid::new_v4(),
-                user_id: user.id,
-                document_type: patient_consent.document_type,
-                document_version: patient_consent.version.clone(),
-                document_hash: patient_consent.document_hash.clone(),
-                accepted_at: now,
-                request_id: None,
-                session_id: None,
-                ip_hash: None,
-                app_version: None,
-                platform: None,
-                locale: None,
-                created_at: now,
-            };
-            legal_repo::insert(&mut *tx, &acceptance).await?;
-        }
-        tx.commit().await?;
-
-        Self::issue_login_response_with_device(state, &user, device_key).await
-    }
-
     pub async fn request_patient_email_otp(
         state: &AppState,
         email: &str,
@@ -287,6 +110,7 @@ impl AuthService {
             if !(18..=120).contains(&age) || profile.date_of_birth > today {
                 return Err(AppError::Validation("Self-registration requires age 18 to 120. Use an adult guardian's family profile for a child.".into()));
             }
+            validation::validate_residential_address(&profile.residential_address)?;
             let active_count = user_repo::count_active(&state.auth_db).await?;
             if active_count as u32 >= state.config.max_active_users {
                 return Err(AppError::CapacityLimitReached(
@@ -299,7 +123,7 @@ impl AuthService {
         if let Some(phone) = phone {
             validation::validate_phone_number(phone)?;
         }
-        let email = email.trim().to_lowercase();
+        let email = crate::domain::validation::normalize_email(email);
         let existing = user_repo::find_by_email(&state.auth_db, &email).await?;
         let existing_id = existing.as_ref().map(|u| u.id);
         if register {
@@ -499,13 +323,22 @@ impl AuthService {
             let password_hash = challenge.password_hash.as_deref().ok_or_else(|| {
                 AppError::internal("Registration challenge is incomplete.".into())
             })?;
+            // One email is one account and one role: the address may have
+            // been taken (e.g. by a Doctor or Peer registration) after this
+            // challenge was issued, so the unique index decides here.
             let user = user_repo::create_patient_user_with_credentials(
                 &mut *tx,
                 &challenge.email,
                 phone,
                 password_hash,
             )
-            .await?;
+            .await
+            .map_err(|error| match &error {
+                sqlx::Error::Database(db) if db.code().as_deref() == Some("23505") => {
+                    AppError::Conflict("Registration details are already in use.".into())
+                }
+                _ => AppError::from(error),
+            })?;
             (user, true)
         } else {
             let user_id = challenge
@@ -549,7 +382,8 @@ impl AuthService {
                 updated_at: now,
             };
             new_patient_full_name = Some(profile.full_name.clone());
-            patient_repo::insert(&mut *tx, &profile).await?;
+            let address = validation::validate_residential_address(&details.residential_address)?;
+            patient_repo::insert_with_address(&mut *tx, &profile, &address).await?;
         }
         if new_patient {
             for consent in documents {
@@ -619,23 +453,96 @@ impl AuthService {
     }
 
     /// Doctor step 1: real Argon2id password verification, issues a second-factor challenge.
-    /// In `development`, the plaintext second-factor code is also returned (see `request_patient_otp`).
+    /// In `development`, the plaintext second-factor code is also returned.
     pub async fn doctor_login_step1(
         state: &AppState,
         email: &str,
         password: &str,
+    ) -> Result<(String, Option<String>), AppError> {
+        Self::care_login_step1(state, email, password, CareRole::Doctor).await
+    }
+
+    /// Peer Navigator step 1: same password + emailed-code sign-in as a doctor.
+    pub async fn peer_login_step1(
+        state: &AppState,
+        email: &str,
+        password: &str,
+    ) -> Result<(String, Option<String>), AppError> {
+        Self::care_login_step1(state, email, password, CareRole::Peer).await
+    }
+
+    /// Care-app sign-in for either role: the account's own role decides
+    /// whether the doctor or the peer flow runs. An unknown email or any
+    /// other role fails exactly like a wrong password (the doctor path's
+    /// dummy verification), so the endpoint reveals nothing about accounts.
+    pub async fn care_any_login_step1(
+        state: &AppState,
+        email: &str,
+        password: &str,
+    ) -> Result<(String, Option<String>), AppError> {
+        validation::validate_email(email)?;
+        let role = user_repo::find_by_email(&state.auth_db, email)
+            .await?
+            .map(|u| u.role);
+        let care = if role == Some(UserRole::Peer) {
+            CareRole::Peer
+        } else {
+            CareRole::Doctor
+        };
+        Self::care_login_step1(state, email, password, care).await
+    }
+
+    /// Verifies the emailed code for either Care-app role; the challenge's
+    /// account decides which role's checks apply.
+    pub async fn care_any_verify_otp_with_device(
+        state: &AppState,
+        ip: &str,
+        session_token: &str,
+        otp_code: &str,
+        device_key: Option<String>,
+    ) -> Result<LoginResponseDto, AppError> {
+        let challenge_user: Option<UserId> =
+            sqlx::query_scalar("SELECT user_id FROM pending_mfa_challenges WHERE token = $1")
+                .bind(session_token)
+                .fetch_optional(&state.auth_db)
+                .await
+                .ok()
+                .flatten();
+        let role = match challenge_user {
+            Some(id) => user_repo::find_by_id(&state.auth_db, id)
+                .await?
+                .map(|u| u.role),
+            None => None,
+        };
+        let care = if role == Some(UserRole::Peer) {
+            CareRole::Peer
+        } else {
+            CareRole::Doctor
+        };
+        Self::care_verify_otp_with_device(state, ip, session_token, otp_code, device_key, care)
+            .await
+    }
+
+    /// Care-app (Doctor or Peer Navigator) step 1: real Argon2id password
+    /// verification, then an emailed second-factor challenge. Shared so the
+    /// two roles cannot drift apart in their brute-force protections.
+    async fn care_login_step1(
+        state: &AppState,
+        email: &str,
+        password: &str,
+        care: CareRole,
     ) -> Result<(String, Option<String>), AppError> {
         let invalid_credentials = || AppError::Unauthorized("Invalid email or password.".into());
         validation::validate_email(email)?;
         if password.is_empty() || password.len() > 1024 {
             return Err(invalid_credentials());
         }
-        abuse::target_attempt(state, "doctor", email).await?;
+        abuse::target_attempt(state, care.scope(), email).await?;
 
         // Each fast-exit path runs a dummy Argon2id verification before
         // returning — see `request_patient_email_otp`'s matching comment.
         let user = match user_repo::find_by_email(&state.auth_db, email).await? {
-            Some(u) if u.role == UserRole::Doctor && u.is_active => u,
+            Some(u) if u.role == care.user_role() && u.is_active => u,
             _ => {
                 crypto::verify_password_dummy_async().await?;
                 return Err(invalid_credentials());
@@ -645,13 +552,20 @@ impl AuthService {
         // not e.g. a deleted/orphaned account) — the profile itself isn't
         // otherwise needed here; downstream steps resolve doctor context
         // from the user id in the issued claims.
-        if doctor_repo::find_by_user_id(&state.auth_db, user.id)
-            .await?
-            .is_none()
-        {
+        let display_name = match care {
+            CareRole::Doctor => doctor_repo::find_by_user_id(&state.auth_db, user.id)
+                .await?
+                .map(|d| d.full_name),
+            CareRole::Peer => {
+                crate::repository::peer_repo::find_by_user_id(&state.auth_db, user.id)
+                    .await?
+                    .map(|p| p.full_name)
+            }
+        };
+        let Some(display_name) = display_name else {
             crypto::verify_password_dummy_async().await?;
             return Err(invalid_credentials());
-        }
+        };
         let Some(hash) = user.password_hash.as_deref() else {
             crypto::verify_password_dummy_async().await?;
             return Err(invalid_credentials());
@@ -682,27 +596,33 @@ impl AuthService {
         )
         .await?;
 
-        let first_name = doctor_repo::find_by_user_id(&state.db, user.id)
-            .await
-            .ok()
-            .flatten()
-            .map(|d| d.full_name)
-            .unwrap_or_default()
+        let first_name = display_name
             .split_whitespace()
             .next()
             .unwrap_or_default()
             .to_string();
-        let rendered = crate::services::email_templates::render_doctor_login_otp(
-            &first_name,
-            &code,
-            MFA_CHALLENGE_TTL_SECONDS / 60,
-            &state.email_assets,
-        );
+        let rendered = match care {
+            // Doctors are greeted by their full name ("Dear Dr. Jane Mwangi"),
+            // like the application and approval emails; the template drops
+            // any stored "Dr." title.
+            CareRole::Doctor => crate::services::email_templates::render_doctor_login_otp(
+                &display_name,
+                &code,
+                MFA_CHALLENGE_TTL_SECONDS / 60,
+                &state.email_assets,
+            ),
+            CareRole::Peer => crate::services::email_templates::render_peer_login_otp(
+                &first_name,
+                &code,
+                MFA_CHALLENGE_TTL_SECONDS / 60,
+                &state.email_assets,
+            ),
+        };
         if let Err(error) = crate::email_delivery::send_rendered_otp_email_tracked(
             state,
             email,
             &rendered,
-            crate::email_delivery::OtpEmailKind::Doctor,
+            care.email_kind(),
             &token,
             expires_at,
         )
@@ -746,6 +666,43 @@ impl AuthService {
         otp_code: &str,
         device_key: Option<String>,
     ) -> Result<LoginResponseDto, AppError> {
+        Self::care_verify_otp_with_device(
+            state,
+            ip,
+            session_token,
+            otp_code,
+            device_key,
+            CareRole::Doctor,
+        )
+        .await
+    }
+
+    pub async fn peer_verify_otp_with_device(
+        state: &AppState,
+        ip: &str,
+        session_token: &str,
+        otp_code: &str,
+        device_key: Option<String>,
+    ) -> Result<LoginResponseDto, AppError> {
+        Self::care_verify_otp_with_device(
+            state,
+            ip,
+            session_token,
+            otp_code,
+            device_key,
+            CareRole::Peer,
+        )
+        .await
+    }
+
+    async fn care_verify_otp_with_device(
+        state: &AppState,
+        ip: &str,
+        session_token: &str,
+        otp_code: &str,
+        device_key: Option<String>,
+        care: CareRole,
+    ) -> Result<LoginResponseDto, AppError> {
         if ip_jail::is_ip_jailed(&state.redis, ip).await? {
             return Err(AppError::Forbidden(
                 "Too many failed login attempts from this network. Try again later.".into(),
@@ -770,7 +727,7 @@ impl AuthService {
             .ok_or_else(|| {
                 AppError::internal("User record for a pending MFA challenge is missing.".into())
             })?;
-        if !user.is_active || user.role != UserRole::Doctor {
+        if !user.is_active || user.role != care.user_role() {
             session_repo::delete_pending_challenge(&mut *tx, session_token).await?;
             tx.commit().await?;
             return Err(AppError::Unauthorized(
@@ -778,7 +735,8 @@ impl AuthService {
             ));
         }
         let account_key = format!(
-            "doctor:{}",
+            "{}:{}",
+            care.scope(),
             user.email
                 .as_deref()
                 .unwrap_or(&challenge.user_id.to_string())
@@ -999,7 +957,26 @@ impl AuthService {
         tx.commit().await?;
         ip_jail::record_success(&state.redis, &account_key).await?;
 
-        Self::issue_login_response(state, &user).await
+        let response = Self::issue_login_response(state, &user).await?;
+        // Activity Log: every Admin sign-in (product owner, 2026-11-14). The
+        // session already exists, so a failed audit write is logged, not
+        // turned into a failed sign-in.
+        if let Err(error) = crate::services::AuditService::log_in_tx(
+            &state.auth_db,
+            crate::services::AuditLogEntry::new(
+                Some(user.id),
+                UserRole::Admin,
+                "ADMIN_SIGNED_IN",
+                "ADMIN_SIGN_IN",
+                Some(user.id.into_inner()),
+                "SUCCESS",
+            ),
+        )
+        .await
+        {
+            tracing::warn!(error = ?error, "Admin sign-in audit write failed");
+        }
+        Ok(response)
     }
 
     /// Consumes one refresh identity and inserts its successor atomically.

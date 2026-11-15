@@ -156,4 +156,27 @@ void main() {
     await auth.close();
     api.dispose();
   });
+
+  test('a slow session refresh at startup does not sign the patient out',
+      () async {
+    final store = MemoryStore();
+    final refreshDio = Dio(BaseOptions(baseUrl: 'http://refresh.test'));
+    final never = Completer<void>();
+    // The refresh request stalls past restore()'s 8-second limit, as on a
+    // slow network or a busy device-proof signer.
+    refreshDio.interceptors.add(InterceptorsWrapper(onRequest: (o, h) async {
+      await never.future;
+    }));
+    final api = ApiClient(
+        dio: Dio(BaseOptions(baseUrl: 'http://refresh.test')),
+        refreshDio: refreshDio,
+        tokenStore: store);
+    await api.saveTokens('access', 'refresh');
+    final auth = AuthCubit(api);
+    await auth.restore();
+    expect(auth.state, isA<SignedIn>());
+    expect(await api.read('refresh_token'), 'refresh');
+    await auth.close();
+    api.dispose();
+  }, timeout: const Timeout(Duration(seconds: 30)));
 }

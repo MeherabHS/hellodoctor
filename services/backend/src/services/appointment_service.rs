@@ -403,6 +403,22 @@ impl AppointmentService {
 
         tx.commit().await?;
 
+        // The payment-worker role cannot write chat_conversations (RLS), so
+        // activation runs in its own transactions right after the confirmed
+        // booking commits — exactly as the paid path does after its webhook
+        // commits. The booking is already final here; if activation fails it
+        // is completed by the participant-authorized, idempotent activation in
+        // `GET /appointments/:id/conversation`, so the error is logged rather
+        // than reported as a failed booking the patient would retry.
+        if let Err(error) = Self::ensure_consultation_activated(state, apt_id).await {
+            tracing::warn!(
+                event = "CONSULTATION_ACTIVATION_DEFERRED",
+                appointment_id = %apt_id,
+                error = %error,
+                "Consultation activation failed after a payment-free booking; it will be completed on first access"
+            );
+        }
+
         Ok(AppointmentBookingResult {
             appointment_id: apt_id,
             appointment_number: apt_num,
@@ -650,14 +666,32 @@ impl AppointmentService {
 
         // Funds captured after a reservation expired require reconciliation.
         // Do not create a consultation for an expired/cancelled obligation.
-        if !matches!(
-            apt.status,
-            AppointmentStatus::Confirmed
-                | AppointmentStatus::InConsultation
-                | AppointmentStatus::Completed
-        ) {
-            return Ok(apt);
-        }
+        // `ensure_consultation_activated` re-checks the status itself.
+        Self::ensure_consultation_activated(state, apt.id).await?;
+        Ok(apt)
+    }
+
+    /// Idempotently gives a confirmed appointment its consultation session
+    /// and its chat conversation. Shared by every path that confirms an
+    /// appointment (payment webhook, payment-free booking) and by the
+    /// participant-authorized repair in `GET /appointments/:id/conversation`.
+    ///
+    /// Runs as the trusted system identity across the same capability pools
+    /// the webhook always used (consultation_sessions on the API role,
+    /// chat_conversations on the system-worker role). Every step is
+    /// find-or-create under the `activate-chat:<id>` advisory lock plus the
+    /// `chat_conversations.appointment_id` unique constraint, so retries and
+    /// concurrent callers converge on one session and one conversation.
+    /// Does nothing for an appointment that is not confirmed or later.
+    ///
+    /// The conversation's messaging window is 24 hours from activation or from
+    /// the end of the booked slot, whichever is later, so a consultation booked
+    /// ahead of time cannot reach its slot with an already expired chat.
+    pub async fn ensure_consultation_activated(
+        state: &AppState,
+        appointment_id: Uuid,
+    ) -> Result<(), AppError> {
+        let ctx = AuthContext::system();
 
         // These existence checks must run under `begin_authed` (not the raw
         // pool) — both tables are FORCE RLS, and `ctx` here is the system
@@ -666,6 +700,25 @@ impl AppointmentService {
         // and every retry would attempt (and fail on the unique constraint) a
         // duplicate insert instead of recognizing the existing row.
         let mut check_tx = state.begin_authed(&ctx).await?;
+        let Some(apt) = appointment_repo::find_by_id(&mut *check_tx, appointment_id).await? else {
+            check_tx.commit().await?;
+            return Ok(());
+        };
+        if !matches!(
+            apt.status,
+            AppointmentStatus::Confirmed
+                | AppointmentStatus::Waiting
+                | AppointmentStatus::InConsultation
+                | AppointmentStatus::Completed
+        ) {
+            check_tx.commit().await?;
+            return Ok(());
+        }
+        let slot_end: chrono::DateTime<Utc> =
+            sqlx::query_scalar("SELECT end_time FROM doctor_schedule_slots WHERE id = $1")
+                .bind(apt.slot_id)
+                .fetch_one(&mut *check_tx)
+                .await?;
         let session_exists = consultation_repo::find_by_appointment(&mut *check_tx, apt.id)
             .await?
             .is_some();
@@ -717,7 +770,7 @@ impl AppointmentService {
                     appointment_id: apt.id,
                     patient_id: apt.patient_id,
                     doctor_id: apt.doctor_id,
-                    expires_at: Utc::now() + chrono::Duration::hours(24),
+                    expires_at: std::cmp::max(Utc::now(), slot_end) + chrono::Duration::hours(24),
                     is_locked: false,
                     created_at: Utc::now(),
                 },
@@ -738,7 +791,7 @@ impl AppointmentService {
             system_tx.commit().await?;
         }
 
-        Ok(apt)
+        Ok(())
     }
 
     /// Phase 2 email support only — names/dates for a confirmed consultation,

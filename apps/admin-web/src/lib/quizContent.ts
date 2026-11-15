@@ -24,7 +24,7 @@ export function quizErrors(quiz:QuizContent,complete=false):QuizIssue[]{
       if((required&&!text.trim())||Array.from(text).length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text))add(row,field,'Text is missing, too long or contains prohibited control characters.');
     }
     for(const [text,seen] of [[q.text_en,en],[q.text_sw,sw]] as const){const key=normalized(text);if(key&&seen.has(key))add(row,'text','Duplicate question.');if(key)seen.add(key);}
-    if(q.options.length>6||(complete&&q.options.length<2))add(row,'options','Use 2–6 options for review.');
+    if(q.options.length>6||(complete&&q.options.length<2))add(row,'options','Use 2–6 options before publishing.');
     const hasSw=Boolean(q.text_sw.trim()||q.explanation_sw.trim()||q.options.some(o=>o.text_sw.trim()));
     q.options.forEach(o=>{if(!o.id||optionIds.has(o.id))add(row,'options.id','Option IDs must be unique.');optionIds.add(o.id);
       for(const lang of ['en','sw'] as const){const text=o[`text_${lang}`];bytes+=new TextEncoder().encode(text).length;if((complete&&(lang==='en'||hasSw)&&!text.trim())||Array.from(text).length>500||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text))add(row,`options.text_${lang}`,'Option text is missing, too long or contains prohibited control characters.');}

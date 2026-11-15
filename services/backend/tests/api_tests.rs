@@ -25,7 +25,7 @@ use hellodoctor_backend::repository::{
 use hellodoctor_backend::seed::{
     self, ADMIN_USER_ID, DOCTOR1_PROFILE_ID, DOCTOR1_USER_ID, DOCTOR2_PROFILE_ID, DOCTOR2_USER_ID,
     PATIENT_PROFILE_ID, PATIENT_USER_ID, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_DOCTOR1_EMAIL,
-    SEED_DOCTOR1_PASSWORD, SEED_PATIENT_PHONE,
+    SEED_DOCTOR1_PASSWORD,
 };
 use http_body_util::BodyExt;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
@@ -38,12 +38,18 @@ use std::sync::Arc;
 use tower::ServiceExt;
 use uuid::Uuid;
 
+#[path = "cases/admin_access_sweep.rs"]
+mod admin_access_sweep;
 #[path = "cases/admin_articles.rs"]
 mod admin_articles;
 #[path = "cases/admin_bootstrap.rs"]
 mod admin_bootstrap;
 #[path = "cases/admin_campaigns.rs"]
 mod admin_campaigns;
+#[path = "cases/admin_content_sanitization.rs"]
+mod admin_content_sanitization;
+#[path = "cases/admin_invitations.rs"]
+mod admin_invitations;
 #[path = "cases/admin_query_g20_investigation.rs"]
 mod admin_query_g20_investigation;
 #[path = "cases/admin_quizzes.rs"]
@@ -60,24 +66,40 @@ mod consultation_live_reservation;
 mod consultation_recovery;
 #[path = "cases/doctor_queue_nairobi_day.rs"]
 mod doctor_queue_nairobi_day;
+#[path = "cases/doctor_web_redesign.rs"]
+mod doctor_web_redesign;
 #[path = "cases/email_outbox_delivery.rs"]
 mod email_outbox_delivery;
 #[path = "cases/engagement_and_holiday_notifications.rs"]
 mod engagement_and_holiday_notifications;
+#[path = "cases/facilities.rs"]
+mod facilities;
 #[path = "cases/financial_module_deferment.rs"]
 mod financial_module_deferment;
+#[path = "cases/grievance_appeals.rs"]
+mod grievance_appeals;
+#[path = "cases/intake_removal_and_doctor_window.rs"]
+mod intake_removal_and_doctor_window;
 #[path = "cases/notification_localization_preferences.rs"]
 mod notification_localization_preferences;
+#[path = "cases/one_email_one_role.rs"]
+mod one_email_one_role;
 #[path = "cases/password_reset.rs"]
 mod password_reset;
+#[path = "cases/patient_address.rs"]
+mod patient_address;
 #[path = "cases/patient_quizzes.rs"]
 mod patient_quizzes;
+#[path = "cases/peer_navigators.rs"]
+mod peer_navigators;
 #[path = "cases/pool_pressure.rs"]
 mod pool_pressure;
 #[path = "cases/profile_pictures.rs"]
 mod profile_pictures;
 #[path = "cases/push_notification_delivery.rs"]
 mod push_notification_delivery;
+#[path = "cases/qna_audit.rs"]
+mod qna_audit;
 #[path = "cases/remediation_a.rs"]
 mod remediation_a;
 
@@ -284,6 +306,7 @@ fn test_config() -> AppConfig {
         email_asset_base_url: None,
         email_patient_app_url: Some("https://app.hellodoctor.asia".into()),
         email_doctor_portal_url: Some("https://doctor.hellodoctor.asia".into()),
+        email_admin_web_url: Some("https://admin.afyamkononi.app".into()),
     }
 }
 
@@ -577,13 +600,20 @@ async fn test_app_with_storage_fixture(
 /// grant/policy set (e.g. confirming `hellodoctor_system_worker`'s notification
 /// grants actually work, not just that a superuser connection can do anything).
 async fn test_app_and_state(pool: PgPool) -> (axum::Router, PgPool, AppState) {
+    test_app_and_state_with_config(pool, test_config()).await
+}
+
+/// `test_app_and_state` with a caller-supplied config (e.g. deferred payments).
+async fn test_app_and_state_with_config(
+    pool: PgPool,
+    config: AppConfig,
+) -> (axum::Router, PgPool, AppState) {
     hellodoctor_backend::telemetry::init_tracing();
     seed::seed_dev_data(&pool).await.expect("seed dev data");
     // Real persisted families for the fixture JWT helper, not a middleware bypass.
     sqlx::query("INSERT INTO auth_sessions(id,user_id,token_family_id,refresh_token_hash,created_at,last_used_at,expires_at) SELECT gen_random_uuid(),id,id,'fixture-session-'||id::text,NOW(),NOW(),NOW()+INTERVAL '7 days' FROM users")
         .execute(&pool).await.unwrap();
     let roles = build_role_pools(&pool).await;
-    let config = test_config();
     let redis_cfg = deadpool_redis::Config::from_url(&config.redis_url);
     let redis = redis_cfg
         .create_pool(Some(deadpool_redis::Runtime::Tokio1))
@@ -669,6 +699,105 @@ async fn assert_controlled_shedding(response: axum::http::Response<Body>) {
 
 /// Model expiry of ONLY the delivery cooldown in isolated test Redis. Other
 /// target/rolling/daily/global and original phone budgets remain untouched.
+/// Email credentials given to the seeded Patient for tests that need a real
+/// interactive sign-in. Patients sign in with email + password + emailed
+/// code only; the phone-code sign-in was removed (2026-11-14, no SMS).
+const SEED_PATIENT_TEST_EMAIL: &str = "seed.patient@example.test";
+const SEED_PATIENT_TEST_PASSWORD: &str = "Seed-Patient-2026!";
+
+async fn give_seed_patient_email_credentials(pool: &PgPool) {
+    let hash = hellodoctor_backend::crypto::hash_password(SEED_PATIENT_TEST_PASSWORD).unwrap();
+    sqlx::query("UPDATE users SET email=$1, password_hash=$2 WHERE id=$3")
+        .bind(SEED_PATIENT_TEST_EMAIL)
+        .bind(hash)
+        .bind(uid(PATIENT_USER_ID))
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+/// Password step of Patient sign-in; returns `(challenge_token, otp_code)`.
+async fn patient_email_challenge(
+    app: &axum::Router,
+    email: &str,
+    password: &str,
+) -> (String, String) {
+    let response = post(
+        app,
+        "/api/v1/auth/patient/login",
+        None,
+        &serde_json::json!({"email": email, "password": password}),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = json_body(response).await;
+    (
+        body["data"]["challenge_token"]
+            .as_str()
+            .unwrap()
+            .to_string(),
+        body["data"]["debug_otp_code"].as_str().unwrap().to_string(),
+    )
+}
+
+/// Full interactive sign-in of the seeded Patient by email; returns the
+/// login response `data` (tokens and user).
+async fn seed_patient_email_login(app: &axum::Router, pool: &PgPool) -> Value {
+    give_seed_patient_email_credentials(pool).await;
+    let (challenge, otp) =
+        patient_email_challenge(app, SEED_PATIENT_TEST_EMAIL, SEED_PATIENT_TEST_PASSWORD).await;
+    let response = post(
+        app,
+        "/api/v1/auth/patient/verify-otp",
+        None,
+        &serde_json::json!({"challenge_token": challenge, "otp_code": otp}),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    json_body(response).await["data"].clone()
+}
+
+/// The current Patient legal documents, as registration must accept them.
+async fn current_patient_acceptances(pool: &PgPool) -> Value {
+    let rows: Vec<(String, String)> = sqlx::query_as(
+        "SELECT document_type::text, version FROM legal_documents \
+         WHERE is_current AND document_type::text IN \
+         ('PATIENT_DATA_SHARING_CONSENT','PATIENT_TERMS','PATIENT_PRIVACY_NOTICE','PATIENT_DATA_RIGHTS')",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    assert_eq!(rows.len(), 4, "all four Patient legal documents are seeded");
+    Value::Array(
+        rows.into_iter()
+            .map(|(t, v)| serde_json::json!({"type": t, "version": v}))
+            .collect(),
+    )
+}
+
+/// Email registration step (password step of a new Patient account).
+async fn patient_email_registration(
+    app: &axum::Router,
+    email: &str,
+    phone: &str,
+) -> axum::http::Response<Body> {
+    post(
+        app,
+        "/api/v1/auth/patient/register",
+        None,
+        &serde_json::json!({
+            "full_name": "Synthetic Patient",
+            "date_of_birth": "1990-05-01",
+            "gender": "FEMALE",
+            "residential_address": "Kilimani, Nairobi",
+            "email": email,
+            "phone_number": phone,
+            "password": "Synthetic-Pass-2026!"
+        }),
+    )
+    .await
+}
+
 async fn expire_otp_delivery_cooldown(state: &AppState, recipient: &str) {
     let key = format!(
         "ratelimit:otp-delivery:cooldown:{}",
@@ -2703,40 +2832,19 @@ async fn test_identity_rls_capabilities_append_only_audit_and_public_privacy(poo
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn test_identity_patient_bootstrap_atomic_and_doctor_phone_never_becomes_patient(
+async fn test_identity_patient_email_registration_atomic_and_doctor_phone_cannot_register(
     pool: PgPool,
 ) {
     let (app, pool) = test_app(pool).await;
-    for (phone, expected) in [
-        ("+254700009993", StatusCode::OK),
-        ("+254700000101", StatusCode::UNAUTHORIZED),
-    ] {
-        let otp_response = post(
-            &app,
-            "/api/v1/auth/register-otp",
-            None,
-            &serde_json::json!({"phone_number":phone}),
-        )
-        .await;
-        assert_eq!(otp_response.status(), expected);
-        let otp = json_body(otp_response).await;
-        // Password accounts correctly reject the legacy OTP request already.
-        // Send a well-formed negative OTP to exercise the authorization guard,
-        // rather than JSON null, which only tests request deserialization (422).
-        let otp_code = otp["data"]["debug_otp_code"].as_str().unwrap_or("000000");
-        let login = post(
-            &app,
-            "/api/v1/auth/verify-otp-and-login",
-            None,
-            &serde_json::json!({
-                "phone_number": phone,
-                "otp_code": otp_code,
-                "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0-afyamkononi"}]
-            }),
-        )
-        .await;
-        assert_eq!(login.status(), expected);
-    }
+    let acceptances = current_patient_acceptances(&pool).await;
+    // A Doctor's phone number can never be reused to create a Patient.
+    let doctor_phone: String = sqlx::query_scalar("SELECT phone_number FROM users WHERE id=$1")
+        .bind(uid(DOCTOR1_USER_ID))
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let reused = patient_email_registration(&app, "doctor.phone@example.test", &doctor_phone).await;
+    assert_eq!(reused.status(), StatusCode::CONFLICT);
     let doctor_patient_profiles: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM patient_profiles WHERE user_id=$1")
             .bind(uid(DOCTOR1_USER_ID))
@@ -2744,31 +2852,44 @@ async fn test_identity_patient_bootstrap_atomic_and_doctor_phone_never_becomes_p
             .await
             .unwrap();
     assert_eq!(doctor_patient_profiles, 0);
+
+    // A new Patient gets exactly one account and one profile.
+    let started = json_body(
+        patient_email_registration(&app, "new.patient@example.test", "+254700009993").await,
+    )
+    .await;
+    let created = post(
+        &app,
+        "/api/v1/auth/patient/verify-otp",
+        None,
+        &serde_json::json!({
+            "challenge_token": started["data"]["challenge_token"],
+            "otp_code": started["data"]["debug_otp_code"],
+            "accepted_documents": acceptances
+        }),
+    )
+    .await;
+    assert_eq!(created.status(), StatusCode::OK);
     let count:i64=sqlx::query_scalar("SELECT count(*) FROM users u JOIN patient_profiles p ON p.user_id=u.id WHERE u.phone_number='+254700009993' AND u.role='PATIENT'").fetch_one(&pool).await.unwrap();
     assert_eq!(count, 1);
+
     // A forced profile write failure must roll back the newly created account.
     sqlx::query("CREATE FUNCTION reject_synthetic_patient() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.user_id IN(SELECT id FROM users WHERE phone_number='+254700009994') THEN RAISE EXCEPTION 'Synthetic profile failure'; END IF; RETURN NEW; END $$")
         .execute(&pool).await.unwrap();
     sqlx::query("CREATE TRIGGER reject_synthetic_patient BEFORE INSERT ON patient_profiles FOR EACH ROW EXECUTE FUNCTION reject_synthetic_patient()")
         .execute(&pool).await.unwrap();
-    let otp = json_body(
-        post(
-            &app,
-            "/api/v1/auth/register-otp",
-            None,
-            &serde_json::json!({"phone_number":"+254700009994"}),
-        )
-        .await,
+    let started = json_body(
+        patient_email_registration(&app, "rollback.patient@example.test", "+254700009994").await,
     )
     .await;
     let response = post(
         &app,
-        "/api/v1/auth/verify-otp-and-login",
+        "/api/v1/auth/patient/verify-otp",
         None,
         &serde_json::json!({
-            "phone_number":"+254700009994",
-            "otp_code":otp["data"]["debug_otp_code"],
-            "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0-afyamkononi"}]
+            "challenge_token": started["data"]["challenge_token"],
+            "otp_code": started["data"]["debug_otp_code"],
+            "accepted_documents": acceptances
         }),
     )
     .await;
@@ -2781,79 +2902,42 @@ async fn test_identity_patient_bootstrap_atomic_and_doctor_phone_never_becomes_p
     assert_eq!(orphan, 0);
 }
 
-/// First-time Patient activation is blocked without the current consent
-/// document, and a successful acceptance is recorded in the immutable ledger.
+/// First-time Patient activation is blocked without the current legal
+/// documents (including care-data consent), and a successful acceptance is
+/// recorded in the immutable ledger.
 #[sqlx::test(migrations = "./migrations")]
 async fn test_security_patient_registration_requires_and_records_data_consent(pool: PgPool) {
-    let (app, pool, state) = test_app_and_state(pool).await;
-    let phone = "+254700009995";
-    let first = json_body(
-        post(
-            &app,
-            "/api/v1/auth/register-otp",
-            None,
-            &serde_json::json!({"phone_number": phone}),
-        )
-        .await,
-    )
-    .await;
+    let (app, pool) = test_app(pool).await;
+    let email = "consent.patient@example.test";
+    let started = json_body(patient_email_registration(&app, email, "+254700009995").await).await;
+    let challenge = started["data"]["challenge_token"].clone();
+    let code = started["data"]["debug_otp_code"].clone();
     let missing = post(
         &app,
-        "/api/v1/auth/verify-otp-and-login",
+        "/api/v1/auth/patient/verify-otp",
         None,
-        &serde_json::json!({
-            "phone_number": phone,
-            "otp_code": first["data"]["debug_otp_code"]
-        }),
+        &serde_json::json!({"challenge_token": challenge, "otp_code": code}),
     )
     .await;
     assert_eq!(missing.status(), StatusCode::UNPROCESSABLE_ENTITY);
     assert_eq!(
-        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users WHERE phone_number=$1")
-            .bind(phone)
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM users WHERE email=$1")
+            .bind(email)
             .fetch_one(&pool)
             .await
             .unwrap(),
         0
     );
 
-    // The first OTP was already consumed (deleted) by the verify attempt
-    // above regardless of its consent outcome, so a fresh code is required
-    // to exercise the accepted-consent path below. Requesting one
-    // immediately must legitimately hit the real per-recipient delivery
-    // cooldown (`rate_limit::check_otp_delivery_limit`, 1/60s) — assert
-    // that rejection explicitly, then advance past only that cooldown
-    // (matching `test_security_patient_otp_resend_invalidates_prior_code`),
-    // rather than silently resetting rate-limit state to reach 200 OK.
-    let still_cooling_down = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({"phone_number": phone}),
-    )
-    .await;
-    assert_eq!(still_cooling_down.status(), StatusCode::TOO_MANY_REQUESTS);
-    assert_controlled_shedding(still_cooling_down).await;
-
-    expire_otp_delivery_cooldown(&state, phone).await;
-    let second = json_body(
-        post(
-            &app,
-            "/api/v1/auth/register-otp",
-            None,
-            &serde_json::json!({"phone_number": phone}),
-        )
-        .await,
-    )
-    .await;
+    // Refusing for missing consent does not consume the code.
     let accepted = post(
         &app,
-        "/api/v1/auth/verify-otp-and-login",
+        "/api/v1/auth/patient/verify-otp",
         None,
         &serde_json::json!({
-            "phone_number": phone,
-            "otp_code": second["data"]["debug_otp_code"],
-            "accepted_documents": [{"type": "PATIENT_DATA_SHARING_CONSENT", "version": "1.0-afyamkononi"}]
+            "challenge_token": challenge,
+            "otp_code": code,
+            "accepted_documents": current_patient_acceptances(&pool).await
         }),
     )
     .await;
@@ -2861,7 +2945,7 @@ async fn test_security_patient_registration_requires_and_records_data_consent(po
     let accepted_json = json_body(accepted).await;
     let user_id = accepted_json["data"]["user"]["id"].as_str().unwrap();
     let ledger_count: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM legal_acceptances WHERE user_id=$1 AND document_type='PATIENT_DATA_SHARING_CONSENT' AND document_version='1.0-afyamkononi'",
+        "SELECT count(*) FROM legal_acceptances WHERE user_id=$1 AND document_type='PATIENT_DATA_SHARING_CONSENT'",
     )
     .bind(Uuid::parse_str(user_id).unwrap())
     .fetch_one(&pool)
@@ -3491,35 +3575,27 @@ async fn test_otp_delivery_reservation_is_atomic_and_denials_preserve_other_budg
 }
 
 #[sqlx::test(migrations = "./migrations")]
-async fn test_patient_otp_auth_flow_and_token_refresh(pool: PgPool) {
-    let (app, _pool) = test_app(pool).await;
+async fn test_patient_email_auth_flow_and_token_refresh(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    give_seed_patient_email_credentials(&pool).await;
+    let (challenge, real_otp) =
+        patient_email_challenge(&app, SEED_PATIENT_TEST_EMAIL, SEED_PATIENT_TEST_PASSWORD).await;
 
-    let res = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({ "phone_number": SEED_PATIENT_PHONE }),
-    )
-    .await;
-    assert_eq!(res.status(), StatusCode::OK);
-    let json = json_body(res).await;
-    let real_otp = json["data"]["debug_otp_code"].as_str().unwrap().to_string();
-
-    // A wrong OTP must now be genuinely rejected — no more universal magic-code bypass.
+    // A wrong code must be genuinely rejected — no universal magic-code bypass.
     let res_wrong = post(
         &app,
-        "/api/v1/auth/verify-otp-and-login",
+        "/api/v1/auth/patient/verify-otp",
         None,
-        &serde_json::json!({ "phone_number": SEED_PATIENT_PHONE, "otp_code": "000000" }),
+        &serde_json::json!({ "challenge_token": challenge, "otp_code": "000000" }),
     )
     .await;
     assert_eq!(res_wrong.status(), StatusCode::UNAUTHORIZED);
 
     let res2 = post(
         &app,
-        "/api/v1/auth/verify-otp-and-login",
+        "/api/v1/auth/patient/verify-otp",
         None,
-        &serde_json::json!({ "phone_number": SEED_PATIENT_PHONE, "otp_code": real_otp }),
+        &serde_json::json!({ "challenge_token": challenge, "otp_code": real_otp }),
     )
     .await;
     assert_eq!(res2.status(), StatusCode::OK);
@@ -3840,6 +3916,53 @@ async fn test_unconfigured_document_storage_does_not_confirm_upload(pool: PgPool
         count, 0,
         "an unavailable upload must not create successful prescription metadata"
     );
+}
+
+/// Product-owner rule (2026-11-13): once the Doctor dispatches the Rx, the
+/// consultation is completed as COMPLETED_WITH_RX and the server refuses any
+/// further Rx page for it. An exact retry of a page already stored still
+/// replays (a dropped response must not look like a failure).
+#[sqlx::test(migrations = "./migrations")]
+async fn test_rx_dispatch_completes_and_locks_further_pages(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let (appointment, _) = book_and_confirm(&app, &patient).await;
+    open_clinical_window(&pool, appointment).await;
+    let uri = format!("/api/v1/consultations/{appointment}/prescription");
+    let page = |shade: u8| {
+        let image = image::RgbImage::from_pixel(3, 3, image::Rgb([shade, 20, 40]));
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(image)
+            .write_to(&mut bytes, image::ImageFormat::Png)
+            .unwrap();
+        serde_json::json!({"base64_photo":STANDARD.encode(bytes.into_inner()),"mime_type":"image/png"})
+    };
+    let first = post(&app, &uri, Some(&doctor), &page(30)).await;
+    assert_eq!(first.status(), StatusCode::CREATED);
+    let first_id = json_body(first).await["data"]["id"].clone();
+
+    let complete = post(
+        &app,
+        &format!("/api/v1/consultations/{appointment}/complete"),
+        Some(&doctor),
+        &serde_json::json!({"outcome":"COMPLETED_WITH_RX"}),
+    )
+    .await;
+    assert_eq!(complete.status(), StatusCode::OK);
+
+    let second = post(&app, &uri, Some(&doctor), &page(90)).await;
+    assert_eq!(second.status(), StatusCode::CONFLICT);
+    let replay = post(&app, &uri, Some(&doctor), &page(30)).await;
+    assert_eq!(replay.status(), StatusCode::CREATED);
+    assert_eq!(json_body(replay).await["data"]["id"], first_id);
+    let pages: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM prescriptions WHERE appointment_id=$1")
+            .bind(appointment)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(pages, 1, "no page may be stored after completion");
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -6549,71 +6672,20 @@ async fn test_admin_dashboard_endpoints_resolve_names_correctly(pool: PgPool) {
     );
 }
 
-/// `MAX_ACTIVE_USERS` must gate brand-new activation only — never an existing
-/// user's own login. Seeding creates exactly 4 active users (1 admin, 1
-/// patient, 2 doctors); setting the cap to that same number means it's
-/// already "full" without creating a thousand fixtures to prove the point.
 #[sqlx::test(migrations = "./migrations")]
 async fn test_max_active_users_caps_new_registration_not_existing_logins(pool: PgPool) {
     let mut config = test_config();
     config.max_active_users = 4;
-    let (app, _pool) = test_app_with_config(pool, config).await;
+    let (app, pool) = test_app_with_config(pool, config).await;
 
-    // The existing seeded patient must still be able to log in — the cap
+    // The existing seeded patient must still be able to sign in — the cap
     // never touches an existing user's own session.
-    let res_otp = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({ "phone_number": SEED_PATIENT_PHONE }),
-    )
-    .await;
-    assert_eq!(res_otp.status(), StatusCode::OK);
-    let otp_json = json_body(res_otp).await;
-    let code = otp_json["data"]["debug_otp_code"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let res_login = post(
-        &app,
-        "/api/v1/auth/verify-otp-and-login",
-        None,
-        &serde_json::json!({ "phone_number": SEED_PATIENT_PHONE, "otp_code": code }),
-    )
-    .await;
-    assert_eq!(
-        res_login.status(),
-        StatusCode::OK,
-        "an existing user's own login must never be blocked by the capacity cap"
-    );
+    let session = seed_patient_email_login(&app, &pool).await;
+    assert!(session["access_token"].as_str().is_some());
 
-    // A brand-new phone number, with no account yet, must be rejected once
-    // the cap is reached.
-    let new_phone = "+254700000202";
-    let res_otp2 = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({ "phone_number": new_phone }),
-    )
-    .await;
-    assert_eq!(
-        res_otp2.status(),
-        StatusCode::OK,
-        "requesting an OTP itself is not gated, only account creation"
-    );
-    let otp_json2 = json_body(res_otp2).await;
-    let code2 = otp_json2["data"]["debug_otp_code"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let res_new = post(
-        &app,
-        "/api/v1/auth/verify-otp-and-login",
-        None,
-        &serde_json::json!({ "phone_number": new_phone, "otp_code": code2 }),
-    )
-    .await;
+    // A brand-new account must be rejected once the cap is reached.
+    let res_new =
+        patient_email_registration(&app, "over.capacity@example.test", "+254700000202").await;
     assert_eq!(
         res_new.status(),
         StatusCode::SERVICE_UNAVAILABLE,
@@ -9762,6 +9834,20 @@ async fn test_doctor_lists_include_patient_display_name(pool: PgPool) {
     assert_eq!(
         appt_row["patient_display_name"].as_str(),
         Some(expected_name.as_str())
+    );
+    // Doctor Web redesign (2026-11-14): age and sex come from the same visible
+    // patient row, computed against the Nairobi calendar date.
+    let (expected_age, expected_sex): (i32, String) = sqlx::query_as(
+        "SELECT date_part('year',age((NOW() AT TIME ZONE 'Africa/Nairobi')::date,date_of_birth))::int, gender::text FROM patient_profiles WHERE id=$1",
+    )
+    .bind(uid(PATIENT_PROFILE_ID))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(appt_row["patient_age"].as_i64(), Some(expected_age as i64));
+    assert_eq!(
+        appt_row["patient_sex"].as_str(),
+        Some(expected_sex.as_str())
     );
 
     let chats = json_body(get(&app, "/api/v1/doctor/chats", Some(&doctor_token)).await).await;
@@ -13985,28 +14071,8 @@ async fn test_security_idempotency_upload_rechecks_ownership_and_clinical_window
     );
 }
 
-async fn security_patient_login(app: &axum::Router) -> Value {
-    let response = post(
-        app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({"phone_number":SEED_PATIENT_PHONE}),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::OK);
-    let otp = json_body(response).await["data"]["debug_otp_code"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let response = post(
-        app,
-        "/api/v1/auth/verify-otp-and-login",
-        None,
-        &serde_json::json!({"phone_number":SEED_PATIENT_PHONE,"otp_code":otp}),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::OK);
-    json_body(response).await["data"].clone()
+async fn security_patient_login(app: &axum::Router, pool: &PgPool) -> Value {
+    seed_patient_email_login(app, pool).await
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -14014,7 +14080,7 @@ async fn test_security_refresh_successors_remain_valid_and_preserve_consumed_ide
     pool: PgPool,
 ) {
     let (app, pool) = test_app(pool).await;
-    let login = security_patient_login(&app).await;
+    let login = security_patient_login(&app, &pool).await;
     let mut token = login["refresh_token"].as_str().unwrap().to_string();
     let original_hash = hellodoctor_backend::crypto::hash_code(&token);
     let family: Uuid =
@@ -14062,8 +14128,8 @@ async fn test_security_refresh_successors_remain_valid_and_preserve_consumed_ide
 #[sqlx::test(migrations = "./migrations")]
 async fn test_security_refresh_reuse_revokes_descendants_but_not_another_family(pool: PgPool) {
     let (app, pool, state) = test_app_and_state(pool).await;
-    let first = security_patient_login(&app).await;
-    // A second real OTP delivery to the same phone immediately afterward
+    let first = security_patient_login(&app, &pool).await;
+    // A second real code delivery to the same recipient immediately afterward
     // legitimately hits the real per-recipient delivery cooldown (1/60s,
     // `rate_limit::check_otp_delivery_limit`) — assert that rejection
     // explicitly, then advance past only that cooldown (the established
@@ -14071,19 +14137,19 @@ async fn test_security_refresh_reuse_revokes_descendants_but_not_another_family(
     // resetting rate-limit state to reach a second successful login. This
     // test's own invariant (reuse revokes descendants but not another
     // family) needs two genuinely distinct sessions, not two rapid OTP
-    // deliveries to the same phone, so advancing past the cooldown is the
+    // deliveries to the same recipient, so advancing past the cooldown is the
     // correct way to establish that precondition.
     let still_cooling_down = post(
         &app,
-        "/api/v1/auth/register-otp",
+        "/api/v1/auth/patient/login",
         None,
-        &serde_json::json!({"phone_number": SEED_PATIENT_PHONE}),
+        &serde_json::json!({"email": SEED_PATIENT_TEST_EMAIL, "password": SEED_PATIENT_TEST_PASSWORD}),
     )
     .await;
     assert_eq!(still_cooling_down.status(), StatusCode::TOO_MANY_REQUESTS);
     assert_controlled_shedding(still_cooling_down).await;
-    expire_otp_delivery_cooldown(&state, SEED_PATIENT_PHONE).await;
-    let other = security_patient_login(&app).await;
+    expire_otp_delivery_cooldown(&state, SEED_PATIENT_TEST_EMAIL).await;
+    let other = security_patient_login(&app, &pool).await;
     let original = first["refresh_token"].as_str().unwrap();
     let payload = serde_json::json!({"refresh_token":original});
     let key = Uuid::new_v4().to_string();
@@ -14132,7 +14198,7 @@ async fn test_security_refresh_concurrent_consumption_has_one_winner_and_revokes
     pool: PgPool,
 ) {
     let (app, pool) = test_app(pool).await;
-    let login = security_patient_login(&app).await;
+    let login = security_patient_login(&app, &pool).await;
     let payload = serde_json::json!({"refresh_token":login["refresh_token"]});
     let key = Uuid::new_v4().to_string();
     let (first, second) = tokio::join!(
@@ -14179,7 +14245,7 @@ async fn test_security_refresh_concurrent_consumption_has_one_winner_and_revokes
 #[sqlx::test(migrations = "./migrations")]
 async fn test_security_refresh_insert_failure_rolls_back_consumption(pool: PgPool) {
     let (app, pool) = test_app(pool).await;
-    let login = security_patient_login(&app).await;
+    let login = security_patient_login(&app, &pool).await;
     let payload = serde_json::json!({"refresh_token":login["refresh_token"]});
     sqlx::raw_sql("CREATE FUNCTION reject_refresh_successor() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Synthetic refresh successor insert failure'; END $$; CREATE TRIGGER reject_refresh_successor BEFORE INSERT ON auth_sessions FOR EACH ROW EXECUTE FUNCTION reject_refresh_successor();")
         .execute(&pool).await.unwrap();
@@ -14212,7 +14278,7 @@ async fn test_security_refresh_insert_failure_rolls_back_consumption(pool: PgPoo
 #[sqlx::test(migrations = "./migrations")]
 async fn test_security_refresh_logout_race_cannot_leave_live_descendants(pool: PgPool) {
     let (app, pool) = test_app(pool).await;
-    let login = security_patient_login(&app).await;
+    let login = security_patient_login(&app, &pool).await;
     let original = serde_json::json!({"refresh_token":login["refresh_token"]});
     let response = post(&app, "/api/v1/auth/refresh", None, &original).await;
     assert_eq!(response.status(), StatusCode::OK);
@@ -14244,376 +14310,6 @@ async fn test_security_refresh_logout_race_cannot_leave_live_descendants(pool: P
             StatusCode::UNAUTHORIZED
         );
     }
-}
-
-#[sqlx::test(migrations = "./migrations")]
-async fn test_security_patient_otp_single_use_even_with_idempotency_key(pool: PgPool) {
-    let (app, pool) = test_app(pool).await;
-    let initial_sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auth_sessions")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    let response = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({"phone_number":SEED_PATIENT_PHONE}),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::OK);
-    let code = json_body(response).await["data"]["debug_otp_code"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let payload = serde_json::json!({"phone_number":SEED_PATIENT_PHONE,"otp_code":code});
-    let key = Uuid::new_v4().to_string();
-    let uri = "/api/v1/auth/verify-otp-and-login";
-    let first = post_idem(&app, uri, None, &payload, &key).await;
-    assert_eq!(first.status(), StatusCode::OK);
-    assert_eq!(
-        post_idem(&app, uri, None, &payload, &key).await.status(),
-        StatusCode::UNAUTHORIZED,
-        "public authentication responses must never be replayed as a second login"
-    );
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auth_sessions")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(count, initial_sessions + 1);
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM phone_otps")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(count, 0);
-}
-
-#[sqlx::test(migrations = "./migrations")]
-async fn test_security_patient_otp_concurrent_consumption_issues_one_session(pool: PgPool) {
-    let (app, pool) = test_app(pool).await;
-    for phone in [SEED_PATIENT_PHONE, "+254711887766"] {
-        let initial_sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE u.phone_number=$1")
-            .bind(phone).fetch_one(&pool).await.unwrap();
-        let response = post(
-            &app,
-            "/api/v1/auth/register-otp",
-            None,
-            &serde_json::json!({"phone_number":phone}),
-        )
-        .await;
-        assert_eq!(response.status(), StatusCode::OK);
-        let code = json_body(response).await["data"]["debug_otp_code"]
-            .as_str()
-            .unwrap()
-            .to_string();
-        let documents = legal_repo::list_current(&pool).await.unwrap();
-        let consent = documents
-            .iter()
-            .find(|d| d.document_type.as_str() == "PATIENT_DATA_SHARING_CONSENT")
-            .unwrap();
-        let payload = serde_json::json!({"phone_number":phone,"otp_code":code,
-            "accepted_documents":[{"type":consent.document_type.as_str(),"version":consent.version}]});
-        let key = Uuid::new_v4().to_string();
-        let (first, second) = tokio::join!(
-            post_idem(
-                &app,
-                "/api/v1/auth/verify-otp-and-login",
-                None,
-                &payload,
-                &key
-            ),
-            post_idem(
-                &app,
-                "/api/v1/auth/verify-otp-and-login",
-                None,
-                &payload,
-                &key
-            )
-        );
-        let mut statuses = [first.status().as_u16(), second.status().as_u16()];
-        statuses.sort();
-        assert_eq!(statuses, [200, 401], "one OTP must authenticate only one concurrent request, for both existing and new patients");
-        let winner = if first.status() == StatusCode::OK {
-            first
-        } else {
-            second
-        };
-        let data = json_body(winner).await["data"].clone();
-        let access_token = data["access_token"].as_str().unwrap();
-        let mut doctors_status = StatusCode::SERVICE_UNAVAILABLE;
-        for _ in 0..3 {
-            let response = get(&app, "/api/v1/doctors", Some(access_token)).await;
-            doctors_status = response.status();
-            if doctors_status != StatusCode::SERVICE_UNAVAILABLE {
-                break;
-            }
-            let retry_after = response
-                .headers()
-                .get("retry-after")
-                .and_then(|value| value.to_str().ok())
-                .and_then(|value| value.parse::<u64>().ok())
-                .unwrap_or(1)
-                .min(5);
-            tokio::time::sleep(std::time::Duration::from_secs(retry_after)).await;
-        }
-        assert_eq!(doctors_status, StatusCode::OK);
-        let counts: (i64, i64) = sqlx::query_as("SELECT (SELECT COUNT(*) FROM auth_sessions s JOIN users u ON u.id=s.user_id WHERE u.phone_number=$1),(SELECT COUNT(*) FROM patient_profiles p JOIN users u ON u.id=p.user_id WHERE u.phone_number=$1)")
-            .bind(phone).fetch_one(&pool).await.unwrap();
-        assert_eq!(counts, (initial_sessions + 1, 1));
-        let remaining: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM phone_otps WHERE phone_number=$1")
-                .bind(phone)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(remaining, 0);
-    }
-}
-
-#[sqlx::test(migrations = "./migrations")]
-async fn test_security_patient_otp_attempt_limit_and_expiry_are_atomic(pool: PgPool) {
-    let (app, pool) = test_app(pool).await;
-    let initial_sessions: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM auth_sessions")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    let response = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({"phone_number":SEED_PATIENT_PHONE}),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::OK);
-    let code = json_body(response).await["data"]["debug_otp_code"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let wrong_code = if code == "000000" { "111111" } else { "000000" };
-    sqlx::query("UPDATE phone_otps SET attempts=2 WHERE phone_number=$1")
-        .bind(SEED_PATIENT_PHONE)
-        .execute(&pool)
-        .await
-        .unwrap();
-    let wrong = serde_json::json!({"phone_number":SEED_PATIENT_PHONE,"otp_code":wrong_code});
-    let uri = "/api/v1/auth/verify-otp-and-login";
-    let (first, second) =
-        tokio::join!(post(&app, uri, None, &wrong), post(&app, uri, None, &wrong));
-    let mut statuses = [first.status().as_u16(), second.status().as_u16()];
-    statuses.sort();
-    assert_eq!(
-        statuses,
-        [401, 429],
-        "concurrent failures must not exceed the attempt budget"
-    );
-    let attempts: i16 = sqlx::query_scalar("SELECT attempts FROM phone_otps WHERE phone_number=$1")
-        .bind(SEED_PATIENT_PHONE)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(attempts, 3);
-    assert_eq!(
-        post(
-            &app,
-            uri,
-            None,
-            &serde_json::json!({"phone_number":SEED_PATIENT_PHONE,"otp_code":code})
-        )
-        .await
-        .status(),
-        StatusCode::TOO_MANY_REQUESTS
-    );
-    sqlx::query("UPDATE phone_otps SET attempts=0,expires_at=NOW()-INTERVAL '1 second' WHERE phone_number=$1").bind(SEED_PATIENT_PHONE).execute(&pool).await.unwrap();
-    assert_eq!(
-        post(
-            &app,
-            uri,
-            None,
-            &serde_json::json!({"phone_number":SEED_PATIENT_PHONE,"otp_code":code})
-        )
-        .await
-        .status(),
-        StatusCode::UNAUTHORIZED
-    );
-    let counts: (i64, i64) = sqlx::query_as(
-        "SELECT (SELECT COUNT(*) FROM phone_otps),(SELECT COUNT(*) FROM auth_sessions)",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(counts, (0, initial_sessions));
-}
-
-/// `rate_limit::check_otp_request_limit` fixes the OTP-request budget at 3
-/// requests/600s per phone number (see `src/rate_limit.rs`). The limiter's
-/// counter is a Redis `INCR`+`EXPIRE` Lua script, so it is atomic even under
-/// concurrent requests — both of two requests that land after the budget is
-/// already spent must come back 429, never silently succeed because they
-/// raced each other.
-#[sqlx::test(migrations = "./migrations")]
-async fn test_security_patient_otp_request_rate_limit_blocks_excess_and_concurrent_requests(
-    pool: PgPool,
-) {
-    let (app, _pool, state) = test_app_and_state(pool).await;
-    let phone = format!("+2547{:08}", rand::thread_rng().gen_range(0..100_000_000));
-    for index in 0..3 {
-        if index > 0 {
-            expire_otp_delivery_cooldown(&state, &phone).await;
-        }
-        let res = post(
-            &app,
-            "/api/v1/auth/register-otp",
-            None,
-            &serde_json::json!({"phone_number": phone}),
-        )
-        .await;
-        assert_eq!(
-            res.status(),
-            StatusCode::OK,
-            "three sends within the original rolling budget are permitted after each cooldown"
-        );
-    }
-    let otp_payload = serde_json::json!({"phone_number": phone});
-    let (fourth, fifth) = tokio::join!(
-        post(&app, "/api/v1/auth/register-otp", None, &otp_payload),
-        post(&app, "/api/v1/auth/register-otp", None, &otp_payload)
-    );
-    assert!([fourth.status(), fifth.status()].contains(&StatusCode::TOO_MANY_REQUESTS));
-    assert_controlled_shedding(fourth).await;
-    assert_controlled_shedding(fifth).await;
-    // Independently prove both callers lose the atomic phone budget, even if
-    // HTTP admission sheds one before it can reach the Redis counter.
-    let (fourth, fifth) = tokio::join!(
-        hellodoctor_backend::rate_limit::check_otp_request_limit(&state.redis, &phone),
-        hellodoctor_backend::rate_limit::check_otp_request_limit(&state.redis, &phone)
-    );
-    assert!(matches!(
-        fourth,
-        Err(hellodoctor_backend::error::AppError::RateLimitExceeded(_))
-    ));
-    assert!(matches!(
-        fifth,
-        Err(hellodoctor_backend::error::AppError::RateLimitExceeded(_))
-    ));
-}
-
-/// OTP replay must be rejected by the OTP row's single-use delete-on-consume
-/// (`otp_repo::delete` inside the same transaction that validates the code),
-/// not merely by the idempotency-key cache layer — a second, independent
-/// request (its own fresh idempotency context) presenting the exact same
-/// already-consumed code must still fail.
-#[sqlx::test(migrations = "./migrations")]
-async fn test_security_patient_otp_replay_rejected_without_relying_on_idempotency_cache(
-    pool: PgPool,
-) {
-    let (app, _pool) = test_app(pool).await;
-    let response = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({"phone_number": SEED_PATIENT_PHONE}),
-    )
-    .await;
-    assert_eq!(response.status(), StatusCode::OK);
-    let code = json_body(response).await["data"]["debug_otp_code"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    let payload = serde_json::json!({"phone_number": SEED_PATIENT_PHONE, "otp_code": code});
-    let uri = "/api/v1/auth/verify-otp-and-login";
-    let first = post(&app, uri, None, &payload).await;
-    assert_eq!(first.status(), StatusCode::OK);
-    let replay = post(&app, uri, None, &payload).await;
-    assert_eq!(
-        replay.status(),
-        StatusCode::UNAUTHORIZED,
-        "a consumed OTP must not authenticate a second, independent request"
-    );
-}
-
-/// A resend (a second `register-otp` call for the same phone number before
-/// the first code expired) must invalidate the earlier code outright, not
-/// merely extend/duplicate it — `otp_repo::upsert`'s `ON CONFLICT` replaces
-/// `code_hash`, `attempts`, and `expires_at` in place, so only the newest
-/// code may ever work.
-#[sqlx::test(migrations = "./migrations")]
-async fn test_security_patient_otp_resend_invalidates_prior_code(pool: PgPool) {
-    let (app, pool, state) = test_app_and_state(pool).await;
-    let first = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({"phone_number": SEED_PATIENT_PHONE}),
-    )
-    .await;
-    assert_eq!(first.status(), StatusCode::OK);
-    let old_code = json_body(first).await["data"]["debug_otp_code"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    let blocked = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({"phone_number": SEED_PATIENT_PHONE}),
-    )
-    .await;
-    assert_eq!(blocked.status(), StatusCode::TOO_MANY_REQUESTS);
-    assert_controlled_shedding(blocked).await;
-    expire_otp_delivery_cooldown(&state, SEED_PATIENT_PHONE).await;
-    let second = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({"phone_number": SEED_PATIENT_PHONE}),
-    )
-    .await;
-    assert_eq!(second.status(), StatusCode::OK);
-    let new_code = json_body(second).await["data"]["debug_otp_code"]
-        .as_str()
-        .unwrap()
-        .to_string();
-    assert_ne!(
-        old_code, new_code,
-        "test setup expects two independently generated codes to differ"
-    );
-
-    let rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM phone_otps WHERE phone_number=$1")
-        .bind(SEED_PATIENT_PHONE)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-    assert_eq!(
-        rows, 1,
-        "the resend must replace the single row in place, not accumulate a second one"
-    );
-
-    let uri = "/api/v1/auth/verify-otp-and-login";
-    let stale = post(
-        &app,
-        uri,
-        None,
-        &serde_json::json!({"phone_number": SEED_PATIENT_PHONE, "otp_code": old_code}),
-    )
-    .await;
-    assert_eq!(
-        stale.status(),
-        StatusCode::UNAUTHORIZED,
-        "a code issued before a resend must not still work"
-    );
-
-    let fresh = post(
-        &app,
-        uri,
-        None,
-        &serde_json::json!({"phone_number": SEED_PATIENT_PHONE, "otp_code": new_code}),
-    )
-    .await;
-    assert_eq!(
-        fresh.status(),
-        StatusCode::OK,
-        "the newest code from the resend must work"
-    );
 }
 
 #[sqlx::test(migrations = "./migrations")]
@@ -15260,26 +14956,26 @@ async fn test_professional_review_migration_backfill_uses_latest_evidence_and_co
 async fn test_exposure_logout_immediately_invalidates_access_and_refresh_only_its_family(
     pool: PgPool,
 ) {
-    let (app, _pool, state) = test_app_and_state(pool).await;
-    let first = security_patient_login(&app).await;
-    // A second real OTP delivery to the same phone immediately afterward
+    let (app, pool, state) = test_app_and_state(pool).await;
+    let first = security_patient_login(&app, &pool).await;
+    // A second real code delivery to the same recipient immediately afterward
     // legitimately hits the real per-recipient delivery cooldown (1/60s,
     // `rate_limit::check_otp_delivery_limit`) — assert that rejection
     // explicitly, then advance past only that cooldown (the established
     // `expire_otp_delivery_cooldown` pattern), rather than silently
     // resetting rate-limit state. This test's invariant needs two genuinely
-    // distinct sessions, not two rapid OTP deliveries to one phone.
+    // distinct sessions, not two rapid code deliveries to one recipient.
     let still_cooling_down = post(
         &app,
-        "/api/v1/auth/register-otp",
+        "/api/v1/auth/patient/login",
         None,
-        &serde_json::json!({"phone_number": SEED_PATIENT_PHONE}),
+        &serde_json::json!({"email": SEED_PATIENT_TEST_EMAIL, "password": SEED_PATIENT_TEST_PASSWORD}),
     )
     .await;
     assert_eq!(still_cooling_down.status(), StatusCode::TOO_MANY_REQUESTS);
     assert_controlled_shedding(still_cooling_down).await;
-    expire_otp_delivery_cooldown(&state, SEED_PATIENT_PHONE).await;
-    let second = security_patient_login(&app).await;
+    expire_otp_delivery_cooldown(&state, SEED_PATIENT_TEST_EMAIL).await;
+    let second = security_patient_login(&app, &pool).await;
     let access = first["access_token"].as_str().unwrap();
     let other = second["access_token"].as_str().unwrap();
     assert_eq!(
@@ -15619,8 +15315,9 @@ async fn test_exposure_redis_outage_fails_closed_for_every_public_auth_route_and
         .unwrap();
     let app = create_router(state);
     for path in [
-        "register-otp",
-        "verify-otp-and-login",
+        "patient/register",
+        "patient/login",
+        "patient/verify-otp",
         "doctor/login",
         "doctor/verify-otp",
         "doctor/register",
@@ -16035,14 +15732,6 @@ async fn test_exposure_no_development_otp_without_explicit_flag_or_in_production
         // Bypass startup only to demonstrate the action guard is independent.
         state.config = Arc::new(config);
         assert!(
-            hellodoctor_backend::services::auth_service::AuthService::request_patient_otp(
-                &state,
-                "+254700000002"
-            )
-            .await
-            .is_err()
-        );
-        assert!(
             hellodoctor_backend::services::auth_service::AuthService::doctor_login_step1(
                 &state,
                 SEED_DOCTOR1_EMAIL,
@@ -16112,18 +15801,7 @@ async fn test_patient_synthetic_api_journey_articles_booking_completion_grievanc
     pool: PgPool,
 ) {
     let (app, pool) = test_app(pool).await;
-    let otp = post(
-        &app,
-        "/api/v1/auth/register-otp",
-        None,
-        &serde_json::json!({"phone_number":SEED_PATIENT_PHONE}),
-    )
-    .await;
-    assert_eq!(otp.status(), StatusCode::OK);
-    let otp = json_body(otp).await;
-    let login=post(&app,"/api/v1/auth/verify-otp-and-login",None,&serde_json::json!({"phone_number":SEED_PATIENT_PHONE,"otp_code":otp["data"]["debug_otp_code"]})).await;
-    assert_eq!(login.status(), StatusCode::OK);
-    let session = json_body(login).await["data"].clone();
+    let session = seed_patient_email_login(&app, &pool).await;
     let patient = session["access_token"].as_str().unwrap();
     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
     let article = draft_article(&app, &doctor).await;
@@ -18700,17 +18378,37 @@ async fn test_pre_e2e_clinical_attachment_shared_private_persistent_and_idempote
         .status(),
         StatusCode::NOT_FOUND
     );
+    // Product owner, 2026-11-13: the patient may attach images to their own
+    // consultation chat too; the doctor sees them in the same thread.
+    let patient_upload = post_idem(
+        &app,
+        &upload,
+        Some(&patient),
+        &body,
+        &Uuid::new_v4().to_string(),
+    )
+    .await;
+    assert_eq!(patient_upload.status(), StatusCode::CREATED);
+    let patient_upload = json_body(patient_upload).await;
+    assert_eq!(patient_upload["data"]["sender_id"], PATIENT_USER_ID);
+    let patient_message = patient_upload["data"]["id"].as_str().unwrap();
+    let patient_view = format!("/api/v1/chat/{conversation}/messages/{patient_message}/attachment");
+    assert_eq!(
+        get(&app, &patient_view, Some(&doctor)).await.status(),
+        StatusCode::OK
+    );
+    // Another patient cannot see this conversation at all.
     assert_eq!(
         post_idem(
             &app,
             &upload,
-            Some(&patient),
+            Some(&other_patient),
             &body,
             &Uuid::new_v4().to_string()
         )
         .await
         .status(),
-        StatusCode::FORBIDDEN
+        StatusCode::NOT_FOUND
     );
     for token in [&other_doctor, &other_patient] {
         assert_eq!(
@@ -18723,25 +18421,29 @@ async fn test_pre_e2e_clinical_attachment_shared_private_persistent_and_idempote
         .execute(&pool)
         .await
         .unwrap();
-    assert_eq!(
-        post_idem(
-            &app,
-            &upload,
-            Some(&doctor),
-            &body,
-            &Uuid::new_v4().to_string()
-        )
-        .await
-        .status(),
-        StatusCode::FORBIDDEN
-    );
+    // Once the chat has expired, neither side can attach.
+    for token in [&doctor, &patient] {
+        assert_eq!(
+            post_idem(
+                &app,
+                &upload,
+                Some(token),
+                &body,
+                &Uuid::new_v4().to_string()
+            )
+            .await
+            .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
     let count: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM chat_messages WHERE conversation_id=$1")
             .bind(Uuid::parse_str(conversation).unwrap())
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(count, 1);
+    // The doctor's image and the patient's image.
+    assert_eq!(count, 2);
 }
 
 #[sqlx::test(migrations = "./migrations")]

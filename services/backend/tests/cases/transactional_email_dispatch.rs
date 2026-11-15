@@ -243,6 +243,7 @@ async fn patient_registration_enqueues_and_sends_welcome_email(pool: PgPool) {
             "full_name": "Welcome Fixture Patient",
             "date_of_birth": "1992-04-01",
             "gender": "FEMALE",
+            "residential_address": "Kilimani, Nairobi",
         }),
     )
     .await;

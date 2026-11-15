@@ -1,8 +1,8 @@
 //! Patient-facing profile and appointment-list endpoints.
 //!
 //! Added for the Patient Flutter client build: confirmed by direct router
-//! inspection that no `/patients/*` route existed before this file — OTP
-//! login (`auth_service.rs::verify_otp_and_login`) auto-creates a
+//! inspection that no `/patients/*` route existed before this file — the
+//! former phone-OTP login (removed 2026-11-14) auto-created a
 //! placeholder `patient_profiles` row (`full_name: "Patient User"`,
 //! `date_of_birth: 1995-01-01`, `gender: Other`) with no prior way for a
 //! patient to read or correct it, and no prior way for a patient to list
@@ -45,10 +45,14 @@ pub async fn get_own_profile(
     let profile = patient_repo::find_by_id(&mut *tx, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Patient profile not found.".into()))?;
+    let address = patient_repo::find_residential_address(&mut *tx, id).await?;
     tx.commit().await?;
+    let mut data = serde_json::to_value(profile)
+        .map_err(|_| AppError::internal("Patient profile could not be read.".into()))?;
+    data["residential_address"] = json!(address);
     Ok(Json(ApiResponse {
         success: true,
-        data: profile,
+        data,
     }))
 }
 
@@ -65,6 +69,8 @@ pub struct PatientProfileUpdate {
     /// written, but never read by anything) if sent against the caller's
     /// own self profile via `PATCH /patients/me`.
     pub relationship: Option<String>,
+    /// Self profile only (`PATCH /patients/me`); ignored for dependents.
+    pub residential_address: Option<String>,
 }
 
 /// Shared by `update_own_profile`, `create_dependent_profile`, and
@@ -152,11 +158,16 @@ pub async fn update_own_profile(
         body.relationship.as_deref(),
     )?;
 
+    let address = body
+        .residential_address
+        .as_deref()
+        .map(crate::domain::validation::validate_residential_address)
+        .transpose()?;
     let id = ctx.patient_profile_id(&state).await?;
     let mut tx = state.begin_authed(&ctx).await?;
     // `WELCOME_GREETING` fires on the genuine "account activation" event for
     // a Patient: the first time this profile actually leaves the OTP-login
-    // placeholder state (`auth_service::verify_otp_and_login`'s seeded
+    // placeholder state (the former phone-OTP login's seeded
     // `full_name: "Patient User"`, `date_of_birth: 1995-01-01`,
     // `gender: OTHER` — the exact triple `PatientProfileDto.isPlaceholder`
     // already checks client-side). Computed from the row as it stands
@@ -194,6 +205,9 @@ pub async fn update_own_profile(
     .await?;
     if rows != 1 {
         return Err(AppError::NotFound("Patient profile not found.".into()));
+    }
+    if let Some(address) = address {
+        patient_repo::update_residential_address(&mut *tx, id, &address).await?;
     }
     if was_placeholder && !will_still_be_placeholder {
         crate::services::NotificationService::notify_welcome_greeting(&mut tx, id).await?;
@@ -531,9 +545,12 @@ pub async fn list_own_documents(
     let mut tx = state.begin_authed(&ctx).await?;
     let prescription_rows = sqlx::query(
         "SELECT p.id, p.appointment_id, p.rx_number, p.page_number, p.mime_type, p.created_at, \
-                d.full_name AS doctor_display_name, d.primary_specialty \
+                d.full_name AS doctor_display_name, d.primary_specialty, \
+                a.appointment_number, a.modality::text AS modality, s.start_time AS consultation_start \
          FROM prescriptions p \
          JOIN doctor_public_directory d ON d.id = p.doctor_id \
+         JOIN appointments a ON a.id = p.appointment_id \
+         JOIN doctor_schedule_slots s ON s.id = a.slot_id \
          WHERE p.patient_id = $1 AND p.security_status = 'CLEAN' \
            AND p.rx_image_object_key IS NOT NULL \
          ORDER BY p.created_at DESC",
@@ -542,10 +559,15 @@ pub async fn list_own_documents(
     .fetch_all(&mut *tx)
     .await?;
     let intake_rows = sqlx::query(
-        "SELECT id, appointment_id, page_number, mime_type, created_at \
-         FROM prescription_intake_documents \
-         WHERE patient_id = $1 AND security_status = 'CLEAN' \
-         ORDER BY created_at DESC",
+        "SELECT i.id, i.appointment_id, i.page_number, i.mime_type, i.created_at, \
+                a.appointment_number, a.modality::text AS modality, s.start_time AS consultation_start, \
+                d.full_name AS doctor_display_name, d.primary_specialty \
+         FROM prescription_intake_documents i \
+         JOIN appointments a ON a.id = i.appointment_id \
+         JOIN doctor_schedule_slots s ON s.id = a.slot_id \
+         JOIN doctor_public_directory d ON d.id = a.doctor_id \
+         WHERE i.patient_id = $1 AND i.security_status = 'CLEAN' \
+         ORDER BY i.created_at DESC",
     )
     .bind(id)
     .fetch_all(&mut *tx)
@@ -566,6 +588,9 @@ pub async fn list_own_documents(
                 "mime_type": r.get::<Option<String>, _>("mime_type"),
                 "doctor_display_name": r.get::<String, _>("doctor_display_name"),
                 "primary_specialty": r.get::<String, _>("primary_specialty"),
+                "appointment_number": r.get::<String, _>("appointment_number"),
+                "modality": r.get::<String, _>("modality"),
+                "consultation_start": r.get::<chrono::DateTime<Utc>, _>("consultation_start"),
                 "created_at": created_at,
             }),
         ));
@@ -580,6 +605,11 @@ pub async fn list_own_documents(
                 "appointment_id": r.get::<uuid::Uuid, _>("appointment_id"),
                 "page_number": r.get::<i16, _>("page_number"),
                 "mime_type": r.get::<String, _>("mime_type"),
+                "doctor_display_name": r.get::<String, _>("doctor_display_name"),
+                "primary_specialty": r.get::<String, _>("primary_specialty"),
+                "appointment_number": r.get::<String, _>("appointment_number"),
+                "modality": r.get::<String, _>("modality"),
+                "consultation_start": r.get::<chrono::DateTime<Utc>, _>("consultation_start"),
                 "created_at": created_at,
             }),
         ));
@@ -626,7 +656,7 @@ pub async fn list_answered_questions(
          FROM health_questions q \
          LEFT JOIN health_answers a ON a.question_id = q.id \
          LEFT JOIN doctor_public_directory d ON d.id = a.doctor_id \
-         WHERE q.status = 'ANSWERED' \
+         WHERE (q.status = 'ANSWERED' AND COALESCE(a.audit_status, 'UNREVIEWED') <> 'FLAGGED') \
             OR ($3 AND q.id IN (SELECT id FROM patient_owned_open_question_ids())) \
          ORDER BY COALESCE(a.created_at,q.created_at) DESC, q.id LIMIT $1 OFFSET $2",
     )

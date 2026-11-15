@@ -24,7 +24,10 @@ class ControlledDiscovery extends BlogsRepository {
       {String search = '',
       String language = 'en',
       BlogCursor? cursor,
-      int limit = 20}) {
+      int limit = 20,
+      String? topic,
+      bool videos = false,
+      bool standaloneQuizzes = false}) {
     calls.add((search, language, cursor));
     return respond!(calls.length, search, language, cursor);
   }

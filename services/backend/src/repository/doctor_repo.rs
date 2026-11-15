@@ -472,7 +472,11 @@ pub async fn list_appointments_as_of<'e, E: PgExecutor<'e>>(
       )
       SELECT paginated.*,
         doctor_history_context_allowed(paginated.id,$5) AS history_access_active,
-        COALESCE(p.full_name,doctor_encounter_patient_name(paginated.id),'Patient') AS patient_display_name
+        COALESCE(p.full_name,doctor_encounter_patient_name(paginated.id),'Patient') AS patient_display_name,
+        -- Age and sex come only from the RLS-visible patient row (the same row that
+        -- supplies the name); outside that visibility they are NULL, never inferred.
+        date_part('year',age(($7::timestamptz AT TIME ZONE 'Africa/Nairobi')::date,p.date_of_birth))::int AS patient_age,
+        p.gender::text AS patient_sex
       FROM paginated LEFT JOIN patient_profiles p ON p.id=paginated.patient_id
     "#)
         .bind(doctor_profile_id)

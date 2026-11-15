@@ -18,9 +18,11 @@ use hellodoctor_backend::services::email_templates::{
     render_consultation_rescheduled, render_doctor_application_received, render_doctor_approved,
     render_doctor_login_otp, render_doctor_rejected, render_password_changed,
     render_password_reset_otp, render_patient_login_otp, render_patient_welcome,
-    render_payment_confirmed, render_refund_processed, ConsultationCancelledParams,
-    ConsultationConfirmedParams, ConsultationRescheduledParams, EmailAssets, EmailLinks,
-    PaymentConfirmedParams, RefundProcessedParams, RenderedEmail,
+    render_payment_confirmed, render_peer_application_received, render_peer_approved,
+    render_peer_login_otp, render_peer_reinstated, render_peer_rejected, render_peer_suspended,
+    render_refund_processed, ConsultationCancelledParams, ConsultationConfirmedParams,
+    ConsultationRescheduledParams, EmailAssets, EmailLinks, PaymentConfirmedParams,
+    RefundProcessedParams, RenderedEmail,
 };
 use std::fs;
 use std::path::Path;
@@ -165,13 +167,49 @@ fn main() {
             file_name: "doctor_login_otp.html",
             category: "Account security",
             description: "Live. Sent for Doctor second-factor login verification, replacing the prior plain-text OTP email.",
-            rendered: render_doctor_login_otp("Njoroge", "482913", 5, &assets),
+            rendered: render_doctor_login_otp("Dr. Jane Njoroge", "482913", 5, &assets),
         },
         PreviewEntry {
             file_name: "admin_login_otp.html",
             category: "Account security",
             description: "Live. Sent for Admin second-factor login verification, replacing the prior plain-text OTP email.",
             rendered: render_admin_login_otp("Wanjiru", "482913", 5, &assets),
+        },
+        PreviewEntry {
+            file_name: "peer_application_received.html",
+            category: "Peer Navigator",
+            description: "Sent when a Peer Navigator signs up in the Care app.",
+            rendered: render_peer_application_received("Grace Wanjiku", &assets),
+        },
+        PreviewEntry {
+            file_name: "peer_approved.html",
+            category: "Peer Navigator",
+            description: "Sent when an Admin approves a Peer Navigator.",
+            rendered: render_peer_approved("Grace Wanjiku", &assets),
+        },
+        PreviewEntry {
+            file_name: "peer_rejected.html",
+            category: "Peer Navigator",
+            description: "Sent when an Admin declines an application. Never states the reason.",
+            rendered: render_peer_rejected("Grace Wanjiku", &assets),
+        },
+        PreviewEntry {
+            file_name: "peer_suspended.html",
+            category: "Peer Navigator",
+            description: "Sent when an Admin pauses a Peer Navigator. Never states the reason.",
+            rendered: render_peer_suspended("Grace Wanjiku", &assets),
+        },
+        PreviewEntry {
+            file_name: "peer_reinstated.html",
+            category: "Peer Navigator",
+            description: "Sent when an Admin reinstates a paused Peer Navigator.",
+            rendered: render_peer_reinstated("Grace Wanjiku", &assets),
+        },
+        PreviewEntry {
+            file_name: "peer_login_otp.html",
+            category: "Peer Navigator",
+            description: "Live. Care app sign-in code for a Peer Navigator.",
+            rendered: render_peer_login_otp("Grace", "482913", 5, &assets),
         },
     ];
 

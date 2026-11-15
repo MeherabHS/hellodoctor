@@ -10,6 +10,7 @@ import {QuizImport} from '../src/components/blogs/QuizImport';
 import {ArticlePreview} from '../src/components/blogs/ArticlePreview';
 import {newQuestion,editableQuiz,quizTemplate,type QuizContent,type QuizDocument,type QuizRevision} from '../src/lib/quizContent';
 import {blankArticle,type AdminArticle} from '../src/lib/blogContent';
+import {clearSoftReads} from '../src/lib/api';
 const article={...blankArticle(),id:'00000000-0000-4000-8000-000000000001',author_id:'author',title_en:'Article body',body_en:'Article paragraph',status:'PUBLISHED',version:4,content_version:1} as AdminArticle;
 function ready():QuizContent{const q=newQuestion();q.text_en='Which answer?';q.text_sw='Jibu gani?';q.explanation_en='First is correct';q.explanation_sw='Kwanza ni sahihi';q.options[0].text_en='First';q.options[0].text_sw='Kwanza';q.options[1].text_en='Second';q.options[1].text_sw='Pili';q.correct_option_id=q.options[0].id;return {include_quiz:true,questions:[q]};}
 function revision(content:QuizContent=ready()):QuizRevision{return {...content,id:'00000000-0000-4000-8000-000000000002',article_id:article.id,status:'DRAFT',version:1,content_version:1,article_content_version:1,can_approve:false,requires_independent_review:true,approved_by:null};}
@@ -24,7 +25,7 @@ test('manual question controls preserve IDs, support translation, options and co
   }finally{if(view)act(()=>view!.unmount());}
 });
 
-test('builder loads on demand, edits locally, saves excluded incomplete drafts and keeps review separate',async()=>{
+test('builder loads on demand, edits locally, saves excluded incomplete drafts and publishing stays explicit',async()=>{
   const previous=globalThis.fetch;const requests:{url:string;method:string;body:Record<string,unknown>|null}[]=[];const previews:QuizContent[]=[];const dirty:boolean[]=[];
   globalThis.fetch=async(url,init)=>{const body=init?.body?JSON.parse(String(init.body)):null;requests.push({url:String(url),method:init?.method||'GET',body});return response(body?{schema_version:1,draft:revision(body.content as QuizContent),published:null}:{schema_version:1,draft:null,published:null});};
   let view:ReactTestRenderer|undefined;
@@ -34,17 +35,22 @@ test('builder loads on demand, edits locally, saves excluded incomplete drafts a
     await act(async()=>{button(view!,'Add question').props.onClick();});await act(async()=>{button(view!,'Kiswahili questions').props.onClick();});
     assert.equal(requests.length,1);assert.equal(previews.at(-1)!.questions.length,1);assert.equal(previews.at(-1)!.include_quiz,false);
     await act(async()=>{button(view!,'Save question draft').props.onClick();});assert.equal(requests.length,2);assert.equal(requests[1].method,'PATCH');assert.equal((requests[1].body!.content as QuizContent).include_quiz,false);assert.equal(dirty.at(-1),false);
-    assert.ok(JSON.stringify(view!.toJSON()).includes('Published article and quiz remain unchanged.'));assert.equal(button(view!,'Submit quiz for review').props.disabled,false);
+    assert.ok(JSON.stringify(view!.toJSON()).includes('Published article and quiz remain unchanged.'));assert.equal(button(view!,'Submit quiz for review'),undefined);assert.equal(button(view!,'Publish quiz').props.disabled,false);
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=previous;}
 });
 
-test('sensitive quiz author sees disabled approval; server rejection remains readable',async()=>{
-  const previous=globalThis.fetch;let writes=0;let view:ReactTestRenderer|undefined;
-  const pending={...revision(),status:'PENDING_REVIEW' as const};globalThis.fetch=async()=>response({schema_version:1,draft:pending,published:null});
-  try{await act(async()=>{view=create(<McqBuilder article={article} onPreview={()=>{}} onDirty={()=>{}}/>);});await act(async()=>{button(view!,'Open MCQ Builder').props.onClick();});assert.equal(button(view!,'Approve quiz').props.disabled,true);assert.ok(JSON.stringify(view!.toJSON()).includes('Approval required from another Admin.'));
-    act(()=>view!.unmount());pending.can_approve=true;
-    globalThis.fetch=async(_url,init)=>{if(!init?.method)return response({schema_version:1,draft:pending,published:null});writes++;return new Response(JSON.stringify({success:false,error:{message:'Approval required from another Admin.'}}),{status:403});};
-    await act(async()=>{view=create(<McqBuilder article={article} onPreview={()=>{}} onDirty={()=>{}}/>);});await act(async()=>{button(view!,'Open MCQ Builder').props.onClick();});await act(async()=>{button(view!,'Approve quiz').props.onClick();});assert.equal(writes,1);const output=JSON.stringify(view!.toJSON());assert.ok(output.includes('Approval required from another Admin.'));assert.ok(!output.includes('API Error'));
+// Admins publish directly (CLAUDE.md, 2026-11-14): no Approve control; a quiz
+// left pending review is finished by Publish quiz, and a refusal stays readable.
+test('a pending quiz is finished by Publish quiz; a server refusal stays readable',async()=>{
+  const previous=globalThis.fetch;const writes:string[]=[];let view:ReactTestRenderer|undefined;
+  const pending={...revision(),status:'PENDING_REVIEW' as const};
+  clearSoftReads();
+  globalThis.fetch=async(url,init)=>{if(!init?.method||init.method==='GET')return response({schema_version:1,draft:pending,published:null});writes.push(String(url));return new Response(JSON.stringify({success:false,error:{code:'FORBIDDEN',message:'You do not have permission to publish this quiz.'}}),{status:403});};
+  try{await act(async()=>{view=create(<McqBuilder article={article} onPreview={()=>{}} onDirty={()=>{}}/>);});await act(async()=>{button(view!,'Open MCQ Builder').props.onClick();});
+    assert.equal(button(view!,'Approve quiz'),undefined);
+    await act(async()=>{button(view!,'Publish quiz').props.onClick();});
+    assert.equal(writes.length,1);assert.ok(writes[0].includes('approve'),'Publish runs the remaining internal approve step first');
+    const output=JSON.stringify(view!.toJSON());assert.ok(output.includes('Not published'));assert.ok(!output.includes('API Error'));assert.ok(!output.includes('FORBIDDEN'));
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=previous;}
 });
 

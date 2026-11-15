@@ -1,3 +1,5 @@
+import 'features/peer/peer_pages.dart';
+import 'features/peer/peer_repository.dart';
 import 'core/notifications/notification_taps.dart';
 import 'features/notifications/notification_navigation.dart';
 import 'core/l10n/doctor_locale.dart';
@@ -15,16 +17,19 @@ import 'core/notifications/background_sync_worker.dart';
 import 'core/notifications/local_notification_service.dart';
 import 'core/theme/tokens.dart';
 import 'core/validation/kenya_phone.dart';
+import 'core/widgets/afya_auth_widgets.dart';
 import 'core/widgets/startup_error_page.dart';
 import 'features/auth/auth_cubit.dart';
 import 'features/auth/forgot_password_page.dart';
 import 'features/auth/legal_consent_page.dart';
+import 'features/auth/welcome_pages.dart';
 import 'features/doctor/doctor_cubit.dart';
 import 'features/doctor/doctor_pages.dart';
 import 'features/doctor/doctor_repository.dart';
 import 'features/notifications/notification_cubit.dart';
 import 'features/notifications/notification_repository.dart';
-import 'features/settings/settings_pages.dart';
+import 'features/home/consultation_history_tab.dart';
+import 'features/home/home_pages.dart';
 
 class HelloDoctorApp extends StatefulWidget {
   const HelloDoctorApp({super.key});
@@ -161,6 +166,10 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
                       debugShowCheckedModeBanner: false,
                       theme: DoctorTokens.theme(),
                       home: home);
+                  if (state is SignedIn && state.isPeer) {
+                    // Peer Navigators get their own screens; no doctor data.
+                    return application(PeerApp(repo: PeerRepository(api!)));
+                  }
                   if (state is SignedIn) {
                     // Scope both the Navigator and all routed subflows to this account.
                     // Removing these providers on logout also disposes their route
@@ -183,7 +192,7 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
                   }
                   return application(state is SessionRestoring
                       ? const _SplashPage()
-                      : LoginPage(auth: auth!));
+                      : WelcomePage(auth: auth!));
                 }))));
   }
 }
@@ -191,35 +200,25 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
 class _SplashPage extends StatelessWidget {
   const _SplashPage();
   @override
-  Widget build(BuildContext context) => Scaffold(
-      backgroundColor: DoctorTokens.bg,
+  Widget build(BuildContext context) => const Scaffold(
+      backgroundColor: DoctorTokens.screen,
       body: Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-                color: DoctorTokens.primaryLight,
-                borderRadius: BorderRadius.circular(18)),
-            child: const Icon(Icons.medical_services_rounded,
-                color: DoctorTokens.primary, size: 30)),
-        const SizedBox(height: 16),
-        const Text('AfyaMkononi',
-            style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: DoctorTokens.text)),
-        const SizedBox(height: 6),
-        const Text('Restoring secure Doctor session…',
-            style: TextStyle(fontSize: 12, color: DoctorTokens.textSub)),
-        const SizedBox(height: 18),
-        const SizedBox(
+        AfyaBrandHeader(),
+        SizedBox(height: 22),
+        SizedBox(
             width: 22,
             height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2))
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: DoctorTokens.primary)),
+        SizedBox(height: 12),
+        Text('Restoring your secure session…',
+            style: TextStyle(fontSize: 13, color: DoctorTokens.slate)),
       ])));
 }
 
+/// Panel 1 of the Doctor reference board. Layout only: every action still
+/// goes through the same [AuthCubit] calls as before.
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key, required this.auth});
   final AuthCubit auth;
@@ -231,6 +230,7 @@ class _LoginState extends State<LoginPage> {
   final email = TextEditingController(),
       password = TextEditingController(),
       otp = TextEditingController();
+  bool _hidePassword = true;
   @override
   void dispose() {
     email.dispose();
@@ -239,113 +239,140 @@ class _LoginState extends State<LoginPage> {
     super.dispose();
   }
 
+  void _signIn() => widget.auth.login(email.text.trim(), password.text.trim());
+
   @override
   Widget build(BuildContext c) {
     return Scaffold(
+        backgroundColor: DoctorTokens.screen,
         body: SafeArea(
-            child: Center(
-                child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(28),
+            child: SingleChildScrollView(
+                child: Center(
                     child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
+                        constraints: const BoxConstraints(maxWidth: 460),
                         child:
                             BlocBuilder<AuthCubit, AuthState>(builder: (_, s) {
                           final m = s is MfaRequired;
-                          return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Icon(Icons.medical_services_rounded,
-                                    color: DoctorTokens.primary, size: 42),
-                                const SizedBox(height: 14),
-                                const Text('Physician Secure Login',
-                                    style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w800,
-                                        color: DoctorTokens.text)),
-                                const SizedBox(height: 6),
-                                Text(
+                          final busy = s is AuthBusy;
+                          return Column(children: [
+                            // Built to
+                            // docs/design/afyamkononi-doctor-signin-reference.png;
+                            // the scene is cut from that design.
+                            const SizedBox(height: 16),
+                            const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 72),
+                                child: AfyaBrandLockup()),
+                            const SizedBox(height: 6),
+                            AspectRatio(
+                                aspectRatio: 941 / 562,
+                                child: Image.asset(
+                                    'assets/auth/signin_scene.jpg',
+                                    fit: BoxFit.cover,
+                                    excludeFromSemantics: true)),
+                            const SizedBox(height: 14),
+                            Text(m ? 'Check your email' : 'Welcome, Team',
+                                style: const TextStyle(
+                                    fontSize: 27,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.3,
+                                    color: DoctorTokens.navy)),
+                            const SizedBox(height: 6),
+                            Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 28),
+                                child: Text(
                                     m
                                         ? 'Enter the verification code for this secure session.'
-                                        : 'Licensed KMPDC practitioners gateway.',
+                                        : 'Sign in to your professional account',
+                                    textAlign: TextAlign.center,
                                     style: const TextStyle(
-                                        color: DoctorTokens.textSub)),
-                                const SizedBox(height: 26),
-                                if (!m) ...[
-                                  TextField(
-                                      controller: email,
-                                      keyboardType: TextInputType.emailAddress,
-                                      autofillHints: const [
-                                        AutofillHints.email
-                                      ],
-                                      decoration: const InputDecoration(
-                                          labelText: 'Email address')),
-                                  const SizedBox(height: 12),
-                                  TextField(
-                                      controller: password,
-                                      obscureText: true,
-                                      decoration: const InputDecoration(
-                                          labelText: 'Password')),
-                                  Align(
-                                      alignment: Alignment.centerRight,
-                                      child: TextButton(
-                                          onPressed: s is AuthBusy
-                                              ? null
-                                              : () => Navigator.push(
-                                                  c,
-                                                  MaterialPageRoute(
-                                                      builder: (_) =>
-                                                          ForgotPasswordPage(
-                                                              auth: widget
-                                                                  .auth))),
-                                          child:
-                                              const Text('Forgot password?'))),
-                                  const SizedBox(height: 4),
-                                  _button(
-                                      'Continue to MFA',
-                                      s is AuthBusy,
-                                      () => widget.auth.login(email.text.trim(),
-                                          password.text.trim())),
-                                  Center(
-                                      child: TextButton(
-                                          onPressed: s is AuthBusy
-                                              ? null
-                                              : () => Navigator.push(
-                                                  c,
-                                                  MaterialPageRoute(
-                                                      builder: (_) =>
-                                                          RegistrationPage(
-                                                              auth: widget
-                                                                  .auth))),
-                                          child:
-                                              const Text('Register as Doctor')))
-                                ] else ...[
-                                  TextField(
-                                      controller: otp,
-                                      keyboardType: TextInputType.number,
-                                      decoration: const InputDecoration(
-                                          labelText:
-                                              'One-time verification code')),
-                                  const SizedBox(height: 18),
-                                  _button('Verify and sign in', s is AuthBusy,
-                                      () => widget.auth.verify(otp.text.trim()))
-                                ],
-                                if (s is SignedOut && s.notice != null)
-                                  Padding(
-                                      padding: const EdgeInsets.only(top: 14),
-                                      child: Text(s.notice!,
-                                          style: const TextStyle(
-                                              color: DoctorTokens.danger))),
-                                if (s is AuthFailure)
-                                  Padding(
-                                      padding: const EdgeInsets.only(top: 14),
-                                      child: Text(s.message,
-                                          style: const TextStyle(
-                                              color: DoctorTokens.danger)))
-                              ]);
+                                        fontSize: 16,
+                                        color: DoctorTokens.slate))),
+                            const SizedBox(height: 22),
+                            Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 28),
+                                child: Column(children: [
+                                  if (!m) ...[
+                                    AfyaAuthField(
+                                        controller: email,
+                                        hint: 'Email address',
+                                        icon: Icons.mail_outline,
+                                        keyboardType:
+                                            TextInputType.emailAddress,
+                                        autofillHints: const [
+                                          AutofillHints.email
+                                        ],
+                                        textInputAction: TextInputAction.next),
+                                    const SizedBox(height: 14),
+                                    AfyaAuthField(
+                                        controller: password,
+                                        hint: 'Password',
+                                        icon: Icons.lock_outline,
+                                        obscure: _hidePassword,
+                                        onToggleObscure: () => setState(() =>
+                                            _hidePassword = !_hidePassword),
+                                        onSubmitted: (_) {
+                                          if (!busy) _signIn();
+                                        }),
+                                    const SizedBox(height: 24),
+                                    AfyaPrimaryButton(
+                                        label: 'Sign In',
+                                        busy: busy,
+                                        onPressed: _signIn),
+                                  ] else ...[
+                                    AfyaAuthField(
+                                        controller: otp,
+                                        hint: 'One-time verification code',
+                                        icon: Icons.pin_outlined,
+                                        keyboardType: TextInputType.number),
+                                    const SizedBox(height: 34),
+                                    AfyaPrimaryButton(
+                                        label: 'Verify and sign in',
+                                        busy: busy,
+                                        onPressed: () => widget.auth
+                                            .verify(otp.text.trim())),
+                                  ],
+                                  if (s is SignedOut && s.notice != null)
+                                    AfyaFormError(s.notice!),
+                                  if (s is AuthFailure)
+                                    AfyaFormError(s.message),
+                                ])),
+                            const SizedBox(height: 20),
+                            const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 38),
+                                child: AfyaSecurityNote(
+                                    'Two-factor authentication (2FA) keeps your account secure.')),
+                            const SizedBox(height: 10),
+                            if (m)
+                              TextButton(
+                                  onPressed:
+                                      busy ? null : widget.auth.restartLogin,
+                                  child: const Text('Back to sign in'))
+                            else
+                              // Registration is reached from the Welcome
+                              // screen, so only this link sits here.
+                              TextButton(
+                                  onPressed: busy
+                                      ? null
+                                      : () => Navigator.push(
+                                          c,
+                                          MaterialPageRoute(
+                                              builder: (_) =>
+                                                  ForgotPasswordPage(
+                                                      auth: widget.auth))),
+                                  child: const Text('Forgot password?',
+                                      style: TextStyle(fontSize: 16))),
+                            const SizedBox(height: 16),
+                          ]);
                         }))))));
   }
 }
 
+/// Panel 12 of the Doctor reference board: "Sign Up" then "Professional
+/// Details", then the legal agreements and "Account Under Review". The
+/// request sent to the server is unchanged — the same ten required values,
+/// collected over two screens instead of one.
 class RegistrationPage extends StatefulWidget {
   const RegistrationPage({super.key, required this.auth});
   final AuthCubit auth;
@@ -355,6 +382,8 @@ class RegistrationPage extends StatefulWidget {
 
 class _RegistrationState extends State<RegistrationPage> {
   String? _clientError;
+  int _step = 0;
+  bool _hidePassword = true;
 
   final controllers = <String, TextEditingController>{
     'name': TextEditingController(),
@@ -376,17 +405,6 @@ class _RegistrationState extends State<RegistrationPage> {
     }
     super.dispose();
   }
-
-  Widget field(String key, String label,
-          {TextInputType? type, bool secret = false, int? maxLength}) =>
-      Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: TextField(
-              controller: controllers[key],
-              keyboardType: type,
-              obscureText: secret,
-              maxLength: maxLength,
-              decoration: InputDecoration(labelText: label)));
 
   /// Mirrors the backend's `validate_password_strength` rule (see
   /// `services/backend/src/domain/validation.rs`): at least 8 characters,
@@ -422,143 +440,331 @@ class _RegistrationState extends State<RegistrationPage> {
       ? 'Enter a Kenyan phone number with 9 digits after +254, e.g. 0712 345 678 or +254 712 345 678.'
       : null;
 
+  void _continueFromAccount() {
+    final error = _requiredError(const {
+          'name': 'Full name',
+          'email': 'Email address',
+          'password': 'Password',
+          'phone': 'Phone number',
+        }) ??
+        _emailError(controllers['email']!.text) ??
+        _passwordStrengthError(controllers['password']!.text) ??
+        _phoneError(controllers['phone']!.text);
+    setState(() {
+      _clientError = error;
+      if (error == null) _step = 1;
+    });
+  }
+
+  /// First empty required field, in form order, as a readable message.
+  String? _requiredError(Map<String, String> fields) {
+    for (final entry in fields.entries) {
+      if (controllers[entry.key]!.text.trim().isEmpty) {
+        return '${entry.value} is required.';
+      }
+    }
+    return null;
+  }
+
+  String? _emailError(String raw) =>
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(raw.trim())
+          ? null
+          : 'Enter a valid email address.';
+
+  /// Mirrors the backend's `doctor_register` checks so an incomplete form is
+  /// caught here, before the agreements step, instead of after it.
+  String? _professionalError() {
+    final missing = _requiredError(const {
+      'license': 'KMPDC registration number',
+      'experience': 'Years of experience',
+      'hospital': 'Hospital name',
+      'specialty': 'Specialty',
+      'qualifications': 'Qualifications',
+      'address': 'Residential address',
+    });
+    if (missing != null) return missing;
+    if (controllers['license']!.text.trim().length < 3) {
+      return 'KMPDC registration number must be at least 3 characters.';
+    }
+    final years = int.tryParse(controllers['experience']!.text.trim());
+    if (years == null || years < 0 || years > 100) {
+      return 'Years of experience must be a whole number from 0 to 100.';
+    }
+    final qualifications = controllers['qualifications']!
+        .text
+        .split(',')
+        .map((q) => q.trim())
+        .where((q) => q.isNotEmpty)
+        .toList();
+    if (qualifications.isEmpty ||
+        qualifications.length > 10 ||
+        qualifications.any((q) => q.length > 150)) {
+      return 'List 1 to 10 qualifications, separated by commas.';
+    }
+    return null;
+  }
+
+  void _continueToAgreements() {
+    final normalizedPhone = normalizeKenyaPhone(controllers['phone']!.text);
+    if (normalizedPhone == null) {
+      setState(() => _step = 0);
+      return;
+    }
+    final error = _professionalError();
+    if (error != null) {
+      setState(() => _clientError = error);
+      return;
+    }
+    setState(() => _clientError = null);
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => LegalConsentPage(
+                auth: widget.auth,
+                draft: DoctorRegistrationDraft(
+                    fullName: controllers['name']!.text,
+                    licenseNumber: controllers['license']!.text,
+                    phoneNumber: normalizedPhone,
+                    email: controllers['email']!.text,
+                    password: controllers['password']!.text,
+                    specialty: controllers['specialty']!.text,
+                    experienceYears: controllers['experience']!.text,
+                    hospital: controllers['hospital']!.text,
+                    qualifications: controllers['qualifications']!.text,
+                    address: controllers['address']!.text))));
+  }
+
+  // Length caps match the shared client/server contract: 150 for short
+  // label-like fields, 255 for email, 20 for a phone number, 300 for the
+  // qualifications/address fields and a 3-digit cap on experience years.
+  // Password is deliberately left uncapped.
+  List<Widget> _accountStep(bool busy) => [
+        const Center(child: AfyaLogoMark(size: 62)),
+        const SizedBox(height: 8),
+        const Text('Create Doctor Account',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 23,
+                fontWeight: FontWeight.w800,
+                color: DoctorTokens.navy)),
+        const SizedBox(height: 4),
+        const Text('Join AfyaMkononi as a verified doctor.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 15, color: DoctorTokens.slate)),
+        const SizedBox(height: 20),
+        AfyaAuthField(
+            controller: controllers['name']!,
+            hint: 'Full Name',
+            icon: Icons.person_outline,
+            requiredMark: true,
+            maxLength: 150,
+            textInputAction: TextInputAction.next),
+        const SizedBox(height: 12),
+        AfyaAuthField(
+            controller: controllers['email']!,
+            hint: 'Email Address',
+            icon: Icons.mail_outline,
+            requiredMark: true,
+            keyboardType: TextInputType.emailAddress,
+            maxLength: 255,
+            textInputAction: TextInputAction.next),
+        const SizedBox(height: 12),
+        AfyaAuthField(
+            controller: controllers['password']!,
+            hint: 'Password',
+            icon: Icons.lock_outline,
+            requiredMark: true,
+            obscure: _hidePassword,
+            onToggleObscure: () =>
+                setState(() => _hidePassword = !_hidePassword),
+            textInputAction: TextInputAction.next),
+        const SizedBox(height: 12),
+        AfyaAuthField(
+            controller: controllers['phone']!,
+            hint: 'Phone Number',
+            icon: Icons.phone_outlined,
+            requiredMark: true,
+            keyboardType: TextInputType.phone,
+            maxLength: 20),
+        const SizedBox(height: 6),
+        const Text('Password: 8+ characters with upper, lower, number, symbol.',
+            style: TextStyle(fontSize: 12, color: DoctorTokens.slate)),
+        const SizedBox(height: 18),
+        AfyaPrimaryButton(
+            label: 'Create Account',
+            busy: busy,
+            onPressed: _continueFromAccount),
+        const SizedBox(height: 10),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Text('Already have an account?',
+              style: TextStyle(fontSize: 14, color: DoctorTokens.slate)),
+          TextButton(
+              onPressed: busy ? null : () => Navigator.pop(context),
+              child: const Text('Sign In'))
+        ]),
+      ];
+
+  /// Order and wording per product-owner instruction (2026-11-14): KMPDC
+  /// registration number, years of experience, hospital name, specialty,
+  /// then qualifications and residential address. All are required.
+  List<Widget> _professionalStep(bool busy) => [
+        AfyaLabeledField(
+            label: 'KMPDC registration number',
+            hint: 'e.g. A12345',
+            controller: controllers['license']!,
+            maxLength: 150),
+        AfyaLabeledField(
+            label: 'Years of experience',
+            hint: '0 to 100',
+            controller: controllers['experience']!,
+            keyboardType: TextInputType.number,
+            maxLength: 3),
+        AfyaLabeledField(
+            label: 'Hospital name',
+            hint: 'Where you currently practise',
+            controller: controllers['hospital']!,
+            maxLength: 200),
+        AfyaLabeledField(
+            label: 'Specialty',
+            hint: 'e.g. General Practitioner',
+            controller: controllers['specialty']!,
+            maxLength: 80),
+        AfyaLabeledField(
+            label: 'Qualifications',
+            hint: 'Comma separated, e.g. MBChB, MMed',
+            controller: controllers['qualifications']!,
+            maxLength: 300),
+        AfyaLabeledField(
+            label: 'Residential address',
+            controller: controllers['address']!,
+            maxLength: 300),
+        const SizedBox(height: 6),
+        AfyaPrimaryButton(
+            label: 'Next', busy: busy, onPressed: _continueToAgreements),
+      ];
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(title: const Text('Register as Doctor')),
-      body: BlocBuilder<AuthCubit, AuthState>(
-          bloc: widget.auth,
-          builder: (_, state) {
-            if (state is RegistrationSubmitted) {
-              return Center(
-                  child: Padding(
-                      padding: const EdgeInsets.all(28),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.pending_actions,
-                            color: DoctorTokens.primary, size: 52),
-                        const SizedBox(height: 14),
-                        const Text('Registration submitted',
-                            style: TextStyle(
-                                fontSize: 22, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 8),
-                        const Text(
-                            'Your Doctor account is pending ClinicalAdmin verification.'),
-                        const SizedBox(height: 18),
-                        FilledButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Return to login'))
-                      ])));
-            }
-            final busy = state is AuthBusy;
-            // Length caps match the shared client/server contract: 150 for
-            // short label-like fields, 255 for email (mirrors the backend's
-            // own `validate_email` cap), 20 for a phone number, 300 for the
-            // qualifications/address fields (longer than a label but not
-            // free-form prose), and a 3-digit cap on experience years (a
-            // numeric field — this just blocks obviously-absurd input, not a
-            // length-of-text concern). Password is deliberately left
-            // uncapped: enforcing a *maximum* password length is a
-            // well-known anti-pattern, not a safety measure.
-            return ListView(padding: const EdgeInsets.all(24), children: [
-              const Text('Submit your credentials for verification.',
-                  style: TextStyle(color: DoctorTokens.textSub)),
-              const SizedBox(height: 18),
-              field('name', 'Full name', maxLength: 150),
-              const Text(
-                  'Professional Registration — Kenya Medical Practitioners and Dentists Council (KMPDC) · Kenya'),
-              field('license', 'KMPDC Registration Number', maxLength: 150),
-              field('phone', 'Phone number',
-                  type: TextInputType.phone, maxLength: 20),
-              field('email', 'Email address (used to sign in)',
-                  type: TextInputType.emailAddress, maxLength: 255),
-              field('password',
-                  'Password (8+ chars: upper, lower, number, symbol)',
-                  secret: true),
-              field('specialty', 'Primary specialty', maxLength: 150),
-              field('experience', 'Experience years',
-                  type: TextInputType.number, maxLength: 3),
-              field('hospital', 'Current hospital', maxLength: 150),
-              field('qualifications', 'Qualifications (comma separated)',
-                  maxLength: 300),
-              field('address', 'Residential address', maxLength: 300),
-              const SizedBox(height: 8),
-              FilledButton(
-                  onPressed: busy
-                      ? null
-                      : () {
-                          final passwordError = _passwordStrengthError(
-                              controllers['password']!.text);
-                          if (passwordError != null) {
-                            setState(() => _clientError = passwordError);
-                            return;
-                          }
-                          final rawPhone = controllers['phone']!.text;
-                          final phoneError = _phoneError(rawPhone);
-                          if (phoneError != null) {
-                            setState(() => _clientError = phoneError);
-                            return;
-                          }
-                          final normalizedPhone =
-                              normalizeKenyaPhone(rawPhone)!;
-                          setState(() => _clientError = null);
-                          Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => LegalConsentPage(
-                                      auth: widget.auth,
-                                      draft: DoctorRegistrationDraft(
-                                          fullName: controllers['name']!.text,
-                                          licenseNumber:
-                                              controllers['license']!.text,
-                                          phoneNumber: normalizedPhone,
-                                          email: controllers['email']!.text,
-                                          password:
-                                              controllers['password']!.text,
-                                          specialty:
-                                              controllers['specialty']!.text,
-                                          experienceYears:
-                                              controllers['experience']!.text,
-                                          hospital:
-                                              controllers['hospital']!.text,
-                                          qualifications:
-                                              controllers['qualifications']!
-                                                  .text,
-                                          address:
-                                              controllers['address']!.text))));
-                        },
-                  child: busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Continue')),
-              if (_clientError != null)
-                Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text(_clientError!,
-                        style: const TextStyle(color: DoctorTokens.danger)))
-              else if (state is AuthFailure)
-                Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text(state.message,
-                        style: const TextStyle(color: DoctorTokens.danger)))
-            ]);
-          }));
+  Widget build(BuildContext context) => PopScope(
+      canPop: _step == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() => _step = 0);
+      },
+      child: Scaffold(
+          backgroundColor: DoctorTokens.screen,
+          appBar: AppBar(
+              title: Text(_step == 0 ? 'Sign Up' : 'Professional Details')),
+          body: BlocBuilder<AuthCubit, AuthState>(
+              bloc: widget.auth,
+              builder: (_, state) {
+                if (state is RegistrationSubmitted) {
+                  return RegistrationSubmittedView(
+                      onDone: () => Navigator.pop(context));
+                }
+                final busy = state is AuthBusy;
+                return ListView(
+                    padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
+                    children: [
+                      ...(_step == 0
+                          ? _accountStep(busy)
+                          : _professionalStep(busy)),
+                      if (_clientError != null)
+                        AfyaFormError(_clientError!)
+                      else if (state is AuthFailure)
+                        AfyaFormError(state.message)
+                    ]);
+              })));
 }
 
-Widget _button(String label, bool busy, VoidCallback f) => SizedBox(
-    width: double.infinity,
-    child: FilledButton(
-        onPressed: busy ? null : f,
-        style: FilledButton.styleFrom(
-            backgroundColor: DoctorTokens.primary,
-            padding: const EdgeInsets.symmetric(vertical: 14)),
-        child: busy
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                    color: Colors.white, strokeWidth: 2))
-            : Text(label)));
+/// Panel 12, third phone: shown once the server has accepted a registration.
+class RegistrationSubmittedView extends StatelessWidget {
+  const RegistrationSubmittedView({super.key, required this.onDone});
+  final VoidCallback onDone;
+  @override
+  Widget build(BuildContext context) => AfyaReviewStatusView(
+      title: 'Account Under Review',
+      message: 'Your details have been submitted for verification. '
+          'We will notify you once your account is approved.',
+      steps: const [
+        AfyaReviewStep('Profile submitted', done: true),
+        AfyaReviewStep('Documents under review', done: true),
+        AfyaReviewStep('Approval & activation', done: false),
+      ],
+      primaryLabel: 'OK',
+      onPrimary: onDone);
+}
+
+/// Signed-in gate for a doctor whose registration is not verified. Wording
+/// follows the server's status; nothing here grants or assumes access.
+class VerificationGateView extends StatelessWidget {
+  const VerificationGateView(
+      {super.key,
+      required this.name,
+      required this.license,
+      required this.status,
+      required this.onRefresh,
+      required this.onLogout,
+      this.reviewNote});
+  final String name, license, status;
+  final String? reviewNote;
+  final VoidCallback onRefresh, onLogout;
+  @override
+  Widget build(BuildContext context) {
+    final details = [name, 'KMPDC Registration: $license'];
+    if (status == 'PENDING') {
+      return AfyaReviewStatusView(
+          title: 'Account Under Review',
+          message: 'Your details have been submitted for verification. '
+              'We will notify you once your account is approved.',
+          details: details,
+          steps: const [
+            AfyaReviewStep('Profile submitted', done: true),
+            AfyaReviewStep('Documents under review', done: true),
+            AfyaReviewStep('Approval & activation', done: false),
+          ],
+          note: reviewNote,
+          primaryLabel: 'Refresh status',
+          onPrimary: onRefresh,
+          secondaryLabel: 'Log out',
+          onSecondary: onLogout);
+    }
+    final (IconData icon, Color color, String title, String message) =
+        switch (status) {
+      'REJECTED' => (
+          Icons.gpp_bad_outlined,
+          DoctorTokens.danger,
+          'Registration Not Approved',
+          'Your registration was reviewed and was not approved. '
+              'Clinical access is not available.'
+        ),
+      'REVOKED' => (
+          Icons.gpp_bad_outlined,
+          DoctorTokens.danger,
+          'Verification Withdrawn',
+          'Your verification has been withdrawn. '
+              'Clinical access is not available.'
+        ),
+      _ => (
+          Icons.gpp_maybe_outlined,
+          DoctorTokens.warning,
+          'Verification Unavailable',
+          'Your verification status could not be confirmed. '
+              'Clinical access requires approval.'
+        ),
+    };
+    return AfyaReviewStatusView(
+        icon: icon,
+        iconColor: color,
+        title: title,
+        message: message,
+        details: details,
+        steps: const [],
+        note: reviewNote,
+        primaryLabel: 'Refresh status',
+        onPrimary: onRefresh,
+        secondaryLabel: 'Log out',
+        onSecondary: onLogout);
+  }
+}
 
 class DoctorShell extends StatefulWidget {
   const DoctorShell({super.key});
@@ -568,6 +774,16 @@ class DoctorShell extends StatefulWidget {
   /// that tab's screen. Looks up the nearest `DoctorShell` ancestor's own
   /// state directly; a no-op if called outside the shell (shouldn't happen
   /// in practice, since every Doctor screen lives under it).
+  /// Shows the schedule inside the Appointments tab, keeping the bottom
+  /// navigation visible as the schedule design draws it. Callable from a
+  /// pushed page as well as from a tab.
+  static void openSchedule(BuildContext context) {
+    final shell = _ShellState.current;
+    if (shell == null) return;
+    Navigator.of(shell.context).popUntil((route) => route.isFirst);
+    shell.openSchedule();
+  }
+
   static void switchTab(BuildContext context, int index) {
     context.findAncestorStateOfType<_ShellState>()?.selectTab(index);
   }
@@ -577,14 +793,22 @@ class DoctorShell extends StatefulWidget {
 }
 
 class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
+  static _ShellState? current;
   int tab = 0;
+  bool _schedule = false;
+
+  void openSchedule() => setState(() {
+        tab = 1;
+        _schedule = true;
+        ClientErrorReporter.current?.screen = 'Schedule';
+      });
   late final ScreenRefresh _queueRefresh;
   StreamSubscription<NotificationState>? _queueNoticeSubscription;
   Set<String> _knownNotificationIds = {};
   PushNotificationService? _pushService;
 
   void _refreshDoctorData() {
-    if (mounted && tab == 0) unawaited(_queueRefresh.run());
+    if (mounted && tab <= 1) unawaited(_queueRefresh.run());
   }
 
   @override
@@ -600,6 +824,7 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    if (current == this) current = null;
     _queueRefresh.dispose();
     _queueNoticeSubscription?.cancel();
     unawaited(_pushService?.dispose());
@@ -611,25 +836,21 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
   void selectTab(int index) {
     setState(() {
       tab = index;
-      ClientErrorReporter.current?.screen = const [
-        'Queue',
-        'Chat',
-        'SmartRx',
-        'Schedule',
-        'Wallet',
-        'Settings'
-      ][index];
+      _schedule = false;
+      ClientErrorReporter.current?.screen =
+          const ['Home', 'Appointments', 'History', 'More'][index];
     });
-    if (index == 0) _refreshDoctorData();
+    if (index <= 1) _refreshDoctorData();
   }
 
   @override
   void initState() {
     super.initState();
-    ClientErrorReporter.current?.screen = 'Queue';
+    current = this;
+    ClientErrorReporter.current?.screen = 'Home';
     _queueRefresh = ScreenRefresh(() => context.read<DoctorCubit>().loadQueue(),
         interval: const Duration(seconds: 30),
-        enabled: () => tab == 0,
+        enabled: () => tab <= 1,
         networkChanges: context.read<DoctorCubit>().connectivity?.changes);
     final notifications = context.read<NotificationCubit>();
     _knownNotificationIds =
@@ -710,36 +931,27 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
     final professional = c.watch<DoctorCubit>().state.profile;
     if (professional != null && !professional.verified) {
       return Scaffold(
-          appBar: AppBar(title: const Text('Professional Registration')),
-          body: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(professional.name),
-                    Text('KMPDC Registration: ${professional.license}'),
-                    const Text(
-                        'Kenya Medical Practitioners and Dentists Council · Kenya'),
-                    Text('Status: ${professional.verificationLabel}'),
-                    const Text(
-                        'Manual AfyaMkononi registration review. Clinical access requires approval.'),
-                    if (professional.reviewNote != null)
-                      Text(professional.reviewNote!),
-                    TextButton(
-                        onPressed: c.read<DoctorCubit>().loadAll,
-                        child: const Text('Refresh verification status')),
-                    TextButton(
-                        onPressed: c.read<AuthCubit>().logout,
-                        child: const Text('Log out')),
-                  ])));
+          backgroundColor: DoctorTokens.screen,
+          body: VerificationGateView(
+              name: professional.name,
+              license: professional.license,
+              status: professional.verificationStatus,
+              reviewNote: professional.reviewNote,
+              onRefresh: c.read<DoctorCubit>().loadAll,
+              onLogout: c.read<AuthCubit>().logout));
     }
-    const pages = [
-      QueuePage(),
-      ChatPage(),
-      ScannerPage(),
-      SchedulePage(),
-      WalletPage(),
-      SettingsHomePage()
+    // Home and Appointments show live appointment data; both are refreshed
+    // by the shell. Chat, prescriptions, wallet, Q&A and articles are reached
+    // from More (product-owner decision, 2026-11-13).
+    final pages = [
+      HomePage(onOpenTab: selectTab),
+      _schedule
+          ? SchedulePage(header: DoctorTopBar(onMenu: () => selectTab(3)))
+          : AppointmentsPage(
+              onBack: () => selectTab(0), onOpenSchedule: openSchedule),
+      ConsultationHistoryTab(
+          onBack: () => selectTab(0), onOpenAppointments: () => selectTab(1)),
+      MorePage(onBack: () => selectTab(0)),
     ];
     return Scaffold(
         body: pages[tab],
@@ -755,19 +967,17 @@ class DoctorBottomNav extends StatelessWidget {
   final int selected;
   final ValueChanged<int> onSelected;
   static const items = <(IconData, String)>[
-    (Icons.people_outline, 'Queue'),
-    (Icons.chat_bubble_outline, 'Chat'),
-    (Icons.camera_alt_outlined, 'Scan Rx'),
-    (Icons.calendar_month_outlined, 'Schedule'),
-    (Icons.account_balance_wallet_outlined, 'Wallet'),
-    (Icons.settings_outlined, 'Settings'),
+    (Icons.home_outlined, 'Home'),
+    (Icons.calendar_month_outlined, 'Appointments'),
+    (Icons.history, 'History'),
+    (Icons.more_horiz, 'More'),
   ];
   @override
   Widget build(BuildContext context) => Container(
       height: 76,
       decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: DoctorTokens.border))),
+          border: Border(top: BorderSide(color: DoctorTokens.fieldBorder))),
       padding: const EdgeInsets.only(top: 7, bottom: 5),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
         for (var i = 0; i < items.length; i++)
@@ -778,20 +988,20 @@ class DoctorBottomNav extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(items[i].$1,
-                            size: 22,
+                            size: 25,
                             color: selected == i
                                 ? DoctorTokens.primary
-                                : DoctorTokens.textSub),
+                                : DoctorTokens.fieldText),
                         const SizedBox(height: 3),
                         Text(items[i].$2,
                             style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 11,
                                 fontWeight: selected == i
-                                    ? FontWeight.w700
-                                    : FontWeight.w600,
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
                                 color: selected == i
                                     ? DoctorTokens.primary
-                                    : DoctorTokens.textSub))
+                                    : DoctorTokens.fieldText))
                       ])))
       ]));
 }

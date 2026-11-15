@@ -1,4 +1,5 @@
-import { createInflightReads } from './inflight.mjs';
+import { createSoftReads } from './inflight.mjs';
+import { adminFetch } from './adminQueue.mjs';
 // API client connecting HelloDoctor Admin Portal to the Axum Rust Backend.
 //
 // Every call goes through this Next.js server's own same-origin proxy
@@ -291,16 +292,29 @@ export interface AdminGrievance {
 
 // Network Request Helper
 let runtimeGeneration=0;
-const inflightReads=createInflightReads();
+// Identical reads share one request while in flight and reuse its answer for
+// 3 s (below every polling interval). Any write clears it, so the next read
+// after a change always comes from the server.
+const SOFT_READ_TTL_MS=3000;
+const inflightReads=createSoftReads(SOFT_READ_TTL_MS);
 export function clearAdminRuntime(){runtimeGeneration++;inflightReads.clear();}
+/** For writes that go around request() (media uploads). */
+export function clearSoftReads(){inflightReads.clear();}
 export function request<T>(path:string,options?:RequestInit):Promise<T>{
- return (options?.method??'GET').toUpperCase()==='GET'&&!options?.signal&&!options?.headers
-  ? inflightReads.run(`${runtimeGeneration}:${path}`,()=>performRequest<T>(path,options)) : performRequest<T>(path,options);
+ if((options?.method??'GET').toUpperCase()==='GET'){
+  return !options?.signal&&!options?.headers
+   ? inflightReads.run(`${runtimeGeneration}:${path}`,()=>performRequest<T>(path,options)) : performRequest<T>(path,options);
+ }
+ inflightReads.clear();
+ return performRequest<T>(path,options).finally(()=>inflightReads.clear());
 }
 async function performRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const generation=runtimeGeneration;
   const url = `${API_BASE}${path}`;
-  const res = await fetch(url, {
+  // Admin routes share the backend's two-request admission lane: queue them
+  // (and retry reads it turned away) rather than racing into 503s.
+  const send = path.startsWith("/admin") ? adminFetch : (input: string, init: RequestInit) => fetch(input, init);
+  const res = await send(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -510,6 +524,15 @@ export async function getPendingDoctorVerifications(): Promise<PendingDoctorVeri
   return request<PendingDoctorVerification[]>("/admin/doctors/pending-verification");
 }
 
+/** Documents a doctor uploaded while pending or when resubmitting after a rejection. */
+export interface VerificationSubmission {
+  id: string; message: string | null; previous_status: 'PENDING' | 'REJECTED'; previous_note: string | null; created_at: string;
+  documents: { id: string; mime_type: string; size_bytes: number; created_at: string }[];
+}
+export async function getVerificationSubmissions(doctorId: string): Promise<VerificationSubmission[]> {
+  return request<VerificationSubmission[]>(`/admin/doctors/${doctorId}/verification-submissions`);
+}
+
 export async function verifyDoctorProfessionalRegistration(id: string, note?: string): Promise<any> {
   return request<any>(`/admin/doctors/${id}/verify`, {
     method: "POST",
@@ -530,19 +553,6 @@ export async function getComplianceAlerts(): Promise<ComplianceAlert[]> {
 
 export async function getAdminLogs(): Promise<AdminLog[]> {
   return request<AdminLog[]>("/admin/logs");
-}
-
-export async function simulateAdminLog(payload: {
-  action: string;
-  subsystem: string;
-  severity: string;
-  error_summary: string;
-  stack_trace?: string;
-}): Promise<any> {
-  return request<any>("/admin/logs/simulate", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
 }
 
 // System Error Service — the dedicated `system_error_logs` admin surface
@@ -616,17 +626,6 @@ export async function resolveSystemError(id: string, resolution_note?: string): 
   });
 }
 
-export async function simulateSystemError(payload: {
-  scenario: string;
-  severity: string;
-  custom_note?: string;
-  impacted_user_id?: string;
-}): Promise<SystemErrorLog> {
-  return request<SystemErrorLog>("/admin/system-errors/simulate", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-}
 
 export async function getAdminGrievances(): Promise<AdminGrievance[]> {
   return request<AdminGrievance[]>("/admin/grievances");
@@ -805,4 +804,69 @@ export const scheduleCampaign = (id: string, version: number, scheduled_for: str
   campaignTransition(id, "schedule", version, { scheduled_for });
 export function getCampaignStats(id: string) {
   return request<CampaignStats>(`/admin/campaigns/${encodeURIComponent(id)}/stats`);
+}
+
+/** Peer Navigators (docs/peer-navigator/PEER_NAVIGATOR_PLAN.md). No chat content is ever returned to Admins. */
+export type PeerApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+export type PeerDecision = 'approve' | 'reject' | 'suspend' | 'reinstate';
+export interface AdminPeer {
+  id: string; full_name: string; email: string | null; phone_number: string; county: string;
+  organization: string | null; approval_status: PeerApprovalStatus; approval_note: string | null;
+  reviewed_at: string | null; created_at: string;
+}
+export async function getAdminPeers(): Promise<AdminPeer[]> {
+  return request<AdminPeer[]>('/admin/peers');
+}
+/** A Peer Navigator with activity counts (Admin Peer Directory). */
+export interface AdminPeerDirectoryRow extends AdminPeer {
+  requests?: number; sessions_completed?: number; sessions_upcoming?: number;
+  patients_supported?: number; chat_sessions?: number; call_sessions?: number;
+  messages?: number; last_session_at?: string | null;
+}
+export async function getAdminPeerDirectory(): Promise<AdminPeerDirectoryRow[]> {
+  return request<AdminPeerDirectoryRow[]>('/admin/peer-directory');
+}
+/** One support session; never the topic the patient wrote or any message. */
+export interface AdminPeerSession {
+  request_id: string; patient_id: string; patient_name: string;
+  support_type: 'CHAT' | 'CALL'; status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
+  start_time: string; end_time: string; requested_at: string;
+  decided_at: string | null; completed_at: string | null; cancelled_at: string | null;
+  messages: number; call_started_at: string | null; call_ended_at: string | null;
+}
+export interface AdminPeerHistory {
+  sessions: AdminPeerSession[];
+  status_history: {event: string; at: string; by: string | null}[];
+}
+/** A patient's Peer Navigator sessions for their Admin record. */
+export interface AdminPatientPeerSession {
+  request_id: string; peer_id: string; peer_name: string; support_type: 'CHAT' | 'CALL';
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
+  start_time: string; requested_at: string; completed_at: string | null; messages: number;
+}
+export async function getAdminPatientPeerSessions(patientId: string): Promise<AdminPatientPeerSession[]> {
+  return request<AdminPatientPeerSession[]>(`/admin/patients/${encodeURIComponent(patientId)}/peer-sessions`);
+}
+/** Records in the audit log that this Admin opened a record. Best effort. */
+export type AuditedRecord = 'PATIENT' | 'DOCTOR_PROFILE' | 'PEER_NAVIGATOR';
+const recentViews = new Map<string, number>();
+export async function recordAdminView(resourceType: AuditedRecord, resourceId: string): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/i.test(resourceId)) return;
+  // One row per opening: skip a repeat of the same view within 5 seconds
+  // (development renders effects twice).
+  const key = `${resourceType}:${resourceId}`; const now = Date.now();
+  if (now - (recentViews.get(key) ?? 0) < 5000) return;
+  recentViews.set(key, now);
+  try {
+    await request<unknown>('/admin/audit/views', {method: 'POST', body: JSON.stringify({resource_type: resourceType, resource_id: resourceId})});
+  } catch { /* the record still opens; the server logs request failures */ }
+}
+export async function getAdminPeerHistory(id: string): Promise<AdminPeerHistory> {
+  return request<AdminPeerHistory>(`/admin/peers/${encodeURIComponent(id)}/history`);
+}
+export async function decideAdminPeer(id: string, action: PeerDecision, note?: string): Promise<unknown> {
+  return request<unknown>(`/admin/peers/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST',
+    body: JSON.stringify(note && note.trim() ? {note: note.trim()} : {}),
+  });
 }

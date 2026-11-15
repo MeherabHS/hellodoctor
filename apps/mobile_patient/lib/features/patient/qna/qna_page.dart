@@ -111,11 +111,12 @@ class QuestionArticle extends StatelessWidget {
     final l = AppLocalizations.of(context);
     if (question.isInternalFixture) return const SizedBox.shrink();
     final category = switch (question.displayCategory) {
-      'Fevers & Infections' => l.qnaTopicFevers,
-      'Child Health' => l.qnaTopicChild,
-      'Diet & Diabetes' => l.qnaTopicDiet,
-      'Skin & Allergy' => l.qnaTopicSkin,
-      _ => l.qnaTopicGeneral,
+      'HIV Testing' => l.supportCatTesting,
+      'PrEP' => l.supportCatPrep,
+      'ART' => l.supportCatArt,
+      'Sexual Health' => l.supportCatSexualHealth,
+      'Stigma & Mental Health' => l.supportCatStigma,
+      _ => l.qnaTopicOther,
     };
     return Padding(
         padding: const EdgeInsets.symmetric(vertical: 20),

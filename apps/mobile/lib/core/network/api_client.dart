@@ -38,9 +38,22 @@ abstract class TokenStore {
   Future<void> clear();
 }
 
+/// The Android preferences file that has always held session tokens (the
+/// plugin's default name, so naming it changes no stored data).
+const sessionSecureStorageFile = 'FlutterSecureStorage';
+
+/// flutter_secure_storage 9.x on Android only *sets* the preferences file name
+/// when a call supplies one and never resets it to the default. After the boot
+/// diagnostics queue (its own file) makes a call, unnamed calls would read and
+/// write that file instead, so session tokens would read back as null. Every
+/// store names its file on every call.
+const sessionSecureStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(sharedPreferencesName: sessionSecureStorageFile),
+);
+
 class SecureTokenStore implements TokenStore {
   SecureTokenStore([FlutterSecureStorage? storage])
-      : storage = storage ?? const FlutterSecureStorage();
+      : storage = storage ?? sessionSecureStorage;
   final FlutterSecureStorage storage;
   @override
   Future<String?> read(String key) => storage.read(key: key);
@@ -368,8 +381,7 @@ class ApiClient {
   final Dio _dio;
   final DeviceProofSigner _proofSigner;
 
-  bool _isSessionEstablishment(String path) =>
-      path.endsWith('/verify-otp') || path.endsWith('/verify-otp-and-login');
+  bool _isSessionEstablishment(String path) => path.endsWith('/verify-otp');
 
   Future<void> _attachDeviceProof(RequestOptions options) async {
     if (!_proofSigner.enabled) return;

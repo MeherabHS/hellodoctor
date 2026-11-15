@@ -11,8 +11,11 @@ import 'blog_discovery_controller.dart';
 
 /// Existing Blogs tab: bounded server search and stable cursor pagination.
 class BlogsPage extends StatefulWidget {
-  const BlogsPage({super.key, required this.repo});
+  const BlogsPage({super.key, required this.repo, this.initialQuery});
   final BlogsRepository repo;
+
+  /// Pre-fills the search (used by the education hub's topic cards).
+  final String? initialQuery;
   @override
   State<BlogsPage> createState() => _BlogsPageState();
 }
@@ -20,10 +23,16 @@ class BlogsPage extends StatefulWidget {
 class _BlogsPageState extends State<BlogsPage> {
   late final BlogDiscoveryController controller;
   String? _language;
+  final _search = TextEditingController();
   @override
   void initState() {
     super.initState();
     controller = BlogDiscoveryController(widget.repo);
+    final initial = widget.initialQuery;
+    if (initial != null && initial.isNotEmpty) {
+      _search.text = initial;
+      controller.query = initial;
+    }
   }
 
   @override
@@ -41,6 +50,7 @@ class _BlogsPageState extends State<BlogsPage> {
   @override
   void dispose() {
     controller.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -55,6 +65,7 @@ class _BlogsPageState extends State<BlogsPage> {
           Padding(
               padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
               child: TextField(
+                controller: _search,
                 maxLength: 160,
                 onChanged: controller.search,
                 decoration: InputDecoration(

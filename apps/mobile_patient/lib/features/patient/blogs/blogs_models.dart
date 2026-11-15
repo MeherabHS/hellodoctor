@@ -42,10 +42,14 @@ class BlogArticleDto {
     this.contentFormat = 'plain',
     this.titleSw = '',
     this.bodySw = '',
+    this.summarySw = '',
     this.categoryEn = '',
     this.categorySw = '',
     this.coverImageId,
     this.quiz,
+    this.topicKey,
+    this.videoUrl,
+    this.standaloneQuiz = false,
   });
   final String id, authorName, specialty, title, summary, body;
   final List<String> referencesList;
@@ -54,18 +58,46 @@ class BlogArticleDto {
       contentFormat,
       titleSw,
       bodySw,
+      summarySw,
       categoryEn,
       categorySw;
   final String? coverImageId;
   final QuizPublication? quiz;
+
+  /// The HIV Prevention & Sexual Health topic of this entry's category
+  /// (HIV_BASICS, PREP, ...), or null.
+  final String? topicKey;
+
+  /// Canonical YouTube watch URL when this entry is a video, else null.
+  final Uri? videoUrl;
+  bool get isVideo => videoUrl != null;
+
+  /// A quiz that is not attached to a blog article (Admin Quiz Manager);
+  /// its body is a short introduction.
+  final bool standaloneQuiz;
+
+  /// Estimated reading time at 200 words a minute, at least one minute.
+  int readMinutesFor(String language) {
+    final words = bodyFor(language)
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
+        .length;
+    return words <= 200 ? 1 : (words / 200).ceil();
+  }
+
   bool get isAdmin => articleType == 'ADMIN';
-  bool get hasCover => isAdmin && coverImageId != null;
+  // Doctor articles can carry a cover too (Doctor Web, 2026-11-14).
+  bool get hasCover => coverImageId != null;
   bool _sw(String language) =>
       language == 'sw' && titleSw.trim().isNotEmpty && bodySw.trim().isNotEmpty;
   String titleFor(String language) => _sw(language) ? titleSw : title;
   String bodyFor(String language) => _sw(language) ? bodySw : body;
   String summaryFor(String language) {
-    if (!isAdmin) return summary;
+    if (!isAdmin) {
+      return language == 'sw' && _sw(language) && summarySw.trim().isNotEmpty
+          ? summarySw
+          : summary;
+    }
     final value = bodyFor(language);
     return value.length > 300 ? value.substring(0, 300) : value;
   }
@@ -95,11 +127,25 @@ class BlogArticleDto {
           admin && j['content_format'] == 'markdown' ? 'markdown' : 'plain',
       titleSw: _textOf(j['title_sw']),
       bodySw: _textOf(j['body_sw']),
+      summarySw: _textOf(j['summary_sw']),
       categoryEn: _textOf(j['category_name_en']),
       categorySw: _textOf(j['category_name_sw']),
       coverImageId:
           RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(cover) ? cover : null,
       quiz: admin ? QuizPublication.parse(j['quiz']) : null,
+      topicKey: j['topic_key'] is String ? j['topic_key'] as String : null,
+      videoUrl: admin ? youTubeWatchUri(j['video_url']) : null,
+      standaloneQuiz: admin && j['standalone_quiz'] == true,
     );
   }
+}
+
+/// Accepts only the backend's canonical YouTube watch URL, so a tampered or
+/// unexpected value can never make the app open another site.
+Uri? youTubeWatchUri(dynamic value) {
+  if (value is! String) return null;
+  return RegExp(r'^https://www\.youtube\.com/watch\?v=[A-Za-z0-9_-]{11}$')
+          .hasMatch(value)
+      ? Uri.parse(value)
+      : null;
 }
