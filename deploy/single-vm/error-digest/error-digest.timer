@@ -1,0 +1,11 @@
+[Unit]
+Description=HelloDoctor nightly error digest at 03:00 Nairobi time
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Africa/Nairobi
+# Run once after boot if the VM was off at 03:00.
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

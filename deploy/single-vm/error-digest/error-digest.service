@@ -1,0 +1,18 @@
+[Unit]
+Description=HelloDoctor nightly error digest (read-only report by email)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/hellodoctor/error-digest.env
+ExecStart=/usr/bin/python3 /opt/hellodoctor/error-digest/error_digest.py
+# Needs the docker group to read container state, logs and run read-only
+# psql inside the Postgres container; nothing else.
+User=hellodoctor-digest
+Group=docker
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+TimeoutStartSec=600
