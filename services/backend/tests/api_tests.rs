@@ -82,6 +82,8 @@ mod grievance_appeals;
 mod intake_removal_and_doctor_window;
 #[path = "cases/notification_localization_preferences.rs"]
 mod notification_localization_preferences;
+#[path = "cases/one_email_one_role.rs"]
+mod one_email_one_role;
 #[path = "cases/password_reset.rs"]
 mod password_reset;
 #[path = "cases/patient_address.rs"]

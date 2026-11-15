@@ -323,13 +323,22 @@ impl AuthService {
             let password_hash = challenge.password_hash.as_deref().ok_or_else(|| {
                 AppError::internal("Registration challenge is incomplete.".into())
             })?;
+            // One email is one account and one role: the address may have
+            // been taken (e.g. by a Doctor or Peer registration) after this
+            // challenge was issued, so the unique index decides here.
             let user = user_repo::create_patient_user_with_credentials(
                 &mut *tx,
                 &challenge.email,
                 phone,
                 password_hash,
             )
-            .await?;
+            .await
+            .map_err(|error| match &error {
+                sqlx::Error::Database(db) if db.code().as_deref() == Some("23505") => {
+                    AppError::Conflict("Registration details are already in use.".into())
+                }
+                _ => AppError::from(error),
+            })?;
             (user, true)
         } else {
             let user_id = challenge
