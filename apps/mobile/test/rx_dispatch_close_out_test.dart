@@ -1,4 +1,4 @@
-﻿import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -119,8 +119,9 @@ void main() {
             initialAppointment: _apt(
                 status: 'COMPLETED',
                 outcome: 'COMPLETED_WITH_RX',
-                completed:
-                    DateTime.now().toUtc().subtract(const Duration(hours: 1)))));
+                completed: DateTime.now()
+                    .toUtc()
+                    .subtract(const Duration(hours: 1)))));
     expect(find.textContaining('is already recorded and cannot be changed'),
         findsOneWidget);
     expect(find.text('Select current consultation'), findsOneWidget,

@@ -18,41 +18,50 @@ test('Markdown renders supported formatting and disables HTML, scripts and embed
   for(const unsafe of ['<script','<img','javascript:','onerror='])assert.ok(!html.includes(unsafe),unsafe);
 });
 
-test('sensitive author sees a disabled approval control and stays pending without transport',async()=>{
-  const previous=globalThis.window;globalThis.window={addEventListener(){},removeEventListener(){}} as unknown as Window & typeof globalThis;
-  const fetchBefore=globalThis.fetch;let requests=0;globalThis.fetch=async()=>{requests++;throw new Error('Self approval must not send a request');};
+// Admins publish directly (CLAUDE.md, 2026-11-14): no Submit for review,
+// Approve or Return controls; Publish runs the backend's remaining internal
+// steps from whatever state the article is in.
+function stubWindow(){const previous=globalThis.window;globalThis.window={addEventListener(){},removeEventListener(){},confirm(){return true;}} as unknown as Window & typeof globalThis;return previous;}
+function stepServer(paths:string[],fail?:(path:string)=>Response|undefined){
+  let version=1;
+  return async(url:RequestInfo|URL)=>{const path=String(url);paths.push(path);const failed=fail?.(path);if(failed)return failed;version++;
+    const status=path.endsWith('/submit')?'PENDING_REVIEW':path.endsWith('/approve')?'APPROVED':path.endsWith('/publish')?'PUBLISHED':'DRAFT';
+    return new Response(JSON.stringify({success:true,data:{...article,status,version}}));};
+}
+test('a sensitive draft is published directly; the review steps run behind Publish',async()=>{
+  const previous=stubWindow();const fetchBefore=globalThis.fetch;const paths:string[]=[];globalThis.fetch=stepServer(paths) as typeof fetch;
   let view:ReactTestRenderer|undefined;
   try{
-    await act(async()=>{view=create(<ArticleEditor initial={{...article,status:'PENDING_REVIEW',can_approve:false,approval_block_reason:'INDEPENDENT_REVIEW_REQUIRED'}} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
-    const approve=view!.root.findAllByType('button').find(b=>b.children.join('')==='Approve')!;
-    assert.equal(approve.props.disabled,true);
-    assert.ok(JSON.stringify(view!.toJSON()).includes('Approval required from another Admin.'));
-    await act(async()=>{approve.props.onClick();});
-    assert.equal(requests,0);assert.ok(JSON.stringify(view!.toJSON()).includes('Pending review'));
+    await act(async()=>{view=create(<ArticleEditor initial={article} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
+    const labels=view!.root.findAllByType('button').map(b=>b.children.join(''));
+    for(const removed of ['Approve','Submit for review','Return'])assert.ok(!labels.includes(removed),removed);
+    await act(async()=>{view!.root.findAllByType('button').find(b=>b.children.join('')==='Publish')!.props.onClick();});
+    assert.deepEqual(paths.map(p=>p.split('/').pop()),['submit','approve','publish']);
+    assert.ok(JSON.stringify(view!.toJSON()).includes('Published. No announcement was sent.'));
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=previous;}
 });
 
-test('authorized independent reviewer can approve through the existing endpoint',async()=>{
-  const previous=globalThis.window;globalThis.window={addEventListener(){},removeEventListener(){}} as unknown as Window & typeof globalThis;
-  const fetchBefore=globalThis.fetch;let requestPath='';
-  globalThis.fetch=async(url)=>{requestPath=String(url);return new Response(JSON.stringify({success:true,data:{...article,status:'APPROVED',version:2,approved_version:1}}));};
+test('an article left pending review is finished by the next Publish',async()=>{
+  const previous=stubWindow();const fetchBefore=globalThis.fetch;const paths:string[]=[];globalThis.fetch=stepServer(paths) as typeof fetch;
   let view:ReactTestRenderer|undefined;
   try{
-    await act(async()=>{view=create(<ArticleEditor initial={{...article,status:'PENDING_REVIEW',can_approve:true,approval_block_reason:null}} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
-    const approve=view!.root.findAllByType('button').find(b=>b.children.join('')==='Approve')!;assert.equal(approve.props.disabled,false);
-    await act(async()=>{approve.props.onClick();});assert.ok(requestPath.endsWith('/approve'));assert.ok(JSON.stringify(view!.toJSON()).includes('Approved'));
+    await act(async()=>{view=create(<ArticleEditor initial={{...article,status:'PENDING_REVIEW'}} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
+    await act(async()=>{view!.root.findAllByType('button').find(b=>b.children.join('')==='Publish')!.props.onClick();});
+    assert.deepEqual(paths.map(p=>p.split('/').pop()),['approve','publish']);
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=previous;}
 });
 
-test('server rejection remains readable and preserves pending review when permission changes',async()=>{
-  const previous=globalThis.window;globalThis.window={addEventListener(){},removeEventListener(){}} as unknown as Window & typeof globalThis;
-  const fetchBefore=globalThis.fetch;
-  globalThis.fetch=async()=>new Response(JSON.stringify({success:false,error:{code:'FORBIDDEN',message:'Sensitive health articles require approval by another Admin. This article remains pending review.'}}),{status:403});
+test('a server refusal while publishing stays readable and keeps the article unpublished',async()=>{
+  const previous=stubWindow();const fetchBefore=globalThis.fetch;const paths:string[]=[];
+  globalThis.fetch=stepServer(paths,path=>path.endsWith('/approve')?new Response(JSON.stringify({success:false,error:{code:'FORBIDDEN',message:'You do not have permission to publish this article.'}}),{status:403}):undefined) as typeof fetch;
   let view:ReactTestRenderer|undefined;
   try{
-    await act(async()=>{view=create(<ArticleEditor initial={{...article,status:'PENDING_REVIEW',can_approve:true,approval_block_reason:null}} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
-    await act(async()=>{view!.root.findAllByType('button').find(b=>b.children.join('')==='Approve')!.props.onClick();});
-    const output=JSON.stringify(view!.toJSON());assert.ok(output.includes('Approval required from another Admin.'));assert.ok(output.includes('Pending review'));assert.ok(!output.includes('API Error'));assert.ok(!output.includes('FORBIDDEN'));
+    await act(async()=>{view=create(<ArticleEditor initial={article} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
+    await act(async()=>{view!.root.findAllByType('button').find(b=>b.children.join('')==='Publish')!.props.onClick();});
+    const output=JSON.stringify(view!.toJSON());
+    assert.ok(output.includes('Not published'));assert.ok(!output.includes('API Error'));assert.ok(!output.includes('FORBIDDEN'));
+    assert.ok(!paths.some(p=>p.endsWith('/publish')));
+    assert.ok(view!.root.findAllByType('button').some(b=>b.children.join('')==='Publish'),'Publish stays available to retry');
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=previous;}
 });
 
@@ -85,7 +94,7 @@ test('preview cover is same-origin authenticated media and shows clear fallback'
   const html=renderToStaticMarkup(<ArticlePreview content={content} category={category} language="sw" setLanguage={()=>{}} article={{...article,cover_image_id:'cover'}} localCover=""/>);
   assert.ok(html.includes(`/api/article-media/${article.id}`));assert.ok(html.includes('English fallback'));assert.ok(html.includes('Draft'));
 });
-test('editor typing and language switching remain local; draft save and review are explicit',async()=>{
+test('editor typing and language switching remain local; draft save and publishing are explicit',async()=>{
   const fetchBefore=globalThis.fetch;const windowBefore=globalThis.window;
   const requests:{url:string;body:Record<string,unknown>}[]=[];
   globalThis.window={addEventListener(){},removeEventListener(){},confirm(){return true;}} as unknown as Window & typeof globalThis;
@@ -105,7 +114,8 @@ test('editor typing and language switching remain local; draft save and review a
     const savedContent=requests[0].body.content as Record<string,unknown>;
     assert.deepEqual(Object.keys(savedContent).sort(),Object.keys(content).sort());
     assert.equal(savedContent.body_en,'## Edited unsaved text');
-    await act(async()=>{buttons().find(b=>b.children.join('')==='Submit for review')!.props.onClick();});
-    assert.equal(requests.length,2);assert.ok(requests[1].url.endsWith('/submit'));
+    assert.ok(!buttons().some(b=>b.children.join('')==='Submit for review'),'no review step in the Admin UI');
+    await act(async()=>{buttons().find(b=>b.children.join('')==='Publish')!.props.onClick();});
+    assert.ok(requests.length>=2);assert.ok(requests[1].url.endsWith('/submit'),'Publish starts the internal review steps');
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=windowBefore;}
 });
