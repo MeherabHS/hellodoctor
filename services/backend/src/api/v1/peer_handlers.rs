@@ -940,6 +940,53 @@ async fn notify_peer_event(
     Ok(())
 }
 
+/// Queues one peer-session email on the caller's transaction (sent after
+/// commit by `send_queued_emails`). The recipient's address is read with the
+/// worker role, since a patient's session can't read the peer's account and
+/// the reverse. No address on file means no email.
+async fn queue_session_email(
+    state: &AppState,
+    conn: &mut sqlx::PgConnection,
+    recipient: UserId,
+    email_type: &str,
+    request_id: Uuid,
+) -> Result<Option<Uuid>, AppError> {
+    // `users.email` is nullable (phone-registered accounts).
+    let email: Option<Option<String>> =
+        sqlx::query_scalar("SELECT email FROM users WHERE id = $1 AND deleted_at IS NULL")
+            .bind(recipient)
+            .fetch_optional(&state.system_db)
+            .await?;
+    let Some(email) = email.flatten().filter(|e| !e.is_empty()) else {
+        return Ok(None);
+    };
+    let id = Uuid::new_v4();
+    crate::repository::email_outbox_repo::enqueue_transactional(
+        &mut *conn,
+        id,
+        email_type,
+        &email,
+        &format!("{}:{request_id}", email_type.to_lowercase()),
+        "PEER_REQUEST",
+        request_id,
+        crate::repository::email_outbox_repo::transactional_email_expiry(),
+    )
+    .await?;
+    Ok(Some(id))
+}
+
+fn send_queued_emails(state: &AppState, ids: Vec<Uuid>) {
+    if ids.is_empty() {
+        return;
+    }
+    let state = state.clone();
+    tokio::spawn(async move {
+        for id in ids {
+            crate::services::email_dispatch_worker::dispatch_now(&state, id).await;
+        }
+    });
+}
+
 #[derive(Deserialize)]
 pub struct CreatePeerRequest {
     pub slot_id: Uuid,
@@ -1014,10 +1061,13 @@ pub async fn create_request(
         return Err(taken());
     }
     notify_peer_event(&state, &mut tx, peer_user, "PEER_REQUEST_NEW", id).await?;
+    let email =
+        queue_session_email(&state, &mut tx, peer_user, "PEER_SESSION_REQUESTED", id).await?;
     let created = peer_repo::patient_request(&mut *tx, ctx.user_id, id)
         .await?
         .ok_or_else(|| AppError::internal("Peer request could not be read back.".into()))?;
     tx.commit().await?;
+    send_queued_emails(&state, email.into_iter().collect());
     Ok((StatusCode::CREATED, ok(created)))
 }
 
@@ -1061,10 +1111,19 @@ pub async fn cancel_request(
         id,
     )
     .await?;
+    let email = queue_session_email(
+        &state,
+        &mut tx,
+        core.peer_user_id,
+        "PEER_SESSION_CANCELLED",
+        id,
+    )
+    .await?;
     let updated = peer_repo::patient_request(&mut *tx, ctx.user_id, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Request not found.".into()))?;
     tx.commit().await?;
+    send_queued_emails(&state, email.into_iter().collect());
     Ok(ok(updated))
 }
 
@@ -1158,10 +1217,47 @@ pub async fn decide_request(
         .await?;
     }
     notify_peer_event(&state, &mut tx, core.patient_user_id, kind, id).await?;
+    // Accepted: the patient's confirmation and the peer's own booking
+    // record. Declined: the patient is told to choose another time.
+    let mut emails = Vec::new();
+    if status == "ACCEPTED" {
+        emails.extend(
+            queue_session_email(
+                &state,
+                &mut tx,
+                core.patient_user_id,
+                "PEER_SESSION_CONFIRMED",
+                id,
+            )
+            .await?,
+        );
+        emails.extend(
+            queue_session_email(
+                &state,
+                &mut tx,
+                core.peer_user_id,
+                "PEER_SESSION_BOOKED",
+                id,
+            )
+            .await?,
+        );
+    } else {
+        emails.extend(
+            queue_session_email(
+                &state,
+                &mut tx,
+                core.patient_user_id,
+                "PEER_SESSION_DECLINED",
+                id,
+            )
+            .await?,
+        );
+    }
     let updated = peer_repo::peer_request(&mut *tx, ctx.user_id, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Request not found.".into()))?;
     tx.commit().await?;
+    send_queued_emails(&state, emails);
     Ok(ok(updated).into_response())
 }
 
