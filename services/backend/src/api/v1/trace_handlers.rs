@@ -290,7 +290,7 @@ pub async fn reschedule(
     Json(body): Json<Reschedule>,
 ) -> Result<Json<Value>, AppError> {
     abac::authorize(&ctx, Action::ManageSlots)?;
-    let reason = crate::domain::validation::validate_text_field(&body.reason, "Reason", 300)?;
+    let reason = crate::domain::validation::validate_admin_text_field(&body.reason, "Reason", 300)?;
     if reason.chars().count() < 8 {
         return Err(AppError::Validation(
             "A reschedule reason of at least 8 characters is required.".into(),

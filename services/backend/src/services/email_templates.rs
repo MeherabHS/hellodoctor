@@ -197,8 +197,22 @@ fn fallback_name(name: &str) -> &str {
     }
 }
 
+/// The name after "Dr.": a stored title ("Dr", "Dr.", "Doctor") is dropped
+/// so the greeting never reads "Dr. Dr. Jane". "Colleague" only when no
+/// name is known at all.
 fn fallback_doctor_name(name: &str) -> &str {
-    let trimmed = name.trim();
+    let mut trimmed = name.trim();
+    loop {
+        let lower = trimmed.to_ascii_lowercase();
+        let rest = ["doctor ", "dr. ", "dr.", "dr "]
+            .iter()
+            .find(|title| lower.starts_with(*title))
+            .map(|title| trimmed[title.len()..].trim_start());
+        match rest {
+            Some(rest) => trimmed = rest,
+            None => break,
+        }
+    }
     if trimmed.is_empty() {
         "Colleague"
     } else {
@@ -1186,6 +1200,103 @@ Stay safe,\nAfyaMkononi Account Security Team\n\n{footer}",
 }
 
 // =====================================================================
+// Admin invitation (product owner, 2026-11-14). Sent by
+// `admin_invitation_service::AdminInvitationService::invite` through the
+// fire-and-forget `send_templated_email` path.
+// =====================================================================
+
+/// The accept link for an Admin invitation: `{admin_web_url}/invite?token=…`.
+/// `None` unless the operator-configured base is a valid https URL. `token`
+/// is server-generated hex, so it needs no escaping.
+pub fn admin_invite_url(admin_web_url: &str, token: &str) -> Option<String> {
+    if token.is_empty() || !token.chars().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let base = validate_https_url(admin_web_url.trim_end_matches('/'))?;
+    Some(format!(
+        "{}/invite?token={token}",
+        base.trim_end_matches('/')
+    ))
+}
+
+pub fn render_admin_invitation(
+    invite_url: &str,
+    expiry_minutes: i64,
+    assets: &EmailAssets,
+) -> RenderedEmail {
+    let subject = "Your AfyaMkononi Admin invitation (expires in 5 minutes)";
+    let subject = if expiry_minutes == 5 {
+        subject.to_string()
+    } else {
+        format!("Your AfyaMkononi Admin invitation (expires in {expiry_minutes} minutes)")
+    };
+    let cta = Some(Cta {
+        label: "Accept invitation",
+        href: invite_url,
+    });
+    let steps = [
+        "Open the button below on the device you will use for the Admin console.".to_string(),
+        "Enter your Kenyan phone number and choose a strong password (at least 8 characters with an uppercase letter, a lowercase letter, a digit and a special character).".to_string(),
+        "Sign in at the Admin console with this email and your new password. We will email you a one-time verification code to finish signing in.".to_string(),
+    ];
+    let steps_html: String = steps
+        .iter()
+        .map(|s| format!("<li style=\"margin:0 0 8px;\">{}</li>", html_escape(s)))
+        .collect();
+    let steps_text: String = steps
+        .iter()
+        .enumerate()
+        .map(|(i, s)| format!("{}. {s}\n", i + 1))
+        .collect();
+    let body_html = format!(
+        "<h1 style=\"margin:0 0 16px;font-size:20px;color:{teal};\">You're invited to join as an Admin</h1>\
+<p style=\"margin:0 0 16px;\">Hello,</p>\
+<p style=\"margin:0 0 16px;\">An AfyaMkononi administrator has invited this email address to the Admin console, where the team manages content, doctor verification, operations and campaigns.</p>\
+<div style=\"margin:0 0 18px;padding:12px 16px;background-color:{mint};border-radius:10px;font-weight:bold;color:{teal};\">This link works for {expiry_minutes} minutes and only once.</div>\
+<p style=\"margin:0 0 8px;font-weight:bold;\">How to accept</p>\
+<ol style=\"margin:0 0 8px;padding-left:20px;\">{steps_html}</ol>\
+{cta_html}\
+<p style=\"margin:24px 0 8px;font-weight:bold;\">If the link has expired</p>\
+<p style=\"margin:0 0 16px;\">Ask the Admin who invited you to send a new invitation. Each new invitation cancels the previous link.</p>\
+<p style=\"margin:0 0 8px;font-weight:bold;\">Keep your account safe</p>\
+<p style=\"margin:0 0 16px;\">Never forward this email or share the link, your password or verification codes. AfyaMkononi will never ask for them. If you were not expecting this invitation, ignore this email: no account is created unless the invitation is accepted.</p>\
+<p style=\"margin:0;\">Regards,<br /><strong>AfyaMkononi Account Security Team</strong></p>",
+        teal = palette::DEEP_TEAL,
+        mint = palette::MINT,
+        cta_html = cta_button_html(cta),
+    );
+    let footer = Footer {
+        contact_label: "Security assistance:",
+        transactional_disclaimer: true,
+    };
+    let text_body = format!(
+        "You're invited to join as an Admin\n\n\
+Hello,\n\n\
+An AfyaMkononi administrator has invited this email address to the Admin console, where the team manages content, doctor verification, operations and campaigns.\n\n\
+This link works for {expiry_minutes} minutes and only once.\n\n\
+How to accept\n{steps_text}{cta_text}\n\
+If the link has expired: ask the Admin who invited you to send a new invitation. Each new invitation cancels the previous link.\n\n\
+Keep your account safe: never forward this email or share the link, your password or verification codes. If you were not expecting this invitation, ignore this email: no account is created unless the invitation is accepted.\n\n\
+Regards,\nAfyaMkononi Account Security Team\n\n{footer}",
+        cta_text = cta_text(cta),
+        footer = footer_text(&footer),
+    );
+    RenderedEmail {
+        html_body: layout(
+            &subject,
+            "Accept your AfyaMkononi Admin invitation within the next few minutes.",
+            Some("hero-security.svg"),
+            "Shield illustration representing account security",
+            assets,
+            &body_html,
+            &footer,
+        ),
+        subject,
+        text_body,
+    }
+}
+
+// =====================================================================
 // 12. Password-reset verification code (Phase 2: Secure Email OTP Password
 //     Recovery). Content: AFYAMKONONI_EMAIL_CONTENT_V1.md "reset mail".
 //     Unlike the 11 templates above, this one IS wired to a live trigger —
@@ -1358,6 +1469,69 @@ With care,\nThe AfyaMkononi Team\n\n{footer}",
     }
 }
 
+/// Peer Navigator sign-in code (Care app). Same layout and security wording
+/// as the doctor code, addressed to a peer rather than "Dr.".
+pub fn render_peer_login_otp(
+    peer_name: &str,
+    verification_code: &str,
+    expiry_minutes: i64,
+    assets: &EmailAssets,
+) -> RenderedEmail {
+    let trimmed = peer_name.trim();
+    let name = if trimmed.is_empty() { "there" } else { trimmed };
+    let name_html = html_escape(name);
+    let subject = "Secure access to your Peer Navigator account.";
+    let body_html = format!(
+        "<h1 style=\"margin:0 0 16px;font-size:20px;color:{teal};\">Secure access to your Peer Navigator account.</h1><p style=\"margin:0 0 16px;\">Hello {name_html},</p><p style=\"margin:0 0 16px;\">A verification code has been requested for your AfyaMkononi Peer Navigator account.</p><p style=\"margin:0 0 16px;\">Please enter the following code to complete the authentication step.</p><p style=\"margin:0 0 4px;font-weight:bold;\">Your verification code</p>{code_block}<p style=\"margin:0 0 16px;text-align:center;\"><strong>Valid for {expiry_minutes} minutes.</strong></p><p style=\"margin:0 0 16px;\">Please do not share this code with anyone, including people claiming to represent the platform.</p><p style=\"margin:0 0 8px;\"><strong>Didn't initiate this request?</strong></p><p style=\"margin:0 0 16px;\">Do not use the code. Contact our support team if you suspect unauthorized account access.</p><p style=\"margin:0;\">Best regards,<br /><strong>AfyaMkononi Account Security</strong></p>",
+        teal = palette::DEEP_TEAL,
+        code_block = verification_code_block_html(verification_code),
+    );
+    let text_body = format!(
+        "Secure access to your Peer Navigator account.
+
+Hello {name},
+
+A verification code has been requested for your AfyaMkononi Peer Navigator account.
+
+Please enter the following code to complete the authentication step.
+
+Your verification code:
+{code_block}
+Valid for {expiry_minutes} minutes.
+
+Please do not share this code with anyone, including people claiming to represent the platform.
+
+Didn't initiate this request?
+Do not use the code. Contact our support team if you suspect unauthorized account access.
+
+Best regards,
+AfyaMkononi Account Security
+
+{footer}",
+        code_block = verification_code_block_text(verification_code),
+        footer = footer_text(&Footer {
+            contact_label: "Support:",
+            transactional_disclaimer: false,
+        }),
+    );
+    RenderedEmail {
+        subject: subject.to_string(),
+        html_body: layout(
+            subject,
+            "Use this code to sign in to your AfyaMkononi Peer Navigator account.",
+            Some("hero-security.svg"),
+            "Shield illustration representing account security",
+            assets,
+            &body_html,
+            &Footer {
+                contact_label: "Support:",
+                transactional_disclaimer: false,
+            },
+        ),
+        text_body,
+    }
+}
+
 pub fn render_doctor_login_otp(
     doctor_name: &str,
     verification_code: &str,
@@ -1490,8 +1664,249 @@ Regards,\nAfyaMkononi Security Team\n\n{footer}",
     }
 }
 
+// =====================================================================
+// Peer Navigator account emails (2026-11-15). Same layout, palette and
+// footer as the doctor emails. A peer is greeted by first name. Decisions
+// never state the Admin's note: review detail stays inside the app, as
+// with doctors.
+// =====================================================================
+
+/// One block of a peer email: a plain paragraph, a bold lead-in heading,
+/// or a "lead. rest" paragraph whose first part is bold.
+enum PeerBlock<'a> {
+    P(&'a str),
+    Heading(&'a str),
+    Lead(&'a str, &'a str),
+}
+
+struct PeerEmail<'a> {
+    subject: &'a str,
+    preheader: &'a str,
+    hero: &'a str,
+    hero_alt: &'a str,
+    blocks: &'a [PeerBlock<'a>],
+    sign_off: &'a str,
+    team: &'a str,
+}
+
+fn peer_first_name(name: &str) -> &str {
+    name.split_whitespace().next().unwrap_or("there")
+}
+
+fn render_peer_email(peer_name: &str, email: PeerEmail<'_>, assets: &EmailAssets) -> RenderedEmail {
+    let name = peer_first_name(peer_name);
+    let footer = Footer {
+        contact_label: "Peer Navigator support:",
+        transactional_disclaimer: false,
+    };
+    let mut html = format!(
+        "<h1 style=\"margin:0 0 16px;font-size:20px;color:{teal};\">{subject}</h1>\
+<p style=\"margin:0 0 16px;\">Hello {name},</p>",
+        teal = palette::DEEP_TEAL,
+        subject = html_escape(email.subject),
+        name = html_escape(name),
+    );
+    let mut text = format!("{}\n\nHello {name},\n\n", email.subject);
+    for block in email.blocks {
+        match block {
+            PeerBlock::P(p) => {
+                html.push_str(&format!(
+                    "<p style=\"margin:0 0 16px;\">{}</p>",
+                    html_escape(p)
+                ));
+                text.push_str(&format!("{p}\n\n"));
+            }
+            PeerBlock::Heading(h) => {
+                html.push_str(&format!(
+                    "<p style=\"margin:0 0 8px;\"><strong>{}</strong></p>",
+                    html_escape(h)
+                ));
+                text.push_str(&format!("{h}\n"));
+            }
+            PeerBlock::Lead(lead, rest) => {
+                html.push_str(&format!(
+                    "<p style=\"margin:0 0 10px;\"><strong>{}</strong> {}</p>",
+                    html_escape(lead),
+                    html_escape(rest)
+                ));
+                text.push_str(&format!("{lead} {rest}\n"));
+            }
+        }
+    }
+    html.push_str(&format!(
+        "<p style=\"margin:24px 0 0;\">{sign_off},<br /><strong>{team}</strong></p>",
+        sign_off = html_escape(email.sign_off),
+        team = html_escape(email.team),
+    ));
+    text.push_str(&format!(
+        "\n{},\n{}\n\n{}",
+        email.sign_off,
+        email.team,
+        footer_text(&footer)
+    ));
+    RenderedEmail {
+        subject: email.subject.to_string(),
+        html_body: layout(
+            email.subject,
+            email.preheader,
+            Some(email.hero),
+            email.hero_alt,
+            assets,
+            &html,
+            &footer,
+        ),
+        text_body: text,
+    }
+}
+
+const PEER_TEAM: &str = "AfyaMkononi Peer Support Team";
+
+/// Sent when a peer signs up in the Care app.
+pub fn render_peer_application_received(peer_name: &str, assets: &EmailAssets) -> RenderedEmail {
+    render_peer_email(
+        peer_name,
+        PeerEmail {
+            subject: "Thank you for stepping forward to support your peers.",
+            preheader: "We've received your Peer Navigator application. Here's what happens next.",
+            hero: "hero-doctor-application.svg",
+            hero_alt: "Illustration representing a received application",
+            blocks: &[
+                PeerBlock::P("Thank you for registering as an AfyaMkononi Peer Navigator."),
+                PeerBlock::P("We've received your application. Peer Navigators help young people, including those living with HIV, feel heard, supported and less alone on their health journey."),
+                PeerBlock::Heading("What happens next?"),
+                PeerBlock::P("An AfyaMkononi Admin will review your application. We'll email you as soon as a decision is made. You don't need to apply again while your application is being reviewed."),
+                PeerBlock::P("Until then you can sign in to the AfyaMkononi Care app to check your status, but you can't accept support requests yet."),
+                PeerBlock::P("Thank you for sharing our commitment to support without stigma."),
+            ],
+            sign_off: "Warm regards",
+            team: PEER_TEAM,
+        },
+        assets,
+    )
+}
+
+/// Sent when an Admin approves a peer.
+pub fn render_peer_approved(peer_name: &str, assets: &EmailAssets) -> RenderedEmail {
+    render_peer_email(
+        peer_name,
+        PeerEmail {
+            subject: "You're in. Welcome to the Peer Navigator team.",
+            preheader: "Your AfyaMkononi Peer Navigator application has been approved.",
+            hero: "hero-doctor-approved.svg",
+            hero_alt: "Celebratory illustration marking approval",
+            blocks: &[
+                PeerBlock::P("Congratulations! Your application to become an AfyaMkononi Peer Navigator has been approved."),
+                PeerBlock::P("Your experience and kindness can make it easier for someone to stay on track with their health."),
+                PeerBlock::Lead("Listen without judgment.", "A supportive conversation can be the first step toward better health."),
+                PeerBlock::Lead("Privacy matters.", "What a patient shares with you stays between you and them."),
+                PeerBlock::Lead("Support, not treatment.", "Peer support never replaces a clinician. Encourage patients to speak to a doctor about medicines, symptoms or test results."),
+                PeerBlock::Lead("Ask for help.", "If someone may be in danger, follow the safeguarding steps you agreed to and contact the AfyaMkononi team."),
+                PeerBlock::Heading("What's next?"),
+                PeerBlock::P("Sign in to the AfyaMkononi Care app with your email and password, then create your support slots so patients can book time with you."),
+                PeerBlock::P("Welcome aboard!"),
+            ],
+            sign_off: "Warm regards",
+            team: PEER_TEAM,
+        },
+        assets,
+    )
+}
+
+/// Sent when an Admin declines an application. Never states the reason.
+pub fn render_peer_rejected(peer_name: &str, assets: &EmailAssets) -> RenderedEmail {
+    render_peer_email(
+        peer_name,
+        PeerEmail {
+            subject: "An update on your Peer Navigator application",
+            preheader: "An update on your AfyaMkononi Peer Navigator application.",
+            hero: "hero-doctor-rejected.svg",
+            hero_alt: "Neutral, minimal illustration",
+            blocks: &[
+                PeerBlock::P("Thank you for your interest in becoming an AfyaMkononi Peer Navigator and for the time you put into your application."),
+                PeerBlock::P("After reviewing it, we are unable to approve your application at this time."),
+                PeerBlock::P("We understand this may not be the outcome you hoped for. If you have questions about the decision or possible next steps, contact support@afyamkononi.app."),
+                PeerBlock::P("Thank you again for caring about the young people in your community."),
+            ],
+            sign_off: "Sincerely",
+            team: PEER_TEAM,
+        },
+        assets,
+    )
+}
+
+/// Sent when an Admin pauses an approved peer. Never states the reason.
+pub fn render_peer_suspended(peer_name: &str, assets: &EmailAssets) -> RenderedEmail {
+    render_peer_email(
+        peer_name,
+        PeerEmail {
+            subject: "Your Peer Navigator account is paused",
+            preheader: "Your AfyaMkononi Peer Navigator account has been paused.",
+            hero: "hero-doctor-rejected.svg",
+            hero_alt: "Neutral, minimal illustration",
+            blocks: &[
+                PeerBlock::P("Your AfyaMkononi Peer Navigator account has been paused by our team."),
+                PeerBlock::P("While it is paused, patients can't book time with you and you can't accept new support requests."),
+                PeerBlock::P("If you have questions, or believe this was a mistake, contact support@afyamkononi.app."),
+            ],
+            sign_off: "Sincerely",
+            team: PEER_TEAM,
+        },
+        assets,
+    )
+}
+
+/// Sent when an Admin reinstates a paused peer.
+pub fn render_peer_reinstated(peer_name: &str, assets: &EmailAssets) -> RenderedEmail {
+    render_peer_email(
+        peer_name,
+        PeerEmail {
+            subject: "Your Peer Navigator account is active again",
+            preheader: "Your AfyaMkononi Peer Navigator account is active again.",
+            hero: "hero-doctor-approved.svg",
+            hero_alt: "Celebratory illustration marking approval",
+            blocks: &[
+                PeerBlock::P("Good news: your AfyaMkononi Peer Navigator account is active again."),
+                PeerBlock::P("Sign in to the AfyaMkononi Care app and check your support slots so patients can book time with you."),
+                PeerBlock::P("Thank you for continuing to support your peers."),
+            ],
+            sign_off: "Warm regards",
+            team: PEER_TEAM,
+        },
+        assets,
+    )
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn admin_invitation_link_is_https_with_hex_token_only() {
+        let token = "ab".repeat(32);
+        assert_eq!(
+            admin_invite_url("https://admin.afyamkononi.app/", &token).as_deref(),
+            Some(format!("https://admin.afyamkononi.app/invite?token={token}").as_str())
+        );
+        assert!(admin_invite_url("http://admin.afyamkononi.app", &token).is_none());
+        assert!(admin_invite_url("javascript:alert(1)", &token).is_none());
+        assert!(admin_invite_url("https://admin.afyamkononi.app", "<script>").is_none());
+        assert!(admin_invite_url("https://user:pw@admin.afyamkononi.app", &token).is_none());
+    }
+
+    #[test]
+    fn admin_invitation_email_states_five_minutes_and_steps() {
+        let url = format!(
+            "https://admin.afyamkononi.app/invite?token={}",
+            "cd".repeat(32)
+        );
+        let email = render_admin_invitation(&url, 5, &EmailAssets::none());
+        assert!(email.subject.contains("5 minutes"));
+        for text in [&email.html_body, &email.text_body] {
+            assert!(text.contains("5 minutes and only once"));
+            assert!(text.contains("How to accept"));
+            assert!(text.contains(&url));
+        }
+        assert!(!email.html_body.contains("<script"));
+    }
+
     use super::*;
 
     const ASSETS_LOCAL: fn() -> EmailAssets = || EmailAssets::with_base_url("assets");
@@ -1579,6 +1994,64 @@ mod tests {
             render_doctor_rejected("", &ASSETS_LOCAL()),
         ] {
             assert!(rendered.html_body.contains("Dear Dr. Colleague"));
+        }
+    }
+
+    #[test]
+    fn doctor_greeting_uses_the_name_and_drops_a_stored_title() {
+        for stored in [
+            "Jane Mwangi",
+            "Dr. Jane Mwangi",
+            "dr Jane Mwangi",
+            "Doctor Jane Mwangi",
+            "DR.Jane Mwangi",
+        ] {
+            let r = render_doctor_login_otp(stored, "123456", 5, &ASSETS_LOCAL());
+            assert!(r.html_body.contains("Dear Dr. Jane Mwangi,"), "{stored}");
+            assert!(r.text_body.contains("Dear Dr. Jane Mwangi,"), "{stored}");
+            assert!(!r.html_body.contains("Colleague"), "{stored}");
+        }
+        // A name that is only a title still gets the generic salutation.
+        let r = render_doctor_login_otp("Dr.", "123456", 5, &ASSETS_LOCAL());
+        assert!(r.html_body.contains("Dear Dr. Colleague,"));
+        // A surname that merely starts with "Dr" is left alone.
+        let r = render_doctor_login_otp("Drew Otieno", "123456", 5, &ASSETS_LOCAL());
+        assert!(r.html_body.contains("Dear Dr. Drew Otieno,"));
+    }
+
+    #[test]
+    fn peer_emails_greet_by_first_name_and_never_say_doctor() {
+        let all = [
+            render_peer_application_received("Grace Wanjiku", &ASSETS_LOCAL()),
+            render_peer_approved("Grace Wanjiku", &ASSETS_LOCAL()),
+            render_peer_rejected("Grace Wanjiku", &ASSETS_LOCAL()),
+            render_peer_suspended("Grace Wanjiku", &ASSETS_LOCAL()),
+            render_peer_reinstated("Grace Wanjiku", &ASSETS_LOCAL()),
+        ];
+        for r in &all {
+            assert!(r.html_body.contains("Hello Grace,"), "{}", r.subject);
+            assert!(r.text_body.contains("Hello Grace,"), "{}", r.subject);
+            assert!(!r.html_body.contains("Wanjiku"), "{}", r.subject);
+            assert!(!r.html_body.contains("Dr."), "{}", r.subject);
+            assert!(r.html_body.contains("AfyaMkononi Peer Support Team"));
+        }
+        assert!(all[1].html_body.contains("Care app"));
+        assert!(all[2].html_body.contains("unable to approve"));
+        assert!(all[3].html_body.contains("paused"));
+        let empty = render_peer_approved("  ", &ASSETS_LOCAL());
+        assert!(empty.html_body.contains("Hello there,"));
+    }
+
+    #[test]
+    fn peer_emails_escape_injection_in_the_name() {
+        for r in [
+            render_peer_application_received(SCRIPT_PAYLOAD, &ASSETS_LOCAL()),
+            render_peer_approved(SCRIPT_PAYLOAD, &ASSETS_LOCAL()),
+            render_peer_rejected(SCRIPT_PAYLOAD, &ASSETS_LOCAL()),
+            render_peer_suspended(SCRIPT_PAYLOAD, &ASSETS_LOCAL()),
+            render_peer_reinstated(SCRIPT_PAYLOAD, &ASSETS_LOCAL()),
+        ] {
+            assert!(!r.html_body.contains("<script>"));
         }
     }
 

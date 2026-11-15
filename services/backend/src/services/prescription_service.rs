@@ -138,11 +138,23 @@ impl PrescriptionService {
             )));
         }
 
-        let mut uploaded: Vec<PrescriptionIntakeDocument> = Vec::new();
-        let mut next_page = existing_count as i16;
-        for (mime, sanitized) in sanitized_files {
-            next_page += 1;
+        // A page the patient removed leaves a gap; new photos fill the lowest
+        // free page numbers so the 1..=20 page check never rejects an upload
+        // the count check above allowed.
+        let free_pages = prescription_repo::free_intake_page_numbers(
+            &mut *tx,
+            appointment_id,
+            sanitized_files.len() as i64,
+        )
+        .await?;
+        if free_pages.len() != sanitized_files.len() {
+            return Err(AppError::UnprocessableEntity(format!(
+                "Maximum {PATIENT_MAX_IMAGES_PER_CONSULTATION} prescription photos allowed per appointment."
+            )));
+        }
 
+        let mut uploaded: Vec<PrescriptionIntakeDocument> = Vec::new();
+        for ((mime, sanitized), next_page) in sanitized_files.into_iter().zip(free_pages) {
             let hash = format!("{:x}", Sha256::digest(&sanitized));
             let object_key = format!(
                 "intake/{}/{}_{}.bin",
@@ -219,6 +231,75 @@ impl PrescriptionService {
         Ok(uploaded)
     }
 
+    /// The patient's own intake documents for one appointment, with whether
+    /// they can still be removed (the same window in which they can upload).
+    pub async fn list_patient_intake_documents(
+        state: &AppState,
+        ctx: &AuthContext,
+        appointment_id: Uuid,
+        patient_id: PatientProfileId,
+    ) -> Result<(Vec<PrescriptionIntakeDocument>, bool), AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        let appointment = appointment_repo::find_by_id(&mut *tx, appointment_id)
+            .await?
+            .filter(|appointment| appointment.patient_id == patient_id)
+            .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+        let editable = patient_intake_status_allowed(appointment.status)
+            && appointment_repo::intake_upload_allowed(&mut *tx, appointment_id).await?;
+        let documents = prescription_repo::list_intake_documents(&mut *tx, appointment_id).await?;
+        tx.commit().await?;
+        Ok((documents, editable))
+    }
+
+    /// Patient removes one of their own intake photos (for example the wrong
+    /// photo) so they can upload the right one. Allowed only in the upload
+    /// window: once the consultation is completed, cancelled or expired the
+    /// upload is part of the clinical record and stays. The row is deleted
+    /// and the stored object is queued for durable deletion in the same
+    /// transaction; a best-effort immediate delete follows the commit.
+    pub async fn remove_patient_intake_document(
+        state: &AppState,
+        ctx: &AuthContext,
+        appointment_id: Uuid,
+        patient_id: PatientProfileId,
+        document_id: Uuid,
+    ) -> Result<(), AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        // Same lock as upload and expiry, so a removal never interleaves with
+        // a concurrent upload's page assignment or the hold-expiry snapshot.
+        appointment_repo::lock_for_document_upload(&mut *tx, appointment_id).await?;
+        let appointment = appointment_repo::find_by_id(&mut *tx, appointment_id)
+            .await?
+            .filter(|appointment| appointment.patient_id == patient_id)
+            .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+        if !patient_intake_status_allowed(appointment.status)
+            || !appointment_repo::intake_upload_allowed(&mut *tx, appointment_id).await?
+        {
+            return Err(AppError::Conflict(
+                "Uploads can no longer be changed for this consultation.".into(),
+            ));
+        }
+        let doc = prescription_repo::find_intake_document(&mut *tx, document_id, appointment_id)
+            .await?
+            .filter(|doc| doc.patient_id == patient_id)
+            .ok_or_else(|| AppError::NotFound("Document not found.".into()))?;
+        if !prescription_repo::remove_intake_document(&mut tx, &doc).await? {
+            return Err(AppError::NotFound("Document not found.".into()));
+        }
+        consultation_trace::record(
+            &mut tx,
+            appointment_id,
+            None,
+            Event::accepted("ATTACHMENT_REMOVED", Some(("DOCUMENT", doc.id))),
+        )
+        .await?;
+        tx.commit().await?;
+        // The row is gone, so nobody can open the file any more; the queued
+        // job guarantees the object itself is deleted even if this fails.
+        DocumentStorageService::delete(state, &doc.object_key).await;
+        Ok(())
+    }
+
     /// Doctor handwritten prescription photo upload
     ///
     /// Same two-phase shape as `upload_patient_intake_documents` and for the
@@ -280,6 +361,24 @@ impl PrescriptionService {
         ).bind(appointment_id).bind(&hash).fetch_optional(&mut *tx).await? {
             tx.commit().await?;
             return Ok(existing);
+        }
+        // Dispatch seals the prescription (product-owner rule, 2026-11-13):
+        // the client completes the consultation as COMPLETED_WITH_RX once
+        // every page is through, and completion takes this same advisory
+        // lock, so this post-lock re-read (not the pre-lock `apt` above) is
+        // authoritative. A consultation completed WITH_RX accepts no further
+        // pages; an exact retry of a stored page still replays above. A
+        // consultation completed with another outcome (referred, escalated)
+        // keeps the 24-hour late-Rx path.
+        let locked = appointment_repo::find_by_id(&mut *tx, appointment_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+        if locked.status == AppointmentStatus::Completed
+            && locked.clinical_outcome.as_deref() == Some("COMPLETED_WITH_RX")
+        {
+            return Err(AppError::Conflict(
+                "The prescription for this consultation has already been dispatched.".into(),
+            ));
         }
         let (count, no_rx): (i64, bool) = sqlx::query_as("SELECT COUNT(*),COALESCE(BOOL_OR(is_no_rx_required),FALSE) FROM prescriptions WHERE appointment_id=$1")
             .bind(appointment_id).fetch_one(&mut *tx).await?;

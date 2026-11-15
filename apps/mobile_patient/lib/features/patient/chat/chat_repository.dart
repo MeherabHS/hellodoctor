@@ -137,6 +137,27 @@ class ChatRepository {
     return base64Decode(raw['base64_content'] as String);
   }
 
+  /// Sends a JPEG or PNG into the consultation chat. The server sanitises
+  /// and re-encodes it into private encrypted storage. [key] is reused when
+  /// the patient retries the same image, so a retry never posts it twice.
+  Future<ChatMessageDto> uploadClinicalImage(String conversationId,
+      Uint8List bytes, String mimeType, String key) async {
+    try {
+      requireOnline();
+      final raw = _data(await api.post('/chat/$conversationId/attachments',
+          idempotencyKey: key,
+          data: {
+            'mime_type': mimeType,
+            'base64_content': base64Encode(bytes)
+          }));
+      return ChatMessageDto.fromJson(Map<String, dynamic>.from(raw as Map));
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Chat', operation: 'upload_image');
+      rethrow;
+    }
+  }
+
   Future<List<ChatMessageDto>> messages(String conversationId) async {
     try {
       requireOnline();

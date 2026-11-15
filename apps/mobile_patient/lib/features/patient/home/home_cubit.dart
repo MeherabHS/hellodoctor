@@ -15,16 +15,39 @@ class HomeState {
     this.error,
     this.upcoming = const [],
     this.lastUpdatedAt,
+    this.fromCache = false,
   });
   final bool loading, refreshing, offline;
   final String? error;
   final List<AppointmentSummaryDto> upcoming;
   final DateTime? lastUpdatedAt;
 
+  /// [upcoming] came from the on-device cache, not from the server just now.
+  final bool fromCache;
+
   /// The single nearest upcoming confirmed/pending consultation, if any —
-  /// the prototype's Home `.consult-card` (`view-0`) only ever shows one.
+  /// shown on the Book Consultation landing.
   AppointmentSummaryDto? get nextUpcoming =>
       upcoming.isEmpty ? null : upcoming.first;
+
+  /// The consultation the Home card shows (product decision 2026-11-13,
+  /// CLAUDE.md rule 2.4): visible only inside the server's window, which opens
+  /// 15 minutes before the start, for both video and chat. Decided from the
+  /// server's own `join` instants and clock (never the device clock alone) and
+  /// only from fresh server data, never from the cache.
+  AppointmentSummaryDto? homeCardAppointment([DateTime? now]) {
+    if (fromCache) return null;
+    for (final a in upcoming) {
+      if (!const ['CONFIRMED', 'WAITING', 'IN_CONSULTATION']
+          .contains(a.status)) {
+        continue;
+      }
+      if (a.status == 'IN_CONSULTATION') return a;
+      final join = a.join;
+      if (join != null && join.withinWindow(now)) return a;
+    }
+    return null;
+  }
 
   HomeState copyWith({
     bool? loading,
@@ -33,8 +56,10 @@ class HomeState {
     Object? error = _unset,
     List<AppointmentSummaryDto>? upcoming,
     DateTime? lastUpdatedAt,
+    bool? fromCache,
   }) =>
       HomeState(
+        fromCache: fromCache ?? this.fromCache,
         loading: loading ?? this.loading,
         refreshing: refreshing ?? this.refreshing,
         offline: offline ?? this.offline,
@@ -87,7 +112,8 @@ class HomeCubit extends Cubit<HomeState> {
           refreshing: true,
           offline: false,
           error: null,
-          upcoming: cached));
+          upcoming: cached,
+          fromCache: true));
     } else {
       emit(state.copyWith(
           loading: true,
@@ -106,6 +132,7 @@ class HomeCubit extends Cubit<HomeState> {
         offline: false,
         error: null,
         upcoming: upcoming,
+        fromCache: false,
         lastUpdatedAt: DateTime.now().toUtc(),
       ));
     } catch (e) {

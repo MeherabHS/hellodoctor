@@ -27,10 +27,18 @@ class AgoraCallPage extends StatefulWidget {
     required this.appointmentId,
     required this.repo,
     this.scheduledStartTime,
+    this.loadToken,
+    this.loadOpenAt,
   });
   final String appointmentId;
   final BookingRepository repo;
   final DateTime? scheduledStartTime;
+
+  /// Peer support calls mint from `/peer-requests/:id/rtc-token` instead of
+  /// the consultation endpoint and send no consultation telemetry.
+  final Future<RtcSessionDto> Function()? loadToken;
+  final Future<DateTime?> Function()? loadOpenAt;
+  bool get _isPeerCall => loadToken != null;
 
   @override
   State<AgoraCallPage> createState() => _AgoraCallPageState();
@@ -48,8 +56,10 @@ class _AgoraCallPageState extends State<AgoraCallPage>
       engine: RealAgoraEngine(),
       mintToken: _mintToken,
       requestPermissions: _requestPermissions,
-      telemetrySubmit: (events) =>
-          widget.repo.submitTelemetryEvents(widget.appointmentId, events),
+      telemetrySubmit: widget._isPeerCall
+          ? null
+          : (events) =>
+              widget.repo.submitTelemetryEvents(widget.appointmentId, events),
     )..addListener(_onControllerChanged);
     _controller.start();
   }
@@ -59,6 +69,8 @@ class _AgoraCallPageState extends State<AgoraCallPage>
   /// text). The Agora engine is never touched on a refusal.
   Future<RtcSessionDto> _mintToken() async {
     try {
+      final peer = widget.loadToken;
+      if (peer != null) return await peer();
       return await widget.repo.mintRtcToken(widget.appointmentId);
     } on ApiException catch (e) {
       throw await _authorizationFailure(e);
@@ -71,8 +83,11 @@ class _AgoraCallPageState extends State<AgoraCallPage>
     if (e.code == 'NOT_YET_OPEN') {
       // Word it with the real open time when the server will tell us.
       try {
-        opensAt = (await widget.repo.joinEligibility(widget.appointmentId))
-            .joinOpenAt;
+        final peer = widget.loadOpenAt;
+        opensAt = peer != null
+            ? await peer()
+            : (await widget.repo.joinEligibility(widget.appointmentId))
+                .joinOpenAt;
       } catch (_) {}
     }
     return mapMintFailure(e, opensAt: opensAt);

@@ -55,6 +55,15 @@ class PatientPageHeader extends StatelessWidget {
           color: PatientTokens.surface,
           border: Border(bottom: BorderSide(color: PatientTokens.border))),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Shown only on a pushed route; a tab root has nothing to pop.
+        if (Navigator.of(context).canPop())
+          Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: IconButton(
+                  onPressed: () => Navigator.maybePop(context),
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.arrow_back_rounded,
+                      size: 22, color: PatientTokens.text))),
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -285,7 +294,15 @@ class PatientField extends StatelessWidget {
       this.onTap,
       this.suffixIcon,
       this.errorText,
-      this.onChanged});
+      this.onChanged,
+      this.labelIcon,
+      this.labelColor = PatientTokens.text,
+      this.labelSuffix,
+      this.requiredMark = false,
+      this.prefixIcon,
+      this.fillColor,
+      this.borderColor,
+      this.borderRadius});
   final String label;
   final TextEditingController controller;
   final String? hint, errorText;
@@ -294,25 +311,76 @@ class PatientField extends StatelessWidget {
   final VoidCallback? onTap;
   final Widget? suffixIcon;
   final ValueChanged<String>? onChanged;
+
+  /// Optional styling used by the illustrated auth screens: an outline icon
+  /// before the label, a lighter label suffix such as "(optional)", an icon
+  /// inside the field, and the field's fill, border and corner radius.
+  final IconData? labelIcon;
+  final Color labelColor;
+  final String? labelSuffix;
+
+  /// Shows a red " *" after the label for a required field.
+  final bool requiredMark;
+  final IconData? prefixIcon;
+  final Color? fillColor, borderColor;
+  final double? borderRadius;
   @override
-  Widget build(BuildContext context) =>
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: PatientTokens.text)),
-        const SizedBox(height: 7),
-        TextField(
-            controller: controller,
-            keyboardType: keyboardType,
-            obscureText: obscureText,
-            readOnly: readOnly,
-            onTap: onTap,
-            onChanged: onChanged,
-            decoration: InputDecoration(
-                hintText: hint, suffixIcon: suffixIcon, errorText: errorText))
-      ]);
+  Widget build(BuildContext context) {
+    OutlineInputBorder? border(Color? color, [double width = 1]) =>
+        borderRadius == null && borderColor == null
+            ? null
+            : OutlineInputBorder(
+                borderRadius:
+                    BorderRadius.circular(borderRadius ?? PatientTokens.radius),
+                borderSide: BorderSide(
+                    color: color ?? PatientTokens.border, width: width));
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        if (labelIcon != null) ...[
+          Icon(labelIcon, size: 19, color: labelColor),
+          const SizedBox(width: 8),
+        ],
+        Flexible(
+          child: Text.rich(
+              TextSpan(text: label, children: [
+                if (labelSuffix != null)
+                  TextSpan(
+                      text: ' $labelSuffix',
+                      style: const TextStyle(fontWeight: FontWeight.w400)),
+                if (requiredMark)
+                  const TextSpan(
+                      text: ' *',
+                      style: TextStyle(
+                          color: PatientTokens.danger,
+                          fontWeight: FontWeight.w800)),
+              ]),
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: labelColor)),
+        ),
+      ]),
+      const SizedBox(height: 7),
+      TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          obscureText: obscureText,
+          readOnly: readOnly,
+          onTap: onTap,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+              hintText: hint,
+              suffixIcon: suffixIcon,
+              errorText: errorText,
+              fillColor: fillColor,
+              prefixIcon: prefixIcon == null
+                  ? null
+                  : Icon(prefixIcon, size: 20, color: PatientTokens.hint),
+              border: border(borderColor),
+              enabledBorder: border(borderColor),
+              focusedBorder: border(PatientTokens.primary, 1.5)))
+    ]);
+  }
 }
 
 class PatientSectionTitle extends StatelessWidget {

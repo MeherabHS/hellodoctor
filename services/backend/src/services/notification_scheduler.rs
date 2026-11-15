@@ -97,6 +97,9 @@ pub fn start(state: AppState) {
             if let Err(error) = run_expired_upload_cleanup(&state).await {
                 tracing::error!(error = ?error, "expired clinical-upload cleanup failed");
             }
+            if let Err(error) = run_intake_removal_cleanup(&state).await {
+                tracing::error!(error = ?error, "removed intake-upload cleanup failed");
+            }
             if let Err(error) = run_consultation_presence_sweep(&state).await {
                 tracing::error!(error = ?error, "consultation presence grace sweep failed");
             }
@@ -882,7 +885,10 @@ pub async fn run_push_delivery_pass(state: &AppState) -> Result<u64, crate::erro
 pub async fn run_consultation_presence_sweep(
     state: &AppState,
 ) -> Result<u64, crate::error::AppError> {
-    super::consultation_presence_service::expire_empty_rooms(state).await
+    let doctor_rooms = super::consultation_presence_service::expire_empty_rooms(state).await?;
+    // Peer support calls use the same empty-room grace.
+    let peer_rooms = super::peer_call_service::PeerCallService::expire_empty_rooms(state).await?;
+    Ok(doctor_rooms + peer_rooms)
 }
 
 /// Upper bound per transaction. A backlog is drained over successive ticks
@@ -997,6 +1003,76 @@ pub async fn run_expired_upload_cleanup(state: &AppState) -> Result<u64, crate::
             update_tx.commit().await?;
         }
         if completed < BATCH as u64 {
+            break;
+        }
+    }
+    Ok(completed)
+}
+
+/// Deletes the stored objects of intake photos a patient removed. The row is
+/// already gone (nobody can open the file); this closes the storage half.
+/// Missing objects count as deleted, so the API's own best-effort delete
+/// after commit simply makes this a no-op.
+pub async fn run_intake_removal_cleanup(state: &AppState) -> Result<u64, crate::error::AppError> {
+    use crate::repository::prescription_repo;
+    const BATCH: i64 = 50;
+    let ctx = crate::auth_context::AuthContext::system();
+    let mut completed = 0u64;
+    for _ in 0..4 {
+        let mut claim_tx = state
+            .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
+            .await?;
+        let jobs = prescription_repo::claim_intake_removal_jobs(&mut *claim_tx, BATCH).await?;
+        claim_tx.commit().await?;
+        if jobs.is_empty() {
+            break;
+        }
+        let claimed = jobs.len();
+        for job in jobs {
+            let expected_prefix = format!("intake/{}/", job.appointment_id);
+            let failure = if !job.object_key.starts_with(&expected_prefix) {
+                Some("Refusing to delete an object outside the appointment namespace.".to_string())
+            } else {
+                let referenced: bool = sqlx::query_scalar(
+                    "SELECT EXISTS(SELECT 1 FROM prescription_intake_documents WHERE object_key=$1)",
+                )
+                .bind(&job.object_key)
+                .fetch_one(&state.system_db)
+                .await?;
+                if referenced {
+                    Some(
+                        "Refusing to delete an object still referenced by an intake record."
+                            .to_string(),
+                    )
+                } else {
+                    DocumentStorageService::delete_strict(state, &job.object_key)
+                        .await
+                        .err()
+                        .map(|error| error.to_string())
+                }
+            };
+            let mut update_tx = state
+                .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
+                .await?;
+            let exhausted = prescription_repo::finish_intake_removal_job(
+                &mut *update_tx,
+                job.document_id,
+                failure.as_deref(),
+            )
+            .await?;
+            update_tx.commit().await?;
+            if failure.is_none() {
+                completed += 1;
+            } else if exhausted {
+                metrics::counter!("intake_removal_cleanup_exhausted_total").increment(1);
+                tracing::error!(
+                    document_id = %job.document_id,
+                    attempts = job.attempts,
+                    "removed intake-upload cleanup exhausted its retry budget; operator intervention required"
+                );
+            }
+        }
+        if (claimed as i64) < BATCH {
             break;
         }
     }
@@ -1355,15 +1431,16 @@ pub async fn run_t15_reminder_pass(
             c.appointment_id,
             c.start_time.to_rfc3339()
         );
-        const FALLBACK_TITLE: &str = "Consultation starting soon";
-        const FALLBACK_BODY: &str = "Your consultation starts in 15 minutes.";
+        let late = t15_reminder_is_late(c.start_time, now);
+        let (template_key, fallback_title, fallback_body) =
+            t15_reminder_text(late, &c.doctor_language);
         let (title, body) = crate::services::NotificationService::render(
             &state.system_db,
-            "consultation_reminder_15m",
+            template_key,
             &c.doctor_language,
             &[],
-            FALLBACK_TITLE,
-            FALLBACK_BODY,
+            fallback_title,
+            fallback_body,
         )
         .await?;
         notification_repo::insert_if_new_with_ttl(
@@ -1389,13 +1466,15 @@ pub async fn run_t15_reminder_pass(
                 c.start_time.to_rfc3339()
             );
             let patient_language = c.patient_language.as_deref().unwrap_or("en");
+            let (template_key, fallback_title, fallback_body) =
+                t15_reminder_text(late, patient_language);
             let (title, body) = crate::services::NotificationService::render(
                 &state.system_db,
-                "consultation_reminder_15m",
+                template_key,
                 patient_language,
                 &[],
-                FALLBACK_TITLE,
-                FALLBACK_BODY,
+                fallback_title,
+                fallback_body,
             )
             .await?;
             notification_repo::insert_if_new(
@@ -1415,6 +1494,74 @@ pub async fn run_t15_reminder_pass(
         }
     }
     Ok(())
+}
+
+/// True when fewer than 14 whole minutes remain before the start, i.e. the
+/// appointment was booked inside the 15-minute window or the scheduler tick
+/// ran late. "Starts in 15 minutes" would then be untrue.
+pub(crate) fn t15_reminder_is_late(start_time: DateTime<Utc>, now: DateTime<Utc>) -> bool {
+    start_time - now < chrono::Duration::minutes(14)
+}
+
+/// Template key and per-language fallback text for the T-15 reminder. The
+/// late variant never states a number of minutes. Same notification type and
+/// idempotency key either way, so a consultation still gets exactly one.
+pub(crate) fn t15_reminder_text(
+    late: bool,
+    language: &str,
+) -> (&'static str, &'static str, &'static str) {
+    match (late, language) {
+        (false, "sw") => (
+            "consultation_reminder_15m",
+            "Mashauriano yanaanza hivi karibuni",
+            "Mashauriano yako yanaanza baada ya dakika 15.",
+        ),
+        (false, _) => (
+            "consultation_reminder_15m",
+            "Consultation starting soon",
+            "Your consultation starts in 15 minutes.",
+        ),
+        (true, "sw") => (
+            "consultation_reminder_soon",
+            "Mashauriano yanaanza hivi karibuni",
+            "Mashauriano yako yanaanza hivi karibuni. Fungua programu ili ujiunge.",
+        ),
+        (true, _) => (
+            "consultation_reminder_soon",
+            "Consultation starting soon",
+            "Your consultation is starting soon. Open the app to join.",
+        ),
+    }
+}
+
+#[cfg(test)]
+mod t15_reminder_text_tests {
+    use super::*;
+    use chrono::TimeZone;
+
+    #[test]
+    fn on_time_reminder_states_fifteen_minutes_late_one_does_not() {
+        let start = Utc.with_ymd_and_hms(2026, 11, 13, 6, 0, 0).unwrap();
+        assert!(!t15_reminder_is_late(
+            start,
+            start - chrono::Duration::minutes(15)
+        ));
+        assert!(!t15_reminder_is_late(
+            start,
+            start - chrono::Duration::seconds(14 * 60)
+        ));
+        assert!(t15_reminder_is_late(
+            start,
+            start - chrono::Duration::minutes(4)
+        ));
+        for lang in ["en", "sw"] {
+            assert!(t15_reminder_text(false, lang).2.contains("15"));
+            assert!(!t15_reminder_text(true, lang)
+                .2
+                .chars()
+                .any(|c| c.is_ascii_digit()));
+        }
+    }
 }
 
 /// Creates a `CONSULTATION_READY` the moment an eligible (`CONFIRMED`,

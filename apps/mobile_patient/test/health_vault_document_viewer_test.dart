@@ -251,4 +251,65 @@ void main() {
       expect(find.text('Unable to open this document.'), findsOneWidget);
     });
   });
+
+  testWidgets(
+      'documents are grouped by consultation; doctor-sent and own uploads are separate',
+      (tester) async {
+    PatientDocumentDto doc(Map<String, dynamic> extra) =>
+        PatientDocumentDto.fromJson({
+          'page_number': 1,
+          'mime_type': 'image/jpeg',
+          'doctor_display_name': 'Dr. Wanjiku',
+          'primary_specialty': 'General Practice',
+          ...extra,
+        });
+    final docs = [
+      doc({
+        'kind': 'PRESCRIPTION',
+        'id': 'rx-1',
+        'appointment_id': 'apt-new',
+        'rx_number': 'RX-1',
+        'appointment_number': 'APT-NEW',
+        'modality': 'VIDEO',
+        'consultation_start': '2026-11-13T06:00:00Z',
+        'created_at': '2026-11-13T06:20:00Z',
+      }),
+      doc({
+        'kind': 'INTAKE',
+        'id': 'up-1',
+        'appointment_id': 'apt-new',
+        'appointment_number': 'APT-NEW',
+        'modality': 'VIDEO',
+        'consultation_start': '2026-11-13T06:00:00Z',
+        'created_at': '2026-11-13T05:50:00Z',
+      }),
+      doc({
+        'kind': 'INTAKE',
+        'id': 'up-2',
+        'appointment_id': 'apt-old',
+        'appointment_number': 'APT-OLD',
+        'modality': 'CHAT',
+        'consultation_start': '2026-11-01T06:00:00Z',
+        'created_at': '2026-11-01T05:50:00Z',
+      }),
+    ];
+    await tester.pumpWidget(_harness(_FakeVaultRepository(docs)));
+    await tester.pumpAndSettle();
+    // Two consultations, newest first, each with its own reference.
+    expect(find.textContaining('APT-NEW'), findsOneWidget);
+    expect(find.textContaining('APT-OLD'), findsOneWidget);
+    expect(
+        tester.getTopLeft(find.textContaining('APT-NEW')).dy <
+            tester.getTopLeft(find.textContaining('APT-OLD')).dy,
+        isTrue);
+    // Doctor-sent documents have their own section, apart from uploads.
+    expect(find.text('SENT BY YOUR DOCTOR'), findsOneWidget);
+    expect(find.text('UPLOADED BY YOU'), findsNWidgets(2));
+    // The doctor tab shows only what the doctor sent.
+    await tester.tap(find.text('From your doctor'));
+    await tester.pumpAndSettle();
+    expect(find.text('UPLOADED BY YOU'), findsNothing);
+    expect(find.textContaining('APT-OLD'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

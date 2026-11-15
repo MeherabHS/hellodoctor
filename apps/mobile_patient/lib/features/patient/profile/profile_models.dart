@@ -26,9 +26,14 @@ class PatientProfileDto {
     this.emergencyContactRelation,
     this.guardianPatientId,
     this.relationship,
+    this.residentialAddress,
   });
 
   final String id, userId, fullName, dateOfBirth, gender;
+
+  /// Self profile only (`GET /patients/me`); null on dependents and on
+  /// accounts created before the address was collected.
+  final String? residentialAddress;
   final String? bloodGroup,
       weightKg,
       emergencyContactPhone,
@@ -66,5 +71,6 @@ class PatientProfileDto {
             _optionalText(j['emergency_contact_relation']),
         guardianPatientId: _optionalText(j['guardian_patient_id']),
         relationship: _optionalText(j['relationship']),
+        residentialAddress: _optionalText(j['residential_address']),
       );
 }

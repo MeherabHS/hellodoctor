@@ -107,6 +107,18 @@ impl QuizContent {
                         field,
                         "Text is missing, too long or contains prohibited control characters.",
                     );
+                } else if crate::sanitize::content_issue(
+                    text,
+                    crate::sanitize::TextKind::Paragraphs,
+                )
+                .is_some()
+                {
+                    issue(
+                        &mut errors,
+                        row,
+                        field,
+                        "Text contains HTML tags, script links or invisible formatting characters.",
+                    );
                 }
             }
             if (!question.text_en.is_empty() && !english.insert(normalized(&question.text_en)))
@@ -155,6 +167,10 @@ impl QuizContent {
                             .any(|c| c.is_control() && !matches!(c, '\n' | '\r' | '\t'))
                     {
                         issue(&mut errors, row, field, "Option text is missing, too long or contains prohibited control characters.");
+                    } else if crate::sanitize::content_issue(text, crate::sanitize::TextKind::Line)
+                        .is_some()
+                    {
+                        issue(&mut errors, row, field, "Option text contains HTML tags, script links, line breaks or invisible formatting characters.");
                     }
                 }
             }

@@ -24,11 +24,19 @@ class PatientDocumentDto {
     this.rxNumber,
     this.doctorDisplayName,
     this.primarySpecialty,
+    this.appointmentNumber,
+    this.modality,
+    this.consultationStart,
   });
   final String kind, id, appointmentId;
   final DateTime createdAt;
   final String? mimeType, rxNumber, doctorDisplayName, primarySpecialty;
   final int? pageNumber;
+
+  /// The consultation this document belongs to (both kinds), so Health
+  /// Records can group documents by consultation.
+  final String? appointmentNumber, modality;
+  final DateTime? consultationStart;
 
   bool get isPrescription => kind == 'PRESCRIPTION';
 
@@ -45,5 +53,9 @@ class PatientDocumentDto {
             ? null
             : patientDoctorName(j['doctor_display_name'].toString()),
         primarySpecialty: _optionalText(j['primary_specialty']),
+        appointmentNumber: _optionalText(j['appointment_number']),
+        modality: _optionalText(j['modality']),
+        consultationStart:
+            DateTime.tryParse(_textOf(j['consultation_start']))?.toUtc(),
       );
 }

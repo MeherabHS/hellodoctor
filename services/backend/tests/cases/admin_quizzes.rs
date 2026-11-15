@@ -251,12 +251,8 @@ async fn test_mcq_publication_snapshot_survives_drafts_and_reviewed_exclusion(po
 
 #[sqlx::test(migrations = "./migrations")]
 async fn test_mcq_sensitive_review_and_article_version_binding(pool: PgPool) {
-    let (app, pool) = test_app(pool).await;
+    let (app, _pool) = test_app(pool).await;
     let a = article(&app, true, false).await;
-    let reviewer_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO users(id,phone_number,role,is_active,is_verified) VALUES($1,$2,'ADMIN',true,true)").bind(reviewer_id).bind(format!("+254{}",rand::thread_rng().gen_range(100000000..999999999))).execute(&pool).await.unwrap();
-    fixture_session(&pool, reviewer_id).await;
-    let reviewer = make_token(reviewer_id, "ADMIN");
     let doc = save(
         &app,
         &a,
@@ -266,19 +262,9 @@ async fn test_mcq_sensitive_review_and_article_version_binding(pool: PgPool) {
     .await;
     let doc = step(&app, &a, &chosen(&doc), &admin(), "submit").await;
     let r = chosen(&doc);
-    assert_eq!(r["can_approve"], false);
-    assert_eq!(
-        post(
-            &app,
-            &format!("{}/{}/approve", path(&a), r["id"].as_str().unwrap()),
-            Some(&admin()),
-            &json!({"version":r["version"]})
-        )
-        .await
-        .status(),
-        StatusCode::FORBIDDEN
-    );
-    let doc = step(&app, &a, &r, &reviewer, "approve").await;
+    // Product owner, 2026-11-13: the quiz author may approve sensitive quizzes.
+    assert_eq!(r["can_approve"], true);
+    let doc = step(&app, &a, &r, &admin(), "approve").await;
     let r = chosen(&doc);
     assert_eq!(r["approved_version"], r["content_version"]);
     let mut article_content = json!({"title_en":a["title_en"],"body_en":"Updated body","category_id":a["category_id"],"sensitive":false});
@@ -612,4 +598,159 @@ async fn test_mcq_json_import_caps_and_review_validation(pool: PgPool) {
     )
     .await;
     assert_eq!(live["quiz"]["included"], false);
+}
+
+/// Standalone quizzes (2026-11-13): an entry created with `standalone_quiz`
+/// reuses the quiz workflow, appears only under `?kind=quiz` once its quiz is
+/// published, never among articles or videos, cannot become a video, and is
+/// answerable through the existing patient quiz endpoints.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_standalone_quiz_lifecycle_and_feed(pool: PgPool) {
+    let (app, _) = test_app(pool).await;
+    let token = admin();
+    let category = data(
+        post(&app, "/api/v1/admin/article-categories", Some(&token),
+            &json!({"name_en":"PrEP quizzes","name_sw":"Maswali ya PrEP","sensitive":false,"topic_key":"PREP"})).await,
+    )
+    .await;
+    let content = json!({"title_en":"PrEP knowledge check","body_en":"Five quick questions about PrEP.","category_id":category["id"],"sensitive":false});
+    // A standalone quiz cannot be a video.
+    let mut with_video = content.clone();
+    with_video["video_url"] = json!("https://youtu.be/dQw4w9WgXcQ");
+    assert_eq!(
+        post(
+            &app,
+            "/api/v1/admin/articles",
+            Some(&token),
+            &json!({"id":Uuid::new_v4(),"content":with_video,"standalone_quiz":true})
+        )
+        .await
+        .status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let mut q = data(
+        post(
+            &app,
+            "/api/v1/admin/articles",
+            Some(&token),
+            &json!({"id":Uuid::new_v4(),"content":content,"standalone_quiz":true}),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(q["standalone_quiz"], true);
+    // The admin list separates quizzes from content.
+    let quizzes = data(get(&app, "/api/v1/admin/articles?kind=quiz", Some(&token)).await).await;
+    assert_eq!(quizzes["total"], 1);
+    let content_list =
+        data(get(&app, "/api/v1/admin/articles?kind=content", Some(&token)).await).await;
+    assert_eq!(content_list["total"], 0);
+    // Editing cannot add a video link to a standalone quiz.
+    let mut edited = content.clone();
+    edited["video_url"] = json!("https://youtu.be/dQw4w9WgXcQ");
+    assert_eq!(
+        send(
+            &app,
+            "PATCH",
+            &format!("/api/v1/admin/articles/{}", q["id"].as_str().unwrap()),
+            Some(&token),
+            Some(&json!({"version":q["version"],"content":edited})),
+            None
+        )
+        .await
+        .status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    for action in ["submit", "approve", "publish"] {
+        q = article_step(&app, &q, &token, action).await;
+    }
+    // Published, but no quiz yet: not listed anywhere.
+    let ids = |body: &Value| -> Vec<String> {
+        body["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| a["id"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    let patient_token = patient();
+    let feed = |path: &'static str| get(&app, path, Some(&patient_token));
+    let id = q["id"].as_str().unwrap().to_owned();
+    assert!(ids(&json_body(feed("/api/v1/articles?kind=quiz").await).await).is_empty());
+    let doc = save(
+        &app,
+        &q,
+        &Value::Null,
+        &json!({"include_quiz":true,"questions":[question("What does PrEP prevent?")]}),
+    )
+    .await;
+    publish_quiz(&app, &q, doc).await;
+    assert_eq!(
+        ids(&json_body(feed("/api/v1/articles?kind=quiz").await).await),
+        vec![id.clone()]
+    );
+    assert_eq!(
+        ids(&json_body(feed("/api/v1/articles?kind=quiz&topic=PREP").await).await),
+        vec![id.clone()]
+    );
+    assert!(!ids(&json_body(feed("/api/v1/articles").await).await).contains(&id));
+    assert!(!ids(&json_body(feed("/api/v1/articles?kind=video").await).await).contains(&id));
+    // Patients take it through the existing quiz endpoints, without answer keys.
+    let quiz = data(
+        get(
+            &app,
+            &format!("/api/v1/articles/{id}/quiz"),
+            Some(&patient()),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(quiz["question_count"], 1);
+    assert!(!quiz.to_string().contains("correct_option"));
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_quiz_import_refuses_html_script_links_and_hidden_characters(pool: PgPool) {
+    let (app, _pool) = test_app(pool).await;
+    let a = article(&app, false, true).await;
+    let token = admin();
+    for bad in [
+        "<script>alert(1)</script>",
+        "Click javascript:alert(1)",
+        "Hidden\u{202E}txt.exe",
+        "<img src=x onerror=alert(1)>",
+    ] {
+        let csv = format!(
+            "text_en,option_a_en,option_b_en,correct_option,explanation_en\r\n\"{bad}\",Yes,No,a,Explanation"
+        );
+        let body = json!({"format":"csv","content":csv,"revision_id":null,"version":null});
+        let preview = data(
+            post(
+                &app,
+                &format!("{}/import-preview", path(&a)),
+                Some(&token),
+                &body,
+            )
+            .await,
+        )
+        .await;
+        assert!(
+            !preview["errors"].as_array().unwrap().is_empty(),
+            "{bad:?} must be reported"
+        );
+    }
+    // An option with HTML is refused too; ordinary text with "<" is fine.
+    let csv = "text_en,option_a_en,option_b_en,correct_option,explanation_en\r\nIs CD4 < 200 low?,<b>Yes</b>,No,a,Explanation";
+    let body = json!({"format":"csv","content":csv,"revision_id":null,"version":null});
+    let preview = data(
+        post(
+            &app,
+            &format!("{}/import-preview", path(&a)),
+            Some(&token),
+            &body,
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(preview["errors"].as_array().unwrap().len(), 1);
 }

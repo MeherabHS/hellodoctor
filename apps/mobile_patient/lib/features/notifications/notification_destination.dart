@@ -6,7 +6,8 @@ enum NotificationDestinationKind {
   appointment,
   chat,
   article,
-  doctorArticle
+  doctorArticle,
+  peerChat
 }
 
 class NotificationDestination {
@@ -74,6 +75,34 @@ class NotificationDestination {
       }
       return NotificationDestination(NotificationDestinationKind.chat,
           id: target, data: data);
+    }
+    // Peer support: a new peer chat message, or the peer accepting the
+    // patient's request, opens that chat. Both are resolved through the
+    // patient's own owner-scoped lists, never from the notification alone.
+    if (!doctor &&
+        ((notice.type == 'NEW_CHAT_MESSAGE' &&
+                notice.relatedEntityType == 'PEER_CHAT') ||
+            (notice.type == 'PEER_REQUEST_ACCEPTED' &&
+                notice.relatedEntityType == 'PEER_REQUEST'))) {
+      List<Map<String, dynamic>> list(dynamic body) =>
+          ((body.data['data'] as List?) ?? const [])
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+      var chatId = target;
+      if (notice.relatedEntityType == 'PEER_REQUEST') {
+        final request = list(await repo.api.get('/peer-requests'))
+            .where((r) => r['id'] == target)
+            .firstOrNull;
+        final conversation = request?['conversation_id']?.toString();
+        if (request == null || !notificationUuid(conversation)) return inbox;
+        chatId = conversation!;
+      }
+      final chat = list(await repo.api.get('/peer-chats'))
+          .where((c) => c['id'] == chatId)
+          .firstOrNull;
+      if (chat == null) return inbox;
+      return NotificationDestination(NotificationDestinationKind.peerChat,
+          id: chatId, data: chat);
     }
     if (!doctor &&
         notice.type == 'NEW_ARTICLE_PUBLISHED' &&

@@ -1,10 +1,7 @@
 //! Phase 2: Secure Email OTP Password Recovery — self-service password reset
-//! for Patient and Doctor accounts only. Admin is deliberately excluded (see
-//! `is_reset_eligible`): an Admin account behaves identically to a
-//! non-existent account at every step of this flow, both to keep the
-//! existing "Admin recovery stays operator-mediated" policy and so a caller
-//! cannot use response differences to discover that an email belongs to an
-//! Admin account.
+//! for Patient, Doctor and (since 2026-11-14, product owner) Admin accounts.
+//! Every response is identical whether or not the email belongs to an
+//! eligible account, so the flow cannot be used to discover accounts.
 //!
 //! Three-step state machine, state derived from column presence rather than
 //! a stored status (see `domain::models::PasswordResetRequest`'s doc
@@ -78,7 +75,7 @@ impl PasswordResetService {
     pub async fn request_reset(state: &AppState, email: &str) -> Result<Option<String>, AppError> {
         Self::feature_gate(state)?;
         validation::validate_email(email)?;
-        let email = email.trim().to_lowercase();
+        let email = crate::domain::validation::normalize_email(email);
 
         crate::services::auth_service::abuse::target_attempt(state, "password-reset", &email)
             .await?;
@@ -151,7 +148,7 @@ impl PasswordResetService {
         otp_code: &str,
     ) -> Result<(String, i64), AppError> {
         Self::feature_gate(state)?;
-        let email = email.trim().to_lowercase();
+        let email = crate::domain::validation::normalize_email(email);
         let account_key = format!("password-reset:{email}");
         let invalid = || AppError::Unauthorized("Invalid or expired verification code.".into());
 
@@ -328,8 +325,15 @@ impl PasswordResetService {
         Ok(())
     }
 
+    /// Admins were excluded until the product owner asked for Admin Web
+    /// forgot-password (2026-11-14). The flow's anti-enumeration, OTP limits,
+    /// IP jail, single-use authorization and full session revocation apply to
+    /// every role alike.
     fn is_reset_eligible_role(role: UserRole) -> bool {
-        matches!(role, UserRole::Patient | UserRole::Doctor)
+        matches!(
+            role,
+            UserRole::Patient | UserRole::Doctor | UserRole::Admin | UserRole::Peer
+        )
     }
 
     /// `None` covers every ineligible case uniformly (no account, wrong
@@ -367,24 +371,41 @@ impl PasswordResetService {
     /// content tables outside the auth worker's grant, exactly as the
     /// existing change-password flow already established.
     async fn first_name_for(state: &AppState, user: &crate::domain::models::User) -> String {
-        match user.role {
-            UserRole::Doctor => doctor_repo::find_by_user_id(&state.db, user.id)
-                .await
-                .ok()
-                .flatten()
-                .map(|d| d.full_name)
-                .unwrap_or_default(),
-            UserRole::Patient => patient_repo::find_by_user_id(&state.db, user.id)
-                .await
-                .ok()
-                .flatten()
-                .map(|p| p.full_name)
-                .unwrap_or_default(),
-            _ => String::new(),
-        }
-        .split_whitespace()
-        .next()
-        .unwrap_or_default()
-        .to_string()
+        account_first_name(state, user).await
     }
+}
+
+/// First name for an account email greeting, or "" (the templates then say
+/// "Hello there"). Read on the system-worker pool: the ordinary API pool
+/// runs under row-level security with no caller context here and sees no
+/// profile rows, which is how these emails used to lose the name.
+pub async fn account_first_name(state: &AppState, user: &crate::domain::models::User) -> String {
+    let full_name = match user.role {
+        UserRole::Doctor => doctor_repo::find_by_user_id(&state.system_db, user.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|d| d.full_name),
+        UserRole::Patient => patient_repo::find_by_user_id(&state.system_db, user.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|p| p.full_name),
+        UserRole::Peer => crate::repository::peer_repo::find_by_user_id(&state.system_db, user.id)
+            .await
+            .ok()
+            .flatten()
+            .map(|p| p.full_name),
+        _ => None,
+    };
+    let name = full_name.unwrap_or_default();
+    let mut words = name.split_whitespace();
+    let first = words.next().unwrap_or_default();
+    // A doctor stored as "Dr. Jane Mwangi" is greeted "Jane", not "Dr.".
+    if user.role == UserRole::Doctor
+        && matches!(first.to_ascii_lowercase().as_str(), "dr" | "dr." | "doctor")
+    {
+        return words.next().unwrap_or_default().to_string();
+    }
+    first.to_string()
 }

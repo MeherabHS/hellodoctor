@@ -262,9 +262,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                     const SizedBox(height: 16),
                     if (doctor.videoBookable(
                         paymentRequired: _paymentRequired ?? true)) ...[
-                      Text(doctor.supportsVideo
-                          ? '${AppLocalizations.of(context).consultVideo} - KES ${doctor.consultationFeeVideo}'
-                          : AppLocalizations.of(context).consultVideo),
+                      Text(AppLocalizations.of(context).consultVideo),
                       const SizedBox(height: 8),
                       FilledButton(
                           onPressed: () => _openBooking(doctor, 'VIDEO'),
@@ -274,8 +272,7 @@ class _DoctorProfilePageState extends State<DoctorProfilePage> {
                       const SizedBox(height: 16),
                     ],
                     if (doctor.supportsChat) ...[
-                      Text(
-                          '${AppLocalizations.of(context).consultChat} - KES ${doctor.consultationFeeChat}'),
+                      Text(AppLocalizations.of(context).consultChat),
                       const SizedBox(height: 8),
                       OutlinedButton(
                           onPressed: () => _openBooking(doctor, 'CHAT'),
@@ -389,9 +386,14 @@ class _AboutCard extends StatelessWidget {
         ]),
       );
 
+  /// First name without any "Dr"/"Dr." title, for "About Dr. {name}" (a
+  /// registered name such as "Dr Jane Doe" previously produced "Dr. Dr").
   String _shortName(String fullName) {
-    final parts = fullName.replaceAll('Dr.', '').trim().split(RegExp(r'\s+'));
-    return parts.isEmpty ? fullName : parts.first;
+    final parts = fullName
+        .trim()
+        .replaceFirst(RegExp(r'^dr\.?\s+', caseSensitive: false), '')
+        .split(RegExp(r'\s+'));
+    return parts.isEmpty || parts.first.isEmpty ? fullName : parts.first;
   }
 }
 

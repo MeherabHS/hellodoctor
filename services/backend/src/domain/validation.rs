@@ -45,11 +45,46 @@ pub fn normalize_kenya_phone_number(phone: &str) -> Result<String, AppError> {
     Ok(format!("+254{national}"))
 }
 
+/// Canonical form used for every email lookup and for storage: trimmed and
+/// ASCII-lowercased. Non-ASCII input is returned trimmed but otherwise
+/// unchanged, so it can never equal a stored (always ASCII) address. Unicode
+/// lowercasing is deliberately not used: it maps lookalikes onto plain ASCII
+/// (e.g. the Kelvin sign U+212A becomes "k"), the "Unicode = SPOTIFY" class
+/// of account confusion.
+/// A patient's residential address: required at self-registration, 3-300
+/// characters after trimming, no control characters. Returns the trimmed value.
+pub fn validate_residential_address(address: &str) -> Result<String, AppError> {
+    let clean = address.trim();
+    let count = clean.chars().count();
+    if !(3..=300).contains(&count) || clean.chars().any(char::is_control) {
+        return Err(AppError::Validation(
+            "Enter your residential address (3 to 300 characters).".into(),
+        ));
+    }
+    Ok(clean.to_owned())
+}
+
+pub fn normalize_email(email: &str) -> String {
+    let trimmed = email.trim();
+    if trimmed.is_ascii() {
+        trimmed.to_ascii_lowercase()
+    } else {
+        trimmed.to_string()
+    }
+}
+
 pub fn validate_email(email: &str) -> Result<(), AppError> {
     let clean = email.trim();
     let invalid = || AppError::Validation("Enter a valid email address.".into());
     if clean.is_empty() || clean.chars().count() > 255 {
         return Err(invalid());
+    }
+    // Printable ASCII only: no lookalike letters (Cyrillic "е", Kelvin sign),
+    // no invisible characters and no Unicode case-folding surprises.
+    if !clean.bytes().all(|b| (0x21..=0x7e).contains(&b)) {
+        return Err(AppError::Validation(
+            "Use an email address with standard letters (A-Z), digits and symbols only.".into(),
+        ));
     }
     let mut parts = clean.split('@');
     let (local, domain) = match (parts.next(), parts.next(), parts.next()) {
@@ -139,12 +174,45 @@ pub fn validate_text_field(
         .trim()
         .chars()
         .filter(|c| !c.is_control() || matches!(c, '\n' | '\r' | '\t'))
+        // Bidirectional embedding/override/isolate controls (2026-11-14 security
+        // review): they make displayed text differ from what was sent ("Trojan
+        // source" spoofing) and have no legitimate use in English or Kiswahili.
+        .filter(|c| !matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'))
         .collect();
     if cleaned.chars().count() > max_len {
         return Err(AppError::Validation(format!(
             "{field_name} must not exceed {max_len} characters."
         )));
     }
+    Ok(cleaned)
+}
+
+#[cfg(test)]
+mod bidi_tests {
+    use super::validate_text_field;
+    #[test]
+    fn text_fields_strip_bidirectional_overrides_but_keep_emoji_joiners() {
+        let cleaned = validate_text_field(
+            "pay\u{202E}gpj.exe \u{2066}x\u{2069} \u{1F469}\u{200D}\u{2695}",
+            "Message",
+            2000,
+        )
+        .unwrap();
+        assert_eq!(cleaned, "paygpj.exe x \u{1F469}\u{200D}\u{2695}");
+    }
+}
+
+/// `validate_text_field` for text an Admin writes (notes, reasons): also
+/// refuses HTML tags, script links and invisible formatting characters
+/// (`sanitize::content_issue`). Patient and doctor text keeps
+/// `validate_text_field`, which stores what they typed.
+pub fn validate_admin_text_field(
+    value: &str,
+    field_name: &str,
+    max_len: usize,
+) -> Result<String, AppError> {
+    let cleaned = validate_text_field(value, field_name, max_len)?;
+    crate::sanitize::check_content(field_name, &cleaned, crate::sanitize::TextKind::Paragraphs)?;
     Ok(cleaned)
 }
 
@@ -417,5 +485,36 @@ mod text_field_tests {
         assert!(cleaned.contains('\n'));
         assert!(cleaned.contains('\t'));
         assert!(!cleaned.contains('\u{0007}'));
+    }
+}
+
+#[cfg(test)]
+mod email_canonical_tests {
+    use super::{normalize_email, validate_email};
+
+    #[test]
+    fn lookalikes_never_collapse_onto_ascii_accounts() {
+        assert_eq!(
+            normalize_email("  Admin@HelloDoctor.Health "),
+            "admin@hellodoctor.health"
+        );
+        // Kelvin sign: Unicode lowercasing would turn it into "k".
+        assert_ne!(
+            normalize_email("\u{212A}evin@example.org"),
+            "kevin@example.org"
+        );
+        assert_ne!(
+            normalize_email("admin@h\u{0435}llodoctor.health"),
+            "admin@hellodoctor.health"
+        );
+        for bad in [
+            "\u{212A}evin@example.org",
+            "admin@h\u{0435}llodoctor.health",
+            "a\u{200B}b@example.org",
+            "\u{FF46}ull@example.org",
+        ] {
+            assert!(validate_email(bad).is_err(), "{bad:?}");
+        }
+        assert!(validate_email("first.last+ops@example.co.ke").is_ok());
     }
 }

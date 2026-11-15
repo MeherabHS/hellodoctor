@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 
 /// Bytes exist only in this route's memory, never in a generic image disk cache.
 class ClinicalImageViewer extends StatefulWidget {
-  const ClinicalImageViewer({super.key, required this.load});
+  const ClinicalImageViewer(
+      {super.key, required this.load, this.title = 'Clinical image'});
   final Future<Uint8List> Function() load;
+  final String title;
   @override
   State<ClinicalImageViewer> createState() => _ClinicalImageViewerState();
 }
@@ -27,7 +29,7 @@ class _ClinicalImageViewerState extends State<ClinicalImageViewer> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-      appBar: AppBar(title: const Text('Clinical image')),
+      appBar: AppBar(title: Text(widget.title)),
       body: SafeArea(
           child: FutureBuilder<Uint8List>(
               future: _image,

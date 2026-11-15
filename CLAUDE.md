@@ -6,19 +6,29 @@
 > - **Backend Core Service:** Rust (Axum, Tokio, SQLx, Tower) — High-performance, memory-safe REST & WebSocket server  
 > - **Persistent Database:** PostgreSQL 16+ (Normalized schema, connection pooling, ACID transactions)  
 > - **Real-Time Video & Chat:** Agora RTC SDK (`agora_rtc_engine` in Flutter + dynamic token minting in Rust) for live teleconsultation; WebSockets for 24-hour clinical chats  
-> - **Reference Baseline:** HTML/CSS/JavaScript prototype located at `index.html` (and `prototype/index.html`)
+> - **Reference Baseline (Patient app):** the AfyaMkononi UI reference image at [`docs/design/afyamkononi-patient-ui-reference.jpeg`](docs/design/afyamkononi-patient-ui-reference.jpeg) — see rule 2.
+> - **Reference Baseline (all other surfaces):** HTML/CSS/JavaScript prototype located at `index.html` (and `prototype/index.html`)
 
 ---
 
 ## 1. Prime Directive & Operating Rules
 
 1. **Read Before Writing**: You must read all documentation in [`docs/`](docs/) before making any architectural or structural decisions.
-2. **Prototype is the Source of Truth**: The prototype in `index.html` represents the exact intended product behavior, screen hierarchy, and visual design. Do not redesign, simplify, or reinvent the product.
+2. **Source of Truth (changed 2026-11-12 by product-owner instruction)**:
+   - **Patient app (`apps/mobile_patient`) — the UI reference image is the source of truth, pixel for pixel.** The image at [`docs/design/afyamkononi-patient-ui-reference.jpeg`](docs/design/afyamkononi-patient-ui-reference.jpeg) defines the exact screens, screen hierarchy, layout, spacing, colors, typography, iconography, copy, and navigation (bottom nav: Home, Services, Messages, Profile) of the Patient app. Its 11 panels are: 1 Home, 2 Prevention & Education, 3 Confidential HIV Support Chat, 4 Peer Navigator, 5 Reminders, 6 Health Records, 7 Facilities & Services, 8 Video Consultation, 9 Dashboard for GHI, 10 Multi-channel Access, 11 Privacy & Confidentiality. Where the image and the old `index.html` prototype disagree for the Patient app, **the image wins**. Do not redesign, simplify, "improve", or reinterpret it; reproduce it exactly.
+   - **Measuring the image:** the reference is a single raster collage, so exact values are read from it, not guessed. Sample colors from pixels, measure spacing and sizes against the 9:41 status-bar frame, and when a value cannot be read reliably, say so and ask rather than invent it. Show a rendered screenshot of each screen next to its panel for approval before calling it done.
+   - **Imagery (changed 2026-11-12 by product-owner instruction):** the reference image's artwork was AI-generated for this project and the product owner has authorized its use, extraction, cropping, adaptation and recreation in the Patient app. Extract illustrations, the logo, photographs and decorative imagery from the image as separate image assets where resolution permits; where it does not, recreate them in a consistent style and record the difference in `docs/patient-ui/`. Do not use generic placeholders merely because an asset is not a separate file. Text, buttons, cards and navigation are always rebuilt as native Flutter widgets, never pasted in as screenshots. Never present an upscaled extraction as an original high-resolution source asset, and do not invent institutional logos or imply endorsements the reference does not establish.
+   - **Design-preview fixtures:** sample content shown in the reference for features without a backend (facilities, reminders, records and similar) may be reproduced only in a clearly separated design-preview environment, labelled as fixtures. The normal signed-in app uses real backend data or truthful unavailable states.
+   - **Logic is preserved:** auth, booking, join-window gating, API clients, localization wiring and tests are not part of the redesign; only the presentation layer is rebuilt. Booking and consultation screens not shown in the image keep their behavior and are restyled with the image's design language.
+   - **Screens without a backend:** a panel whose feature has no backend yet (e.g. HIV Support Chat, Peer Navigator, Facilities map, GHI dashboard, WhatsApp/SMS/USSD) is built to match the image visually but must show honest empty/"coming soon" states instead of fake data, per rule 6 and the privacy rules below.
+   - **Doctor Flutter app (`apps/mobile`) — changed 2026-11-13 by product-owner instruction:** the Doctor App reference board at [`docs/design/afyamkononi-doctor-ui-reference-11-panel.png`](docs/design/afyamkononi-doctor-ui-reference-11-panel.png) is the source of truth, pixel for pixel. Its 11 panels are: 1 Login, 2 Home Dashboard, 3 Appointment Queue, 4 Patient Details, 5 Waiting Room, 6 Video Consultation, 7 Clinical Notes & Outcome, 8 Patient Records (List), 9 Patient Record (Detail), 10 Profile & Availability, 11 Notifications; bottom nav: Home, Appointments, Patients, More. The 14-panel board beside it adds 12 Registration, 13 Availability (10-minute slots) and 14 Prescription. The measuring, imagery, design-preview-fixture, logic-preserved and no-backend rules above apply to it exactly as they do to the Patient app. Discovery and plan: [`docs/doctor-ui/`](docs/doctor-ui/).
+   - **Admin Web (`apps/admin-web`) — changed 2026-11-13 by product-owner instruction:** the `index.html` prototype is no longer its visual source of truth. Admin Web gets a full UI redesign in the AfyaMkononi design language of the Patient and Doctor reference boards in `docs/design/` (colours, typography, iconography, cards, spacing), adapted to a desktop admin console. The product owner supplied five Admin workflow boards (2026-11-13) in `docs/design/admin/`; they are the reference, with the removals and decisions in [`docs/admin-ui/ADMIN_REDESIGN_PLAN.md`](docs/admin-ui/ADMIN_REDESIGN_PLAN.md). **Patient medical conditions are never shown anywhere in the Admin front end** (no column, chip, filter, tile or detail field), whatever a reference image shows. Only presentation changes: the BFF routes, auth/session handling, API clients, validation, workflows (content approval, facilities, doctor verification and the rest) and tests are preserved, and no feature is added or removed without instruction.
+   - **Doctor Web (`apps/doctor-web`) — changed 2026-11-14 by product-owner instruction:** the `index.html` prototype is no longer its visual source of truth. Doctor Web gets a full UI redesign in the AfyaMkononi design language; the six proposal boards in `docs/design/doctor-web/` are proposals (polish and simplify freely), with the decisions and omissions in [`docs/doctor-web-ui/DOCTOR_WEB_REDESIGN_PLAN.md`](docs/doctor-web-ui/DOCTOR_WEB_REDESIGN_PLAN.md). Only presentation changes: the BFF, auth/session, API clients, join-window gating, Agora, Rx upload, workflows and tests are preserved; proposal items without a backend are omitted unless that plan approves them.
 3. **Strict Technology Boundaries**:
    - The mobile application must be written in **Flutter**. Do not use web wrappers (e.g., Capacitor, Cordova, WebView shells).
    - The backend service must be written in **Rust** using **Axum** and **SQLx**.
    - Database operations must target **PostgreSQL**.
-4. **No Unilateral Feature Inventions**: If a behavior is not found in the prototype or specified in the documentation, do not invent it. Follow the guidance in [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) or use documented safe defaults.
+4. **No Unilateral Feature Inventions**: If a behavior is not found in the prototype, the Patient UI reference image, or specified in the documentation, do not invent it. Follow the guidance in [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md) or use documented safe defaults.
 5. **Milestone Discipline**: Implement feature-by-feature following [`docs/IMPLEMENTATION_ROADMAP.md`](docs/IMPLEMENTATION_ROADMAP.md). Track progress in [`docs/PROGRESS.md`](docs/PROGRESS.md).
 6. **No Phantom Completions**: Never declare a feature, milestone, or task complete if automated tests fail or if compilation errors exist.
 7. **Healthcare Security & Privacy**:
@@ -49,19 +59,25 @@
 2. **Doctor Earnings 20% Debarred Settlement**:
    - Doctor earnings must always be computed and presented using the 3-step formula:
      $$\text{Gross Earnings} \longrightarrow \text{20\% Withheld Platform Charge} \longrightarrow \text{Final Net Take-Home}$$
-   - The mandatory note: *"Total calculation is based including the platform charge 20%"* must be rendered on all earnings views.
+   - The mandatory note: *"Total calculation is based including the platform charge 20%"* must be rendered on all earnings views, **except** Doctor Web's Earnings page and Statement, which omit it intentionally (changed 2026-11-14 by product-owner instruction; the Doctor Web dashboard, Doctor mobile and Admin Web keep it).
 3. **Multi-Prescription Upload Cap (1 to 20 Images, 40 KB Per Image)**:
    - Patient pre-consultation intake allows uploading between 1 and 20 prescription/lab photos per consultation (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`), scoped to the current consultation only (never lifetime/account-wide, never summed across consultations). Selections beyond 20 must be rejected or capped with user notification.
    - Every prescription/Rx image (Patient intake and Doctor Rx alike) is compressed toward its OWN independent `MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024` (40 KB) ceiling — never a shared/batch budget divided by image count. This bounds Patient aggregate per-consultation storage at 20 × 40 KB = 800 KB.
    - The Doctor's own Rx page-count cap (5 pages per appointment) is a separate, unrelated limit and is unaffected by this item.
-4. **Emergency Contact Helpline**:
-   - The Emergency Contact banner must be positioned immediately above the Upcoming Consultation card on the patient home screen. It must never be labeled with the prefix *"24/7"*. 
-   - Note it's configurable per country (Kenya deployment emergency contact).
+4. **Patient Home and Emergency Contact (changed 2026-11-12 and 2026-11-13 by product-owner instruction)**:
+   - The Patient Home dashboard has no Emergency Contact banner. Its layout is: header, greeting, search, the Upcoming Consultation card (see below), the hero banner, the 3 x 3 grid of nine modules and the bottom navigation.
+   - **Upcoming Consultation card timing (changed 2026-11-13 by product-owner instruction):** the card appears on Home **15 minutes before the consultation's start** and is absent before that. Use the server's join information (`join.join_open_at` and `server_time` on the appointment list), never the device clock alone or a hardcoded value. It stays while the consultation is joinable or in progress, and disappears once it is completed, cancelled or the server's window has closed.
+   - The Upcoming Consultation card's button opens the waiting room; joining stays gated by the server's join window. The 15-minute reminder is the backend's existing `CONSULTATION_REMINDER_15M` notification.
+   - While the device is offline, Home replaces the hero with the offline banner, greys out the modules that need a connection and marks Reminders and Health Records as available offline.
+   - Wherever an emergency contact is shown (currently the "Need urgent help?" card on the consultation landing), it must never be labeled with the prefix *"24/7"*. The number is configurable per country (Kenya deployment emergency contact).
 5. **Bilingual Regional Localization & Future Expansion**:
    - The patient interface must support instantaneous toggling between **English** and **Swahili (Kiswahili)**.
    - Active deployment scope is Kenya only; English and Swahili.
 6. **Consultation Outcomes**:
    - Consultation completion does NOT require a prescription. Doctors may complete consultations with clinical outcomes: COMPLETED_WITH_RX, COMPLETED_NO_RX, REFERRED, ESCALATED.
+
+7. **Admins publish directly (changed 2026-11-14 by product-owner instruction; replaces the 2026-11-13 single-Admin approval rule)**:
+   - The Admin UI has no Submit for review, Approve or Return step for articles, videos, standalone quizzes, quiz revisions or notification campaigns. An Admin publishes (or schedules) directly. The backend still records its internal submit → approve steps for the audit trail; Admin Web runs them automatically, resuming from any part-finished state (`apps/admin-web/src/lib/publishFlow.ts`). The `sensitive` flag is a content label only. Doctor verification and grievance decisions are not publishing and are unaffected.
 
 ---
 
@@ -188,6 +204,6 @@ Before marking any milestone or task complete in [`docs/PROGRESS.md`](docs/PROGR
 - [ ] Automated unit, service, and integration tests have been written and pass 100%.
 - [ ] Form inputs validate on both client (Flutter) and server (Rust).
 - [ ] Database entities and migrations reflect the specification in [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md).
-- [ ] UI visually matches the reference prototype screens per [`docs/VISUAL_FIDELITY.md`](docs/VISUAL_FIDELITY.md).
+- [ ] UI visually matches the reference (Patient app: the UI reference image, pixel for pixel; Doctor app: its reference board; Admin Web: the AfyaMkononi design language per rule 2; Doctor Web: the prototype per [`docs/VISUAL_FIDELITY.md`](docs/VISUAL_FIDELITY.md)).
 - [ ] Acceptance criteria in [`docs/ACCEPTANCE_CRITERIA.md`](docs/ACCEPTANCE_CRITERIA.md) are fully satisfied.
 - [ ] No sensitive credentials, tokens, or PII are exposed in logs or test fixtures.

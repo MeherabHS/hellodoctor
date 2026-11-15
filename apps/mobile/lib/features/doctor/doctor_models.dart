@@ -41,8 +41,19 @@ class AppointmentDto {
       this.patientPresent,
       this.doctorPresent,
       this.join,
+      this.clinicalOutcome,
       this.queueActionable = true});
   final bool queueActionable;
+
+  /// Server-recorded outcome once completed (COMPLETED_WITH_RX,
+  /// COMPLETED_NO_RX, REFERRED, ESCALATED).
+  final String? clinicalOutcome;
+
+  /// The prescription decision is final: an Rx was dispatched or "no Rx
+  /// needed" was recorded. The server refuses further pages either way.
+  bool get rxDecided =>
+      status == 'COMPLETED' &&
+      const ['COMPLETED_WITH_RX', 'COMPLETED_NO_RX'].contains(clinicalOutcome);
 
   /// Server-derived join eligibility (authoritative policy); `null` from an
   /// older backend, in which case nothing is locked client-side.
@@ -124,6 +135,7 @@ class AppointmentDto {
       patientPresent: j['patient_present'] as bool?,
       doctorPresent: j['doctor_present'] as bool?,
       join: JoinEligibility.tryParse(j['join']),
+      clinicalOutcome: optionalText(j['clinical_outcome']),
       queueActionable: j['queue_actionable'] == true);
 }
 

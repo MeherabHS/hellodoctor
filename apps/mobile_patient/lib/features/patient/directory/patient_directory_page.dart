@@ -6,6 +6,7 @@ import '../../../core/cache/patient_cache_store.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/theme/tokens.dart';
+import '../../../core/widgets/afya_widgets.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../core/l10n/patient_labels.dart';
 import '../../../l10n/app_localizations.dart';
@@ -120,33 +121,31 @@ class _PatientDirectoryPageState extends State<PatientDirectoryPage> {
             builder: (context, state) => Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  padding: const EdgeInsets.only(bottom: 14),
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(children: [
-                          IconButton(
-                              onPressed: () => Navigator.maybePop(context),
-                              icon: const Icon(Icons.arrow_back_rounded)),
-                          const SizedBox(width: 4),
-                          Expanded(
-                              child: Text(
-                                  AppLocalizations.of(context).discoveryTitle,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall))
-                        ]),
-                        const SizedBox(height: 4),
-                        Text(AppLocalizations.of(context).discoverySubtitle,
-                            style:
-                                const TextStyle(color: PatientTokens.textSub)),
-                        const SizedBox(height: 18),
-                        TextField(
-                            onChanged: _cubit.setSearch,
-                            decoration: InputDecoration(
-                                hintText: AppLocalizations.of(context)
-                                    .discoverySearch,
-                                prefixIcon: const Icon(Icons.search_rounded))),
+                        _DirectoryHeader(
+                            title: AppLocalizations.of(context).discoveryTitle,
+                            subtitle:
+                                AppLocalizations.of(context).discoverySubtitle),
+                        const SizedBox(height: 14),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: TextField(
+                              onChanged: _cubit.setSearch,
+                              decoration: InputDecoration(
+                                  hintText: AppLocalizations.of(context)
+                                      .discoverySearch,
+                                  prefixIcon: const Icon(Icons.search_rounded),
+                                  enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(18),
+                                      borderSide: const BorderSide(
+                                          color: PatientTokens.border)),
+                                  border: OutlineInputBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(18)))),
+                        ),
                         const SizedBox(height: 12),
                         DoctorDirectoryFilters(
                           specialty: state.specialty == 'all'
@@ -169,7 +168,6 @@ class _PatientDirectoryPageState extends State<PatientDirectoryPage> {
                         ),
                       ]),
                 ),
-                const Divider(height: 1),
                 Expanded(
                     child: RefreshIndicator(
                         onRefresh: _cubit.load, child: _list(context, state))),
@@ -259,8 +257,9 @@ class _PatientDirectoryPageState extends State<PatientDirectoryPage> {
       return ErrorPanel(state.error!, onRetry: _cubit.load);
     }
     final visible = state.visible;
+    if (visible.isEmpty) return _DirectoryEmpty(onReset: _cubit.resetFilters);
     return ListView(
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 6, 20, 28),
         children: [
           Row(children: [
             Expanded(
@@ -273,25 +272,155 @@ class _PatientDirectoryPageState extends State<PatientDirectoryPage> {
                 state.modalityTab != 'all' ||
                 state.onDutyOnly)
               TextButton(
-                  onPressed: _cubit.resetFilters, child: const Text('Reset'))
+                  onPressed: _cubit.resetFilters,
+                  child:
+                      Text(AppLocalizations.of(context).discoveryResetFilters))
           ]),
           const SizedBox(height: 12),
-          if (visible.isEmpty)
-            const Padding(
-                padding: EdgeInsets.symmetric(vertical: 60),
-                child: EmptyState(
-                    icon: Icons.search_off_rounded,
-                    title: 'No doctors found',
-                    message: 'Try another name, specialty, or filter.'))
-          else
-            ...visible.map((d) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: PatientDoctorCard(
-                    doctor: d,
-                    repo: _cubit.repo,
-                    paymentRequired: _paymentRequired,
-                    onProfile: () => profile(d),
-                    onBook: (m) => book(d, m))))
+          ...visible.map((d) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: PatientDoctorCard(
+                  doctor: d,
+                  repo: _cubit.repo,
+                  paymentRequired: _paymentRequired,
+                  onProfile: () => profile(d),
+                  onBook: (m) => book(d, m))))
         ]);
+  }
+}
+
+/// Banner of the product owner's "Find a Doctor" design: sky wash, back
+/// arrow and brand mark, the heading on the left and the doctor-and-clinic
+/// artwork on the right. The heading is native text; the artwork holds none.
+class _DirectoryHeader extends StatelessWidget {
+  const _DirectoryHeader({required this.title, required this.subtitle});
+  final String title, subtitle;
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: const BoxDecoration(
+            gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFCFEAF8), Color(0xFFEAF7F4)])),
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 6, 12, 0),
+            child: Row(children: [
+              IconButton(
+                  onPressed: () => Navigator.maybePop(context),
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  icon: const Icon(Icons.arrow_back_rounded,
+                      color: PatientTokens.navy)),
+              const Expanded(child: Center(child: AfyaBrandLockup())),
+              const SizedBox(width: 48),
+            ]),
+          ),
+          IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Expanded(
+                flex: 9,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 4, 18),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(title,
+                            style: const TextStyle(
+                                fontSize: 27,
+                                height: 1.12,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -.4,
+                                color: PatientTokens.navy)),
+                        const SizedBox(height: 6),
+                        Text(subtitle,
+                            style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.35,
+                                color: PatientTokens.navy)),
+                      ]),
+                ),
+              ),
+              Expanded(
+                flex: 10,
+                child: ClipRRect(
+                  borderRadius:
+                      const BorderRadius.only(topLeft: Radius.circular(18)),
+                  child: Image.asset(
+                      'assets/illustrations/doctor_search_header.jpg',
+                      height: 124,
+                      fit: BoxFit.cover,
+                      alignment: Alignment.bottomLeft,
+                      excludeFromSemantics: true),
+                ),
+              ),
+            ]),
+          ),
+        ]),
+      );
+}
+
+/// Empty state of the "Find a Doctor" design: illustration, heading, one
+/// sentence, a "Reset filters" action and the hills artwork at the bottom.
+class _DirectoryEmpty extends StatelessWidget {
+  const _DirectoryEmpty({required this.onReset});
+  final VoidCallback onReset;
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return LayoutBuilder(builder: (context, box) {
+      return SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: box.maxHeight),
+          child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 12, 28, 18),
+                  child: Column(children: [
+                    Image.asset('assets/illustrations/doctor_search_empty.png',
+                        height: 168,
+                        fit: BoxFit.contain,
+                        excludeFromSemantics: true),
+                    const SizedBox(height: 16),
+                    Text(l.discoveryEmptyTitle,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: PatientTokens.navy)),
+                    const SizedBox(height: 8),
+                    Text(l.discoveryEmptyBody,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 15,
+                            height: 1.45,
+                            color: PatientTokens.textSub)),
+                    const SizedBox(height: 18),
+                    OutlinedButton.icon(
+                        onPressed: onReset,
+                        icon: const Icon(Icons.refresh_rounded, size: 22),
+                        label: Text(l.discoveryResetFilters),
+                        style: OutlinedButton.styleFrom(
+                            foregroundColor: PatientTokens.primaryDark,
+                            minimumSize: const Size(220, 50),
+                            side: const BorderSide(
+                                color: PatientTokens.primaryDark, width: 1.5),
+                            shape: const StadiumBorder(),
+                            textStyle: const TextStyle(
+                                fontFamily: 'Plus Jakarta Sans',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700))),
+                  ]),
+                ),
+                Image.asset('assets/illustrations/hills_footer.jpg',
+                    width: double.infinity,
+                    fit: BoxFit.fitWidth,
+                    excludeFromSemantics: true),
+              ]),
+        ),
+      );
+    });
   }
 }

@@ -133,16 +133,22 @@ void main() {
           await tester.tap(find.text('Create an account'));
           await tester.pumpAndSettle();
           await tester.enterText(field('Full name'), 'Patient Y');
+          await tester.ensureVisible(field('Date of birth'));
+          await tester.pumpAndSettle();
           await tester.tap(field('Date of birth'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('OK'));
           await tester.pumpAndSettle();
           await tester.enterText(field('Phone number'), '0712345678');
+          await tester.ensureVisible(field('Address'));
+          await tester.enterText(field('Address'), 'Kilimani, Nairobi');
         }
         await tester.enterText(field('Email address'), 'patient.y@example.com');
-        await tester.enterText(field('Password'), 'PatientPassword!2026');
+        await tester.enterText(
+            field(registration ? 'Create password' : 'Password'),
+            'PatientPassword!2026');
         final submit = find.widgetWithText(
-            FilledButton, registration ? 'Continue' : 'Sign in');
+            FilledButton, registration ? 'Create account' : 'Log in');
         await tester.ensureVisible(submit);
         await tester.tap(submit);
         await tester.pumpAndSettle();
@@ -192,6 +198,21 @@ void main() {
           expect(find.byType(AuthEntryPage, skipOffstage: false), findsNothing);
           final context = tester.element(find.byType(PatientShell));
           expect(Navigator.of(context).canPop(), isFalse);
+          // D-08c: Android Back on another tab returns to Home instead of
+          // leaving the app; on Home it is not intercepted.
+          int shellTab() =>
+              (tester.state(find.byType(PatientShell)) as dynamic).tab as int;
+          await tester.tap(find.descendant(
+              of: find.byType(PatientBottomNav),
+              matching: find.text('Services')));
+          await tester.pumpAndSettle();
+          expect(shellTab(), 1);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(shellTab(), 0);
+          expect(find.byType(PatientShell), findsOneWidget);
+          final shellRoute = ModalRoute.of(context)!;
+          expect(shellRoute.popDisposition, RoutePopDisposition.bubble);
           final auth = context.read<AuthCubit>();
           Navigator.of(context).push(MaterialPageRoute<void>(
               builder: (_) =>

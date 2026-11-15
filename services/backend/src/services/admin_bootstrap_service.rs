@@ -59,7 +59,7 @@ pub async fn bootstrap_first_admin(
     password: &str,
 ) -> Result<BootstrapOutcome, AppError> {
     validate_email(email)?;
-    let email = email.trim().to_lowercase();
+    let email = crate::domain::validation::normalize_email(email);
     let phone_number = normalize_kenya_phone_number(phone_number)?;
     validate_password_strength(password)?;
 

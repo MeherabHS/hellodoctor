@@ -105,6 +105,45 @@ async fn increment_inner(
     Ok(())
 }
 
+/// Failure-only lockout (e.g. re-entering a password to confirm a sensitive
+/// action): successes never count, so honest use is never throttled, while
+/// guessing stops after `limit` wrong answers per window. Fails closed when
+/// Redis is unavailable.
+pub async fn ensure_failures_below(pool: &Pool, key: &str, limit: u32) -> Result<(), AppError> {
+    let read = async {
+        let mut conn = pool.get().await.map_err(|e| {
+            AppError::rate_limit_service_unavailable(format!("Rate limiter store unavailable: {e}"))
+        })?;
+        let count: Option<u32> = deadpool_redis::redis::cmd("GET")
+            .arg(key)
+            .query_async(&mut conn)
+            .await
+            .map_err(|e| {
+                AppError::rate_limit_service_unavailable(format!("Rate limiter store error: {e}"))
+            })?;
+        if count.unwrap_or(0) >= limit {
+            return Err(AppError::RateLimitExceeded(
+                "Too many wrong attempts. Try again in 15 minutes.".into(),
+            ));
+        }
+        Ok(())
+    };
+    tokio::time::timeout(std::time::Duration::from_millis(250), read)
+        .await
+        .map_err(|_| {
+            AppError::rate_limit_service_unavailable("Rate limiter deadline exceeded.".into())
+        })?
+}
+
+/// Records one failure for [`ensure_failures_below`].
+pub async fn record_failure(pool: &Pool, key: &str, window_secs: u64) -> Result<(), AppError> {
+    // The limit is enforced by `ensure_failures_below`; this only counts.
+    match check_and_increment(pool, key, u32::MAX, window_secs).await {
+        Err(AppError::RateLimitExceeded(_)) | Ok(()) => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
 /// Global per-IP ceiling applied to every request (120 req/min/IP per §9 by
 /// default). Fails closed with RATE_LIMIT_SERVICE_UNAVAILABLE (503) when
 /// Redis is unavailable; an outage never disables the abuse boundary.
@@ -122,12 +161,6 @@ pub async fn check_global_ip_limit(
     limit_per_min: u32,
 ) -> Result<(), AppError> {
     check_and_increment(pool, &format!("ratelimit:global:{ip}"), limit_per_min, 60).await
-}
-
-/// Brute-force-adjacent (bounds how many OTPs can be requested for a phone
-/// number): fails closed.
-pub async fn check_otp_request_limit(pool: &Pool, phone: &str) -> Result<(), AppError> {
-    check_and_increment(pool, &format!("ratelimit:otp:{phone}"), 3, 600).await
 }
 
 /// Directly brute-force-shaped: fails closed, same principle as `ip_jail`.

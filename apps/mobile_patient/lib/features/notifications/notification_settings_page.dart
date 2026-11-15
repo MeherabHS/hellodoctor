@@ -7,7 +7,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/utils/time_format.dart';
 import '../../core/widgets/patient_widgets.dart';
 import '../../l10n/app_localizations.dart';
-import 'notification_cubit.dart';
+import 'notification_repository.dart';
 import 'notification_models.dart';
 
 /// Milestone 3 task 11: a simple notification-settings screen using this
@@ -17,8 +17,14 @@ import 'notification_models.dart';
 /// (CLAUDE.md scopes the bilingual toggle to the Patient interface) so a
 /// language change here immediately syncs `users.preferred_language` to the
 /// backend via `LocaleController`'s bound sync hook.
+///
+/// [repo] is passed in explicitly: this page is pushed onto the app
+/// navigator, which sits above the signed-in session's providers, so reading
+/// `NotificationCubit` from context here threw and showed "Unable to load
+/// notification settings" (defect D-04).
 class NotificationSettingsPage extends StatefulWidget {
-  const NotificationSettingsPage({super.key});
+  const NotificationSettingsPage({super.key, required this.repo});
+  final NotificationRepository repo;
   @override
   State<NotificationSettingsPage> createState() =>
       _NotificationSettingsPageState();
@@ -42,8 +48,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       _hasError = false;
     });
     try {
-      final prefs =
-          await context.read<NotificationCubit>().repo.getPreferences();
+      final prefs = await widget.repo.getPreferences();
       if (!mounted) return;
       setState(() {
         _prefs = prefs;
@@ -65,7 +70,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       _saving = true;
     });
     try {
-      final repo = context.read<NotificationCubit>().repo;
+      final repo = widget.repo;
       final saved = await repo.updatePreferences(
         operationalEnabled: next.operationalEnabled,
         engagementEnabled: next.engagementEnabled,

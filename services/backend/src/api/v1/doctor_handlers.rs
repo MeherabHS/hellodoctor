@@ -42,12 +42,12 @@ pub async fn list_doctors(
         }
     }
     // FINANCIAL_MODULE_MODE=deferred: no fee is ever charged, so an unpriced
-    // (fee = 0) doctor must still be discoverable and bookable for VIDEO —
-    // the backend's deferred booking path (`book_appointment_deferred`)
-    // already accepts fee = 0. CHAT keeps its fee-based offering signal
-    // because the chat booking flow is payment-specific.
+    // (fee = 0) verified doctor must stay discoverable and bookable for both
+    // VIDEO and CHAT — `book_appointment_deferred` accepts fee = 0 for either
+    // modality and activates the chat conversation itself. With payments
+    // enabled, a positive fee remains the per-modality offering signal.
     let fee_not_required = state.config.financial_module_deferred();
-    let list = sqlx::query_as::<_, doctor_repo::PublicDoctorProfile>("SELECT * FROM doctor_public_directory WHERE professional_verification_status='VERIFIED' AND ($1::text IS NULL OR ($1='VIDEO' AND ($4::bool OR consultation_fee_video > 0)) OR ($1='CHAT' AND consultation_fee_chat > 0)) AND ($2::text IS NULL OR lower(primary_specialty)=lower($2)) AND ($3::text IS NULL OR full_name ILIKE '%' || $3 || '%' OR current_hospital ILIKE '%' || $3 || '%') ORDER BY full_name")
+    let list = sqlx::query_as::<_, doctor_repo::PublicDoctorProfile>("SELECT * FROM doctor_public_directory WHERE professional_verification_status='VERIFIED' AND ($1::text IS NULL OR ($1='VIDEO' AND ($4::bool OR consultation_fee_video > 0)) OR ($1='CHAT' AND ($4::bool OR consultation_fee_chat > 0))) AND ($2::text IS NULL OR lower(primary_specialty)=lower($2)) AND ($3::text IS NULL OR full_name ILIKE '%' || $3 || '%' OR current_hospital ILIKE '%' || $3 || '%') ORDER BY full_name")
         .bind(query.modality).bind(query.specialty).bind(query.search).bind(fee_not_required).fetch_all(&state.db).await?;
 
     Ok(Json(ApiResponse {
@@ -373,7 +373,7 @@ pub async fn list_own_appointments(
     )
     .await?;
     tx.commit().await?;
-    let data: Vec<_> = rows.into_iter().map(|r| json!({"join": crate::domain::join_window::evaluate(&r.get::<String,_>("status"), &r.get::<String,_>("modality"), r.get::<DateTime<Utc>,_>("start_time"), r.get::<DateTime<Utc>,_>("end_time"), Utc::now(), state.config.agora_token_window_before_mins, state.config.agora_token_window_after_mins).with_recovery_state(r.get::<Option<String>,_>("consultation_recovery_state").as_deref()).to_json(), "queue_actionable":r.get::<bool,_>("queue_actionable"), "id": r.get::<Uuid,_>("id"), "appointment_number": r.get::<String,_>("appointment_number"), "patient_id": r.get::<Uuid,_>("patient_id"), "patient_display_name": r.get::<String,_>("patient_display_name"), "conversation_id":r.get::<Option<Uuid>,_>("conversation_id"), "chat_locked":r.get::<Option<bool>,_>("chat_locked"), "chat_expires_at":r.get::<Option<DateTime<Utc>>,_>("chat_expires_at"), "modality": r.get::<String,_>("modality"), "status": r.get::<String,_>("status"), "doctor_lifecycle": r.get::<String,_>("doctor_lifecycle"), "history_access_from": r.get::<DateTime<Utc>,_>("history_access_from"), "history_access_until": r.get::<Option<DateTime<Utc>>,_>("history_access_until"), "history_access_active": r.get::<bool,_>("history_access_active"), "consultation_fee": r.get::<bigdecimal::BigDecimal,_>("consultation_fee"), "payment_policy": r.get::<String,_>("payment_policy"), "clinical_outcome": r.get::<Option<String>,_>("clinical_outcome"), "completed_at": r.get::<Option<DateTime<Utc>>,_>("completed_at"), "start_time": r.get::<DateTime<Utc>,_>("start_time"), "end_time": r.get::<DateTime<Utc>,_>("end_time"), "consultation_session_status": r.get::<Option<String>,_>("consultation_session_status"), "consultation_recovery_state": r.get::<Option<String>,_>("consultation_recovery_state"), "empty_room_deadline": r.get::<Option<DateTime<Utc>>,_>("empty_room_deadline"), "patient_present": r.get::<Option<bool>,_>("patient_present"), "doctor_present": r.get::<Option<bool>,_>("doctor_present")})).collect();
+    let data: Vec<_> = rows.into_iter().map(|r| json!({"join": crate::domain::join_window::evaluate(&r.get::<String,_>("status"), &r.get::<String,_>("modality"), r.get::<DateTime<Utc>,_>("start_time"), r.get::<DateTime<Utc>,_>("end_time"), Utc::now(), state.config.agora_token_window_before_mins, state.config.agora_token_window_after_mins).with_recovery_state(r.get::<Option<String>,_>("consultation_recovery_state").as_deref()).to_json(), "queue_actionable":r.get::<bool,_>("queue_actionable"), "id": r.get::<Uuid,_>("id"), "appointment_number": r.get::<String,_>("appointment_number"), "patient_id": r.get::<Uuid,_>("patient_id"), "patient_display_name": r.get::<String,_>("patient_display_name"), "patient_age": r.get::<Option<i32>,_>("patient_age"), "patient_sex": r.get::<Option<String>,_>("patient_sex"), "conversation_id":r.get::<Option<Uuid>,_>("conversation_id"), "chat_locked":r.get::<Option<bool>,_>("chat_locked"), "chat_expires_at":r.get::<Option<DateTime<Utc>>,_>("chat_expires_at"), "modality": r.get::<String,_>("modality"), "status": r.get::<String,_>("status"), "doctor_lifecycle": r.get::<String,_>("doctor_lifecycle"), "history_access_from": r.get::<DateTime<Utc>,_>("history_access_from"), "history_access_until": r.get::<Option<DateTime<Utc>>,_>("history_access_until"), "history_access_active": r.get::<bool,_>("history_access_active"), "consultation_fee": r.get::<bigdecimal::BigDecimal,_>("consultation_fee"), "payment_policy": r.get::<String,_>("payment_policy"), "clinical_outcome": r.get::<Option<String>,_>("clinical_outcome"), "completed_at": r.get::<Option<DateTime<Utc>>,_>("completed_at"), "start_time": r.get::<DateTime<Utc>,_>("start_time"), "end_time": r.get::<DateTime<Utc>,_>("end_time"), "consultation_session_status": r.get::<Option<String>,_>("consultation_session_status"), "consultation_recovery_state": r.get::<Option<String>,_>("consultation_recovery_state"), "empty_room_deadline": r.get::<Option<DateTime<Utc>>,_>("empty_room_deadline"), "patient_present": r.get::<Option<bool>,_>("patient_present"), "doctor_present": r.get::<Option<bool>,_>("doctor_present")})).collect();
     Ok(Json(ApiResponse {
         success: true,
         data,
@@ -643,6 +643,15 @@ pub async fn consultation_summary(
             "This encounter is not available to this account.".into(),
         ));
     }
+    // Files stay listed only inside the doctor's 20-day window (migration
+    // 20261221000002); after it the client says access ended instead of
+    // implying the consultation never had files.
+    let files_access_ended: bool =
+        sqlx::query_scalar("SELECT NOT doctor_document_window_allowed($1,$2)")
+            .bind(appointment_id)
+            .bind(ctx.user_id)
+            .fetch_one(&mut *tx)
+            .await?;
     crate::api::middleware::request_context::bind_consultation(appointment_id, None);
     let row = sqlx::query("SELECT a.id, a.patient_id, a.status::text AS status, a.clinical_outcome, a.completed_at, i.chief_complaint, i.clinical_notes, cs.id AS consultation_id, cs.started_at, cs.ended_at FROM appointments a LEFT JOIN appointment_clinical_intake i ON i.appointment_id=a.id LEFT JOIN consultation_sessions cs ON cs.appointment_id=a.id WHERE a.id=$1 AND a.doctor_id=$2")
         .bind(appointment_id).bind(doctor_id).fetch_optional(&mut *tx).await?;
@@ -653,6 +662,7 @@ pub async fn consultation_summary(
     let data = json!({
         "appointment_id": r.get::<Uuid, _>("id"),
         "documents":documents,"prescriptions":prescriptions,
+        "files_access_ended": files_access_ended,
         "patient_id": r.get::<Uuid, _>("patient_id"),
         "status": r.get::<String, _>("status"),
         "clinical_outcome": r.get::<Option<String>, _>("clinical_outcome"),

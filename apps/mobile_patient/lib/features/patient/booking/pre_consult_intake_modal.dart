@@ -11,6 +11,7 @@ import '../../../core/theme/tokens.dart';
 import '../../../core/validation/upload_validation.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
+import 'booking_models.dart';
 import 'booking_repository.dart';
 
 /// `prototype/index.html`'s `#preConsultIntakeModal`. Copy is corrected from
@@ -47,8 +48,8 @@ class _PickedFile {
 /// further use for the plugin's temp file. Extracted as a standalone
 /// function so it's directly unit-testable without driving image_picker's
 /// platform channel. Failures are swallowed — cleanup must never surface to
-/// the UI or block the pick flow.
-@visibleForTesting
+/// the UI or block the pick flow. Also used by the consultation chat's
+/// image attachment.
 Future<void> deletePickedSourceFile(String path) async {
   try {
     final f = File(path);
@@ -86,6 +87,76 @@ class _PreConsultIntakeModalState extends State<PreConsultIntakeModal> {
   String? _error;
   bool _done = false;
 
+  /// Pages already sent for this consultation. A failed load leaves this
+  /// empty and editable, which is the pre-existing behaviour (the server
+  /// still enforces the cap and the window on upload).
+  List<IntakeUploadDto> _uploaded = const [];
+  bool _editable = true;
+  String? _removingId;
+
+  int get _total => _uploaded.length + _files.length;
+  bool get _hasRoom => _total < kPatientMaxImagesPerConsultation;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUploaded();
+  }
+
+  Future<void> _loadUploaded() async {
+    try {
+      final result = await widget.repo.intakeUploads(widget.appointmentId);
+      if (!mounted) return;
+      setState(() {
+        _uploaded = result.documents;
+        _editable = result.editable;
+      });
+    } catch (_) {
+      // Non-blocking: the sheet still works as an upload-only form.
+    }
+  }
+
+  Future<void> _removeUploaded(IntakeUploadDto doc) async {
+    if (_removingId != null || _uploading) return;
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text(l10n.intakeRemoveUploadedTitle),
+        content: Text(l10n.intakeRemoveUploadedBody),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(c).pop(false),
+              child: Text(MaterialLocalizations.of(c).cancelButtonLabel)),
+          TextButton(
+              onPressed: () => Navigator.of(c).pop(true),
+              child: Text(l10n.intakeRemoveConfirm,
+                  style: const TextStyle(color: PatientTokens.danger))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() {
+      _removingId = doc.id;
+      _error = null;
+    });
+    try {
+      await widget.repo.removeIntake(widget.appointmentId, doc.id);
+      if (!mounted) return;
+      setState(
+          () => _uploaded = _uploaded.where((d) => d.id != doc.id).toList());
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e is ApiException
+          ? e.userMessage
+          : AppLocalizations.of(context).intakeRemoveError);
+      // A 409 means the window closed; refresh so the sheet locks.
+      unawaited(_loadUploaded());
+    } finally {
+      if (mounted) setState(() => _removingId = null);
+    }
+  }
+
   String? _mimeFromPath(String path) {
     final lower = path.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
@@ -110,7 +181,7 @@ class _PreConsultIntakeModalState extends State<PreConsultIntakeModal> {
     if (!mounted) return;
     setState(() {
       _error = null;
-      if (_files.length < kPatientMaxImagesPerConsultation) {
+      if (_hasRoom) {
         _files.add(_PickedFile(file.name, mime, bytes));
       } else {
         _error = AppLocalizations.of(context)
@@ -143,7 +214,7 @@ class _PreConsultIntakeModalState extends State<PreConsultIntakeModal> {
     unawaited(cleanupFilePickerTemp());
     if (file?.bytes == null) return;
     setState(() {
-      if (_files.length < kPatientMaxImagesPerConsultation) {
+      if (_hasRoom) {
         _files.add(_PickedFile(file!.name, 'application/pdf', file.bytes!));
       } else {
         _error = AppLocalizations.of(context)
@@ -233,7 +304,7 @@ class _PreConsultIntakeModalState extends State<PreConsultIntakeModal> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         InkWell(
-                          onTap: _pickGallery,
+                          onTap: _editable ? _pickGallery : null,
                           borderRadius:
                               BorderRadius.circular(PatientTokens.cardRadius),
                           child: Container(
@@ -266,7 +337,7 @@ class _PreConsultIntakeModalState extends State<PreConsultIntakeModal> {
                         Row(children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: _pickCamera,
+                              onPressed: _editable ? _pickCamera : null,
                               icon: const Icon(Icons.camera_alt_outlined,
                                   size: 16),
                               label: Text(l10n.cameraButton),
@@ -275,13 +346,71 @@ class _PreConsultIntakeModalState extends State<PreConsultIntakeModal> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: _pickPdf,
+                              onPressed: _editable ? _pickPdf : null,
                               icon: const Icon(Icons.picture_as_pdf_outlined,
                                   size: 16),
                               label: Text(l10n.pdfButton),
                             ),
                           ),
                         ]),
+                        if (_uploaded.isNotEmpty) ...[
+                          const SizedBox(height: 14),
+                          Text(l10n.intakeUploadedPages,
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: PatientTokens.textSub)),
+                          const SizedBox(height: 8),
+                          for (final doc in _uploaded)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: PatientCard(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
+                                child: Row(children: [
+                                  Icon(
+                                      doc.isPdf
+                                          ? Icons.picture_as_pdf
+                                          : Icons.image_outlined,
+                                      size: 18,
+                                      color: PatientTokens.primaryDark),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                        l10n.intakeUploadedPage(doc.pageNumber),
+                                        style: const TextStyle(fontSize: 12)),
+                                  ),
+                                  if (_editable)
+                                    _removingId == doc.id
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2))
+                                        : IconButton(
+                                            key: ValueKey(
+                                                'intake-remove-${doc.id}'),
+                                            tooltip: l10n.intakeRemoveConfirm,
+                                            onPressed: () =>
+                                                _removeUploaded(doc),
+                                            icon: const Icon(
+                                                Icons.delete_outline,
+                                                size: 18,
+                                                color: PatientTokens.danger),
+                                            padding: EdgeInsets.zero,
+                                            constraints:
+                                                const BoxConstraints()),
+                                ]),
+                              ),
+                            ),
+                        ],
+                        if (!_editable) ...[
+                          const SizedBox(height: 8),
+                          Text(l10n.intakeUploadsLocked,
+                              style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: PatientTokens.textSub)),
+                        ],
                         if (_files.isNotEmpty) ...[
                           const SizedBox(height: 14),
                           Row(
@@ -293,8 +422,7 @@ class _PreConsultIntakeModalState extends State<PreConsultIntakeModal> {
                                         fontWeight: FontWeight.w800,
                                         color: PatientTokens.textSub)),
                                 StatusChip(l10n.intakeFileCountChip(
-                                    _files.length,
-                                    kPatientMaxImagesPerConsultation)),
+                                    _total, kPatientMaxImagesPerConsultation)),
                               ]),
                           const SizedBox(height: 8),
                           for (var i = 0; i < _files.length; i++)
@@ -348,10 +476,13 @@ class _PreConsultIntakeModalState extends State<PreConsultIntakeModal> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed:
-                      isValidIntakeImageCount(_files.length) && !_uploading
-                          ? _submit
-                          : null,
+                  onPressed: _editable &&
+                          _files.isNotEmpty &&
+                          isValidIntakeImageCount(_total) &&
+                          !_uploading &&
+                          _removingId == null
+                      ? _submit
+                      : null,
                   style: FilledButton.styleFrom(
                       backgroundColor: PatientTokens.primary),
                   child: _uploading

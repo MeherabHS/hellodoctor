@@ -6,16 +6,19 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../core/l10n/patient_display.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
+import '../booking/pre_consult_intake_modal.dart' show deletePickedSourceFile;
 import '../grievance/grievance_modal.dart';
 import '../grievance/grievance_repository.dart';
 import 'chat_cubit.dart';
 import 'chat_models.dart';
 import 'chat_repository.dart';
+import '../../../core/utils/initials.dart';
 
 /// `prototype/index.html` view-6 — "Consultation Chat & Digital Rx". Scoped
 /// to plain-text messaging plus a real "Report Issue" grievance shortcut
@@ -145,6 +148,75 @@ class _PatientChatPageState extends State<PatientChatPage> {
     if (mounted && !_cubit.state.notSent) _input.clear();
   }
 
+  /// Paperclip: take a photo or choose one from the gallery, then send it
+  /// into the consultation. The picker's own copy is deleted once read.
+  Future<void> _attach() async {
+    final l10n = AppLocalizations.of(context);
+    if (widget.conversation.isExpired || _cubit.state.uploadingImage) return;
+    final source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        builder: (sheet) => SafeArea(
+            child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(l10n.chatAttachTitle,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 6),
+                      Text(l10n.chatAttachSubtitle,
+                          style: const TextStyle(
+                              fontSize: 13, color: PatientTokens.textSub)),
+                      const SizedBox(height: 8),
+                      ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.photo_camera_outlined),
+                          title: Text(l10n.chatAttachCamera),
+                          onTap: () =>
+                              Navigator.pop(sheet, ImageSource.camera)),
+                      ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.photo_library_outlined),
+                          title: Text(l10n.chatAttachGallery),
+                          onTap: () =>
+                              Navigator.pop(sheet, ImageSource.gallery)),
+                    ]))));
+    if (source == null || !mounted) return;
+    final XFile? file;
+    try {
+      file = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    } catch (_) {
+      if (mounted) _attachProblem(l10n.chatAttachInvalid);
+      return;
+    }
+    if (file == null || !mounted) return;
+    final name = file.name.toLowerCase();
+    final mime = name.endsWith('.png')
+        ? 'image/png'
+        : name.endsWith('.jpg') || name.endsWith('.jpeg')
+            ? 'image/jpeg'
+            : null;
+    if (mime == null) {
+      unawaited(deletePickedSourceFile(file.path));
+      _attachProblem(l10n.chatAttachInvalid);
+      return;
+    }
+    if (await file.length() > 10 * 1024 * 1024) {
+      unawaited(deletePickedSourceFile(file.path));
+      if (mounted) _attachProblem(l10n.chatAttachTooLarge);
+      return;
+    }
+    final bytes = await file.readAsBytes();
+    unawaited(deletePickedSourceFile(file.path));
+    if (!mounted) return;
+    await _cubit.sendImage(bytes, mime);
+  }
+
+  void _attachProblem(String message) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(message)));
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -251,7 +323,45 @@ class _PatientChatPageState extends State<PatientChatPage> {
                                   color: PatientTokens.danger, fontSize: 11)),
                         ),
                       ),
+                    if (state.uploadingImage)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(children: [
+                          const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2)),
+                          const SizedBox(width: 8),
+                          Text(l10n.chatAttachSending,
+                              style: const TextStyle(fontSize: 12)),
+                        ]),
+                      )
+                    else if (state.imageError != null) ...[
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                            state.imageError!.isEmpty
+                                ? l10n.chatAttachFailed
+                                : state.imageError!,
+                            style: const TextStyle(
+                                color: PatientTokens.danger, fontSize: 12)),
+                      ),
+                      if (state.imagePending)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                              onPressed: _cubit.retryImage,
+                              child: Text(l10n.chatAttachRetry)),
+                        ),
+                    ],
                     Row(children: [
+                      IconButton(
+                          tooltip: l10n.chatAttachTooltip,
+                          onPressed: state.uploadingImage ? null : _attach,
+                          constraints:
+                              const BoxConstraints(minWidth: 48, minHeight: 48),
+                          icon: const Icon(Icons.attach_file,
+                              color: PatientTokens.primary)),
                       Expanded(
                         child: Container(
                           decoration: BoxDecoration(
@@ -268,8 +378,16 @@ class _PatientChatPageState extends State<PatientChatPage> {
                             maxLength: 2000,
                             style: const TextStyle(fontSize: 12.5),
                             decoration: InputDecoration(
+                                // The pill around the field is the only
+                                // border; the theme's outlined states would
+                                // draw a second one inside it.
                                 filled: false,
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                focusedErrorBorder: InputBorder.none,
                                 hintText: l10n.chatInputHint,
                                 isDense: true,
                                 counterText: '',
@@ -399,18 +517,7 @@ class _ChatTopBar extends StatelessWidget {
     );
   }
 
-  String _initialsOf(String name) {
-    final words = name
-        .replaceAll('Dr.', '')
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .toList();
-    if (words.isEmpty) return '?';
-    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-    return (words.first.substring(0, 1) + words.last.substring(0, 1))
-        .toUpperCase();
-  }
+  String _initialsOf(String name) => nameInitials(name);
 }
 
 const _avatarPalette = <(Color, Color)>[

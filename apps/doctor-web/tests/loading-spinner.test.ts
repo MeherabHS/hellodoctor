@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const webCss = readFileSync(new URL('../src/app/web.css', import.meta.url), 'utf8');
-const prototypeCss = readFileSync(new URL('../src/app/prototype.css', import.meta.url), 'utf8');
 const commonTsx = readFileSync(new URL('../src/components/Common.tsx', import.meta.url), 'utf8');
 
 function rule(css: string, selector: string): string {
@@ -30,11 +29,9 @@ test('the spinner element only carries the one self-contained class, never the l
   assert.ok(!commonTsx.includes('loading-spinner-ring'), 'Common.tsx must not reintroduce the removed, conflicting loading-spinner-ring class');
 });
 
-test('prototype.css no longer defines a conflicting loading-spinner-ring box model', () => {
-  assert.ok(!prototypeCss.includes('.loading-spinner-ring'), 'the old split/conflicting rule should be fully removed, not left dormant to be reintroduced later');
-  // The shared @keyframes declaration is harmless to keep (keyframes do not
-  // have cascade-order conflicts the way box-model properties do).
-  assert.ok(prototypeCss.includes('@keyframes spinRing'));
+test('the 2026-11-14 redesign removed prototype.css, so no second stylesheet can redefine the spinner', () => {
+  assert.ok(!existsSync(new URL('../src/app/prototype.css', import.meta.url)), 'prototype.css must stay deleted');
+  assert.ok(webCss.includes('@keyframes spinRing'));
 });
 
 test('reduced-motion preference still disables the spin animation', () => {

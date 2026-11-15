@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_client.dart';
 import '../../core/cache/patient_cache_store.dart';
 import '../../core/validation/kenya_phone.dart';
-import '../../core/validation/otp_validation.dart';
 import '../notifications/notification_repository.dart';
 import 'auth_repository.dart';
 
@@ -37,22 +38,6 @@ class EmailChallengeSent extends AuthState {
   final String? debugOtpCode;
 }
 
-/// An OTP was requested for [phoneNumber] (already normalized to
-/// `+254XXXXXXXXX`) and the app is now waiting for the 6-digit code. Carries
-/// [expiresInSeconds] for a resend countdown, and [debugOtpCode] — present
-/// only against a `development` backend — so the OTP entry screen can show
-/// it behind an explicit "DEV" marker.
-class OtpSent extends AuthState {
-  const OtpSent({
-    required this.phoneNumber,
-    required this.expiresInSeconds,
-    this.debugOtpCode,
-  });
-  final String phoneNumber;
-  final int expiresInSeconds;
-  final String? debugOtpCode;
-}
-
 class SignedIn extends AuthState {
   const SignedIn();
 }
@@ -60,6 +45,13 @@ class SignedIn extends AuthState {
 class AuthFailure extends AuthState {
   const AuthFailure(this.message);
   final String message;
+}
+
+/// The server has password reset switched off (`PASSWORD_RESET_ENABLED`):
+/// `POST /auth/password-reset/request` answers 404 only in that case, since
+/// for an unknown email it answers exactly as for a known one.
+class PasswordResetUnavailable extends AuthState {
+  const PasswordResetUnavailable();
 }
 
 /// Phase 2: Secure Email OTP Password Recovery — step 1 complete. The
@@ -87,12 +79,40 @@ class PasswordResetCompleted extends AuthState {
   const PasswordResetCompleted();
 }
 
+/// First missing or malformed required registration field, in form order
+/// (full name, phone, email, date of birth, address, password); null when
+/// the form can be sent. The backend re-checks every rule.
+String? registrationFieldError({
+  required String fullName,
+  required String phone,
+  required String email,
+  required String dateOfBirth,
+  required String residentialAddress,
+  required String password,
+}) {
+  if (fullName.trim().isEmpty) return 'Full name is required.';
+  if (phone.trim().isEmpty) return 'Phone number is required.';
+  if (email.trim().isEmpty) return 'Email address is required.';
+  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.trim())) {
+    return 'Enter a valid email address.';
+  }
+  if (dateOfBirth.trim().isEmpty) return 'Date of birth is required.';
+  final address = residentialAddress.trim();
+  if (address.isEmpty) return 'Address is required.';
+  if (address.length < 3 || address.length > 300) {
+    return 'Enter your address (3 to 300 characters).';
+  }
+  if (password.isEmpty) return 'Password is required.';
+  return null;
+}
+
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit(this.api, {this.cache, AuthRepository? repository})
       : repository = repository ?? AuthRepository(api),
         super(const SignedOut()) {
     api.onSessionExpired = () {
-      _phoneNumber = null;
+      authDiag(
+          'auth.signedOutByExpiry', {'state': state.runtimeType.toString()});
       cache?.clear();
       if (!isClosed) emit(const SignedOut());
     };
@@ -100,7 +120,6 @@ class AuthCubit extends Cubit<AuthState> {
   final ApiClient api;
   final AuthRepository repository;
   final PatientCacheStore? cache;
-  String? _phoneNumber;
   bool _busy = false;
 
   Future<void> requestPatientLogin(String email, String password) async {
@@ -132,8 +151,20 @@ class AuthCubit extends Cubit<AuthState> {
       String email, String phone, String password,
       {required String fullName,
       required String dateOfBirth,
-      required String gender}) async {
+      required String gender,
+      required String residentialAddress}) async {
     if (_busy) return;
+    final missing = registrationFieldError(
+        fullName: fullName,
+        phone: phone,
+        email: email,
+        dateOfBirth: dateOfBirth,
+        residentialAddress: residentialAddress,
+        password: password);
+    if (missing != null) {
+      emit(AuthFailure(missing));
+      return;
+    }
     _busy = true;
     emit(const AuthBusy());
     try {
@@ -148,7 +179,8 @@ class AuthCubit extends Cubit<AuthState> {
           password: password,
           fullName: fullName,
           dateOfBirth: dateOfBirth,
-          gender: gender);
+          gender: gender,
+          residentialAddress: residentialAddress.trim());
       emit(EmailChallengeSent(
           challengeToken: result.challengeToken,
           expiresInSeconds: result.expiresInSeconds,
@@ -244,6 +276,13 @@ class AuthCubit extends Cubit<AuthState> {
         await cache?.clear();
         emit(const SignedOut());
       }
+    } on TimeoutException {
+      // A slow network or a slow device-proof signature is not a rejected
+      // session. Treat it like being offline: stay signed in with the stored
+      // tokens. If the refresh still in flight is later rejected (401/403),
+      // ApiClient expires the session and onSessionExpired signs out then.
+      authDiag('restore.timeout', {'state': 'kept signed in'});
+      emit(const SignedIn());
     } catch (_) {
       emit(const SignedOut());
     } finally {
@@ -253,7 +292,6 @@ class AuthCubit extends Cubit<AuthState> {
 
   void restartLogin() {
     if (_busy) return;
-    _phoneNumber = null;
     emit(const SignedOut());
   }
 
@@ -281,7 +319,9 @@ class AuthCubit extends Cubit<AuthState> {
       // convenience, never relied on for correctness.
       emit(PasswordResetOtpSent(email: trimmed, expiresInSeconds: 300));
     } on ApiException catch (e) {
-      emit(AuthFailure(e.userMessage));
+      emit(e.status == 404
+          ? const PasswordResetUnavailable()
+          : AuthFailure(e.userMessage));
     } catch (_) {
       emit(const AuthFailure(
           'Unable to request a password reset. Please retry.'));
@@ -346,81 +386,6 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const SignedOut());
   }
 
-  /// Step 1: `POST /auth/register-otp`. [rawPhone] is normalized via
-  /// [normalizeKenyaPhone] client-side first — a structurally invalid number
-  /// never reaches the network.
-  Future<void> requestOtp(String rawPhone) async {
-    if (_busy) return;
-    final phone = normalizeKenyaPhone(rawPhone);
-    if (phone == null) {
-      emit(const AuthFailure('Enter a valid Kenyan phone number.'));
-      return;
-    }
-    _busy = true;
-    emit(const AuthBusy());
-    try {
-      final result = await repository.requestOtp(phone);
-      _phoneNumber = phone;
-      emit(OtpSent(
-        phoneNumber: phone,
-        expiresInSeconds: result.expiresInSeconds,
-        debugOtpCode: developmentOtpEnabled(
-          environment: const String.fromEnvironment('ENVIRONMENT'),
-          flag: const bool.fromEnvironment('DEV_AUTH_OTP_ENABLED'),
-        )
-            ? result.debugOtpCode
-            : null,
-      ));
-    } on ApiException catch (e) {
-      emit(AuthFailure(e.userMessage));
-    } catch (_) {
-      emit(const AuthFailure('Unable to request a verification code. '
-          'Please retry.'));
-    } finally {
-      _busy = false;
-    }
-  }
-
-  /// Step 2: `POST /auth/verify-otp-and-login`. Only callable after
-  /// [requestOtp] has populated the phone number this code is being verified
-  /// against — the backend contract never reuses a `session_token` here.
-  Future<void> verifyOtp(String otp,
-      {List<Map<String, String>> acceptedDocuments = const []}) async {
-    if (_busy || _phoneNumber == null) return;
-    if (!isValidOtpFormat(otp)) {
-      emit(const AuthFailure('Enter the 6-digit verification code.'));
-      return;
-    }
-    _busy = true;
-    emit(const AuthBusy());
-    try {
-      // The returned `PatientUser` is intentionally not kept beyond this
-      // call — the cubit's `SignedIn` state carries no payload (matching the
-      // Doctor app's own convention), since the only durable source of
-      // patient profile data is the backend profile endpoint, not this
-      // one-shot login response.
-      await repository.verifyOtp(
-          phoneNumber: _phoneNumber!,
-          otpCode: otp.trim(),
-          acceptedDocuments: acceptedDocuments);
-      // A new interactive login is an explicit session/account boundary.
-      await cache?.clear();
-      final accessToken = await api.read('access_token');
-      if (accessToken != null) await cache?.initializeScope(accessToken);
-      _phoneNumber = null;
-      emit(const SignedIn());
-    } on ApiException catch (e) {
-      emit(AuthFailure(e.status == 401
-          ? 'The verification code is invalid or has expired. Request a new '
-              'code or try again.'
-          : e.userMessage));
-    } catch (_) {
-      emit(const AuthFailure('Unable to verify this code. Please retry.'));
-    } finally {
-      _busy = false;
-    }
-  }
-
   Future<void> logout() async {
     if (_busy) return;
     _busy = true;
@@ -442,7 +407,6 @@ class AuthCubit extends Cubit<AuthState> {
     } finally {
       await api.clearSession();
       await cache?.clear();
-      _phoneNumber = null;
       emit(SignedOut(notice: notice));
       _busy = false;
     }

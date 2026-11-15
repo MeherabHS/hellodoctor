@@ -340,8 +340,11 @@ pub async fn revoke_doctor_professional_registration(
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManageProfessionalVerification)?;
     let id = DoctorProfileId::from(id);
-    let reason =
-        crate::domain::validation::validate_text_field(&payload.reason, "Revocation reason", 1000)?;
+    let reason = crate::domain::validation::validate_admin_text_field(
+        &payload.reason,
+        "Revocation reason",
+        1000,
+    )?;
     let mut tx = state.begin_authed(&ctx).await?;
     let doc = doctor_repo::find_by_id(&mut *tx, id)
         .await?
@@ -598,7 +601,7 @@ pub async fn create_doctor(
     let user = User {
         id: user_id,
         phone_number: phone.clone(),
-        email: Some(payload.email.trim().to_lowercase()),
+        email: Some(crate::domain::validation::normalize_email(&payload.email)),
         password_hash: Some(password_hash),
         role: UserRole::Doctor,
         preferred_language: "en".into(),
@@ -1537,7 +1540,7 @@ async fn review_doctor_professional_registration(
     abac::authorize(&ctx, Action::ManageProfessionalVerification)?;
     let note = payload
         .note
-        .map(|n| crate::domain::validation::validate_text_field(&n, "Review note", 1000))
+        .map(|n| crate::domain::validation::validate_admin_text_field(&n, "Review note", 1000))
         .transpose()?;
     let mut tx = state.begin_authed(&ctx).await?;
     let doc = doctor_repo::find_by_id(&mut *tx, id)
@@ -1725,12 +1728,13 @@ pub async fn simulate_admin_log(
         ));
     }
 
-    let action = crate::domain::validation::validate_text_field(&payload.action, "Action", 150)?;
+    let action =
+        crate::domain::validation::validate_admin_text_field(&payload.action, "Action", 150)?;
     let subsystem =
-        crate::domain::validation::validate_text_field(&payload.subsystem, "Subsystem", 150)?;
+        crate::domain::validation::validate_admin_text_field(&payload.subsystem, "Subsystem", 150)?;
     let severity =
-        crate::domain::validation::validate_text_field(&payload.severity, "Severity", 150)?;
-    let error_summary = crate::domain::validation::validate_text_field(
+        crate::domain::validation::validate_admin_text_field(&payload.severity, "Severity", 150)?;
+    let error_summary = crate::domain::validation::validate_admin_text_field(
         &payload.error_summary,
         "Error summary",
         1000,
@@ -1880,7 +1884,9 @@ pub async fn resolve_system_error(
     let payload = ResolveSystemErrorRequest {
         resolution_note: payload
             .resolution_note
-            .map(|n| crate::domain::validation::validate_text_field(&n, "Resolution note", 1000))
+            .map(|n| {
+                crate::domain::validation::validate_admin_text_field(&n, "Resolution note", 1000)
+            })
             .transpose()?,
     };
     let mut tx = state.begin_authed(&ctx).await?;
@@ -2033,7 +2039,7 @@ pub async fn simulate_system_error(
 
     let custom_note = payload
         .custom_note
-        .map(|n| crate::domain::validation::validate_text_field(&n, "Custom note", 300))
+        .map(|n| crate::domain::validation::validate_admin_text_field(&n, "Custom note", 300))
         .transpose()?;
     let message = match custom_note.as_deref() {
         Some(note) if !note.is_empty() => format!("{default_message} [{note}]"),
@@ -2131,7 +2137,7 @@ pub async fn list_admin_grievances(
             .await?
             .into_iter()
             .collect();
-    let decisions: HashMap<Uuid,serde_json::Value> = sqlx::query_as("SELECT DISTINCT ON(grievance_id) grievance_id,jsonb_build_object('action',action_type,'date',adjudicated_at,'admin',adjudicated_by_admin_id,'notes',audit_notes) FROM grievance_adjudications ORDER BY grievance_id,adjudicated_at DESC,id DESC").fetch_all(&mut *tx).await?.into_iter().collect();
+    let decisions: HashMap<Uuid,serde_json::Value> = sqlx::query_as("SELECT DISTINCT ON(grievance_id) grievance_id,jsonb_build_object('action',action_type,'date',adjudicated_at,'admin',adjudicated_by_admin_id,'notes',audit_notes) FROM grievance_adjudications WHERE superseded_at IS NULL ORDER BY grievance_id,adjudicated_at DESC,id DESC").fetch_all(&mut *tx).await?.into_iter().collect();
     let mut list = Vec::new();
     for g in &grievances {
         let patient_name = patient_name_by_id
@@ -2223,7 +2229,8 @@ pub async fn resolve_consultation_recovery(
     Json(body): Json<ConsultationRecoveryResolutionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ViewConsultationTimeline)?;
-    let reason = crate::domain::validation::validate_text_field(&body.reason, "Reason", 1000)?;
+    let reason =
+        crate::domain::validation::validate_admin_text_field(&body.reason, "Reason", 1000)?;
     if reason.chars().count() < 8 {
         return Err(AppError::Validation(
             "A resolution reason of at least 8 characters is required.".into(),
@@ -2323,7 +2330,8 @@ pub async fn release_live_reservation(
     Json(body): Json<ReleaseLiveReservationRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ViewConsultationTimeline)?;
-    let reason = crate::domain::validation::validate_text_field(&body.reason, "Reason", 1000)?;
+    let reason =
+        crate::domain::validation::validate_admin_text_field(&body.reason, "Reason", 1000)?;
     if reason.chars().count() < 8 {
         return Err(AppError::Validation(
             "A release reason of at least 8 characters is required.".into(),

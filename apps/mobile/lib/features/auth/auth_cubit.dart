@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_client.dart';
 import '../../core/cache/doctor_cache_store.dart';
@@ -28,7 +29,27 @@ class MfaRequired extends AuthState {
 }
 
 class SignedIn extends AuthState {
-  const SignedIn();
+  const SignedIn({this.role});
+
+  /// `DOCTOR` or `PEER` (the Care app serves both); null if unknown.
+  final String? role;
+  bool get isPeer => role == 'PEER';
+}
+
+/// The `role` claim of a JWT access token, without verifying it (the server
+/// verifies every request; this only chooses which screens to show).
+String? roleFromAccessToken(String? token) {
+  if (token == null) return null;
+  final parts = token.split('.');
+  if (parts.length != 3) return null;
+  try {
+    final payload = jsonDecode(
+        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+    final role = (payload as Map)['role'];
+    return role is String ? role : null;
+  } catch (_) {
+    return null;
+  }
 }
 
 class AuthFailure extends AuthState {
@@ -102,10 +123,11 @@ class AuthCubit extends Cubit<AuthState> {
       if (access != null || refresh != null) {
         await cache?.initializeScope(access ?? refresh!);
       }
-      emit(const SignedIn());
+      emit(SignedIn(role: roleFromAccessToken(access)));
     } on ApiException catch (e) {
       if (e.status == null) {
-        emit(const SignedIn());
+        emit(SignedIn(
+            role: roleFromAccessToken(await api.read('access_token'))));
       } else {
         await cache?.clear();
         emit(const SignedOut());
@@ -132,7 +154,9 @@ class AuthCubit extends Cubit<AuthState> {
     _busy = true;
     emit(const AuthBusy());
     try {
-      final response = await api.post('/auth/doctor/login',
+      // One sign-in for doctors and peer navigators; the account's role
+      // decides which flow the server runs.
+      final response = await api.post('/auth/care/login',
           data: {'email': email.trim().toLowerCase(), 'password': password});
       final data = response.data['data'];
       _challenge = data['session_token'] as String;
@@ -249,7 +273,7 @@ class AuthCubit extends Cubit<AuthState> {
   // path (login). Callers own _busy/AuthBusy around this.
   Future<void> _completeVerification(String otp) async {
     try {
-      final response = await api.post('/auth/doctor/verify-otp',
+      final response = await api.post('/auth/care/verify-otp',
           data: {'session_token': _challenge, 'otp_code': otp});
       final data = response.data['data'];
       await api.saveTokens(
@@ -258,7 +282,9 @@ class AuthCubit extends Cubit<AuthState> {
       await cache?.clear();
       await cache?.initializeScope(data['access_token'] as String);
       _challenge = null;
-      emit(const SignedIn());
+      emit(SignedIn(
+          role: (data['user'] as Map?)?['role']?.toString() ??
+              roleFromAccessToken(data['access_token'] as String)));
     } on ApiException catch (e) {
       emit(AuthFailure(e.status == 401
           ? 'The verification code is invalid or the challenge expired. Retry or sign in again.'

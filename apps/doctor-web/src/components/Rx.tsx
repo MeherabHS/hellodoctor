@@ -4,10 +4,11 @@ import { ApiError, errorText, runtimeGeneration, uploadPrescription } from '../l
 import { compressRxPhoto, RX_PAGE_MAX_BYTES } from '../lib/rx-compression';
 import { uploadPrescriptionPages } from '../lib/rx-upload';
 import { Appointment, Profile, RecordDto, RxPage } from '../lib/contracts';
-import { State } from './Common';
-import { ClinicalAction, date } from './Queue';
+import { Avatar, Badge, PageHeader, State, demographics } from './Common';
+import { Icon } from './Icons';
+import { ClinicalAction, date, time } from './Queue';
 
-export function Rx({profile,appointments,appointment,pages,setPages,select,action,complete}:{profile:Profile;appointments:Appointment[];appointment:Appointment|null;pages:RxPage[];setPages:(pages:RxPage[])=>void;select:(a:Appointment)=>void;action:ClinicalAction;complete:()=>void}) {
+export function Rx({profile,appointments,appointment,pages,setPages,select,action,complete,back}:{profile:Profile;appointments:Appointment[];appointment:Appointment|null;pages:RxPage[];setPages:(pages:RxPage[])=>void;select:(a:Appointment)=>void;action:ClinicalAction;complete:()=>void;back:()=>void}) {
   const picker=useRef<HTMLInputElement>(null);const [busy,setBusy]=useState(false);const [preparing,setPreparing]=useState('');const [error,setError]=useState('');const [notes,setNotes]=useState('');const [focused,setFocused]=useState(0);const lock=useRef(false);const preparingLock=useRef(false);const pageRef=useRef(pages);pageRef.current=pages;
   const mounted=useRef(true);const contextRef=useRef(appointment?.id);contextRef.current=appointment?.id;
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
@@ -44,33 +45,53 @@ export function Rx({profile,appointments,appointment,pages,setPages,select,actio
   const disabled=busy||!!preparing;
   const allUploaded=pages.length>0&&pages.every(p=>p.state==='UPLOADED');
   const chosen=pages[focused]??pages[0];
-  return <><section className="dw-page-view active" id="webRxWorkspace">
-    <header className="dw-page-header"><div className="dw-page-title-group"><h2>Smart Rx Scanner &amp; Dispatch</h2><p>Handwritten prescription photos &middot; 1-5 pages</p></div><span className="badge badge-green">{pages.length}/5 pages</span></header>
-    <div className="web-workspace-grid">
-      <div className="web-workspace-stack">
-        <section className="dw-section-card"><div className="dw-section-header"><h3 className="dw-section-title">Consultation &amp; Patient Context</h3></div><div className="web-section-body">
-          <label>Consultation<select aria-label="Prescription consultation" value={appointment?.id??''} disabled={disabled} onChange={e=>{const a=appointments.find(row=>row.id===e.target.value);if(a)select(a);}}><option value="" disabled>Select a consultation</option>{appointments.map(a=><option key={a.id} value={a.id}>{a.patient_display_name} &middot; {a.appointment_number}</option>)}</select></label>
-          <div><strong>{appointment?.patient_display_name??'No consultation selected'}</strong><p className="sheet-desc">{appointment?`${date(appointment.start_time)} · ${appointment.status}`:'Choose an owned appointment to upload a prescription.'}</p></div>
-          <div className="web-action-row"><button className="dw-btn-outline-sm" disabled={!appointment} onClick={()=>appointment&&action('history',appointment)}>Patient Case History</button><button className="dw-btn-outline-sm" disabled={!appointment} onClick={()=>appointment&&action('documents',appointment)}>Consultation Documents</button></div>
-        </div></section>
-        <section className="dw-section-card"><div className="dw-section-header"><h3 className="dw-section-title">Doctor Advice &amp; Dispatch</h3></div><div className="web-section-body">
-          <label>Doctor quick advice to patient<textarea id="docAdviceInput" rows={5} value={notes} maxLength={4000} disabled={disabled} onChange={e=>setNotes(e.target.value)}/></label>
-          <button id="btnSendCapturedRx" className="dw-btn-primary" disabled={disabled||!appointment||!pages.length||allUploaded} onClick={()=>void upload()}>{busy?'Uploading prescription pages...':preparing?'Preparing prescription photos...':allUploaded?'All pages uploaded':'Send Prescription ->'}</button>
-          {pages.map((p,index)=>p.state==='UPLOADING'&&<div key={p.key} className="web-rx-upload-progress"><strong>Uploading page {index+1} of {pages.length}</strong><progress max={100} value={p.uploadProgress==null?undefined:p.uploadProgress*100} aria-label={`Uploading prescription page ${index+1}`}/><span role="status">{p.uploadProgress==null?'Preparing upload...':p.uploadProgress>=1?'100% transferred · Waiting for server confirmation...':`${Math.floor(p.uploadProgress*100)}% transferred`}</span></div>)}
-          <State error={error}/>{allUploaded&&<div role="status"><strong>All selected pages uploaded to the server</strong><p className="sheet-desc">Complete the consultation separately to record the clinical outcome.</p><button className="dw-btn-primary" onClick={complete}>Complete consultation</button></div>}
-          <button className="dw-btn-outline" disabled={disabled||!appointment} onClick={complete}>Complete without prescription / Other outcome</button>
-        </div></section>
+  const stateTone:Record<RxPage['state'],'slate'|'blue'|'green'|'red'>={LOCAL:'slate',UPLOADING:'blue',UPLOADED:'green',FAILED:'red'};
+  const stateLabel:Record<RxPage['state'],string>={LOCAL:'Ready to send',UPLOADING:'Uploading',UPLOADED:'Sent',FAILED:'Failed'};
+  return <section id="webRxWorkspace" className="am-stack" style={{gap:22}}>
+    <PageHeader title="Prescription (Rx)" subtitle="Photograph or scan your handwritten prescription. 1 to 5 pages, each compressed to 40 KB or less." back={{label:'Consultation room',onClick:back}}>
+      <Badge tone="green">{pages.length}/5 pages</Badge>
+    </PageHeader>
+    <div className="am-grid main-side" style={{alignItems:'start'}}>
+      <section className="am-card">
+        <div className="am-card-head"><h2><Icon name="upload"/>Prescription pages</h2><button className="am-btn primary sm" aria-describedby="rxUploadHelp" disabled={disabled||!appointment||pages.length>=5} onClick={()=>picker.current?.click()}><Icon name="plus" size={15}/>Add photo</button></div>
+        <div className="am-card-body am-stack">
+          <input id="rxPhotoFileInput" type="file" ref={picker} hidden multiple accept="image/jpeg,image/png,image/webp" disabled={disabled||!appointment||pages.length>=5} onChange={e=>{void add(Array.from(e.target.files??[]));e.target.value='';}}/>
+          {!pages.length&&<button type="button" className="am-dropzone" style={{cursor:appointment?'pointer':'not-allowed'}} disabled={disabled||!appointment} onClick={()=>picker.current?.click()}><Icon name="camera" size={34}/><strong>Choose prescription photos</strong><span id="rxUploadHelp">{!appointment?(appointments.length?'Select a consultation first.':'A prescription must belong to a consultation, and none are available.'):'JPEG, PNG or WebP, up to 10 MB each. They are compressed automatically before sending.'}</span></button>}
+          {preparing&&<div role="status" className="am-stack" style={{gap:6}}><progress className="am-meter" aria-label="Compressing prescription photos"/><span className="am-faint">{preparing}</span></div>}
+          {chosen&&<img src={chosen.preview} className="am-rx-preview" alt={`Handwritten prescription page ${focused+1}`}/>}
+          {pages.length>0&&<div className="am-rx-grid">{pages.map((p,index)=><figure key={p.key} className="am-rx-page" style={{margin:0,borderColor:index===focused?'var(--am-green)':undefined}}>
+            <button className="am-rx-thumb" aria-label={`Preview prescription page ${index+1}`} onClick={()=>setFocused(index)}><img src={p.preview} alt={`Prescription page ${index+1}`}/></button>
+            <figcaption>
+              <div className="am-row between"><strong className="am-strong">Page {index+1}</strong><Badge tone={stateTone[p.state]}>{p.state==='UPLOADED'?'Server confirmed':stateLabel[p.state]}</Badge></div>
+              <span className="am-faint">{Math.ceil(p.file.size/1024)} KB of 40 KB{p.originalBytes!==undefined&&` · was ${Math.ceil(p.originalBytes/1024)} KB`}</span>
+              {p.state==='UPLOADING'&&<><progress className="am-meter" max={100} value={p.uploadProgress==null?undefined:p.uploadProgress*100} aria-label={`Uploading prescription page ${index+1}`}/><span className="am-faint" role="status">{p.uploadProgress==null?'Preparing upload…':p.uploadProgress>=1?'Waiting for server confirmation…':`${Math.floor(p.uploadProgress*100)}% sent`}</span></>}
+              {p.error&&<p role="alert" className="am-error-text">{p.error}</p>}
+              <div className="am-row" style={{gap:6}}>{p.state==='FAILED'&&<button className="am-btn soft sm" disabled={disabled} onClick={()=>void upload(p.key)}>Retry</button>}{p.state!=='UPLOADED'&&<button className="am-btn danger sm" disabled={disabled} onClick={()=>remove(p)}><Icon name="trash" size={14}/>Remove</button>}</div>
+            </figcaption>
+          </figure>)}</div>}
+          <State error={error}/>
+        </div>
+      </section>
+      <div className="am-stack" style={{gap:18}}>
+        <section className="am-card">
+          <div className="am-card-head"><h2><Icon name="user"/>Consultation</h2></div>
+          <div className="am-card-body am-stack">
+            <label className="am-field"><span>Prescription for</span><select className="am-select" aria-label="Prescription consultation" value={appointment?.id??''} disabled={disabled} onChange={e=>{const a=appointments.find(row=>row.id===e.target.value);if(a)select(a);}}><option value="" disabled>Select a consultation</option>{appointments.map(a=><option key={a.id} value={a.id}>{a.patient_display_name} · {a.appointment_number}</option>)}</select></label>
+            {appointment&&<div className="am-person"><Avatar name={appointment.patient_display_name}/><div><strong>{appointment.patient_display_name}</strong><span>{[demographics(appointment),`${date(appointment.start_time)}, ${time(appointment.start_time)}`].filter(Boolean).join(' · ')}</span></div></div>}
+            <div className="am-row"><button className="am-btn ghost sm" disabled={!appointment} onClick={()=>appointment&&action('history',appointment)}><Icon name="history" size={15}/>History</button><button className="am-btn ghost sm" disabled={!appointment} onClick={()=>appointment&&action('documents',appointment)}><Icon name="file" size={15}/>Documents</button></div>
+            <div className="am-callout" style={{padding:'10px 12px'}}><Icon name="stethoscope"/><span><strong>{profile.full_name}</strong><br/><span className="am-faint">{[profile.qualifications.join(', '),`KMPDC ${profile.license_number}`].filter(Boolean).join(' · ')}</span></span></div>
+          </div>
+        </section>
+        <section className="am-card">
+          <div className="am-card-head"><h2><Icon name="send"/>Send to patient</h2></div>
+          <div className="am-card-body am-stack">
+            <label className="am-field"><span>Advice for the patient (optional)</span><textarea className="am-textarea" id="docAdviceInput" rows={4} value={notes} maxLength={4000} disabled={disabled} placeholder="For example: take after meals, return if symptoms persist." onChange={e=>setNotes(e.target.value)}/></label>
+            <button id="btnSendCapturedRx" className="am-btn primary block lg" disabled={disabled||!appointment||!pages.length||allUploaded} onClick={()=>void upload()}><Icon name="send" size={17}/>{busy?'Sending prescription…':preparing?'Preparing photos…':allUploaded?'All pages sent':'Send prescription'}</button>
+            {allUploaded&&<div className="am-callout" role="status"><Icon name="checkCircle"/><span><strong>Prescription sent.</strong> Complete the consultation to record its outcome.</span></div>}
+            <button className="am-btn ghost block" disabled={disabled||!appointment} onClick={complete}><Icon name="checkCircle" size={16}/>{allUploaded?'Complete consultation':'Complete without prescription / other outcome'}</button>
+          </div>
+        </section>
       </div>
-      <section className="dw-section-card"><div className="dw-section-header"><h3 className="dw-section-title">Upload Handwritten Prescription</h3><span className="badge badge-green">Photo workflow</span></div><div className="web-section-body">
-        <div className="web-action-row"><button className="dw-btn-primary" aria-describedby="rxUploadHelp" disabled={disabled||!appointment||pages.length>=5} onClick={()=>picker.current?.click()}>Upload Rx Photo</button></div>
-        <p id="rxUploadHelp" className="sheet-desc">{!appointment?(appointments.length?'Select a consultation above to enable photo upload.':'No consultations are available for your account. A prescription must belong to a consultation.'):'Select 1–5 JPEG, PNG or WebP photos, up to 10 MB each. Photos are automatically compressed to at most 40 KB per page. Check the preview, then use Send Prescription.'}</p>
-        <input id="rxPhotoFileInput" type="file" ref={picker} hidden multiple accept="image/jpeg,image/png,image/webp" disabled={disabled||!appointment||pages.length>=5} onChange={e=>{void add(Array.from(e.target.files??[]));e.target.value='';}}/>
-        {preparing&&<div className="web-rx-preparing" role="status"><progress aria-label="Compressing prescription photos"/>{preparing}</div>}
-        <div className="web-action-row"><strong>{profile.full_name}</strong><span className="sheet-desc">{profile.qualifications.join(', ')} &middot; {profile.license_number}</span></div>
-        {chosen?<img src={chosen.preview} className="web-rx-page-preview" alt={`Handwritten prescription page ${focused+1}`}/>:<State empty="Choose a handwritten prescription photo to preview"/>}
-        <div className="web-rx-preview-grid">{pages.map((p,index)=><figure key={p.key}><button className="web-name-button" aria-label={`Preview prescription page ${index+1}`} onClick={()=>setFocused(index)}><img src={p.preview} alt={`Prescription page ${index+1}`}/></button><figcaption>Page {index+1} &middot; {p.state}<p className="sheet-desc">{Math.ceil(p.file.size/1024)} KB / 40 KB{p.originalBytes!==undefined&&` · Original ${Math.ceil(p.originalBytes/1024)} KB`}</p>{p.error&&<p role="alert">{p.error}</p>}</figcaption>{p.state==='FAILED'&&<button className="dw-btn-outline-sm" disabled={disabled} onClick={()=>void upload(p.key)}>Retry page</button>}{p.state!=='UPLOADED'&&<button className="dw-btn-outline-sm" disabled={disabled} onClick={()=>remove(p)}>Remove</button>}{p.state==='UPLOADED'&&<span className="badge badge-green">Server confirmed</span>}</figure>)}</div>
-      </div></section>
     </div>
-  </section></>;
-
+  </section>;
 }

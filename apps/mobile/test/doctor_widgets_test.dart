@@ -245,7 +245,9 @@ void main() {
     });
 
     for (final width in [360.0, 390.0, 412.0]) {
-      await tester.binding.setSurfaceSize(Size(width, 800));
+      // Tall enough that both slot cards sit below the schedule header
+      // without scrolling (the reference cards are taller than before).
+      await tester.binding.setSurfaceSize(Size(width, 1600));
       await tester.pumpWidget(harness(const SchedulePage(),
           DoctorState(slots: [booked, available], queue: [appointment])));
       await tester.pumpAndSettle();
@@ -287,11 +289,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Blocked'), findsWidgets);
     expect(
-        find.text('Blocked ? unavailable for patient booking'), findsOneWidget);
-    expect(find.text('Booked (0)'), findsOneWidget);
-    expect(find.text('Available (0)'), findsOneWidget);
+        find.text('Blocked — unavailable for patient booking'), findsOneWidget);
+    // Zero counts read "Booked" / "Available" with no "(0)", as in the
+    // empty schedule reference; nothing claims a booking.
+    expect(find.textContaining('Booked ('), findsNothing);
+    expect(find.textContaining('Available ('), findsNothing);
+    expect(find.text('All Slots (1)'), findsOneWidget);
     expect(find.text('Call Patient'), findsNothing);
     expect(find.textContaining('Cancel Slot'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty schedule matches the empty reference', (tester) async {
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    await tester.binding.setSurfaceSize(const Size(412, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(harness(const SchedulePage(), const DoctorState()));
+    await tester.pumpAndSettle();
+    expect(find.text('Consultation Schedule'), findsOneWidget);
+    expect(find.text('0 Booked'), findsOneWidget);
+    expect(find.text('Consultations'), findsOneWidget);
+    expect(find.text('All Slots (0)'), findsOneWidget);
+    expect(find.text('No consultations scheduled yet'), findsOneWidget);
+    // Header link and the empty-card button both add a slot.
+    expect(find.text('Add Slot'), findsNWidgets(2));
+    expect(find.text('Today'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -323,6 +345,9 @@ void main() {
       'doctor_lifecycle': 'BOOKED',
     });
 
+    // Tall enough that both slot cards sit below the schedule header.
+    await tester.binding.setSurfaceSize(const Size(412, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(harness(const SchedulePage(),
         DoctorState(slots: [booked, available], queue: [appointment])));
     await tester.pumpAndSettle();
@@ -523,6 +548,9 @@ void main() {
       'doctor_lifecycle': 'BOOKED',
     });
 
+    // Tall enough that both slot cards sit below the schedule header.
+    await tester.binding.setSurfaceSize(const Size(412, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(harness(const SchedulePage(),
         DoctorState(slots: [booked, available], queue: [appointment])));
     await tester.pumpAndSettle();

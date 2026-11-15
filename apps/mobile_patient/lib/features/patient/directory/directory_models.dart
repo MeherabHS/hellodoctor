@@ -1,4 +1,5 @@
 import '../../../core/l10n/patient_display.dart';
+import '../../../core/utils/initials.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -50,40 +51,21 @@ class PublicDoctorDto {
   final bool hasPhoto;
   final DateTime? photoUpdatedAt;
 
-  // Matches DoctorQuery: a positive configured fee enables that modality.
-  bool get supportsVideo => _positiveFee(consultationFeeVideo);
-  bool get supportsChat => _positiveFee(consultationFeeChat);
-
-  /// Whether VIDEO can be booked. When the server's booking policy says no
-  /// payment is required (`FINANCIAL_MODULE_MODE=deferred`) an unpriced doctor
-  /// is still bookable — the deferred booking endpoint never charges the fee,
-  /// so a zero fee must not hide the modality. In paid mode the configured
-  /// fee remains the offering signal, exactly as before. CHAT stays
-  /// fee-driven (its booking flow is payment-specific).
-  bool videoBookable({required bool paymentRequired}) =>
-      !paymentRequired || supportsVideo;
-  static bool _positiveFee(String fee) {
-    final value = double.tryParse(fee);
-    return value != null && value.isFinite && value > 0;
-  }
+  /// The patient app is payment-free (product decision, 2026-11-13): every
+  /// doctor the server lists is approved and offers both video and chat,
+  /// whatever fee is configured. Fees are never shown or used to decide
+  /// availability; the server's directory decides who is listed, and booking
+  /// refuses with a configuration error if the server ever requires payment.
+  bool get supportsVideo => true;
+  bool get supportsChat => true;
+  bool videoBookable({required bool paymentRequired}) => true;
 
   String get displayName => patientDoctorName(fullName);
 
   /// Two-letter tile/avatar initials from the doctor's display name (e.g.
   /// "Dr. Sabrina Akter" → "SA") — the prototype's `.doc-tile-avatar` /
   /// `.profile-avatar` content, derived rather than hardcoded per doctor.
-  String get initials {
-    final words = displayName
-        .replaceAll('Dr.', '')
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .toList();
-    if (words.isEmpty) return '?';
-    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-    return (words.first.substring(0, 1) + words.last.substring(0, 1))
-        .toUpperCase();
-  }
+  String get initials => nameInitials(displayName);
 
   factory PublicDoctorDto.fromJson(Json j) => PublicDoctorDto(
         id: _textOf(j['id']),

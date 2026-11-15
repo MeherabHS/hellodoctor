@@ -340,6 +340,183 @@ impl GrievanceService {
         Ok(report)
     }
 
+    /// Records an appeal against the current WARNED or DISMISSED decision,
+    /// on the patient's behalf (product owner, 2026-11-14). Refund decisions
+    /// are not appealable: their refund request is already in Finance's
+    /// hands. One open appeal per grievance (`grievance_appeals_one_open`).
+    pub async fn record_appeal(
+        state: &AppState,
+        ctx: &AuthContext,
+        grievance_id: Uuid,
+        admin_id: UserId,
+        reason: String,
+    ) -> Result<serde_json::Value, AppError> {
+        let mut tx = state.begin_authed_as(ctx, DbRole::FinanceWorker).await?;
+        let status: Option<String> =
+            sqlx::query_scalar("SELECT status::text FROM grievance_reports WHERE id=$1 FOR UPDATE")
+                .bind(grievance_id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        let status =
+            status.ok_or_else(|| AppError::NotFound("Grievance report not found.".into()))?;
+        if !matches!(status.as_str(), "WARNED" | "DISMISSED") {
+            return Err(AppError::Conflict(
+                "Only a warned or dismissed decision can be appealed.".into(),
+            ));
+        }
+        let adjudication: Uuid = sqlx::query_scalar(
+            "SELECT id FROM grievance_adjudications WHERE grievance_id=$1 AND superseded_at IS NULL",
+        )
+        .bind(grievance_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::Conflict("This grievance has no current decision to appeal.".into()))?;
+        let appeal_id = Uuid::new_v4();
+        let inserted = sqlx::query(
+            "INSERT INTO grievance_appeals (id, grievance_id, appealed_adjudication_id, reason, recorded_by) \
+             VALUES ($1,$2,$3,$4,$5) ON CONFLICT (grievance_id) WHERE status='OPEN' DO NOTHING",
+        )
+        .bind(appeal_id)
+        .bind(grievance_id)
+        .bind(adjudication)
+        .bind(&reason)
+        .bind(admin_id)
+        .execute(&mut *tx)
+        .await?;
+        if inserted.rows_affected() != 1 {
+            return Err(AppError::Conflict(
+                "This grievance already has an open appeal.".into(),
+            ));
+        }
+        AuditService::log_in_tx(
+            &mut *tx,
+            AuditLogEntry::new(
+                Some(admin_id),
+                ctx.role,
+                "GRIEVANCE_APPEAL_RECORDED",
+                "GRIEVANCE_REPORT",
+                Some(grievance_id),
+                "SUCCESS",
+            )
+            .with_after(serde_json::json!({ "appeal_id": appeal_id, "appealed_status": status })),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(
+            serde_json::json!({ "appeal_id": appeal_id, "grievance_id": grievance_id, "status": "OPEN" }),
+        )
+    }
+
+    /// Decides an open appeal. UPHOLD keeps the decision. OVERTURN marks the
+    /// decision superseded (kept for history) and returns the grievance to
+    /// PENDING_REVIEW, where it is decided again through the normal
+    /// adjudication endpoints.
+    pub async fn decide_appeal(
+        state: &AppState,
+        ctx: &AuthContext,
+        appeal_id: Uuid,
+        admin_id: UserId,
+        overturn: bool,
+        note: String,
+    ) -> Result<serde_json::Value, AppError> {
+        let mut tx = state.begin_authed_as(ctx, DbRole::FinanceWorker).await?;
+        let row: Option<(Uuid, Uuid, String)> = sqlx::query_as(
+            "SELECT grievance_id, appealed_adjudication_id, status FROM grievance_appeals WHERE id=$1 FOR UPDATE",
+        )
+        .bind(appeal_id)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let (grievance_id, adjudication_id, status) =
+            row.ok_or_else(|| AppError::NotFound("Appeal not found.".into()))?;
+        if status != "OPEN" {
+            return Err(AppError::Conflict(
+                "This appeal has already been decided.".into(),
+            ));
+        }
+        let grievance_status: String =
+            sqlx::query_scalar("SELECT status::text FROM grievance_reports WHERE id=$1 FOR UPDATE")
+                .bind(grievance_id)
+                .fetch_one(&mut *tx)
+                .await?;
+        if overturn {
+            let superseded = sqlx::query(
+                "UPDATE grievance_adjudications SET superseded_at=now(), superseded_by_appeal=$2 \
+                 WHERE id=$1 AND superseded_at IS NULL",
+            )
+            .bind(adjudication_id)
+            .bind(appeal_id)
+            .execute(&mut *tx)
+            .await?;
+            let reopened = sqlx::query(
+                "UPDATE grievance_reports SET status='PENDING_REVIEW' WHERE id=$1 AND status IN ('WARNED','DISMISSED')",
+            )
+            .bind(grievance_id)
+            .execute(&mut *tx)
+            .await?;
+            if superseded.rows_affected() != 1 || reopened.rows_affected() != 1 {
+                return Err(AppError::Conflict(
+                    "The appealed decision is no longer current. Reload the grievance.".into(),
+                ));
+            }
+        }
+        let outcome = if overturn { "OVERTURNED" } else { "UPHELD" };
+        sqlx::query(
+            "UPDATE grievance_appeals SET status=$2, decided_by=$3, decided_at=now(), decision_note=$4 WHERE id=$1 AND status='OPEN'",
+        )
+        .bind(appeal_id)
+        .bind(outcome)
+        .bind(admin_id)
+        .bind(&note)
+        .execute(&mut *tx)
+        .await?;
+        AuditService::log_in_tx(
+            &mut *tx,
+            AuditLogEntry::new(
+                Some(admin_id),
+                ctx.role,
+                if overturn {
+                    "GRIEVANCE_APPEAL_OVERTURNED"
+                } else {
+                    "GRIEVANCE_APPEAL_UPHELD"
+                },
+                "GRIEVANCE_REPORT",
+                Some(grievance_id),
+                "SUCCESS",
+            )
+            .with_after(serde_json::json!({ "appeal_id": appeal_id, "outcome": outcome })),
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(serde_json::json!({
+            "appeal_id": appeal_id,
+            "grievance_id": grievance_id,
+            "status": outcome,
+            "grievance_status": if overturn { "PENDING_REVIEW" } else { grievance_status.as_str() },
+        }))
+    }
+
+    /// Every appeal, newest first, with the decision it was against.
+    pub async fn list_appeals(
+        state: &AppState,
+        ctx: &AuthContext,
+    ) -> Result<Vec<serde_json::Value>, AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        let rows: Vec<(serde_json::Value,)> = sqlx::query_as(
+            "SELECT jsonb_build_object('id',a.id,'grievance_id',a.grievance_id,'grievance_number',g.grievance_number,\
+             'category',g.category,'target',g.target_type::text,'grievance_status',g.status::text,\
+             'appealed_action',adj.action_type,'appealed_at',adj.adjudicated_at,'reason',a.reason,'status',a.status,\
+             'recorded_by',a.recorded_by,'recorded_at',a.recorded_at,'decided_by',a.decided_by,'decided_at',a.decided_at,\
+             'decision_note',a.decision_note) \
+             FROM grievance_appeals a JOIN grievance_reports g ON g.id=a.grievance_id \
+             JOIN grievance_adjudications adj ON adj.id=a.appealed_adjudication_id \
+             ORDER BY a.recorded_at DESC, a.id",
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(rows.into_iter().map(|(v,)| v).collect())
+    }
+
     /// Finance's visibility into every refund approved so far (GAP-C03: an
     /// approved refund previously had no operator-facing surface at all once
     /// `adjudicate_refund` ran).

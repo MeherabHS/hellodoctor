@@ -61,7 +61,10 @@ class BlogsRepository {
       {String search = '',
       String language = 'en',
       BlogCursor? cursor,
-      int limit = 20}) async {
+      int limit = 20,
+      String? topic,
+      bool videos = false,
+      bool standaloneQuizzes = false}) async {
     try {
       final response = await api.get('/articles', query: {
         'limit': limit,
@@ -69,6 +72,9 @@ class BlogsRepository {
         'language': language,
         if (cursor != null) 'before_time': cursor.time,
         if (cursor != null) 'before_id': cursor.id,
+        if (topic != null) 'topic': topic,
+        if (videos) 'kind': 'video',
+        if (standaloneQuizzes && !videos) 'kind': 'quiz',
       });
       final body = response.data;
       final rows = _listData(_data(response))

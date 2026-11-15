@@ -10,13 +10,6 @@ import 'package:hellodoctor_mobile_patient/features/auth/auth_repository.dart';
 class FakeAuthRepository extends AuthRepository {
   FakeAuthRepository(super.api);
 
-  OtpRequestResult? otpResult;
-  Object? otpError;
-  PatientUser? verifyResult;
-  Object? verifyError;
-  String? lastRequestedPhone;
-  ({String phone, String code})? lastVerified;
-
   Object? resetRequestError;
   String? lastResetRequestedEmail;
   ResetAuthorizationResult? resetVerifyResult;
@@ -50,24 +43,6 @@ class FakeAuthRepository extends AuthRepository {
         (authorization: resetAuthorization, password: newPassword);
     if (resetCompleteError != null) throw resetCompleteError!;
   }
-
-  @override
-  Future<OtpRequestResult> requestOtp(String phoneNumber) async {
-    lastRequestedPhone = phoneNumber;
-    if (otpError != null) throw otpError!;
-    return otpResult!;
-  }
-
-  @override
-  Future<PatientUser> verifyOtp(
-      {required String phoneNumber,
-      required String otpCode,
-      List<Map<String, String>> acceptedDocuments = const []}) async {
-    lastVerified = (phone: phoneNumber, code: otpCode);
-    if (verifyError != null) throw verifyError!;
-    await api.saveTokens('access-token', 'refresh-token');
-    return verifyResult!;
-  }
 }
 
 class MemoryStore implements TokenStore {
@@ -100,76 +75,6 @@ void main() {
 
   tearDown(() => cubit.close());
 
-  group('requestOtp', () {
-    test('rejects a structurally invalid phone number without any network call',
-        () async {
-      await cubit.requestOtp('12345');
-      expect(cubit.state, isA<AuthFailure>());
-      expect(repo.lastRequestedPhone, isNull);
-    });
-
-    test('normalizes a valid local number before calling the repository',
-        () async {
-      repo.otpResult = const OtpRequestResult(
-          sessionToken: 's', expiresInSeconds: 120, debugOtpCode: '584920');
-      await cubit.requestOtp('0712345678');
-      expect(repo.lastRequestedPhone, '+254712345678');
-      expect(cubit.state, isA<OtpSent>());
-      final state = cubit.state as OtpSent;
-      expect(state.phoneNumber, '+254712345678');
-      expect(state.expiresInSeconds, 120);
-      // A backend debug code is never surfaced unless this client was built
-      // with both explicit development compile-time flags.
-      expect(state.debugOtpCode, isNull);
-    });
-
-    test('surfaces a repository failure as AuthFailure', () async {
-      repo.otpError = const ApiException(429, 'Too many attempts.');
-      await cubit.requestOtp('0712345678');
-      expect(cubit.state, isA<AuthFailure>());
-    });
-  });
-
-  group('verifyOtp', () {
-    test('does nothing if no phone number was requested first', () async {
-      await cubit.verifyOtp('123456');
-      expect(cubit.state, isA<SignedOut>());
-      expect(repo.lastVerified, isNull);
-    });
-
-    test('rejects a malformed code without calling the repository', () async {
-      repo.otpResult =
-          const OtpRequestResult(sessionToken: 's', expiresInSeconds: 120);
-      await cubit.requestOtp('0712345678');
-      await cubit.verifyOtp('abc');
-      expect(cubit.state, isA<AuthFailure>());
-      expect(repo.lastVerified, isNull);
-    });
-
-    test('transitions to SignedIn on a valid code, not using session_token',
-        () async {
-      repo.otpResult = const OtpRequestResult(
-          sessionToken: 'ignored-by-step-2', expiresInSeconds: 120);
-      repo.verifyResult = const PatientUser(
-          id: 'p1', role: 'PATIENT', phoneNumber: '+254712345678');
-      await cubit.requestOtp('0712345678');
-      await cubit.verifyOtp('654321');
-      expect(repo.lastVerified?.phone, '+254712345678');
-      expect(repo.lastVerified?.code, '654321');
-      expect(cubit.state, isA<SignedIn>());
-    });
-
-    test('an invalid/expired code surfaces a specific message', () async {
-      repo.otpResult =
-          const OtpRequestResult(sessionToken: 's', expiresInSeconds: 120);
-      repo.verifyError = const ApiException(401, 'Invalid OTP.');
-      await cubit.requestOtp('0712345678');
-      await cubit.verifyOtp('000000');
-      expect(cubit.state, isA<AuthFailure>());
-      expect((cubit.state as AuthFailure).message, contains('expired'));
-    });
-  });
-
   group('Phase 2: password reset', () {
     test(
         'requestPasswordReset normalizes the email and emits PasswordResetOtpSent',
@@ -187,6 +92,21 @@ void main() {
       await cubit.requestPasswordReset('not-an-email');
       expect(cubit.state, isA<AuthFailure>());
       expect(repo.lastResetRequestedEmail, isNull);
+    });
+
+    test(
+        'a 404 from the request endpoint means reset is switched off, '
+        'not a missing record', () async {
+      repo.resetRequestError =
+          const ApiException(404, 'Password reset is not available.');
+      await cubit.requestPasswordReset('someone@example.com');
+      expect(cubit.state, isA<PasswordResetUnavailable>());
+    });
+
+    test('other request failures still surface as AuthFailure', () async {
+      repo.resetRequestError = const ApiException(429, 'Too many attempts.');
+      await cubit.requestPasswordReset('someone@example.com');
+      expect(cubit.state, isA<AuthFailure>());
     });
 
     test('verifyPasswordResetOtp does nothing without a prior request',

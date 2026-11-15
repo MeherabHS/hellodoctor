@@ -45,6 +45,8 @@ pub enum OtpEmailKind {
     /// reset code the user never receives must fail the request, not be
     /// silently swallowed.
     PasswordReset,
+    /// Peer Navigator sign-in code (Care app).
+    Peer,
 }
 
 impl OtpEmailKind {
@@ -54,6 +56,7 @@ impl OtpEmailKind {
             Self::Doctor => "DOCTOR_OTP",
             Self::Admin => "ADMIN_OTP",
             Self::PasswordReset => "PASSWORD_RESET_OTP",
+            Self::Peer => "PEER_OTP",
         }
     }
 
@@ -63,6 +66,7 @@ impl OtpEmailKind {
             Self::Doctor => "doctor",
             Self::Admin => "admin",
             Self::PasswordReset => "password-reset",
+            Self::Peer => "peer",
         }
     }
 }
@@ -296,6 +300,8 @@ pub enum TransactionalEmailKind {
     PaymentConfirmed,
     RefundProcessed,
     PasswordChanged,
+    /// Invitation to become an Admin (migrations/20261216000001).
+    AdminInvitation,
 }
 
 impl TransactionalEmailKind {
@@ -310,6 +316,7 @@ impl TransactionalEmailKind {
             Self::PaymentConfirmed => "PAYMENT_CONFIRMED",
             Self::RefundProcessed => "REFUND_PROCESSED",
             Self::PasswordChanged => "PASSWORD_CHANGED",
+            Self::AdminInvitation => "ADMIN_INVITATION",
         }
     }
 }
@@ -524,6 +531,7 @@ mod tests {
             OtpEmailKind::Doctor,
             OtpEmailKind::Admin,
             OtpEmailKind::PasswordReset,
+            OtpEmailKind::Peer,
         ];
         let db_values: Vec<_> = kinds.iter().map(|k| k.as_db_value()).collect();
         assert_eq!(
@@ -532,10 +540,14 @@ mod tests {
                 "PATIENT_OTP",
                 "DOCTOR_OTP",
                 "ADMIN_OTP",
-                "PASSWORD_RESET_OTP"
+                "PASSWORD_RESET_OTP",
+                "PEER_OTP"
             ]
         );
         let labels: Vec<_> = kinds.iter().map(|k| k.as_dedup_label()).collect();
-        assert_eq!(labels, ["patient", "doctor", "admin", "password-reset"]);
+        assert_eq!(
+            labels,
+            ["patient", "doctor", "admin", "password-reset", "peer"]
+        );
     }
 }

@@ -1,4 +1,6 @@
+pub mod activity_handlers;
 pub mod admin_handlers;
+pub mod admin_team_handlers;
 pub mod appointment_handlers;
 pub mod article_handlers;
 pub mod auth_handlers;
@@ -9,12 +11,17 @@ pub mod client_error_handlers;
 pub mod config_handlers;
 pub mod consultation_handlers;
 pub mod doctor_handlers;
+pub mod doctor_verification_handlers;
+pub mod facility_handlers;
 pub mod grievance_handlers;
 pub mod legal_handlers;
 pub mod notification_handlers;
 pub mod patient_handlers;
+pub mod peer_chat_handlers;
+pub mod peer_handlers;
 pub mod prescription_handlers;
 pub mod profile_picture_handlers;
+pub mod qna_audit_handlers;
 pub mod wallet_handlers;
 pub mod webhook_handlers;
 

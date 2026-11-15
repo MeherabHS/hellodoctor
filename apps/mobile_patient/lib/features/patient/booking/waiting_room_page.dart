@@ -8,13 +8,15 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/tokens.dart';
-import '../../../core/l10n/kenya_time.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/patient_widgets.dart';
 import '../../../l10n/app_localizations.dart';
 import '../chat/chat_repository.dart';
 import '../chat/patient_chat_page.dart';
+import '../consultation/consultation_scene.dart';
 import '../consultation/post_consultation_page.dart';
+import '../directory/directory_repository.dart';
+import '../modules/afya_module_widgets.dart';
 import '../grievance/grievance_modal.dart';
 import '../grievance/grievance_repository.dart';
 import '../home/home_models.dart';
@@ -22,6 +24,7 @@ import '../profile/family_profiles_cubit.dart';
 import '../video/agora_call_page.dart';
 import 'booking_repository.dart';
 import 'join_eligibility.dart';
+import 'pre_consult_intake_modal.dart';
 import 'waiting_room_cubit.dart';
 
 /// `prototype/index.html` view-10 — "Scheduled Consultation" / Waiting Room.
@@ -199,80 +202,62 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
         backgroundColor: PatientTokens.bg,
         body: SafeArea(
           child: Column(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-              child: Row(children: [
-                IconButton(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  icon: const Icon(Icons.arrow_back, size: 20),
-                ),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(
-                      isVideo
-                          ? l10n.waitingRoomVideoTitle
-                          : l10n.waitingRoomChatTitle,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: PatientTokens.text)),
-                  Text(l10n.waitingRoomDoctorInitiated,
-                      style: const TextStyle(
-                          fontSize: 11, color: PatientTokens.textSub)),
-                ]),
-              ]),
-            ),
+            // Product owner's waiting-room design: illustrated banner.
+            const ConsultationHeader(art: 'waiting_room_header', wideArt: true),
             Expanded(
               child: BlocBuilder<WaitingRoomCubit, WaitingRoomState>(
                 builder: (context, state) {
                   return ListView(
                     padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
                     children: [
-                      PatientCard(
-                        child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const CircleAvatar(
-                                radius: 25,
-                                backgroundColor: PatientTokens.primaryLight,
-                                child: Icon(Icons.medical_services,
-                                    color: PatientTokens.primaryDark),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(appointment.doctorDisplayName,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              color: PatientTokens.text)),
-                                      Text(appointment.primarySpecialty,
-                                          style: const TextStyle(
-                                              fontSize: 11.5,
-                                              color: PatientTokens.textSub)),
-                                      const SizedBox(height: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 8, vertical: 3),
-                                        decoration: BoxDecoration(
-                                            color: PatientTokens.primaryLight,
-                                            borderRadius:
-                                                BorderRadius.circular(6)),
-                                        child: Text(
-                                            l10n.waitingRoomSlotLabel(
-                                                _formatSlot(l10n,
-                                                    appointment.startTime)),
-                                            style: const TextStyle(
-                                                fontSize: 10.5,
-                                                fontWeight: FontWeight.w700,
-                                                color:
-                                                    PatientTokens.primaryDark)),
-                                      ),
-                                    ]),
-                              ),
-                              StatusChip(_statusLabel(l10n, state.status)),
-                            ]),
-                      ),
+                      if (isVideo &&
+                          const ['CONFIRMED', 'WAITING']
+                              .contains(state.status)) ...[
+                        Row(children: [
+                          const SizedBox(
+                              width: 34,
+                              height: 34,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 4,
+                                  color: PatientTokens.primary,
+                                  backgroundColor: PatientTokens.primaryLight)),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(l10n.waitingTitle,
+                                      style: const TextStyle(
+                                          fontSize: 19,
+                                          fontWeight: FontWeight.w800,
+                                          color: PatientTokens.navy)),
+                                  const SizedBox(height: 2),
+                                  Text(l10n.waitingBody,
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          height: 1.35,
+                                          color: PatientTokens.textSub)),
+                                ]),
+                          ),
+                        ]),
+                        const SizedBox(height: 14),
+                      ] else ...[
+                        Text(
+                            isVideo
+                                ? l10n.waitingRoomVideoTitle
+                                : l10n.waitingRoomChatTitle,
+                            style: const TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                color: PatientTokens.navy)),
+                        const SizedBox(height: 12),
+                      ],
+                      ConsultationDoctorCard(
+                          appointment: appointment,
+                          photos: DirectoryRepository(widget.repo.api),
+                          verifiedLabel: l10n.waitingVerifiedDoctor,
+                          trailing:
+                              StatusChip(_statusLabel(l10n, state.status))),
                       const SizedBox(height: 12),
                       if (state.status == 'COMPLETED')
                         Column(children: [
@@ -320,11 +305,44 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
                         'WAITING',
                         'IN_CONSULTATION'
                       ].contains(state.status))
-                        const Padding(
-                            padding: EdgeInsets.all(14),
-                            child: Text(
-                                'Your consultation opens after payment is confirmed.'))
+                        Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Text(l10n.waitingRoomNotActive))
                       else ...[
+                        if (isVideo) ...[
+                          Text(l10n.waitingConnectionTitle,
+                              style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: PatientTokens.navy)),
+                          const SizedBox(height: 10),
+                          _ConnectionTiles(
+                              permissions: _permissionResult,
+                              checking: _checkingPermissions,
+                              online:
+                                  widget.repo.connectivity?.isOffline != true,
+                              onCheck: _testPermissions),
+                          const SizedBox(height: 14),
+                        ],
+                        // Pre-consultation documents (product owner,
+                        // 2026-11-13): saved to Health Records under this
+                        // consultation, for both video and chat.
+                        AfyaInfoCard(
+                            icon: Icons.upload_file_rounded,
+                            title: l10n.waitingRoomUploadTitle,
+                            body: l10n.waitingRoomUploadBody),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                            onPressed: () => showModalBottomSheet<void>(
+                                context: context,
+                                isScrollControlled: true,
+                                builder: (_) => PreConsultIntakeModal(
+                                    doctorName: appointment.doctorDisplayName,
+                                    appointmentId: appointment.id,
+                                    repo: widget.repo)),
+                            icon: const Icon(Icons.attach_file_rounded),
+                            label: Text(l10n.waitingRoomUploadAction)),
+                        const SizedBox(height: 14),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -418,26 +436,25 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
                             ),
                           ),
                         ],
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed:
-                                _checkingPermissions ? null : _testPermissions,
-                            icon: _checkingPermissions
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2))
-                                : const Icon(Icons.videocam_outlined, size: 16),
-                            label: Text(l10n.waitingRoomTestCameraMic),
-                          ),
-                        ),
-                        if (_permissionResult != null) ...[
-                          const SizedBox(height: 8),
-                          _PermissionSummary(result: _permissionResult!),
+                        if (isVideo) ...[
+                          const SizedBox(height: 14),
+                          AfyaInfoCard(
+                              icon: Icons.info_outline_rounded,
+                              title: l10n.waitingKeepOpenTitle,
+                              body: l10n.waitingKeepOpenBody),
                         ],
+                        const SizedBox(height: 14),
+                        OutlinedButton.icon(
+                            onPressed: () => Navigator.of(context).maybePop(),
+                            icon: const Icon(Icons.call_end_rounded, size: 22),
+                            label: Text(l10n.waitingLeave),
+                            style: OutlinedButton.styleFrom(
+                                foregroundColor: PatientTokens.urgentIcon,
+                                side: const BorderSide(
+                                    color: PatientTokens.urgentIcon,
+                                    width: 1.5),
+                                minimumSize: const Size.fromHeight(52),
+                                shape: const StadiumBorder())),
                         const SizedBox(height: 18),
                         Center(
                           child: TextButton.icon(
@@ -476,60 +493,101 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
         'EXPIRED' => l10n.apptStatusExpired,
         _ => status,
       };
-
-  String _formatSlot(AppLocalizations l10n, DateTime start) {
-    // Both sides of the "today" comparison are Nairobi wall-clock, never the
-    // device's own zone.
-    final eat = kenyaTime(start);
-    final today = kenyaTime(DateTime.now());
-    final isToday = eat.year == today.year &&
-        eat.month == today.month &&
-        eat.day == today.day;
-    final time = formatTimeEat(start);
-    return '${isToday ? l10n.todayLabel : '${eat.day}/${eat.month}'}, $time';
-  }
 }
 
-class _PermissionSummary extends StatelessWidget {
-  const _PermissionSummary({required this.result});
-  final Map<Permission, PermissionStatus> result;
+/// Camera, microphone and internet readiness (waiting-room design). Camera
+/// and microphone show the real permission state once checked; tapping
+/// either asks the system for both. Internet reflects the connectivity hint.
+class _ConnectionTiles extends StatelessWidget {
+  const _ConnectionTiles(
+      {required this.permissions,
+      required this.checking,
+      required this.online,
+      required this.onCheck});
+  final Map<Permission, PermissionStatus>? permissions;
+  final bool checking, online;
+  final VoidCallback onCheck;
 
   @override
   Widget build(BuildContext context) {
-    final allGranted = result.values.every((s) => s.isGranted);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color:
-            allGranted ? const Color(0xFFF0FDF4) : PatientTokens.warningLight,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(children: [
-        Icon(allGranted ? Icons.check_circle : Icons.warning_amber_rounded,
-            size: 18,
-            color:
-                allGranted ? const Color(0xFF059669) : PatientTokens.amberText),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            allGranted
-                ? AppLocalizations.of(context).waitingRoomPermissionsGranted
-                : AppLocalizations.of(context).waitingRoomPermissionsDenied,
-            style: TextStyle(
-                fontSize: 11.5,
-                color: allGranted
-                    ? const Color(0xFF065F46)
-                    : PatientTokens.amberText),
+    final l = AppLocalizations.of(context);
+    Widget tile(IconData icon, String name, bool? ok, String state,
+        {VoidCallback? onTap}) {
+      final good = ok == true;
+      final color = ok == null
+          ? PatientTokens.navInactive
+          : good
+              ? PatientTokens.primary
+              : PatientTokens.danger;
+      return Expanded(
+        child: Material(
+          color: good ? const Color(0xFFF0FBF5) : PatientTokens.surface,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(
+                  color:
+                      good ? const Color(0xFFBFE8D2) : PatientTokens.border)),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(icon, size: 26, color: color),
+                  if (ok != null) ...[
+                    const SizedBox(width: 6),
+                    Icon(
+                        good ? Icons.check_circle_rounded : Icons.error_rounded,
+                        size: 20,
+                        color: color),
+                  ],
+                ]),
+                const SizedBox(height: 6),
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: PatientTokens.navy)),
+                Text(state,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12, color: PatientTokens.textSub)),
+              ]),
+            ),
           ),
         ),
+      );
+    }
+
+    bool? granted(Permission p) => permissions?[p]?.isGranted;
+    String label(bool? ok) => checking
+        ? '…'
+        : ok == null
+            ? l.waitingTapToCheck
+            : ok
+                ? l.waitingReady
+                : l.waitingNotAllowed;
+    final cam = granted(Permission.camera),
+        mic = granted(Permission.microphone);
+    return IntrinsicHeight(
+      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        tile(Icons.videocam_outlined, l.waitingCamera, cam, label(cam),
+            onTap: checking ? null : onCheck),
+        const SizedBox(width: 8),
+        tile(Icons.mic_none_rounded, l.waitingMicrophone, mic, label(mic),
+            onTap: checking ? null : onCheck),
+        const SizedBox(width: 8),
+        tile(Icons.wifi_rounded, l.waitingInternet, online,
+            online ? l.waitingConnected : l.waitingNoConnection),
       ]),
     );
   }
 }
 
-/// Why Join is (not) available, straight from the server-derived eligibility:
-/// "Your consultation room opens at [time] EAT" with a countdown, instead of a
-/// generic connection error after tapping a button that could never work.
 class _JoinGateNotice extends StatelessWidget {
   const _JoinGateNotice({required this.join, required this.l10n});
   final JoinEligibility join;

@@ -3,6 +3,7 @@ module.exports = {
   output: 'standalone',
   reactStrictMode: true,
   poweredByHeader: false,
+  devIndicators: false,
   async headers() {
     return [{ source: '/:path*', headers: [
       { key: 'X-Frame-Options', value: 'DENY' },

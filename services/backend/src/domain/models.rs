@@ -18,6 +18,8 @@ pub enum UserRole {
     Support,
     Compliance,
     SecurityAdmin,
+    /// Peer Navigator: a trained, non-clinical supporter (2026-11-14).
+    Peer,
 }
 
 impl UserRole {
@@ -32,6 +34,7 @@ impl UserRole {
             UserRole::Support => "SUPPORT",
             UserRole::Compliance => "COMPLIANCE",
             UserRole::SecurityAdmin => "SECURITY_ADMIN",
+            UserRole::Peer => "PEER",
         }
     }
 
@@ -46,6 +49,7 @@ impl UserRole {
             "SUPPORT" => Some(UserRole::Support),
             "COMPLIANCE" => Some(UserRole::Compliance),
             "SECURITY_ADMIN" => Some(UserRole::SecurityAdmin),
+            "PEER" => Some(UserRole::Peer),
             _ => None,
         }
     }
@@ -195,6 +199,9 @@ pub enum LegalDocumentType {
     PatientTerms,
     PatientPrivacyNotice,
     PatientDataRights,
+    PeerTerms,
+    PeerPrivacyNotice,
+    PeerConductSafeguarding,
 }
 
 impl LegalDocumentType {
@@ -211,6 +218,9 @@ impl LegalDocumentType {
             LegalDocumentType::PatientTerms => "PATIENT_TERMS",
             LegalDocumentType::PatientPrivacyNotice => "PATIENT_PRIVACY_NOTICE",
             LegalDocumentType::PatientDataRights => "PATIENT_DATA_RIGHTS",
+            LegalDocumentType::PeerTerms => "PEER_TERMS",
+            LegalDocumentType::PeerPrivacyNotice => "PEER_PRIVACY_NOTICE",
+            LegalDocumentType::PeerConductSafeguarding => "PEER_CONDUCT_SAFEGUARDING",
         }
     }
 }
@@ -832,15 +842,6 @@ pub struct PasswordResetRequest {
     pub otp_expires_at: DateTime<Utc>,
     pub authorization_hash: Option<String>,
     pub authorization_expires_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct PhoneOtp {
-    pub phone_number: String,
-    pub code_hash: String,
-    pub attempts: i16,
-    pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
 }
 

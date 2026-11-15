@@ -8,9 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../directory/directory_models.dart';
 import '../profile/family_profile_chip_row.dart';
 import '../profile/family_profiles_cubit.dart';
-import 'add_payment_method_sheet.dart';
 import 'booking_cubit.dart';
-import 'booking_models.dart';
 
 import 'booking_repository.dart';
 
@@ -58,9 +56,7 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
     _cubit = BookingCubit(widget.repo,
         doctorId: widget.doctor.id, modality: widget.modality)
       ..loadSlots()
-      ..loadBookingPolicy()
-      ..loadPaymentMethods(
-          profileId: widget.familyProfilesCubit.state.activeProfileId);
+      ..loadBookingPolicy();
     _availabilityRefresh = AvailabilityRefresh(() {
       if (mounted && !_cubit.state.submitting && _cubit.state.result == null) {
         _cubit.loadSlots();
@@ -75,10 +71,6 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
     _complaintController.dispose();
     super.dispose();
   }
-
-  String get _fee => widget.modality == 'VIDEO'
-      ? widget.doctor.consultationFeeVideo
-      : widget.doctor.consultationFeeChat;
 
   Future<void> _submit() async {
     final activeProfileId = widget.familyProfilesCubit.state.activeProfileId;
@@ -123,13 +115,8 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
     final l10n = AppLocalizations.of(context);
     return BlocProvider.value(
       value: _cubit,
-      child: BlocListener<FamilyProfilesCubit, FamilyProfilesState>(
-        bloc: widget.familyProfilesCubit,
-        listenWhen: (previous, current) =>
-            previous.activeProfileId != current.activeProfileId,
-        listener: (context, state) =>
-            _cubit.loadPaymentMethods(profileId: state.activeProfileId),
-        child: Scaffold(
+      child: Builder(
+        builder: (context) => Scaffold(
           backgroundColor: PatientTokens.bg,
           body: SafeArea(
             child: Column(children: [
@@ -210,26 +197,19 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                             hintText: l10n.bookingReasonHint,
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        // Same booking steps in both modes. Only the payment itself
-                        // (method picker, charge) is switched off by the server's
-                        // booking policy.
-                        _FeeSummary(
-                            doctor: widget.doctor,
-                            modality: widget.modality,
-                            paymentRequired: state.paymentRequired),
                         if (widget.modality == 'VIDEO') ...[
                           const SizedBox(height: 10),
                           const _ChatIncludedCallout(),
                         ],
-                        if (state.paymentRequired) ...[
-                          const SizedBox(height: 14),
-                          _PaymentMethodPicker(
-                            state: state,
-                            cubit: _cubit,
-                            profileId: widget
-                                .familyProfilesCubit.state.activeProfileId,
-                          ),
+                        // Payment-free app: a server that requires payment is a
+                        // configuration problem, never a checkout.
+                        if (state.policyLoadFailed) ...[
+                          const SizedBox(height: 10),
+                          InlineError(l10n.bookingPolicyUnavailable,
+                              onRetry: _cubit.loadBookingPolicy),
+                        ] else if (state.paymentBlocked) ...[
+                          const SizedBox(height: 10),
+                          InlineError(l10n.bookingUnavailableConfiguration),
                         ],
                         if (state.submitError != null) ...[
                           const SizedBox(height: 6),
@@ -259,10 +239,7 @@ class _PatientBookingPageState extends State<PatientBookingPage> {
                             height: 18,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white))
-                        : Text(
-                            state.paymentRequired
-                                ? l10n.bookingProceedToPayment(_fee)
-                                : l10n.bookingConfirmNoPayment,
+                        : Text(l10n.bookingConfirmNoPayment,
                             textAlign: TextAlign.center,
                             style:
                                 const TextStyle(fontWeight: FontWeight.w800)),
@@ -631,219 +608,4 @@ class _ChatIncludedCallout extends StatelessWidget {
       ]),
     );
   }
-}
-
-class _FeeSummary extends StatelessWidget {
-  const _FeeSummary(
-      {required this.doctor,
-      required this.modality,
-      required this.paymentRequired});
-  final PublicDoctorDto doctor;
-  final String modality;
-  final bool paymentRequired;
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final fee = modality == 'VIDEO'
-        ? doctor.consultationFeeVideo
-        : doctor.consultationFeeChat;
-    return PatientCard(
-      child: Column(children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(modality == 'VIDEO' ? l10n.bookingFeeVideo : l10n.bookingFeeChat,
-              style:
-                  const TextStyle(fontSize: 12, color: PatientTokens.textSub)),
-          Text(l10n.bookingFeeAmount(fee),
-              style: const TextStyle(fontWeight: FontWeight.w700)),
-        ]),
-        const SizedBox(height: 6),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(l10n.bookingPlatformGatewayFee,
-              style:
-                  const TextStyle(fontSize: 12, color: PatientTokens.textSub)),
-          Text(l10n.bookingFree,
-              style: const TextStyle(
-                  color: PatientTokens.primary, fontWeight: FontWeight.w700)),
-        ]),
-        if (modality == 'VIDEO') ...[
-          const SizedBox(height: 6),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Flexible(
-                child: Text(l10n.bookingChatRow,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: PatientTokens.primary,
-                        fontWeight: FontWeight.w700))),
-            Text(l10n.bookingIncludedFree,
-                style: const TextStyle(
-                    color: PatientTokens.primary, fontWeight: FontWeight.w700)),
-          ]),
-        ],
-        const Divider(height: 20),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(
-              paymentRequired
-                  ? l10n.bookingTotalPayable
-                  : l10n.bookingPayableNow,
-              style: const TextStyle(fontWeight: FontWeight.w800)),
-          Flexible(
-              child: Text(
-                  paymentRequired
-                      ? l10n.bookingFeeAmount(fee)
-                      : l10n.bookingFeeAmount('0'),
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: PatientTokens.primary,
-                      fontSize: 16))),
-        ]),
-        if (!paymentRequired) ...[
-          const SizedBox(height: 2),
-          Align(
-              alignment: Alignment.centerRight,
-              child: Text(l10n.bookingPaymentDeferred,
-                  style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: PatientTokens.textSub))),
-        ],
-      ]),
-    );
-  }
-}
-
-/// Real checkout payment-method picker — replaces the old hardcoded
-/// "M-PESA" chip this section used to show regardless of what the patient
-/// actually had saved. Lists every saved `patient_payment_methods` row as a
-/// selectable chip (mirrors `_SlotGrid`'s tap-to-select style, deliberately
-/// not a `FilledButton` so the bottom nav's own submit button remains the
-/// only `FilledButton` on this page), with an inline "+ Add" action when the
-/// patient has none yet, or wants another.
-class _PaymentMethodPicker extends StatelessWidget {
-  const _PaymentMethodPicker(
-      {required this.state, required this.cubit, required this.profileId});
-  final BookingState state;
-  final BookingCubit cubit;
-  final String? profileId;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    return PatientCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(l10n.bookingPaymentMethodLabel,
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: PatientTokens.text)),
-          const SizedBox(height: 10),
-          if (state.loadingPaymentMethods)
-            Text(l10n.bookingPaymentMethodLoading,
-                style:
-                    const TextStyle(fontSize: 12, color: PatientTokens.textSub))
-          else if (state.paymentMethodsError != null)
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(state.paymentMethodsError!,
-                  style: const TextStyle(
-                      fontSize: 12, color: PatientTokens.danger)),
-              TextButton(
-                onPressed: () => cubit.loadPaymentMethods(profileId: profileId),
-                child: Text(AppLocalizations.of(context).retryButton),
-              ),
-            ])
-          else ...[
-            if (state.paymentMethods.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Text(l10n.bookingPaymentMethodNone,
-                    style: const TextStyle(
-                        fontSize: 12, color: PatientTokens.textSub)),
-              )
-            else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final method in state.paymentMethods)
-                    _PaymentMethodChip(
-                      method: method,
-                      selected: state.selectedPaymentMethodId == method.id,
-                      defaultLabel: l10n.bookingPaymentMethodDefaultBadge,
-                      onTap: () => cubit.selectPaymentMethod(method.id),
-                    ),
-                ],
-              ),
-            const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: () =>
-                  showAddPaymentMethodSheet(context, profileId: profileId),
-              child: Text(state.paymentMethods.isEmpty
-                  ? l10n.bookingAddMpesaNumber
-                  : l10n.bookingAddAnotherMpesaNumber),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _PaymentMethodChip extends StatelessWidget {
-  const _PaymentMethodChip({
-    required this.method,
-    required this.selected,
-    required this.defaultLabel,
-    required this.onTap,
-  });
-  final PatientPaymentMethodDto method;
-  final bool selected;
-  final String defaultLabel;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          decoration: BoxDecoration(
-            color: selected ? PatientTokens.primary : PatientTokens.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-                color: selected ? PatientTokens.primary : PatientTokens.border),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(selected ? Icons.check_circle : Icons.radio_button_unchecked,
-                size: 16,
-                color: selected ? Colors.white : PatientTokens.textSub),
-            const SizedBox(width: 6),
-            Text(method.maskedDestination,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: selected ? Colors.white : PatientTokens.text)),
-            if (method.isPrimary) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? Colors.white.withValues(alpha: 0.2)
-                      : PatientTokens.primaryLight,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(defaultLabel,
-                    style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w800,
-                        color: selected
-                            ? Colors.white
-                            : PatientTokens.primaryDark)),
-              ),
-            ],
-          ]),
-        ),
-      );
 }

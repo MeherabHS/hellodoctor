@@ -38,9 +38,27 @@ abstract class TokenStore {
   Future<void> clear();
 }
 
+/// The Android preferences file that has always held session tokens: the
+/// plugin's own default name, so naming it changes no stored data.
+const sessionSecureStorageFile = 'FlutterSecureStorage';
+
+/// Session storage with its preferences file named explicitly.
+///
+/// flutter_secure_storage 9.x on Android keeps one native instance and only
+/// *sets* the preferences file name when a call supplies one; it never resets
+/// it to the default (`FlutterSecureStorage.ensureOptions`). After any call
+/// from a store with its own file (reminders, boot diagnostics), every later
+/// call that omits the name silently reads and writes that other file. Session
+/// tokens then read back as null, requests go out unauthenticated and the
+/// session is expired locally. Every store in this app therefore names its
+/// file on every call.
+const sessionSecureStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(sharedPreferencesName: sessionSecureStorageFile),
+);
+
 class SecureTokenStore implements TokenStore {
   SecureTokenStore([FlutterSecureStorage? storage])
-      : storage = storage ?? const FlutterSecureStorage();
+      : storage = storage ?? sessionSecureStorage;
   final FlutterSecureStorage storage;
   @override
   Future<String?> read(String key) => storage.read(key: key);
@@ -159,6 +177,22 @@ void validateMobileDeployment({
       'ENVIRONMENT=development and ALLOW_INSECURE_HTTP=true.',
     );
   }
+}
+
+final _uuidPattern = RegExp(
+    r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}');
+
+/// Debug-only session diagnostics. Records *why* a 401, refresh or local
+/// session expiry happened (path with ids redacted, server error code and
+/// message, token-presence booleans) and never a token, proof or body.
+/// Compiled out of release builds by the `kDebugMode` guard.
+void authDiag(String event, [Map<String, Object?> fields = const {}]) {
+  if (!kDebugMode) return;
+  final details = fields.entries
+      .map((e) =>
+          '${e.key}=${e.value is String ? (e.value as String).replaceAll(_uuidPattern, ':id') : e.value}')
+      .join(' ');
+  debugPrint('[auth-diag] $event $details');
 }
 
 class ApiClient {
@@ -324,8 +358,25 @@ class ApiClient {
               options.path.startsWith('/auth/')) {
             return handler.next(error);
           }
+          if (kDebugMode) {
+            final body = error.response?.data;
+            final err =
+                body is Map && body['error'] is Map ? body['error'] : null;
+            authDiag('http401', {
+              'path': options.path,
+              'code': err?['code'],
+              'message': err?['message'],
+              'retried': options.extra['retried'] == true,
+              'gen': _sessionGeneration,
+              'hasAuthHeader': options.headers.containsKey('Authorization'),
+              'hasProofHeader': options.headers.containsKey('X-Device-Proof'),
+              'storedAccess': await _storage.read('access_token') != null,
+              'storedRefresh': await _storage.read('refresh_token') != null,
+              'deviceBound': await _storage.read('device_bound'),
+            });
+          }
           if (options.extra['retried'] == true) {
-            await expireSession();
+            await expireSession(reason: 'retried request still 401');
             return handler.next(error);
           }
           try {
@@ -366,8 +417,7 @@ class ApiClient {
   final Dio _dio;
   final DeviceProofSigner _proofSigner;
 
-  bool _isSessionEstablishment(String path) =>
-      path.endsWith('/verify-otp') || path.endsWith('/verify-otp-and-login');
+  bool _isSessionEstablishment(String path) => path.endsWith('/verify-otp');
 
   Future<void> _attachDeviceProof(RequestOptions options) async {
     if (!_proofSigner.enabled) return;
@@ -450,6 +500,12 @@ class ApiClient {
     final generation = _sessionGeneration;
     try {
       final refresh = await read('refresh_token');
+      authDiag('refresh.start', {
+        'gen': generation,
+        'hasRefresh': refresh != null,
+        'storedRefresh': await _storage.read('refresh_token') != null,
+        'deviceBound': await _storage.read('device_bound'),
+      });
       if (refresh == null) throw const ApiException(401, '');
       final response = await _refreshDio.post<dynamic>(
         '/auth/refresh',
@@ -464,14 +520,29 @@ class ApiClient {
         await _storage.write('refresh_token', data['refresh_token'] as String);
       });
     } on DioException catch (e) {
+      final body = e.response?.data;
+      authDiag('refresh.failed', {
+        'status': e.response?.statusCode,
+        'type': e.type.name,
+        'message': body is Map && body['error'] is Map
+            ? body['error']['message']
+            : null,
+        'sameGen': generation == _sessionGeneration,
+      });
       if (generation == _sessionGeneration) _observeUnexpectedTransport(e);
       if (generation == _sessionGeneration &&
           (e.response?.statusCode == 401 || e.response?.statusCode == 403)) {
-        await expireSession();
+        await expireSession(reason: 'refresh rejected');
       }
       throw _mapError(e);
-    } on ApiException {
-      if (generation == _sessionGeneration) await expireSession();
+    } on ApiException catch (e) {
+      authDiag('refresh.aborted', {
+        'status': e.status,
+        'sameGen': generation == _sessionGeneration,
+      });
+      if (generation == _sessionGeneration) {
+        await expireSession(reason: 'refresh aborted locally');
+      }
       rethrow;
     }
   }
@@ -639,6 +710,7 @@ class ApiClient {
 
   Future<void> saveTokens(String access, String refresh) async {
     final generation = ++_sessionGeneration;
+    authDiag('session.save', {'gen': generation});
     await _serializeSessionStorage(() async {
       if (generation != _sessionGeneration) return;
       await _storage.write('access_token', access);
@@ -683,11 +755,13 @@ class ApiClient {
 
   Future<void> clearSession() async {
     ++_sessionGeneration;
+    authDiag('session.clear', {'gen': _sessionGeneration});
     _refresh = null;
     await _serializeSessionStorage(_storage.clear);
   }
 
-  Future<void> expireSession() async {
+  Future<void> expireSession({String reason = 'unspecified'}) async {
+    authDiag('session.expire', {'reason': reason, 'gen': _sessionGeneration});
     await clearSession();
     onSessionExpired?.call();
   }

@@ -87,6 +87,17 @@ pub enum Action {
     /// Milestone 6B/6C.
     ManageCampaigns,
     ManageArticles,
+    /// Facilities & Services directory: create, edit, photos, publish, archive.
+    ManageFacilities,
+    /// Review (approve or flag) doctors' answers to patient questions.
+    ReviewQnaAnswers,
+    /// List Admins and invite, resend or revoke Admin invitations.
+    ManageAdminTeam,
+
+    /// A Peer Navigator's own profile, slots and (later) requests and chats.
+    PeerSelf,
+    /// Admin review of Peer Navigators (approve, reject, suspend).
+    ManagePeerNavigators,
 }
 
 pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
@@ -139,7 +150,13 @@ pub fn authorize(ctx: &AuthContext, action: Action) -> Result<(), AppError> {
         | ManagePlatformPaymentMethod
         | ExecuteDataRightsAction
         | ManageCampaigns
-        | ManageArticles => matches!(ctx.role, Admin),
+        | ManageArticles
+        | ManageFacilities
+        | ReviewQnaAnswers
+        | ManageAdminTeam
+        | ManagePeerNavigators => matches!(ctx.role, Admin),
+
+        PeerSelf => matches!(ctx.role, Peer),
     };
 
     if allowed {

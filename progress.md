@@ -1,4 +1,4 @@
-# HelloDoctor / AfyaMkononi — Work Log (this Claude Code session)
+# HelloDoctor / AfyaMkononi — Work Log
 
 This file is a durable record of completed work across the session's tasks.
 For the *exact* point to resume from right now, read `checkpoint.md` instead —
@@ -287,3 +287,134 @@ this session). (source-level impact
   appointment → Real Agora consultation → Clinical completion → Notifications
   and records → only then restore `ENVIRONMENT=production` with
   `FINANCIAL_MODULE_MODE=deferred`.
+
+
+## Task 5 — Patient Flutter UI replication (IN PROGRESS, 2026-11-12 to 2026-11-13)
+
+Scope: `apps/mobile_patient` only. Branch `feature/patient-ui-replication`, uncommitted. No repository, cubit, model, network, backend or schema file was changed for presentation work. `flutter analyze` clean; `flutter test` 462 of 462 (407 before this task).
+
+Authorities, by product-owner instruction: the reference collage `docs/design/afyamkononi-patient-ui-reference.jpeg`, the v2.1 brief (root docx), and individual designs supplied during the task. `CLAUDE.md` was edited to record each decision.
+
+### 5.1 Discovery (complete)
+
+Five documents in `docs/patient-ui/`: discovery report, screen inventory, component map, emulator workflow, redesign plan. Key findings: 36 screens; old tabs were Home, Services, Blogs, Account; Peer Navigator, Reminders, Facilities, videos and audio had no client or backend code; every endpoint the app calls exists.
+
+### 5.2 Built
+
+| Area | What changed |
+|---|---|
+| Theme | `PatientTokens` extended with the reference palette; primary green now `#009A73` |
+| Shell | Tabs Home, Services, Messages, Profile; Messages built on first visit; module screens show the bottom bar |
+| Home | Brand header, greeting, search pill (opens Services), hero, 3 × 3 module grid, upcoming-consultation card when one exists, offline state |
+| Modules | One list drives Home and Services. Screens for education hub, support chat (over the existing Q&A), peer navigator (layout only), reminders, health records hub, facilities (layout only), consultation landing, privacy, more |
+| Reminders | New local feature: encrypted on-device storage per account, Android local notifications, once/daily/weekly/monthly, cancelled on sign-out and re-armed on sign-in. No backend |
+| Messages, Profile | Redesigned from the design language |
+| Auth | Log in, create account, forgot password; header artwork plus native card; scrolls; independent of screen size |
+| Notifications, Find a Doctor | Headers and empty states to the supplied designs |
+| Consultation | Confirmed, waiting room and completion screens restyled on the existing pages; join gating, payment and polling logic untouched |
+| Q&A | Topic list is now HIV Testing, PrEP, ART, Sexual Health, Stigma & Mental Health, Other |
+
+New files: `core/widgets/afya_widgets.dart`, `core/widgets/afya_bottom_nav.dart`, `features/auth/auth_scene.dart`, `features/patient/modules/*`, `features/patient/reminders/*`, `features/patient/consultation/consultation_scene.dart`, `features/patient/home/upcoming_consultation_section.dart`, `assets/brand`, `assets/illustrations`, `assets/auth`.
+
+Deleted: `features/patient/home/emergency_contact_banner.dart` (the banner left Home by product-owner decision; the number constant is still used on the consultation landing).
+
+Android manifest: `RECEIVE_BOOT_COMPLETED` and the two `flutter_local_notifications` receivers, for reminders.
+
+Tests added: `auth_scene_adaptive_test.dart` (31), `reminders_test.dart` (16), `post_consultation_layout_test.dart` (8). Tests edited: tab labels in `patient_navigation_safe_area_test.dart`; auth button and label copy in `auth_navigation_test.dart`; localization delegates added to `patient_chat_list_deferred_fee_test.dart`, `consultation_booking_test.dart`, `pre_e2e_availability_payment_test.dart`.
+
+### 5.3 Deliberate differences from the designs
+
+- Card 3 on Home is "Book Consultation", not "Book Testing, PrEP or ART".
+- "Start Video Call" is "Book a Video Consultation" and opens doctor discovery; calls stay slot-booked and join-window gated.
+- No sample facilities, reminders, records, consultation summaries or follow-up plans are shown; those need data the app does not have.
+- Registration keeps required email, date of birth and gender; forgot password is email-code only.
+- The GHI staff dashboard and multi-channel panels are not in the Patient app.
+
+### 5.4 Open
+
+- Sign-out defect (see `checkpoint.md`).
+- Screens not yet redesigned, emulator captures still missing, and outstanding decisions: listed in `checkpoint.md` and in `docs/patient-ui/PATIENT_UI_REPLICATION_STATUS.md`.
+
+### 5.5 Backend work the redesign implies (assessment, nothing built)
+
+Sizes are rough judgements from reading the backend, not estimates from a plan.
+
+| Item | What exists | What is missing | Size |
+|---|---|---|---|
+| Book Consultation, waiting room, call, completion | Everything | Nothing | None |
+| Health Records (prescriptions, uploads) | Everything | Nothing | None |
+| 15-minute consultation reminder | `CONSULTATION_REMINDER_15M` | Nothing | None |
+| Support chat topics | Free-text category on questions | Optional server-side category filter | Small |
+| Education topic filter | Article categories and tags in the schema | A category or tag parameter on the patient feed, a patient-readable category list, seeded topics | Small |
+| Messages inbox previews and unread badges | `last_message_at` on conversations; a doctor-only chat list | A patient conversations endpoint with last message and unread count | Small |
+| Help & Support, emergency number config | Legal documents endpoint | Content or config endpoints | Small |
+| Consultation summary and follow-up plan on the completion screen | Clinical outcome only | A patient-visible summary and plan written by the doctor: schema, doctor-side entry, patient read | Medium (touches Doctor app or Doctor Web) |
+| Facilities directory | Nothing | Table and migration, Admin CRUD and Admin Web screens, patient list and detail endpoints, map-link validation | Medium |
+| Videos and audio | Nothing (article media accepts cover images only) | Content model, storage or links, Admin authoring, patient endpoints | Medium |
+| Reminder sync across devices | Nothing (reminders are local) | Optional; table and endpoints if wanted | Small to medium, optional |
+| Peer Navigator | Nothing | New role, registration branch, Admin approval, patient-facing directory, chat-request state machine, conversations not tied to an appointment, call authorisation for peer sessions, access rules and tests; also Doctor Flutter and Admin Web changes | Large |
+
+Summary: the app as it now stands needs **no backend work to ship**. The small items are each roughly a day or two. Facilities and video content are each roughly a week of backend plus Admin Web. Peer Navigator is the one heavy piece, on the order of several weeks across backend, Doctor app and Admin Web.
+
+
+## Task 6 — Doctor Flutter UI replication and Peer Navigator discovery (IN PROGRESS, 2026-11-13)
+
+Scope: `apps/mobile` only; uncommitted. Target is the Doctor reference board in `docs/design/` reproduced pixel for pixel (product-owner instruction; recorded in `CLAUDE.md` rule 2). Discovery, plan, Peer Navigator gap analysis and per-screen status are in `docs/doctor-ui/`; read `DOCTOR_UI_REPLICATION_STATUS.md` first.
+
+- Discovery complete: 35 screens; the mobile consultation-completion screen is unreachable; no backend for doctor notes, patient list or record, or structured prescriptions; no Peer Navigator support anywhere.
+- Design preview: `flutter run -t lib/dev/design_preview_main.dart` opens the signed-in screens with labelled sample data, no login. Debug only.
+- Batch A built: login, two-step registration, account-under-review and other approval states, splash; new theme colours. Password-reset and legal-agreement screens have the new theme but not yet a reworked layout.
+- `flutter analyze` clean; `flutter test` 324 passed, 10 golden-image tests failing as they did before the work (platform font drift; goldens will need regenerating on CI).
+
+
+## Task 7 — Patient post-rebuild gap analysis (DIAGNOSTIC COMPLETE, 2026-11-13)
+
+Report: `docs/patient-ui/PATIENT_POST_REBUILD_GAP_ANALYSIS.md`. No product code, backend, configuration or migration was changed.
+
+- Baseline: HEAD `3c09124` + uncommitted redesign; Flutter 3.47.6 / Dart 3.13.5; `flutter analyze` 0 issues; `flutter test` 462/462; debug APK built and run on `Pixel_9` (API 37) against the local backend.
+- Runtime verified: registration, email code, session restore, Home, Services, Messages, Profile, nine module screens, notification inbox, data rights, English and Swahili, text scale 1.3, 360 dp.
+- Not testable locally: every consultation flow (no doctors, slots or appointments in the local database), push delivery (FCM transport is a no-op locally), Peer (no backend).
+- Defects found: intermittent sign-out after sign-in (P0, root cause unverified); Notification settings never loads; password reset blocked outside development with a misleading message; Home card ignores server join data; chat booking missing from Book Consultation; Profile chips overflow at 1.3 (open since baseline); plus visual and copy items. Counts P0 3, P1 9, P2 19.
+- Fixture run (approved): one synthetic doctor, three slots, a video and a chat booking. Verified: directory, profile, EAT slots, deferred booking, confirmation, waiting room, permissions, RTC token (shared channel), server completion, PHI-free notifications. New defects: deferred chat bookings never get a conversation (P0); no API sets doctor fees; completion screen/history unreachable after the fact; consultation copy contradictions. Final counts P0 4, P1 12, P2 25.
+- Next: fix P0-1 (sign-out) and P0-4 (deferred chat activation), then a two-client video test.
+
+## Task 8 — Patient remediation, education topics and Facilities & Services (2026-11-13)
+
+All uncommitted on `fix/p0-consultation-repair`.
+
+- **Gap map:** `docs/patient-ui/PATIENT_REMEDIATION_GAP_MAP.md` re-checks the 41 gap-analysis findings against the code (15 fixed, 19 open, 6 blocked or needing a decision, 1 deferred).
+- **Password reset:** the unconditional staging/production refusal was removed; it now requires the three Azure email settings (product owner verified delivery). Patient app shows an honest "reset unavailable" message. Backend password-reset tests 15/15.
+- **HIV Prevention & Sexual Health:** six topic pages with per-topic banners and empty states, topic-linked articles (`article_categories.topic_key`), videos as YouTube-linked articles (`admin_articles.video_url`), quizzes tab, audio empty state, restyled reader, app header on hub and topic pages. Migration `20261211000001` (with down). `docs/patient-ui/EDUCATION_TOPICS.md`.
+- **Android Back:** `android:enableOnBackInvokedCallback="true"` added; Back on pushed pages had closed the app on Android 16+ (target SDK 36).
+- **Facilities & Services:** Admin CMS, backend (migration `20261212000001`, with down), Patient directory and details with server-computed opening status, no distance. Report: `docs/facilities/FACILITIES_IMPLEMENTATION_REPORT.md`.
+- **Local dev environment:** Azurite blob emulator `hd-azurite` (127.0.0.1:10000) with containers `clinical-local` and `articles-local`; the dev backend is started with Azurite settings from a scratchpad launcher (process environment only). Local admin password was reset at the product owner's request. Synthetic facilities and three "(local test)" articles exist in the local database.
+- **Standalone quizzes:** Admin Web "Quiz Manager" creates quizzes not tied to an article (`admin_articles.standalone_quiz`, migration `20261213000001`, with down). Feed `?kind=quiz`; the Patient Quizzes tab lists standalone quizzes first, then article quizzes. A standalone quiz's intro does not mention reading an article. Backend `admin_quizzes` 10/10.
+- **Single-Admin approval:** any Admin, including the author, may approve and publish articles, videos, quizzes and quiz revisions, sensitive or not (CLAUDE.md rule 7). Migration `20261214000001_single_admin_approval` (reversible). Backend `admin_articles` 16/16.
+- **Verified end to end (local, 2026-11-13):** through the Admin Web routes, an article with a cover, a YouTube video, an article quiz, a standalone quiz and a facility were created and published; on the emulator the Patient app shows each: cover in the topic list and reader, video opening the CDC video in YouTube, standalone quiz answered with feedback.
+- **Tests:** Patient 515/515, analyze clean. Admin Web 105/106 (the one failure needs a separately provisioned Redis fixture; unrelated). Full backend suite (2026-11-13, `--test-threads=2`): unit 216/216; integration 556 passed, 17 failed, 5 ignored. All 17 pass when rerun with `--test-threads=1`: they share Redis-backed test state (admission control, rate limits, reservations) and interfere when run in parallel. Net 573 passed, 0 failing.
+- **Android Back on tabs (D-08c) fixed:** Back on Services, Messages or Profile returns to Home; Back on Home leaves the app (`PopScope` on `PatientShell`, test in `auth_navigation_test.dart`).
+- **Facilities map strip removed** (product owner): the decorative map picture under the directory and its asset `assets/illustrations/facilities_map.png` are gone.
+- **Committed** as `4633445` (2026-11-14).
+
+## Task 9 — Admin Web redesign, team, security and notifications (2026-11-14, committed `54f8582`)
+
+Product owner replaced the prototype look with five AfyaMkononi Admin boards (`docs/design/admin/`). Decisions, removals and per-step status: `docs/admin-ui/ADMIN_REDESIGN_PLAN.md` (CLAUDE.md rule 2 updated; patient conditions are never shown in Admin). Endpoint and rule details: `docs/API_SPEC.md` §8 and the sections dated 2026-11-14 at its end.
+
+- **Shell and design system:** green grouped sidebar, breadcrumb top bar, tokens and Plus Jakarta Sans (self-hosted), shared components (`components/ui/afya.tsx`), new login page.
+- **Pages:** all 15 rebuilt (Dashboard, Patients + record, Doctor Verification + review + clinician detail, Slot Matrix, Incidents, Grievances with appeals, Rx & Q&A Audit, Articles + editor, Topics & Categories, Quizzes, Facilities + editor, Campaigns + editor, three Finance pages), plus the Admin Team group: **Admins & Invitations** and **Activity Log**.
+- **Q&A answer audit and grievance appeals:** migrations `20261215000001`, `20261215000002` (reversible).
+- **Admin invitations:** migration `20261216000001` (reversible). No self-registration; invite by email; single-use link valid 5 minutes, token stored only as a hash; HTML email with instructions; resend and revoke; the invitee sets phone and password at `/invite` (token removed from the address bar). Inviting and resending re-check the Admin's current password (403 on a wrong one, audited as `ADMIN_REAUTH_FAILED`, 5 failures per 15 minutes; correct passwords never count). Admins table shows who invited whom.
+- **Activity Log:** `GET /admin/activity`, visible to every Admin, live every 10 s; areas, action search, only mine, load older. Admins named by email, patients and doctors by role, no record contents.
+- **Notifications:** `GET /admin/notifications`; Admin Web pops up other Admins' actions, new doctor applications, new grievances (number only), new incidents (severity and component only) and security events, with a **View** link; bell with unread count. Own actions, sign-ins and record views do not notify.
+- **Forgot password for Admins:** `/forgot-password` (email, 6-digit code, new password) on the existing protected reset flow.
+- **Simulate failure removed** from App Errors & Incidents (backend simulate routes remain refused in production; backend tests use them).
+- **Security hardening:** privilege sweep over every `/admin` route (`tests/cases/admin_access_sweep.rs`); forged role claims refused and audited; proxy path guard (`src/lib/proxyPath.ts`); HSTS in production; backend `Cache-Control: no-store` default; media BFF relays only image/JSON; Admin text sanitized at the source (`sanitize::content_issue`, `validate_admin_text_field`); emails ASCII-only with ASCII lowercasing (`normalize_email`); the product owner's 20-item checklist reviewed item by item (`docs/API_SPEC.md`, "Security checklist review").
+- **Soft caching:** backend content cache for published articles and facilities (`src/content_cache.rs`, role-keyed, cleared on every Admin change); Admin Web 3-second read cache cleared on every write.
+- **Admin request queue:** two `/admin` requests at a time, reads retried on 503 (`src/lib/adminQueue.mjs`).
+- **Bugs fixed:** patient "Last visit" empty; Command Center "of N registered"; dead patient filters; unconfirmed tag not treated as unsaved; invite page marked valid links invalid in development (token read twice).
+- **Line endings:** `.gitattributes` keeps `services/backend/migrations/*.sql` LF (an earlier CRLF rewrite stopped the backend with `VersionMismatch`).
+- **Tests at commit:** backend unit 224/224; targeted integration suites 143 + 17 passed, 0 failed; clippy clean (also on the staged snapshot alone). Admin Web 120/121 + 28/28 (the refresh test needs its Redis fixture), tsc clean, lint 1 old warning. Schema verified on the dev database at `20261216000001`. End-to-end screenshots `docs/admin-ui/screenshots/21`–`36`.
+- **Left out of the commit:** Doctor-app work (`apps/mobile/**`, `consultation_service.rs`, `prescription_service.rs`, the Rx dispatch test in `tests/api_tests.rs`, `docs/doctor-ui/consultation-schedule.md`, two doctor schedule reference images), the stray Android project at the repo root, the Patient UI `.docx` and an empty `services/backend/abac.rs`.
+- **Local only:** while taking screenshots the reauth lockout and the per-IP login limit triggered as designed; the counters were cleared in the local dev Redis only. Several `invited.*@example.test` / `joined.*@example.test` Admin accounts now exist in the local database.
+
+- **Open (Task 8):** Facilities screenshots in `docs/facilities/screenshots/` predate the Nearby and map-strip removals (product owner is checking the app directly); full-size art for the Facilities empty state; Swahili review.

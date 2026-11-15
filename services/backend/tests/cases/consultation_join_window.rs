@@ -100,6 +100,14 @@ async fn test_too_early_is_denied_with_stable_code_and_issues_no_session(pool: P
     let (app, pool) = test_app_with_config(pool, deferred_config()).await;
     let b = book(&app, &pool).await;
     move_slot(&pool, b.slot, 16).await; // 16 minutes before start: closed
+                                        // A confirmed booking is activated at booking time (session INITIALIZED,
+                                        // never started), for payment-free bookings exactly as for paid ones.
+    let sessions_before: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM consultation_sessions WHERE appointment_id = $1")
+            .bind(b.apt)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
 
     for token in [&b.patient, &b.doctor] {
         let (status, body) = mint(&app, &b, token).await;
@@ -118,9 +126,18 @@ async fn test_too_early_is_denied_with_stable_code_and_issues_no_session(pool: P
             .await
             .unwrap();
     assert_eq!(
-        sessions, 0,
+        sessions, sessions_before,
         "an ineligible attempt must not create a consultation session"
     );
+    let started: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM consultation_sessions WHERE appointment_id = $1 \
+         AND (started_at IS NOT NULL OR status::text <> 'INITIALIZED')",
+    )
+    .bind(b.apt)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(started, 0, "an ineligible attempt must not start a session");
 }
 
 #[sqlx::test(migrations = "./migrations")]

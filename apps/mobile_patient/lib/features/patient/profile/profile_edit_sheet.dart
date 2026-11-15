@@ -36,6 +36,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
   late final TextEditingController _weightController;
   late final TextEditingController _emergencyPhoneController;
   late final TextEditingController _emergencyRelationController;
+  late final TextEditingController _addressController;
   late String _gender;
   String? _error;
 
@@ -51,6 +52,8 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
         TextEditingController(text: p.emergencyContactPhone ?? '');
     _emergencyRelationController =
         TextEditingController(text: p.emergencyContactRelation ?? '');
+    _addressController =
+        TextEditingController(text: p.residentialAddress ?? '');
     _gender = p.gender;
   }
 
@@ -62,6 +65,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
     _weightController.dispose();
     _emergencyPhoneController.dispose();
     _emergencyRelationController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -83,6 +87,14 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
 
   Future<void> _submit() async {
     setState(() => _error = null);
+    final address = _addressController.text.trim();
+    if (widget.profile.residentialAddress != null || address.isNotEmpty) {
+      if (address.length < 3 || address.length > 300) {
+        setState(
+            () => _error = AppLocalizations.of(context).profileAddressInvalid);
+        return;
+      }
+    }
     String? normalizedPhone;
     if (_emergencyPhoneController.text.trim().isNotEmpty) {
       normalizedPhone = normalizeKenyaPhone(_emergencyPhoneController.text);
@@ -111,6 +123,7 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
               _emergencyRelationController.text.trim().isEmpty
                   ? null
                   : _emergencyRelationController.text.trim(),
+          residentialAddress: address.isEmpty ? null : address,
         );
     if (!mounted) return;
     if (ok) {
@@ -172,6 +185,15 @@ class _ProfileEditSheetState extends State<_ProfileEditSheet> {
                     child: Text(AppLocalizations.of(context).genderOther)),
               ],
               onChanged: (value) => setState(() => _gender = value ?? _gender),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _addressController,
+              keyboardType: TextInputType.streetAddress,
+              maxLength: 300,
+              decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context).profileAddress,
+                  counterText: ''),
             ),
             const SizedBox(height: 10),
             TextField(

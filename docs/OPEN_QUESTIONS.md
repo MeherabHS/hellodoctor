@@ -31,6 +31,7 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Affected Components:** `services/backend/src/services/payment_service.rs`, `adminPage_finance`.
 - **Safe Default:** Implement an abstract `PaymentGateway` trait in Rust with a direct bKash/M-Pesa simulator for development and pluggable drivers for aggregators.
 - **Blocks Implementation?** **NON-BLOCKER.** Implementation can proceed using the simulator driver.
+- **Decision (2026-11-14, product owner):** Finance comes later, not now. The financial module stays deferred (`financial_module_deferred`); no gateway is chosen yet.
 
 ---
 
@@ -40,12 +41,14 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Affected Components:** `services/backend/src/services/auth_service.rs`.
 - **Safe Default:** Implement mock OTP logger in development mode (fixed code `584920` or printed to console logs) while providing configurable environment variables (`SMS_API_KEY`, `SMS_SENDER_ID`) for production.
 - **Blocks Implementation?** **NON-BLOCKER.**
+- **Decision (2026-11-14, product owner):** No SMS. No SMS provider will be provisioned.
 
 ---
 
 ### Q-NEW-1: What jurisdiction-specific medical record retention periods apply? (KE)
 - **Question:** How long must clinical data be stored legally based on jurisdiction?
 - **Blocks Implementation?** **NON-BLOCKER.**
+- **Status (2026-11-14):** Still open for the stored records themselves: prescriptions and patient uploads are kept indefinitely and are not purged. Separately decided: a doctor can open their own consultation's prescriptions and patient uploads only until 20 days after the consultation ended (migration `20261221000002_doctor_document_20_day_window`); patients and Admins keep access.
 
 ### Q-NEW-2: Payment-hold terminology
 - **Decision:** Use `PAYMENT_HELD` and payment-hold terminology throughout product, API, database, and financial operations documents. Do not describe the arrangement as legal escrow unless counsel and the payment provider explicitly approve that classification.
@@ -57,3 +60,11 @@ The following items were clarified by reverse-engineering `index.html` and need 
 ### Q-NEW-4: What Agora data-region configuration is needed for KE compliance?
 - **Question:** What Agora data-region configuration is needed for KE compliance?
 - **Blocks Implementation?** **NON-BLOCKER.**
+- **Decision (2026-11-14, product owner):** Decided by the product owner; no open question remains.
+
+### Q-NEW-5: Product decisions recorded 2026-11-14 (product owner)
+- **Patient intake uploads:** a patient can remove their own uploaded page and upload the right one while the consultation still accepts uploads (live payment hold, CONFIRMED, WAITING, IN_CONSULTATION). After that the upload stays in the record. Migration `20261221000001_patient_intake_removal`; `GET`/`DELETE /appointments/:id/prescriptions[/:document_id]`.
+- **Health Records:** the reference panel's Share Access tab is removed, not shown as unavailable.
+- **Reminders:** stay on the device only (encrypted local storage, no server copy); they do not survive a reinstall or a new phone. Accepted as is.
+- **Doctor Web earnings note:** Doctor Web's Earnings page and Statement intentionally do not render the "Total calculation is based including the platform charge 20%" note; the Doctor Web dashboard, Doctor mobile and Admin Web still do.
+- **Book Consultation wording:** "Book a Video Consultation" (slot-booked) instead of the reference's "Start Video Call" is correct.

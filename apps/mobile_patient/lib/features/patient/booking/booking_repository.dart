@@ -2,6 +2,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/client_error_reporter.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/validation/upload_validation.dart';
+import '../home/home_models.dart';
 import 'booking_models.dart';
 import 'join_eligibility.dart';
 
@@ -193,6 +194,37 @@ class BookingRepository {
     }
   }
 
+  /// `GET /appointments/:id/prescriptions` — this consultation's uploaded
+  /// pages (metadata only) and whether they can still be changed. Never
+  /// cached: a stale list could offer to remove a page that is already gone.
+  Future<IntakeUploads> intakeUploads(String appointmentId) async {
+    try {
+      requireOnline();
+      final raw =
+          _data(await api.get('/appointments/$appointmentId/prescriptions'));
+      return IntakeUploads.fromJson(Map<String, dynamic>.from(raw as Map));
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Booking', operation: 'list_intake');
+      rethrow;
+    }
+  }
+
+  /// `DELETE /appointments/:id/prescriptions/:documentId` — removes one of
+  /// the patient's own uploaded pages while the consultation still accepts
+  /// uploads, so the right page can be uploaded instead.
+  Future<void> removeIntake(String appointmentId, String documentId) async {
+    try {
+      requireOnline();
+      _data(await api
+          .delete('/appointments/$appointmentId/prescriptions/$documentId'));
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Booking', operation: 'remove_intake');
+      rethrow;
+    }
+  }
+
   /// `GET /appointments/:id` — used by the Waiting Room to poll for a status
   /// change while a patient waits (e.g. cancelled elsewhere). No caching:
   /// a stale read here could mislead a patient into waiting for a
@@ -206,6 +238,45 @@ class BookingRepository {
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'WaitingRoom', operation: 'poll_appointment');
+      rethrow;
+    }
+  }
+
+  /// `GET /appointments/:id` as a full summary (doctor, times, modality,
+  /// status, outcome and server join eligibility), so a notification or
+  /// history entry is always resolved from the latest server state rather
+  /// than from what the notification said when it was sent. No caching.
+  Future<AppointmentSummaryDto> appointmentSummary(String appointmentId) async {
+    try {
+      requireOnline();
+      final raw = _data(await api.get('/appointments/$appointmentId'));
+      return AppointmentSummaryDto.fromJson(
+          Map<String, dynamic>.from(raw as Map));
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'Appointment', operation: 'resolve');
+      rethrow;
+    }
+  }
+
+  /// `GET /patients/me/appointments?status=…` — consultation history.
+  /// [status] is `upcoming` or `past`; no caching (history drives routing).
+  Future<List<AppointmentSummaryDto>> myAppointments(String status,
+      {String? profileId}) async {
+    try {
+      requireOnline();
+      final raw = _data(await api.get('/patients/me/appointments', query: {
+        'status': status,
+        'limit': 100,
+        if (profileId != null) 'profile_id': profileId,
+      }));
+      return (raw as List)
+          .map((e) => AppointmentSummaryDto.fromJson(
+              Map<String, dynamic>.from(e as Map)))
+          .toList();
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'ConsultationHistory', operation: 'load');
       rethrow;
     }
   }

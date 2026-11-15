@@ -286,7 +286,7 @@ async fn scrub_step(state: &AppState, id: Uuid, claim: Uuid) -> Result<(), AppEr
         if !deleted {
             let suffix = short_suffix(job.profile_id);
             if job.profile_kind == "PATIENT" {
-                sqlx::query("UPDATE patient_profiles SET full_name=$2,date_of_birth=DATE '1900-01-01',blood_group=NULL,weight_kg=NULL,emergency_contact_phone=NULL,emergency_contact_relation=NULL,profile_picture_object_key=NULL,profile_picture_bucket=NULL,profile_picture_content_hash=NULL,profile_picture_mime_type=NULL,profile_picture_size_bytes=NULL,profile_picture_updated_at=NULL,updated_at=clock_timestamp() WHERE id=$1")
+                sqlx::query("UPDATE patient_profiles SET full_name=$2,date_of_birth=DATE '1900-01-01',residential_address=NULL,blood_group=NULL,weight_kg=NULL,emergency_contact_phone=NULL,emergency_contact_relation=NULL,profile_picture_object_key=NULL,profile_picture_bucket=NULL,profile_picture_content_hash=NULL,profile_picture_mime_type=NULL,profile_picture_size_bytes=NULL,profile_picture_updated_at=NULL,updated_at=clock_timestamp() WHERE id=$1")
                     .bind(job.profile_id).bind(format!("Deleted Patient {suffix}")).execute(&mut *tx).await?;
             } else {
                 sqlx::query("UPDATE doctor_profiles SET full_name=$2,residential_address='[ERASED]',verified_phone=$3,is_on_duty=false,profile_picture_object_key=NULL,profile_picture_bucket=NULL,profile_picture_content_hash=NULL,profile_picture_mime_type=NULL,profile_picture_size_bytes=NULL,profile_picture_updated_at=NULL,updated_at=clock_timestamp() WHERE id=$1")
