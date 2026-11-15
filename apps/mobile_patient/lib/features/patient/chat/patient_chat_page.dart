@@ -18,6 +18,7 @@ import '../grievance/grievance_repository.dart';
 import 'chat_cubit.dart';
 import 'chat_models.dart';
 import 'chat_repository.dart';
+import '../../../core/utils/initials.dart';
 
 /// `prototype/index.html` view-6 — "Consultation Chat & Digital Rx". Scoped
 /// to plain-text messaging plus a real "Report Issue" grievance shortcut
@@ -377,8 +378,16 @@ class _PatientChatPageState extends State<PatientChatPage> {
                             maxLength: 2000,
                             style: const TextStyle(fontSize: 12.5),
                             decoration: InputDecoration(
+                                // The pill around the field is the only
+                                // border; the theme's outlined states would
+                                // draw a second one inside it.
                                 filled: false,
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
+                                focusedErrorBorder: InputBorder.none,
                                 hintText: l10n.chatInputHint,
                                 isDense: true,
                                 counterText: '',
@@ -508,18 +517,7 @@ class _ChatTopBar extends StatelessWidget {
     );
   }
 
-  String _initialsOf(String name) {
-    final words = name
-        .replaceAll('Dr.', '')
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .toList();
-    if (words.isEmpty) return '?';
-    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-    return (words.first.substring(0, 1) + words.last.substring(0, 1))
-        .toUpperCase();
-  }
+  String _initialsOf(String name) => nameInitials(name);
 }
 
 const _avatarPalette = <(Color, Color)>[

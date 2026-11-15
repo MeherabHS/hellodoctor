@@ -533,6 +533,9 @@ impl ConsultationService {
         outcome: ClinicalOutcome,
     ) -> Result<(), AppError> {
         let mut tx = state.begin_authed(ctx).await?;
+        // The same per-consultation lock Rx uploads take, so a page upload
+        // and completion serialize: no page can land after COMPLETED.
+        appointment_repo::lock_for_document_upload(&mut *tx, appointment_id).await?;
         Self::complete_in_transaction(&mut tx, ctx, appointment_id, outcome).await?;
         tx.commit().await?;
         Ok(())

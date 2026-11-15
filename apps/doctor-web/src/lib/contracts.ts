@@ -3,7 +3,7 @@ import { joinGate, lockedMessage, type JoinInfo } from './join-window.ts';
 export type { JoinInfo } from './join-window.ts';
 export type RecordDto = Record<string, unknown>;
 export interface Profile { id: string; user_id: string; full_name: string; license_number: string; license_authority: string; current_hospital: string; primary_specialty: string; is_verified: boolean; professional_verification_status: 'PENDING' | 'VERIFIED' | 'REJECTED'; license_country: string; professional_verification_note?: string | null; qualifications: string[] }
-export interface Appointment { /** Server-derived join eligibility (authoritative policy). */ join?: JoinInfo; queue_actionable?: boolean; id: string; appointment_number: string; patient_id: string; patient_display_name: string; modality: string; status: string; doctor_lifecycle: string; start_time: string; end_time: string; history_access_from: string; history_access_until: string | null; history_access_active: boolean; clinical_outcome: string | null; conversation_id?: string | null; chat_expires_at?: string | null; chat_locked?: boolean | null }
+export interface Appointment { /** Server-derived join eligibility (authoritative policy). */ join?: JoinInfo; queue_actionable?: boolean; id: string; appointment_number: string; patient_id: string; patient_display_name: string; /** Doctor Web redesign: from the RLS-visible patient row, null when not visible. */ patient_age?: number | null; patient_sex?: string | null; modality: string; status: string; doctor_lifecycle: string; start_time: string; end_time: string; history_access_from: string; history_access_until: string | null; history_access_active: boolean; clinical_outcome: string | null; conversation_id?: string | null; chat_expires_at?: string | null; chat_locked?: boolean | null }
 export interface Slot { bookable?: boolean; id: string; status: string; start_time: string; end_time: string; appointment_id: string | null; patient_display_name: string | null }
 export interface Conversation { id: string; appointment_id: string; patient_display_name: string; expires_at: string; is_locked: boolean; last_message_at: string | null; modality?: string; appointment_status?: string }
 export interface Message { id: string; sender_id: string; content: string; sent_at: string; attachment_id?: string; attachment?: {id:string;display_name:string;mime_type:string;size_bytes:number}|null }
@@ -81,8 +81,8 @@ export function paymentRequiredFromPolicy(data: { payment_required?: boolean } |
 export function safeBackendPath(path: string, method: string): boolean {
   const id = '[0-9a-fA-F-]{36}';
   const routes: [string, string][] = [
-    ['GET|POST', 'doctor/articles'], ['GET|PATCH', `doctor/articles/${id}`], ['POST', `doctor/articles/${id}/(?:publish|archive)`],
-    ['GET|PATCH', 'doctor/profile'], ['GET|PUT', 'doctor/duty'], ['GET|POST', 'doctor/slots'],
+    ['GET|POST', 'doctor/articles'], ['GET|PATCH', `doctor/articles/${id}`], ['POST', `doctor/articles/${id}/(?:publish|archive|cover)`], ['GET|POST', 'doctor/verification/submissions'],
+    ['GET|PATCH', 'doctor/profile'], ['POST|DELETE', 'doctor/profile/photo'], ['POST', 'auth/change-password'], ['GET|PUT', 'doctor/duty'], ['GET|POST', 'doctor/slots'],
     ['DELETE|PATCH', `doctor/slots/${id}`], ['GET', 'doctor/appointments'], ['GET', `appointments/${id}/conversation`], ['POST', `appointments/${id}/trace-ack`], ['GET', 'doctor/chats'],
     ['GET', `doctor/appointments/${id}/patient-history(?:/${id})?`],
     ['GET', `doctor/consultations/${id}/summary`], ['GET', 'doctor/qna/questions'],

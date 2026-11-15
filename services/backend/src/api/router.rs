@@ -153,6 +153,12 @@ pub fn create_router_with_metrics(state: AppState, metrics_handle: PrometheusHan
     // Layers execute from last to first: authenticate before preparing any
     // idempotency context. Public credentials/download grants never use it.
     let protected = protected_routes()
+        // Innermost: runs after auth, around the handler, so it can see
+        // whether the handler wrote its own audit row.
+        .route_layer(from_fn_with_state(
+            state.clone(),
+            crate::api::middleware::admin_audit::middleware,
+        ))
         .route_layer(from_fn_with_state(
             state.clone(),
             content_cache_invalidation,
@@ -329,10 +335,6 @@ fn public_routes() -> Router<AppState> {
             get(prescription_handlers::download_document),
         )
         .route(
-            "/auth/register-otp",
-            axum::routing::post(auth_handlers::register_otp),
-        )
-        .route(
             "/auth/patient/register",
             axum::routing::post(auth_handlers::patient_register),
         )
@@ -345,16 +347,32 @@ fn public_routes() -> Router<AppState> {
             axum::routing::post(auth_handlers::patient_verify_otp),
         )
         .route(
-            "/auth/verify-otp-and-login",
-            axum::routing::post(auth_handlers::verify_otp_and_login),
-        )
-        .route(
             "/auth/doctor/login",
             axum::routing::post(auth_handlers::doctor_login),
         )
         .route(
             "/auth/doctor/register",
             axum::routing::post(auth_handlers::doctor_register),
+        )
+        .route(
+            "/auth/peer/register",
+            axum::routing::post(crate::api::v1::peer_handlers::register),
+        )
+        .route(
+            "/auth/care/login",
+            axum::routing::post(crate::api::v1::peer_handlers::care_login),
+        )
+        .route(
+            "/auth/care/verify-otp",
+            axum::routing::post(crate::api::v1::peer_handlers::care_verify_otp),
+        )
+        .route(
+            "/auth/peer/login",
+            axum::routing::post(crate::api::v1::peer_handlers::login),
+        )
+        .route(
+            "/auth/peer/verify-otp",
+            axum::routing::post(crate::api::v1::peer_handlers::verify_otp),
         )
         .route(
             "/legal/documents",
@@ -461,6 +479,8 @@ fn protected_routes() -> Router<AppState> {
         .route("/doctor/articles/:id", get(article_handlers::own_detail).patch(article_handlers::update))
         .route("/doctor/articles/:id/publish", axum::routing::post(article_handlers::publish))
         .route("/doctor/articles/:id/archive", axum::routing::post(article_handlers::archive))
+        .route("/doctor/verification/submissions", get(crate::api::v1::doctor_verification_handlers::own_submissions).post(crate::api::v1::doctor_verification_handlers::submit).layer(axum::extract::DefaultBodyLimit::max(crate::api::v1::doctor_verification_handlers::MAX_SUBMISSION_BODY)))
+        .route("/doctor/articles/:id/cover", axum::routing::post(crate::services::article_media_service::doctor_upload).layer(axum::extract::DefaultBodyLimit::max(crate::services::article_media_service::MAX_COVER_UPLOAD * 4 / 3 + 1024)))
         .route("/articles", get(article_handlers::feed))
         .route("/articles/:id", get(article_handlers::detail))
         .route("/articles/:id/quiz", get(patient_quiz_handlers::read))
@@ -480,7 +500,7 @@ fn protected_routes() -> Router<AppState> {
         .route("/admin/article-categories/:id", axum::routing::patch(admin_article_handlers::edit_category).delete(admin_article_handlers::delete_category))
         .route("/admin/articles", get(admin_article_handlers::list).post(admin_article_handlers::create))
         .route("/admin/articles/:id", get(admin_article_handlers::detail).patch(admin_article_handlers::edit))
-        .route("/admin/articles/:id/cover", get(crate::services::article_media_service::admin_cover).post(crate::services::article_media_service::upload).layer(axum::extract::DefaultBodyLimit::max(crate::services::article_media_service::MAX_COVER_UPLOAD)))
+        .route("/admin/articles/:id/cover", get(crate::services::article_media_service::admin_cover).post(crate::services::article_media_service::upload).layer(axum::extract::DefaultBodyLimit::max(crate::services::article_media_service::MAX_ADMIN_IMAGE_UPLOAD)))
         .route("/admin/articles/:id/:action", post(admin_article_handlers::transition))
         .route("/admin/articles/:id/quiz", get(crate::api::v1::admin_quiz_handlers::get).patch(crate::api::v1::admin_quiz_handlers::save).layer(axum::extract::DefaultBodyLimit::max(crate::domain::article_quizzes::MAX_REQUEST_BYTES)))
         .route("/admin/articles/:id/quiz/import-preview", post(crate::api::v1::admin_quiz_handlers::import_preview).layer(axum::extract::DefaultBodyLimit::max(crate::domain::article_quizzes::MAX_REQUEST_BYTES)))
@@ -497,6 +517,22 @@ fn protected_routes() -> Router<AppState> {
         .route("/doctors/:id/photo", get(crate::api::v1::profile_picture_handlers::get_directory_doctor_photo))
         .route("/doctor/duty", get(doctor_handlers::get_own_duty).put(doctor_handlers::update_own_duty))
         .route("/doctor/slots", get(doctor_handlers::list_own_slots).post(doctor_handlers::create_own_slot))
+        .route("/peer/profile", get(crate::api::v1::peer_handlers::get_profile).patch(crate::api::v1::peer_handlers::update_profile))
+        .route("/peer/slots", get(crate::api::v1::peer_handlers::list_slots).post(crate::api::v1::peer_handlers::create_slot))
+        .route("/peer/slots/:slot_id", axum::routing::delete(crate::api::v1::peer_handlers::cancel_slot))
+        .route("/peers", get(crate::api::v1::peer_handlers::directory))
+        .route("/peers/:peer_id/slots", get(crate::api::v1::peer_handlers::peer_open_slots))
+        .route("/peer-requests", get(crate::api::v1::peer_handlers::list_my_requests).post(crate::api::v1::peer_handlers::create_request))
+        .route("/peer-requests/:id/cancel", axum::routing::post(crate::api::v1::peer_handlers::cancel_request))
+        .route("/peer/requests", get(crate::api::v1::peer_handlers::list_inbox))
+        .route("/peer-chats", get(crate::api::v1::peer_chat_handlers::list))
+        .route("/peer-requests/:id/call", get(crate::api::v1::peer_chat_handlers::call_state))
+        .route("/peer-requests/:id/rtc-token", axum::routing::post(crate::api::v1::peer_chat_handlers::call_token))
+        .route("/peer-chats/:id/messages", get(crate::api::v1::peer_chat_handlers::messages).post(crate::api::v1::peer_chat_handlers::send))
+        .route("/peer-chats/:id/attachments", axum::routing::post(crate::api::v1::peer_chat_handlers::upload_image))
+        .route("/peer-chats/:id/messages/:message_id/attachment", get(crate::api::v1::peer_chat_handlers::view_image))
+        .route("/peer-chats/:id/read", axum::routing::post(crate::api::v1::peer_chat_handlers::mark_read))
+        .route("/peer/requests/:id/:action", axum::routing::post(crate::api::v1::peer_handlers::decide_request))
         .route("/doctor/slots/:slot_id", axum::routing::delete(doctor_handlers::cancel_own_slot).patch(doctor_handlers::update_own_slot))
         .route("/doctor/appointments", get(doctor_handlers::list_own_appointments))
         .route("/appointments/:id/trace-ack", axum::routing::post(crate::api::v1::trace_handlers::acknowledge))
@@ -562,7 +598,12 @@ fn protected_routes() -> Router<AppState> {
         )
         .route(
             "/appointments/:id/prescriptions",
-            axum::routing::post(prescription_handlers::upload_patient_intake),
+            axum::routing::post(prescription_handlers::upload_patient_intake)
+                .get(prescription_handlers::list_patient_intake),
+        )
+        .route(
+            "/appointments/:id/prescriptions/:document_id",
+            axum::routing::delete(prescription_handlers::remove_patient_intake),
         )
         .route(
             "/appointments/:id/documents/:document_id",
@@ -666,6 +707,7 @@ fn protected_routes() -> Router<AppState> {
         // Activity Log: who did what and when, for every Admin.
         .route("/admin/activity", get(activity_handlers::list_activity))
         .route("/admin/notifications", get(activity_handlers::notifications))
+        .route("/admin/audit/views", axum::routing::post(activity_handlers::record_view))
         // Admin Team: invite other Admins by email.
         .route("/admin/team", get(admin_team_handlers::team))
         .route("/admin/team/invitations", axum::routing::post(admin_team_handlers::invite))
@@ -687,6 +729,11 @@ fn protected_routes() -> Router<AppState> {
         )
         // Admin & Telemetry & Governance
         .route("/admin/overview", get(admin_handlers::get_admin_overview))
+        .route("/admin/peers", get(crate::api::v1::peer_handlers::admin_list))
+        .route("/admin/peer-directory", get(crate::api::v1::peer_handlers::admin_directory))
+        .route("/admin/patients/:id/peer-sessions", get(crate::api::v1::peer_handlers::admin_patient_sessions))
+        .route("/admin/peers/:peer_id/history", get(crate::api::v1::peer_handlers::admin_history))
+        .route("/admin/peers/:peer_id/:action", axum::routing::post(crate::api::v1::peer_handlers::admin_decide))
         .route(
             "/admin/doctors",
             get(admin_handlers::list_admin_doctors).post(admin_handlers::create_doctor),
@@ -749,6 +796,8 @@ fn protected_routes() -> Router<AppState> {
             "/admin/doctors/:id/verify",
             axum::routing::post(admin_handlers::verify_doctor_professional_registration),
         )
+        .route("/admin/doctors/:id/verification-submissions", get(crate::api::v1::doctor_verification_handlers::admin_submissions))
+        .route("/admin/doctors/:id/verification-documents/:document_id", get(crate::api::v1::doctor_verification_handlers::admin_document))
         .route(
             "/admin/doctors/:id/reject",
             axum::routing::post(admin_handlers::reject_doctor_professional_registration),

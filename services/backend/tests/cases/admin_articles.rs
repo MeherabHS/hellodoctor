@@ -692,7 +692,7 @@ async fn test_cms_cover_rejects_malformed_spoofed_oversized_and_unconfigured_sto
             &a["id"],
             &a["version"],
             Some(&admin),
-            vec![0; article_media_service::MAX_COVER_UPLOAD + 1],
+            vec![0; article_media_service::MAX_ADMIN_IMAGE_UPLOAD + 1],
             "image/jpeg"
         )
         .await

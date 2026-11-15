@@ -1,5 +1,6 @@
 import {clearSoftReads,request} from './api';
 import {adminFetch} from './adminQueue.mjs';
+import {MAX_ADMIN_IMAGE_UPLOAD} from './imageLimits';
 import type {AdminFacility,FacilityContent,ServiceCategory} from './facilityContent';
 
 export const listFacilities=(query:URLSearchParams)=>request<{items:AdminFacility[];total:number}>(`/admin/facilities?${query}`);
@@ -19,7 +20,7 @@ async function binary(id:string,method:'POST'|'DELETE',version:number,file?:File
   return data.data;
 }
 export async function uploadFacilityImage(id:string,version:number,file:File):Promise<AdminFacility>{
-  if(!['image/jpeg','image/png'].includes(file.type)||file.size>5*1024*1024)throw new Error('Choose a JPEG or PNG up to 5 MB.');
+  if(!['image/jpeg','image/png'].includes(file.type)||file.size>MAX_ADMIN_IMAGE_UPLOAD)throw new Error('Choose a JPEG or PNG up to 25 MB.');
   return binary(id,'POST',version,file);
 }
 export const removeFacilityImage=(id:string,version:number)=>binary(id,'DELETE',version);

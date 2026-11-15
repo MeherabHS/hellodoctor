@@ -8,6 +8,11 @@ pub struct PatientRegistrationProfile {
     pub full_name: String,
     pub date_of_birth: NaiveDate,
     pub gender: Gender,
+    /// Required for new registrations (checked when the challenge is
+    /// created). `default` only so a challenge stored just before this
+    /// field existed still deserializes; it then fails the same check.
+    #[serde(default)]
+    pub residential_address: String,
 }
 use sqlx::PgExecutor;
 

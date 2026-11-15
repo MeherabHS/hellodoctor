@@ -5,6 +5,8 @@ pub async fn insert<'e, E: PgExecutor<'e>>(
     executor: E,
     event: &AuditEvent,
 ) -> Result<(), sqlx::Error> {
+    // Tells the Admin audit layer this request wrote its own audit row.
+    crate::api::middleware::admin_audit::mark_audited();
     sqlx::query(
         "INSERT INTO audit_events (id, actor_id, actor_role, action, resource_type, resource_id, session_id, request_id, ip_hash, result, reason, before_data, after_data, changed_fields, created_at) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)",

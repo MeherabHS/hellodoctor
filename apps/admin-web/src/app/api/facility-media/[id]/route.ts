@@ -1,5 +1,6 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {withAdminSession,backendUrl,backendHeaders} from '@/lib/session';
+import {MAX_ADMIN_IMAGE_UPLOAD} from '@/lib/imageLimits';
 
 // Bounded binary transport for facility photos (same shape as article covers).
 // GET previews the current photo; POST uploads; DELETE removes a draft's photo.
@@ -14,7 +15,7 @@ async function forward(req:NextRequest,id:string){
     if(!['image/jpeg','image/png'].includes(mime))return NextResponse.json({error:'JPEG or PNG required.'},{status:415});
     const reader=req.body?.getReader();if(!reader)return NextResponse.json({error:'Image required.'},{status:400});
     const chunks:Uint8Array[]=[];let size=0;
-    for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>5*1024*1024){await reader.cancel();return NextResponse.json({error:'Photo is limited to 5 MB.'},{status:413});}chunks.push(value);}
+    for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>MAX_ADMIN_IMAGE_UPLOAD){await reader.cancel();return NextResponse.json({error:'Photo is limited to 25 MB.'},{status:413});}chunks.push(value);}
     body=new Uint8Array(size);let offset=0;for(const chunk of chunks){body.set(chunk,offset);offset+=chunk.byteLength;}
   }
   const version=req.nextUrl.searchParams.get('version');

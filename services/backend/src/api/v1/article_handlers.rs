@@ -27,9 +27,57 @@ pub struct ArticleContent {
     pub body: String,
     #[serde(default)]
     pub references_list: Vec<String>,
+    /// Optional topic and Swahili version (Doctor Web). Omitted by older clients, in
+    /// which case an update keeps the stored values; present means replace them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extras: Option<ArticleExtras>,
+}
+#[derive(Deserialize, serde::Serialize, Default, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct ArticleExtras {
+    #[serde(default)]
+    pub topic_key: Option<String>,
+    #[serde(default)]
+    pub swahili: Option<SwahiliContent>,
+}
+#[derive(Deserialize, serde::Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct SwahiliContent {
+    pub title: String,
+    pub summary: String,
+    pub body: String,
+}
+impl ArticleExtras {
+    fn validate(&mut self) -> Result<(), AppError> {
+        if let Some(topic) = &self.topic_key {
+            if !crate::domain::admin_articles::TOPIC_KEYS.contains(&topic.as_str()) {
+                return Err(AppError::Validation(
+                    "Choose one of the listed health topics.".into(),
+                ));
+            }
+        }
+        if let Some(sw) = &mut self.swahili {
+            for (name, text, maximum) in [
+                ("Swahili title", &mut sw.title, 160),
+                ("Swahili summary", &mut sw.summary, 600),
+                ("Swahili article", &mut sw.body, 30000),
+            ] {
+                *text = text.trim().to_owned();
+                if text.is_empty() || text.chars().count() > maximum || text.contains('\0') {
+                    return Err(AppError::Validation(format!(
+                        "{name} must contain 1-{maximum} characters."
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 impl ArticleContent {
     fn validate(&mut self) -> Result<(), AppError> {
+        if let Some(extras) = &mut self.extras {
+            extras.validate()?;
+        }
         for (name, text, maximum) in [
             ("Title", &mut self.title, 160),
             ("Summary", &mut self.summary, 600),
@@ -262,8 +310,12 @@ pub async fn create(
     );
     let mut tx = state.begin_authed(&ctx).await?;
     let id = Uuid::new_v4();
-    let inserted=sqlx::query("INSERT INTO doctor_articles(id,author_id,title,summary,body,references_list,creation_key,creation_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(author_id,creation_key) DO NOTHING")
-        .bind(id).bind(author).bind(&payload.content.title).bind(&payload.content.summary).bind(&payload.content.body).bind(json!(payload.content.references_list)).bind(&payload.creation_key).bind(&hash).execute(&mut *tx).await?.rows_affected()==1;
+    let extras = payload.content.extras.clone().unwrap_or_default();
+    let sw = extras.swahili.clone();
+    let inserted=sqlx::query("INSERT INTO doctor_articles(id,author_id,title,summary,body,references_list,creation_key,creation_hash,topic_key,title_sw,summary_sw,body_sw) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(author_id,creation_key) DO NOTHING")
+        .bind(id).bind(author).bind(&payload.content.title).bind(&payload.content.summary).bind(&payload.content.body).bind(json!(payload.content.references_list)).bind(&payload.creation_key).bind(&hash)
+        .bind(&extras.topic_key).bind(sw.as_ref().map(|s| s.title.clone())).bind(sw.as_ref().map(|s| s.summary.clone())).bind(sw.as_ref().map(|s| s.body.clone()))
+        .execute(&mut *tx).await?.rows_affected()==1;
     let id = if inserted {
         id
     } else {
@@ -300,8 +352,16 @@ pub async fn update(
     let author = ctx.verified_doctor_profile_id(&state).await?;
     payload.content.validate()?;
     let mut tx = state.begin_authed(&ctx).await?;
-    let changed=sqlx::query("UPDATE doctor_articles SET title=$1,summary=$2,body=$3,references_list=$4,version=version+1,updated_at=NOW() WHERE id=$5 AND author_id=$6 AND version=$7 AND status<>'ARCHIVED'")
-        .bind(payload.content.title).bind(payload.content.summary).bind(payload.content.body).bind(json!(payload.content.references_list)).bind(id).bind(author).bind(payload.version).execute(&mut *tx).await?.rows_affected()==1;
+    let replace_extras = payload.content.extras.is_some();
+    let extras = payload.content.extras.clone().unwrap_or_default();
+    let sw = extras.swahili.clone();
+    let changed=sqlx::query("UPDATE doctor_articles SET title=$1,summary=$2,body=$3,references_list=$4,version=version+1,updated_at=NOW(), \
+        topic_key=CASE WHEN $8 THEN $9 ELSE topic_key END, title_sw=CASE WHEN $8 THEN $10 ELSE title_sw END, \
+        summary_sw=CASE WHEN $8 THEN $11 ELSE summary_sw END, body_sw=CASE WHEN $8 THEN $12 ELSE body_sw END \
+        WHERE id=$5 AND author_id=$6 AND version=$7 AND status<>'ARCHIVED'")
+        .bind(payload.content.title).bind(payload.content.summary).bind(payload.content.body).bind(json!(payload.content.references_list)).bind(id).bind(author).bind(payload.version)
+        .bind(replace_extras).bind(&extras.topic_key).bind(sw.as_ref().map(|s| s.title.clone())).bind(sw.as_ref().map(|s| s.summary.clone())).bind(sw.as_ref().map(|s| s.body.clone()))
+        .execute(&mut *tx).await?.rows_affected()==1;
     finish_mutation(tx, &ctx, id, author, changed, "ARTICLE_EDIT").await
 }
 pub async fn publish(

@@ -134,6 +134,7 @@ class ProfileCubit extends Cubit<ProfileState> {
     String? weightKg,
     String? emergencyContactPhone,
     String? emergencyContactRelation,
+    String? residentialAddress,
   }) async {
     if (state.saving) return false;
     emit(state.copyWith(saving: true, error: null));
@@ -146,6 +147,7 @@ class ProfileCubit extends Cubit<ProfileState> {
         weightKg: weightKg,
         emergencyContactPhone: emergencyContactPhone,
         emergencyContactRelation: emergencyContactRelation,
+        residentialAddress: residentialAddress,
       );
       final profile = await repo.profile();
       if (isClosed) return true;

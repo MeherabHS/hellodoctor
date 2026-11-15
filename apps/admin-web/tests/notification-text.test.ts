@@ -16,3 +16,11 @@ test('events route to the page that handles them', () => {
   const forged = describeNotice({id: '6', kind: 'activity', at, action: 'AUTH_ROLE_MISMATCH', resource_type: 'AUTH_SESSION', result: 'DENIED', actor_role: 'PATIENT', actor_email: null});
   assert.equal(forged.tone, 'urgent'); assert.equal(forged.body, 'By a patient.'); assert.equal(forged.page, 'activity');
 });
+
+test('a Peer Navigator sign-up is an attention notice that opens Peer Navigators', () => {
+  const n = describeNotice({id: '7', kind: 'activity', at: '2026-11-15T08:00:00Z', action: 'PEER_NAVIGATOR_CREATED', resource_type: 'PEER_NAVIGATOR', result: 'SUCCESS', actor_role: 'PEER', actor_email: null});
+  assert.equal(n.title, 'New Peer Navigator application');
+  assert.equal(n.page, 'peers');
+  assert.equal(n.tone, 'warning');
+  assert.equal(n.body, 'A Peer Navigator signed up and is waiting for approval.');
+});

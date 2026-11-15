@@ -76,6 +76,37 @@ class NavigationApi extends ApiClient {
   }
 }
 
+const peerChatId = '44444444-4444-4444-8444-444444444444';
+
+/// Owner-scoped peer lists for the peer-support destinations.
+class PeerNavigationApi extends NavigationApi {
+  List<Map<String, dynamic>> peerRequests = [
+    {'id': entityId, 'status': 'ACCEPTED', 'conversation_id': peerChatId}
+  ];
+  List<Map<String, dynamic>> peerChats = [
+    {
+      'id': peerChatId,
+      'request_id': entityId,
+      'counterpart_name': 'Neema Kamau',
+      'support_type': 'CHAT',
+      'request_status': 'ACCEPTED',
+      'start_time': '2026-11-15T10:00:00Z',
+      'unread_count': 1
+    }
+  ];
+  @override
+  Future<Response<dynamic>> get(String path,
+      {Map<String, dynamic>? query}) async {
+    if (path == '/peer-requests' || path == '/peer-chats') {
+      requests.add(path);
+      return Response(
+          requestOptions: RequestOptions(path: path),
+          data: {'data': path == '/peer-chats' ? peerChats : peerRequests});
+    }
+    return super.get(path, query: query);
+  }
+}
+
 class NavigationRepo extends NotificationRepository {
   NavigationRepo(super.api);
   int reads = 0;
@@ -376,5 +407,69 @@ void main() {
         (await NotificationDestination.load(repo, noticeId, doctor: true)).kind,
         NotificationDestinationKind.doctorArticle);
     expect(api.requests.last, '/doctor/articles/$entityId');
+  });
+  test('a peer chat message opens that peer chat from the own chat list',
+      () async {
+    final api = PeerNavigationApi()
+      ..type = 'NEW_CHAT_MESSAGE'
+      ..entityType = 'PEER_CHAT';
+    api.peerChats.first['id'] = entityId;
+    addTearDown(api.dispose);
+    final destination = await NotificationDestination.load(
+        NotificationRepository(api), noticeId,
+        doctor: false);
+    expect(destination.kind, NotificationDestinationKind.peerChat);
+    expect(destination.id, entityId);
+    expect(destination.data['counterpart_name'], 'Neema Kamau');
+    expect(api.requests, ['/notifications/$noticeId', '/peer-chats']);
+  });
+  test('an accepted peer request opens its chat', () async {
+    final api = PeerNavigationApi()
+      ..type = 'PEER_REQUEST_ACCEPTED'
+      ..entityType = 'PEER_REQUEST';
+    addTearDown(api.dispose);
+    final destination = await NotificationDestination.load(
+        NotificationRepository(api), noticeId,
+        doctor: false);
+    expect(destination.kind, NotificationDestinationKind.peerChat);
+    expect(destination.id, peerChatId);
+    expect(api.requests,
+        ['/notifications/$noticeId', '/peer-requests', '/peer-chats']);
+  });
+  test('a peer chat the patient is not part of falls back to the inbox',
+      () async {
+    final api = PeerNavigationApi()
+      ..type = 'NEW_CHAT_MESSAGE'
+      ..entityType = 'PEER_CHAT';
+    addTearDown(api.dispose);
+    // The own list does not contain the notified conversation.
+    expect(
+        (await NotificationDestination.load(
+                NotificationRepository(api), noticeId,
+                doctor: false))
+            .kind,
+        NotificationDestinationKind.inbox);
+    api
+      ..type = 'PEER_REQUEST_ACCEPTED'
+      ..entityType = 'PEER_REQUEST'
+      ..peerRequests = [
+        {'id': entityId, 'status': 'ACCEPTED', 'conversation_id': null}
+      ];
+    expect(
+        (await NotificationDestination.load(
+                NotificationRepository(api), noticeId,
+                doctor: false))
+            .kind,
+        NotificationDestinationKind.inbox);
+    api
+      ..type = 'PEER_REQUEST_DECLINED'
+      ..requests.clear();
+    expect(
+        (await NotificationDestination.load(
+                NotificationRepository(api), noticeId,
+                doctor: false))
+            .kind,
+        NotificationDestinationKind.inbox);
+    expect(api.requests, ['/notifications/$noticeId']);
   });
 }

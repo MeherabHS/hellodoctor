@@ -11,6 +11,8 @@ import '../patient/chat/patient_chat_page.dart';
 import '../patient/booking/booking_repository.dart';
 import '../patient/consultation/appointment_destination.dart';
 import '../patient/home/home_models.dart';
+import '../patient/peer/peer_pages.dart';
+import '../patient/peer/peer_repository.dart';
 import '../patient/profile/family_profiles_cubit.dart';
 import '../patient/profile/profile_cubit.dart';
 import '../patient/profile/profile_repository.dart';
@@ -83,6 +85,19 @@ Future<void> openNotificationDestination(BuildContext context,
                 doctorDisplayName: AppLocalizations.of(context).doctorLabel,
                 repo: ChatRepository(cubit.repo.api),
                 myUserId: profile.userId);
+          case NotificationDestinationKind.peerChat:
+            final chat = PeerChatSummaryDto.fromJson(destination.data);
+            page = PatientPeerChatPage(
+                repo: PatientPeerRepository(cubit.repo.api),
+                bookingRepo: BookingRepository(cubit.repo.api),
+                chatId: chat.id,
+                requestId: chat.requestId,
+                peerName: chat.peerName,
+                requestStatus: chat.requestStatus,
+                myUserId: deps?.myUserId ??
+                    (await ProfileRepository(cubit.repo.api).profile())
+                        .userId);
+            if (!context.mounted || !gate.current) return;
           case NotificationDestinationKind.article:
             page = BlogDetailPage(
                 articleId: destination.id!,
@@ -126,6 +141,7 @@ class NotificationNavigationHost extends StatefulWidget {
 class _HostState extends State<NotificationNavigationHost> {
   final _gate = NotificationTapGate();
   StreamSubscription<String?>? _subscription;
+
   /// Session cubits for appointment destinations. The host is mounted inside
   /// `_SignedInRoot`, which provides both; a host without them (e.g. an
   /// isolated widget) falls back to the plain appointment status page.

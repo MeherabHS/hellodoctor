@@ -85,8 +85,8 @@ void main() {
     test('cached data never shows the card; completed or cancelled never do',
         () {
       final now = DateTime.now().toUtc();
-      final open = appointment(
-          serverNow: now, opensIn: const Duration(minutes: -1));
+      final open =
+          appointment(serverNow: now, opensIn: const Duration(minutes: -1));
       expect(HomeState(upcoming: [open]).homeCardAppointment(), isNotNull);
       expect(HomeState(upcoming: [open], fromCache: true).homeCardAppointment(),
           isNull);
@@ -150,7 +150,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: ConsultationHistoryPage(repo: repo, familyProfilesCubit: family)));
+        home:
+            ConsultationHistoryPage(repo: repo, familyProfilesCubit: family)));
     await tester.pumpAndSettle();
     expect(find.text('You have no current consultations.'), findsOneWidget);
     await tester.tap(find.text('Past'));

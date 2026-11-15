@@ -107,8 +107,7 @@ pub async fn create_patient_user_with_credentials<'e, E: PgExecutor<'e>>(
 
 /// Total active, non-deleted user accounts — the metric `MAX_ACTIVE_USERS`
 /// is checked against before admitting a brand-new registration (see
-/// `auth_service::verify_otp_and_login`'s patient self-registration branch
-/// and `admin_handlers::create_doctor`). Existing users/sessions are never
+/// patient self-registration and `admin_handlers::create_doctor`). Existing users/sessions are never
 /// affected by this count — it only gates new activation.
 pub async fn count_active<'e, E: PgExecutor<'e>>(executor: E) -> Result<i64, sqlx::Error> {
     sqlx::query_scalar("SELECT count(*) FROM users WHERE is_active = TRUE AND deleted_at IS NULL")

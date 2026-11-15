@@ -100,7 +100,7 @@ void main() {
           selectedDate: tomorrow.startTime,
           selectedSlotId: 'tomorrow',
           loadingPolicy: false,
-        paymentRequired: false,
+          paymentRequired: false,
         ),
       );
       final refresh = cubit.loadSlots();
@@ -225,7 +225,8 @@ void main() {
         await family.close();
       },
     );
-  }  test(
+  }
+  test(
       'attachment metadata maps to shared message identity without raw storage URLs',
       () {
     final message = ChatMessageDto.fromJson({

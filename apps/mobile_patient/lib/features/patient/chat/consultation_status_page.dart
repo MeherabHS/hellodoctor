@@ -137,8 +137,8 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
     if (opening) return;
     setState(() => opening = true);
     try {
-      final repo =
-          ChatRepository(widget.repo.api, connectivity: widget.repo.connectivity);
+      final repo = ChatRepository(widget.repo.api,
+          connectivity: widget.repo.connectivity);
       final conversation =
           await repo.conversationForAppointment(widget.appointment.id);
       if (!mounted) return;
@@ -186,19 +186,25 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
         : completed
             ? (l.consultStatusCompletedTitle, l.consultStatusCompletedBody)
             : status == 'IN_CONSULTATION'
-                ? (l.consultStatusInProgressTitle,
+                ? (
+                    l.consultStatusInProgressTitle,
                     video
                         ? l.consultStatusActiveVideoBody
-                        : l.consultStatusActiveChatBody)
+                        : l.consultStatusActiveChatBody
+                  )
                 : active
-                    ? (l.consultStatusConfirmedTitle,
+                    ? (
+                        l.consultStatusConfirmedTitle,
                         video
                             ? l.consultStatusActiveVideoBody
-                            : l.consultStatusActiveChatBody)
+                            : l.consultStatusActiveChatBody
+                      )
                     : ended
                         ? (l.consultStatusEndedTitle, l.consultStatusEndedBody)
-                        : (l.consultStatusNotActiveTitle,
-                            l.consultStatusNotActiveBody);
+                        : (
+                            l.consultStatusNotActiveTitle,
+                            l.consultStatusNotActiveBody
+                          );
 
     return Scaffold(
         backgroundColor: PatientTokens.bg,
@@ -267,7 +273,8 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                         child: Text(l.consultBookNew)),
                   if (!known)
                     TextButton(
-                        onPressed: refresh, child: Text(l.consultRefreshStatus)),
+                        onPressed: refresh,
+                        child: Text(l.consultRefreshStatus)),
                   if (active) ...[
                     const SizedBox(height: 8),
                     OutlinedButton(

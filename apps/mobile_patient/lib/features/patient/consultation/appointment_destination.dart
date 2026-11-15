@@ -12,7 +12,9 @@ import 'post_consultation_page.dart';
 enum AppointmentDestinationKind { waitingRoom, outcome, status }
 
 AppointmentDestinationKind destinationFor(String status) => switch (status) {
-      'CONFIRMED' || 'WAITING' || 'IN_CONSULTATION' =>
+      'CONFIRMED' ||
+      'WAITING' ||
+      'IN_CONSULTATION' =>
         AppointmentDestinationKind.waitingRoom,
       'COMPLETED' => AppointmentDestinationKind.outcome,
       _ => AppointmentDestinationKind.status,

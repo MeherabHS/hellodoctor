@@ -55,6 +55,14 @@ pub async fn apply_provider_event(
         ));
     }
 
+    // Peer support calls share this webhook and its timing rules.
+    if event
+        .channel_name
+        .starts_with(crate::services::peer_call_service::PEER_CHANNEL_PREFIX)
+    {
+        return crate::services::peer_call_service::PeerCallService::apply_presence(state, &event)
+            .await;
+    }
     let ctx = AuthContext::system();
     let mut tx = state.begin_authed_as(&ctx, DbRole::SystemWorker).await?;
     let session = sqlx::query(

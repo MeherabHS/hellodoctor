@@ -10,7 +10,9 @@ import { ActivityLogPage } from '@/components/team/ActivityLogPage';
 import { NotificationCenter } from '@/components/shell/NotificationCenter';
 import { PatientsDirectory } from '@/components/people/PatientsDirectory';
 import { PatientRecord } from '@/components/people/PatientRecord';
+import { PeerDirectory } from '@/components/people/PeerDirectory';
 import { DoctorVerification } from '@/components/people/DoctorVerification';
+import { PeerNavigators } from '@/components/people/PeerNavigators';
 import { CommandCenter } from '@/components/operations/CommandCenter';
 import { SlotMatrix } from '@/components/operations/SlotMatrix';
 import { IncidentsPage } from '@/components/operations/IncidentsPage';
@@ -290,6 +292,8 @@ function AdminPortalContent() {
     command: { title: 'Operations & Live Command Center', breadcrumb: 'Live consultations, specialist availability and the emergency helpline' },
     patients: { title: 'Patients Directory', breadcrumb: 'People & Care · Find patients and review their care history' },
     verification: { title: 'Doctor Verification', breadcrumb: 'People & Care · Review KMPDC professional registrations' },
+    peers: { title: 'Peer Navigators', breadcrumb: 'People & Care · Approve Peer Navigators from the Care app' },
+    peerDirectory: { title: 'Peer Directory', breadcrumb: 'People & Care · Peer Navigators and the patients they support' },
     slots: { title: 'Slot Matrix & Locks', breadcrumb: 'Operations & Safety · Doctor schedule slots, blocks and payment locks' },
     logs: { title: 'App Errors & Incidents', breadcrumb: 'Operations & Safety · Track, triage and resolve platform incidents' },
     grievances: { title: 'Consultation Grievances', breadcrumb: 'Operations & Safety · Complaints, adjudication and appeals' },
@@ -1202,6 +1206,8 @@ function AdminPortalContent() {
           {activeAdminPage === 'quizzes' && <div className="admin-page-view active" id="adminPage_quizzes"><QuizManager /></div>}
           {activeAdminPage === 'topics' && <div className="admin-page-view active" id="adminPage_topics"><TopicsPage /></div>}
           {activeAdminPage === 'team' && <div className="admin-page-view active" id="adminPage_team"><AdminTeamPage /></div>}
+          {activeAdminPage === 'peers' && <div className="admin-page-view active" id="adminPage_peers"><PeerNavigators /></div>}
+          {activeAdminPage === 'peerDirectory' && <div className="admin-page-view active" id="adminPage_peerDirectory"><PeerDirectory onOpenPatient={(id) => requestNavigation(() => { setSelectedPatientKey(id); setActiveAdminPage('patients'); })} /></div>}
           {activeAdminPage === 'activity' && <div className="admin-page-view active" id="adminPage_activity"><ActivityLogPage /></div>}
           {activeAdminPage === 'campaigns' && (
             <div className="admin-page-view active" id="adminPage_campaigns">

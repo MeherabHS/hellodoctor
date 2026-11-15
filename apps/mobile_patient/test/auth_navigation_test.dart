@@ -140,6 +140,8 @@ void main() {
           await tester.tap(find.text('OK'));
           await tester.pumpAndSettle();
           await tester.enterText(field('Phone number'), '0712345678');
+          await tester.ensureVisible(field('Address'));
+          await tester.enterText(field('Address'), 'Kilimani, Nairobi');
         }
         await tester.enterText(field('Email address'), 'patient.y@example.com');
         await tester.enterText(

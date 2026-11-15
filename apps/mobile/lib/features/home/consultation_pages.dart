@@ -339,7 +339,9 @@ class _PatientDetailsState extends State<PatientDetailsPage> {
           'prescriptions': snap.data!['prescriptions']
         });
         if (docs.isEmpty) {
-          return const _Empty('No files for this consultation.');
+          return _Empty(filesAccessEnded(snap.data!)
+              ? kFilesAccessEnded
+              : 'No files for this consultation.');
         }
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           for (final d in docs)

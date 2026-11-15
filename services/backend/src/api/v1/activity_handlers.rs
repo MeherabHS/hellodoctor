@@ -215,6 +215,7 @@ pub struct NotificationQuery {
 /// Admins are always included (except sign-ins and record views).
 const ATTENTION_ACTIONS: &[&str] = &[
     "DOCTOR_PROFILE_CREATED",
+    "PEER_NAVIGATOR_CREATED",
     "DATA_RIGHTS_ERASURE_REQUESTED",
     "AUTH_ROLE_MISMATCH",
     "CONCURRENT_LIVE_PARTICIPATION_DETECTED",
@@ -330,4 +331,46 @@ pub async fn notifications(
         success: true,
         data: serde_json::json!({ "items": items, "server_time": now }),
     }))
+}
+
+/// Records that an Admin opened a record the console already had loaded
+/// (a patient, a doctor, a Peer Navigator), so viewing leaves an audit row
+/// even when no detail request reaches the server.
+#[derive(Deserialize)]
+pub struct RecordViewRequest {
+    pub resource_type: String,
+    pub resource_id: Uuid,
+}
+
+/// `POST /admin/audit/views`
+pub async fn record_view(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Json(body): Json<RecordViewRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    if ctx.role != crate::domain::models::UserRole::Admin {
+        return Err(AppError::Forbidden("Admins only.".into()));
+    }
+    let action = match body.resource_type.as_str() {
+        "PATIENT" => "PATIENT_RECORD_VIEWED",
+        "DOCTOR_PROFILE" => "DOCTOR_RECORD_VIEWED",
+        "PEER_NAVIGATOR" => "PEER_NAVIGATOR_RECORD_VIEWED",
+        _ => return Err(AppError::Validation("Unknown record type.".into())),
+    };
+    crate::services::audit_service::AuditService::log(
+        &state,
+        &ctx,
+        crate::services::audit_service::AuditLogEntry::new(
+            Some(ctx.user_id),
+            ctx.role,
+            action,
+            body.resource_type.as_str(),
+            Some(body.resource_id),
+            "SUCCESS",
+        ),
+    )
+    .await?;
+    Ok(Json(
+        serde_json::json!({ "success": true, "data": { "recorded": true } }),
+    ))
 }

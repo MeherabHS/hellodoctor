@@ -524,6 +524,15 @@ export async function getPendingDoctorVerifications(): Promise<PendingDoctorVeri
   return request<PendingDoctorVerification[]>("/admin/doctors/pending-verification");
 }
 
+/** Documents a doctor uploaded while pending or when resubmitting after a rejection. */
+export interface VerificationSubmission {
+  id: string; message: string | null; previous_status: 'PENDING' | 'REJECTED'; previous_note: string | null; created_at: string;
+  documents: { id: string; mime_type: string; size_bytes: number; created_at: string }[];
+}
+export async function getVerificationSubmissions(doctorId: string): Promise<VerificationSubmission[]> {
+  return request<VerificationSubmission[]>(`/admin/doctors/${doctorId}/verification-submissions`);
+}
+
 export async function verifyDoctorProfessionalRegistration(id: string, note?: string): Promise<any> {
   return request<any>(`/admin/doctors/${id}/verify`, {
     method: "POST",
@@ -795,4 +804,69 @@ export const scheduleCampaign = (id: string, version: number, scheduled_for: str
   campaignTransition(id, "schedule", version, { scheduled_for });
 export function getCampaignStats(id: string) {
   return request<CampaignStats>(`/admin/campaigns/${encodeURIComponent(id)}/stats`);
+}
+
+/** Peer Navigators (docs/peer-navigator/PEER_NAVIGATOR_PLAN.md). No chat content is ever returned to Admins. */
+export type PeerApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+export type PeerDecision = 'approve' | 'reject' | 'suspend' | 'reinstate';
+export interface AdminPeer {
+  id: string; full_name: string; email: string | null; phone_number: string; county: string;
+  organization: string | null; approval_status: PeerApprovalStatus; approval_note: string | null;
+  reviewed_at: string | null; created_at: string;
+}
+export async function getAdminPeers(): Promise<AdminPeer[]> {
+  return request<AdminPeer[]>('/admin/peers');
+}
+/** A Peer Navigator with activity counts (Admin Peer Directory). */
+export interface AdminPeerDirectoryRow extends AdminPeer {
+  requests?: number; sessions_completed?: number; sessions_upcoming?: number;
+  patients_supported?: number; chat_sessions?: number; call_sessions?: number;
+  messages?: number; last_session_at?: string | null;
+}
+export async function getAdminPeerDirectory(): Promise<AdminPeerDirectoryRow[]> {
+  return request<AdminPeerDirectoryRow[]>('/admin/peer-directory');
+}
+/** One support session; never the topic the patient wrote or any message. */
+export interface AdminPeerSession {
+  request_id: string; patient_id: string; patient_name: string;
+  support_type: 'CHAT' | 'CALL'; status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
+  start_time: string; end_time: string; requested_at: string;
+  decided_at: string | null; completed_at: string | null; cancelled_at: string | null;
+  messages: number; call_started_at: string | null; call_ended_at: string | null;
+}
+export interface AdminPeerHistory {
+  sessions: AdminPeerSession[];
+  status_history: {event: string; at: string; by: string | null}[];
+}
+/** A patient's Peer Navigator sessions for their Admin record. */
+export interface AdminPatientPeerSession {
+  request_id: string; peer_id: string; peer_name: string; support_type: 'CHAT' | 'CALL';
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED' | 'COMPLETED';
+  start_time: string; requested_at: string; completed_at: string | null; messages: number;
+}
+export async function getAdminPatientPeerSessions(patientId: string): Promise<AdminPatientPeerSession[]> {
+  return request<AdminPatientPeerSession[]>(`/admin/patients/${encodeURIComponent(patientId)}/peer-sessions`);
+}
+/** Records in the audit log that this Admin opened a record. Best effort. */
+export type AuditedRecord = 'PATIENT' | 'DOCTOR_PROFILE' | 'PEER_NAVIGATOR';
+const recentViews = new Map<string, number>();
+export async function recordAdminView(resourceType: AuditedRecord, resourceId: string): Promise<void> {
+  if (!/^[0-9a-f-]{36}$/i.test(resourceId)) return;
+  // One row per opening: skip a repeat of the same view within 5 seconds
+  // (development renders effects twice).
+  const key = `${resourceType}:${resourceId}`; const now = Date.now();
+  if (now - (recentViews.get(key) ?? 0) < 5000) return;
+  recentViews.set(key, now);
+  try {
+    await request<unknown>('/admin/audit/views', {method: 'POST', body: JSON.stringify({resource_type: resourceType, resource_id: resourceId})});
+  } catch { /* the record still opens; the server logs request failures */ }
+}
+export async function getAdminPeerHistory(id: string): Promise<AdminPeerHistory> {
+  return request<AdminPeerHistory>(`/admin/peers/${encodeURIComponent(id)}/history`);
+}
+export async function decideAdminPeer(id: string, action: PeerDecision, note?: string): Promise<unknown> {
+  return request<unknown>(`/admin/peers/${encodeURIComponent(id)}/${action}`, {
+    method: 'POST',
+    body: JSON.stringify(note && note.trim() ? {note: note.trim()} : {}),
+  });
 }

@@ -1,3 +1,4 @@
+pub mod admin_audit;
 pub mod auth;
 pub mod global_guard;
 pub mod idempotency;

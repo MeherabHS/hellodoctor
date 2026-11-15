@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tokens.dart';
+import '../utils/initials.dart';
 
 /// The AfyaMkononi heart-and-figures mark from the reference image, redrawn
 /// as clean vector shapes and rendered to a 512 px transparent PNG (the
@@ -50,11 +51,7 @@ class AfyaInitialsAvatar extends StatelessWidget {
   final double size;
 
   static String initialsOf(String? name) {
-    final words = (name ?? '')
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .toList();
+    final words = initialWords(name);
     if (words.isEmpty) return '';
     final first = words.first.characters.first;
     final second = words.length > 1

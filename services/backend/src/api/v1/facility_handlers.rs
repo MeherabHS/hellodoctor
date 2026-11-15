@@ -13,7 +13,9 @@ use crate::{
     error::AppError,
     repository::AppState,
     services::{
-        article_media_service::{sanitize_async, MAX_COVER_UPLOAD},
+        article_media_service::{
+            sanitize_admin_async, MAX_ADMIN_IMAGE_BYTES, MAX_ADMIN_IMAGE_UPLOAD,
+        },
         audit_service::{AuditLogEntry, AuditService},
     },
 };
@@ -31,8 +33,8 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-pub const MAX_IMAGE_UPLOAD: usize = MAX_COVER_UPLOAD;
-const MAX_IMAGE_BYTES: usize = 500 * 1024;
+pub const MAX_IMAGE_UPLOAD: usize = MAX_ADMIN_IMAGE_UPLOAD;
+const MAX_IMAGE_BYTES: usize = MAX_ADMIN_IMAGE_BYTES;
 
 const COLUMNS: &str = "id,name,description,county,location_text,contact_phone,google_maps_url,services,youth_friendly,timezone,opening_hours,image_media_id,publication_status,version,published_at,archived_at,created_at,updated_at,created_by,updated_by";
 
@@ -738,7 +740,7 @@ pub async fn admin_upload_image(
         .and_then(|h| h.to_str().ok())
         .unwrap_or("")
         .to_owned();
-    let sanitized = sanitize_async(body.to_vec(), mime).await?;
+    let sanitized = sanitize_admin_async(body.to_vec(), mime).await?;
     let media = Uuid::new_v4();
     let key = object_key(media);
     let hash = hex::encode(Sha256::digest(&sanitized));

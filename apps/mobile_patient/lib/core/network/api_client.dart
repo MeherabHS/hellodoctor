@@ -189,7 +189,8 @@ final _uuidPattern = RegExp(
 void authDiag(String event, [Map<String, Object?> fields = const {}]) {
   if (!kDebugMode) return;
   final details = fields.entries
-      .map((e) => '${e.key}=${e.value is String ? (e.value as String).replaceAll(_uuidPattern, ':id') : e.value}')
+      .map((e) =>
+          '${e.key}=${e.value is String ? (e.value as String).replaceAll(_uuidPattern, ':id') : e.value}')
       .join(' ');
   debugPrint('[auth-diag] $event $details');
 }
@@ -359,7 +360,8 @@ class ApiClient {
           }
           if (kDebugMode) {
             final body = error.response?.data;
-            final err = body is Map && body['error'] is Map ? body['error'] : null;
+            final err =
+                body is Map && body['error'] is Map ? body['error'] : null;
             authDiag('http401', {
               'path': options.path,
               'code': err?['code'],
@@ -415,8 +417,7 @@ class ApiClient {
   final Dio _dio;
   final DeviceProofSigner _proofSigner;
 
-  bool _isSessionEstablishment(String path) =>
-      path.endsWith('/verify-otp') || path.endsWith('/verify-otp-and-login');
+  bool _isSessionEstablishment(String path) => path.endsWith('/verify-otp');
 
   Future<void> _attachDeviceProof(RequestOptions options) async {
     if (!_proofSigner.enabled) return;

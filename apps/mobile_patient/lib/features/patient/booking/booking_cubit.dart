@@ -43,7 +43,8 @@ class BookingState {
 
   /// The server reports that bookings require payment, which this app never
   /// collects. Booking is refused rather than creating an unpaid booking.
-  bool get paymentBlocked => !loadingPolicy && !policyLoadFailed && paymentRequired;
+  bool get paymentBlocked =>
+      !loadingPolicy && !policyLoadFailed && paymentRequired;
   final String? slotsError, submitError, uploadError, selectedSlotId;
   final List<DoctorSlotDto> slots;
   final DateTime? selectedDate;

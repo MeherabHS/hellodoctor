@@ -14,7 +14,7 @@ import './blogs.css';
 const PAGE=20;
 type StatusTab=''|ArticleStatus;
 const TABS:{id:StatusTab;label:string}[]=[
-  {id:'',label:'All'},{id:'DRAFT',label:'Draft'},{id:'PENDING_REVIEW',label:'Pending review'},{id:'APPROVED',label:'Approved'},
+  {id:'',label:'All'},{id:'DRAFT',label:'Draft'},
   {id:'SCHEDULED',label:'Scheduled'},{id:'PUBLISHED',label:'Published'},{id:'ARCHIVED',label:'Archived'},
 ];
 
@@ -52,7 +52,6 @@ export function QuizManager(){
     <div className="afya-stat-grid">
       <StatTile icon={ClipboardList} tone="green" value={counts['']??'—'} label="Total quizzes"/>
       <StatTile icon={CheckCircle2} tone="green" value={counts.PUBLISHED??'—'} label="Published"/>
-      <StatTile icon={Hourglass} tone="purple" value={counts.PENDING_REVIEW??'—'} label="Pending review"/>
       <StatTile icon={FileEdit} tone="amber" value={counts.DRAFT??'—'} label="Drafts"/>
     </div>
     <section className="admin-card">

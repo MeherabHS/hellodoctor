@@ -103,7 +103,9 @@ class RemindersCubit extends Cubit<RemindersState> {
     }
     if (!isClosed) {
       emit(state.copyWith(
-          items: next, notificationsAllowed: allowed, exactAlarmsAllowed: exact));
+          items: next,
+          notificationsAllowed: allowed,
+          exactAlarmsAllowed: exact));
     }
     return true;
   }

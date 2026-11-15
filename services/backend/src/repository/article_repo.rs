@@ -2,7 +2,7 @@ use crate::domain::{articles::DoctorArticle, ids::DoctorProfileId};
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-const SELECT: &str = "SELECT a.id,a.author_id,d.full_name AS author_name,d.primary_specialty AS specialty,a.title,a.summary,a.body,a.references_list,a.status,a.version,a.created_at,a.updated_at,a.published_at FROM doctor_articles a JOIN doctor_public_directory d ON d.id=a.author_id";
+const SELECT: &str = "SELECT a.id,a.author_id,d.full_name AS author_name,d.primary_specialty AS specialty,a.title,a.summary,a.body,a.references_list,a.status,a.version,a.created_at,a.updated_at,a.published_at,a.topic_key,a.title_sw,a.summary_sw,a.body_sw,a.cover_image_id FROM doctor_articles a JOIN doctor_public_directory d ON d.id=a.author_id";
 
 pub async fn list<'e, E: PgExecutor<'e>>(
     executor: E,

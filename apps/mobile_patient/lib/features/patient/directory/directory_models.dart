@@ -1,4 +1,5 @@
 import '../../../core/l10n/patient_display.dart';
+import '../../../core/utils/initials.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -64,18 +65,7 @@ class PublicDoctorDto {
   /// Two-letter tile/avatar initials from the doctor's display name (e.g.
   /// "Dr. Sabrina Akter" → "SA") — the prototype's `.doc-tile-avatar` /
   /// `.profile-avatar` content, derived rather than hardcoded per doctor.
-  String get initials {
-    final words = displayName
-        .replaceAll('Dr.', '')
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .toList();
-    if (words.isEmpty) return '?';
-    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-    return (words.first.substring(0, 1) + words.last.substring(0, 1))
-        .toUpperCase();
-  }
+  String get initials => nameInitials(displayName);
 
   factory PublicDoctorDto.fromJson(Json j) => PublicDoctorDto(
         id: _textOf(j['id']),

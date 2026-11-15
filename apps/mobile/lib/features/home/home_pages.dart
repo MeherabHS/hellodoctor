@@ -143,6 +143,61 @@ class BoardTitleBar extends StatelessWidget {
 
 // ---------------------------------------------------------------- Home
 
+/// The Home header: menu (opens More), the AfyaMkononi logo and wordmark,
+/// the notification bell and the profile initials. Shared by Home and the
+/// Consultation Schedule so both carry the same original logo bar.
+class DoctorTopBar extends StatelessWidget {
+  const DoctorTopBar({super.key, required this.onMenu});
+  final VoidCallback onMenu;
+  @override
+  Widget build(BuildContext c) {
+    final profile = c.watch<DoctorCubit>().state.profile;
+    final unread = c.watch<NotificationCubit>().state.unreadCount;
+    return Padding(
+        padding: const EdgeInsets.fromLTRB(6, 4, 12, 4),
+        child: Row(children: [
+          IconButton(
+              onPressed: onMenu,
+              tooltip: 'More',
+              icon: const Icon(Icons.menu, color: DoctorTokens.navy)),
+          // Scales down rather than overflowing on narrow phones or at
+          // large text sizes.
+          const Expanded(
+              child: Center(
+                  child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        AfyaLogoMark(size: 34),
+                        SizedBox(width: 6),
+                        Text('AfyaMkononi',
+                            style: TextStyle(
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
+                                color: _wordmark)),
+                      ])))),
+          NotificationBellAction(
+              unreadCount: unread,
+              onTap: () => _push(c, const NotificationCenterPage())),
+          InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => _push(c, const ProfilePage()),
+              child: Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                      color: DoctorTokens.primary, shape: BoxShape.circle),
+                  child: Text(
+                      profile == null ? '' : personInitials(profile.name),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white)))),
+        ]));
+  }
+}
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key, required this.onOpenTab});
 
@@ -173,7 +228,6 @@ class HomePage extends StatelessWidget {
     final inProgress = all.where((a) => a.status == 'IN_CONSULTATION').length;
     final completed = today.where((a) => a.status == 'COMPLETED').length;
     final profile = s.profile;
-    final unread = c.watch<NotificationCubit>().state.unreadCount;
     final openQuestions =
         s.questions.whereType<QnaDto>().where((q) => q.status == 'OPEN').length;
 
@@ -184,55 +238,7 @@ class HomePage extends StatelessWidget {
             child: RefreshIndicator(
                 onRefresh: cubit.loadAll,
                 child: ListView(padding: EdgeInsets.zero, children: [
-                  Padding(
-                      padding: const EdgeInsets.fromLTRB(6, 4, 12, 4),
-                      child: Row(children: [
-                        IconButton(
-                            onPressed: () => onOpenTab(3),
-                            tooltip: 'More',
-                            icon: const Icon(Icons.menu,
-                                color: DoctorTokens.navy)),
-                        // Scales down rather than overflowing on narrow
-                        // phones or at large text sizes.
-                        const Expanded(
-                            child: Center(
-                                child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          AfyaLogoMark(size: 34),
-                                          SizedBox(width: 6),
-                                          Text('AfyaMkononi',
-                                              style: TextStyle(
-                                                  fontSize: 19,
-                                                  fontWeight: FontWeight.w800,
-                                                  letterSpacing: -0.3,
-                                                  color: _wordmark)),
-                                        ])))),
-                        NotificationBellAction(
-                            unreadCount: unread,
-                            onTap: () =>
-                                _push(c, const NotificationCenterPage())),
-                        InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: () => _push(c, const ProfilePage()),
-                            child: Container(
-                                width: 34,
-                                height: 34,
-                                alignment: Alignment.center,
-                                decoration: const BoxDecoration(
-                                    color: DoctorTokens.primary,
-                                    shape: BoxShape.circle),
-                                child: Text(
-                                    profile == null
-                                        ? ''
-                                        : personInitials(profile.name),
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white)))),
-                      ])),
+                  DoctorTopBar(onMenu: () => onOpenTab(3)),
                   CacheStatusBar(
                       offline: s.offline,
                       refreshing: s.refreshing,

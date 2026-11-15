@@ -97,6 +97,9 @@ pub fn start(state: AppState) {
             if let Err(error) = run_expired_upload_cleanup(&state).await {
                 tracing::error!(error = ?error, "expired clinical-upload cleanup failed");
             }
+            if let Err(error) = run_intake_removal_cleanup(&state).await {
+                tracing::error!(error = ?error, "removed intake-upload cleanup failed");
+            }
             if let Err(error) = run_consultation_presence_sweep(&state).await {
                 tracing::error!(error = ?error, "consultation presence grace sweep failed");
             }
@@ -882,7 +885,10 @@ pub async fn run_push_delivery_pass(state: &AppState) -> Result<u64, crate::erro
 pub async fn run_consultation_presence_sweep(
     state: &AppState,
 ) -> Result<u64, crate::error::AppError> {
-    super::consultation_presence_service::expire_empty_rooms(state).await
+    let doctor_rooms = super::consultation_presence_service::expire_empty_rooms(state).await?;
+    // Peer support calls use the same empty-room grace.
+    let peer_rooms = super::peer_call_service::PeerCallService::expire_empty_rooms(state).await?;
+    Ok(doctor_rooms + peer_rooms)
 }
 
 /// Upper bound per transaction. A backlog is drained over successive ticks
@@ -997,6 +1003,76 @@ pub async fn run_expired_upload_cleanup(state: &AppState) -> Result<u64, crate::
             update_tx.commit().await?;
         }
         if completed < BATCH as u64 {
+            break;
+        }
+    }
+    Ok(completed)
+}
+
+/// Deletes the stored objects of intake photos a patient removed. The row is
+/// already gone (nobody can open the file); this closes the storage half.
+/// Missing objects count as deleted, so the API's own best-effort delete
+/// after commit simply makes this a no-op.
+pub async fn run_intake_removal_cleanup(state: &AppState) -> Result<u64, crate::error::AppError> {
+    use crate::repository::prescription_repo;
+    const BATCH: i64 = 50;
+    let ctx = crate::auth_context::AuthContext::system();
+    let mut completed = 0u64;
+    for _ in 0..4 {
+        let mut claim_tx = state
+            .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
+            .await?;
+        let jobs = prescription_repo::claim_intake_removal_jobs(&mut *claim_tx, BATCH).await?;
+        claim_tx.commit().await?;
+        if jobs.is_empty() {
+            break;
+        }
+        let claimed = jobs.len();
+        for job in jobs {
+            let expected_prefix = format!("intake/{}/", job.appointment_id);
+            let failure = if !job.object_key.starts_with(&expected_prefix) {
+                Some("Refusing to delete an object outside the appointment namespace.".to_string())
+            } else {
+                let referenced: bool = sqlx::query_scalar(
+                    "SELECT EXISTS(SELECT 1 FROM prescription_intake_documents WHERE object_key=$1)",
+                )
+                .bind(&job.object_key)
+                .fetch_one(&state.system_db)
+                .await?;
+                if referenced {
+                    Some(
+                        "Refusing to delete an object still referenced by an intake record."
+                            .to_string(),
+                    )
+                } else {
+                    DocumentStorageService::delete_strict(state, &job.object_key)
+                        .await
+                        .err()
+                        .map(|error| error.to_string())
+                }
+            };
+            let mut update_tx = state
+                .begin_authed_as(&ctx, crate::repository::DbRole::SystemWorker)
+                .await?;
+            let exhausted = prescription_repo::finish_intake_removal_job(
+                &mut *update_tx,
+                job.document_id,
+                failure.as_deref(),
+            )
+            .await?;
+            update_tx.commit().await?;
+            if failure.is_none() {
+                completed += 1;
+            } else if exhausted {
+                metrics::counter!("intake_removal_cleanup_exhausted_total").increment(1);
+                tracing::error!(
+                    document_id = %job.document_id,
+                    attempts = job.attempts,
+                    "removed intake-upload cleanup exhausted its retry budget; operator intervention required"
+                );
+            }
+        }
+        if (claimed as i64) < BATCH {
             break;
         }
     }

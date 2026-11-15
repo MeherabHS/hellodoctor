@@ -6,6 +6,7 @@ import type {AdminFacility,FacilityContent,ServiceCategory} from '../../lib/faci
 import {blankFacility,editableFacility,facilityErrors,publishProblems,statusLabel} from '../../lib/facilityContent';
 import {createFacility,facilityImageUrl,getFacility,removeFacilityImage,transitionFacility,updateFacility,uploadFacilityImage} from '../../lib/facilityApi';
 import {useAdminNavigation,useUnsavedChanges} from '../navigation/NavigationGuard';
+import {MAX_ADMIN_IMAGE_UPLOAD} from '../../lib/imageLimits';
 import {blogErrorMessage} from '../../lib/blogErrors';
 import {HoursEditor} from './HoursEditor';
 import {Card,Chip} from '../ui/afya';
@@ -107,8 +108,8 @@ export function FacilityEditor({initial,services,counties,onSaved,onClose}:{init
               {photo&&<button type="button" className="afya-btn-secondary" onClick={()=>{setPhoto(null);setLocalPhoto('');}}>Discard selected photo</button>}
               {facility?.has_image&&!photo&&facility.publication_status==='DRAFT'&&<button type="button" className="afya-icon-btn" aria-label="Remove photo" onClick={()=>void removePhoto()}><Trash2 size={16} color="var(--afya-danger-fg)"/></button>}
             </div>
-            <input ref={fileRef} type="file" accept="image/jpeg,image/png" hidden aria-label="Facility photo file" onChange={e=>{const file=e.target.files?.[0]||null;e.target.value='';if(file&&(!['image/jpeg','image/png'].includes(file.type)||file.size>5*1024*1024)){setError('Choose a JPEG or PNG up to 5 MB.');return;}setPhoto(file);}}/>
-            <p className="afya-stat-note" style={{margin:'8px 0 0'}}>JPEG or PNG up to 5 MB. Required before publishing. Resized and stored privately.</p>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png" hidden aria-label="Facility photo file" onChange={e=>{const file=e.target.files?.[0]||null;e.target.value='';if(file&&(!['image/jpeg','image/png'].includes(file.type)||file.size>MAX_ADMIN_IMAGE_UPLOAD)){setError('Choose a JPEG or PNG up to 25 MB.');return;}setPhoto(file);}}/>
+            <p className="afya-stat-note" style={{margin:'8px 0 0'}}>JPEG or PNG, any size up to 25 MB. Required before publishing. Compressed automatically to 1 MB and stored privately.</p>
           </fieldset>
         </Card>
         <Card title="Service tags *" subtitle="Select every service offered here.">

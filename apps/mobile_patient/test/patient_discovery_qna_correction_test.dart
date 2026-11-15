@@ -294,7 +294,8 @@ void main() {
   // Payment-free product (2026-11-13): every doctor the server lists offers
   // both video and chat, whatever fee is configured, and no price is shown.
   for (final fees in [('800', '0'), ('0', '300'), ('0', '0'), ('800', '300')]) {
-    testWidgets('fees ${fees.$1}/${fees.$2}: card offers both modalities, no price',
+    testWidgets(
+        'fees ${fees.$1}/${fees.$2}: card offers both modalities, no price',
         (tester) async {
       await viewport(tester, 320);
       final doctor = PublicDoctorDto.fromJson({
@@ -410,6 +411,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.chevron_right).first);
     await tester.pumpAndSettle();
   }
+
   testWidgets(
       'payment-free: slot tap on a zero-fee doctor offers both modalities and opens booking',
       (tester) async {
@@ -445,7 +447,8 @@ void main() {
             "Couldn't check booking availability. Check your connection and try again."),
         findsOneWidget);
   });
-  testWidgets('zero-fee doctor profile shows both consultation types and no price',
+  testWidgets(
+      'zero-fee doctor profile shows both consultation types and no price',
       (tester) async {
     await pumpProfileWithPolicy(tester, policy: {'payment_required': false});
     await tester.tapAt(const Offset(5, 5));

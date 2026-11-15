@@ -163,12 +163,6 @@ pub async fn check_global_ip_limit(
     check_and_increment(pool, &format!("ratelimit:global:{ip}"), limit_per_min, 60).await
 }
 
-/// Brute-force-adjacent (bounds how many OTPs can be requested for a phone
-/// number): fails closed.
-pub async fn check_otp_request_limit(pool: &Pool, phone: &str) -> Result<(), AppError> {
-    check_and_increment(pool, &format!("ratelimit:otp:{phone}"), 3, 600).await
-}
-
 /// Directly brute-force-shaped: fails closed, same principle as `ip_jail`.
 pub async fn check_login_attempt_limit(pool: &Pool, ip: &str) -> Result<(), AppError> {
     check_and_increment(pool, &format!("ratelimit:login:{ip}"), 5, 900).await
