@@ -1637,3 +1637,77 @@ async fn peer_session_emails_reach_both_sides_without_the_topic(pool: PgPool) {
         .unwrap();
     assert!(confirmed.3.contains("Hello Patient,") && confirmed.3.contains("Neema"));
 }
+
+/// Once an accepted session's call window has passed, every list both sides
+/// read says the call is closed, so neither app offers "Start call" for it.
+#[sqlx::test(migrations = "./migrations")]
+async fn a_past_peer_session_reports_its_call_as_closed_on_every_list(pool: PgPool) {
+    let (app, pool, _state) = test_app_and_state(pool).await;
+    let (peer, _peer_id, slots) =
+        approved_peer_with_slots(&app, &pool, PEER_EMAIL, "+254711220043", 1).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let request = json_body(request_slot(&app, &patient, &slots[0]).await).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    post(
+        &app,
+        &format!("/api/v1/peer/requests/{request}/accept"),
+        Some(&peer),
+        &serde_json::json!({}),
+    )
+    .await;
+
+    let closed = |app: &axum::Router, path: &'static str, token: String, key: &'static str| {
+        let app = app.clone();
+        let request = request.clone();
+        async move {
+            let body = json_body(get(&app, path, Some(&token)).await).await;
+            body["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r[key] == request.as_str())
+                .unwrap_or_else(|| panic!("{path} lists the request"))["call_closed"]
+                .clone()
+        }
+    };
+    assert_eq!(
+        closed(&app, "/api/v1/peer-requests", patient.clone(), "id").await,
+        false
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer/requests", peer.clone(), "id").await,
+        false
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer-chats", patient.clone(), "request_id").await,
+        false
+    );
+
+    // The call was held and hung up: the room cannot be reopened. (The
+    // time-based close is unit-tested in peer_repo; slot times are immutable.)
+    sqlx::query(
+        "INSERT INTO peer_call_sessions (request_id, channel_name, patient_user_id, peer_user_id, status, ended_at)          SELECT r.id, 'peer_' || replace(r.id::text, '-', ''), r.patient_user_id, r.peer_user_id, 'ENDED', now()          FROM peer_requests r WHERE r.id = $1",
+    )
+    .bind(Uuid::parse_str(&request).unwrap())
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        closed(&app, "/api/v1/peer-requests", patient.clone(), "id").await,
+        true
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer/requests", peer.clone(), "id").await,
+        true
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer-chats", patient.clone(), "request_id").await,
+        true
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer-chats", peer.clone(), "request_id").await,
+        true
+    );
+}

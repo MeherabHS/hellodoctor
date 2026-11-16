@@ -79,7 +79,11 @@ class _AppointmentState extends State<NotificationAppointmentPage> {
                 Text(data['appointment_number']?.toString() ?? '',
                     style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 24),
-                Text(statuses[data['status']] ?? l10n.appointmentTitle,
+                Text(
+                    // A booking whose time passed unstarted is not "Confirmed".
+                    data['lapsed'] == true
+                        ? l10n.appointmentStatusLapsed
+                        : statuses[data['status']] ?? l10n.appointmentTitle,
                     style: Theme.of(context).textTheme.titleMedium),
               ]);
             }));

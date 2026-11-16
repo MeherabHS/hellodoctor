@@ -307,6 +307,12 @@ pub struct PatientPeerRequest {
     pub decided_at: Option<DateTime<Utc>>,
     /// Set once the peer accepts: the chat opens.
     pub conversation_id: Option<Uuid>,
+    /// The call room ended (hung up), from `peer_call_sessions`.
+    #[serde(skip)]
+    pub call_ended: bool,
+    /// Set by [`mark_call_closed`]: the call can no longer be joined.
+    #[sqlx(default)]
+    pub call_closed: bool,
 }
 
 /// A request as the peer sees it: no patient identity beyond the snapshot.
@@ -323,6 +329,12 @@ pub struct PeerInboxRequest {
     pub created_at: DateTime<Utc>,
     pub decided_at: Option<DateTime<Utc>>,
     pub conversation_id: Option<Uuid>,
+    /// The call room ended (hung up), from `peer_call_sessions`.
+    #[serde(skip)]
+    pub call_ended: bool,
+    /// Set by [`mark_call_closed`]: the call can no longer be joined.
+    #[sqlx(default)]
+    pub call_closed: bool,
 }
 
 /// The peer behind a slot that is still open and in the future, locking it.
@@ -468,7 +480,8 @@ pub async fn set_request_status<'e, E: PgExecutor<'e>>(
 const PATIENT_REQUEST_SELECT: &str =
     "SELECT r.id, r.peer_id, p.full_name AS peer_name, s.start_time, s.end_time, \
      r.support_type, r.topic, r.status, r.decline_note, r.created_at, r.decided_at, \
-     cv.id AS conversation_id \
+     cv.id AS conversation_id, \
+     EXISTS (SELECT 1 FROM peer_call_sessions pc WHERE pc.request_id = r.id AND pc.status = 'ENDED') AS call_ended \
      FROM peer_requests r JOIN peer_slots s ON s.id = r.slot_id \
      LEFT JOIN peer_profiles p ON p.id = r.peer_id \
      LEFT JOIN peer_conversations cv ON cv.request_id = r.id";
@@ -501,7 +514,8 @@ pub async fn patient_request<'e, E: PgExecutor<'e>>(
 
 const PEER_REQUEST_SELECT: &str =
     "SELECT r.id, r.patient_display_name, r.patient_age_range, s.start_time, s.end_time, \
-     r.support_type, r.topic, r.status, r.created_at, r.decided_at, cv.id AS conversation_id \
+     r.support_type, r.topic, r.status, r.created_at, r.decided_at, cv.id AS conversation_id, \
+     EXISTS (SELECT 1 FROM peer_call_sessions pc WHERE pc.request_id = r.id AND pc.status = 'ENDED') AS call_ended \
      FROM peer_requests r JOIN peer_slots s ON s.id = r.slot_id \
      LEFT JOIN peer_conversations cv ON cv.request_id = r.id";
 
@@ -532,4 +546,77 @@ pub async fn peer_request<'e, E: PgExecutor<'e>>(
     .bind(id)
     .fetch_optional(executor)
     .await
+}
+
+/// A peer session whose call window can be checked: the same window as a
+/// consultation (`join_window`), closed once it has passed or the call ended.
+pub trait PeerCallWindow {
+    fn call_window(&self) -> (&str, DateTime<Utc>, bool);
+    fn set_call_closed(&mut self, closed: bool);
+}
+
+impl PeerCallWindow for PatientPeerRequest {
+    fn call_window(&self) -> (&str, DateTime<Utc>, bool) {
+        (&self.status, self.end_time, self.call_ended)
+    }
+    fn set_call_closed(&mut self, closed: bool) {
+        self.call_closed = closed;
+    }
+}
+
+impl PeerCallWindow for PeerInboxRequest {
+    fn call_window(&self) -> (&str, DateTime<Utc>, bool) {
+        (&self.status, self.end_time, self.call_ended)
+    }
+    fn set_call_closed(&mut self, closed: bool) {
+        self.call_closed = closed;
+    }
+}
+
+/// Marks each accepted session whose call can no longer be joined, so the
+/// apps hide "Start call" instead of opening a room that will refuse them.
+pub fn mark_call_closed<T: PeerCallWindow>(items: &mut [T], after_mins: i64, now: DateTime<Utc>) {
+    for item in items {
+        let (status, end_time, ended) = item.call_window();
+        let closed = status == "ACCEPTED"
+            && (ended || now > end_time + chrono::Duration::minutes(after_mins));
+        item.set_call_closed(closed);
+    }
+}
+
+#[cfg(test)]
+mod call_window_tests {
+    use super::*;
+
+    fn session(status: &str, end_time: DateTime<Utc>, call_ended: bool) -> PeerInboxRequest {
+        PeerInboxRequest {
+            id: Uuid::nil(),
+            patient_display_name: "A.".into(),
+            patient_age_range: None,
+            start_time: end_time - chrono::Duration::minutes(30),
+            end_time,
+            support_type: "CALL".into(),
+            topic: String::new(),
+            status: status.into(),
+            created_at: end_time,
+            decided_at: None,
+            conversation_id: None,
+            call_ended,
+            call_closed: false,
+        }
+    }
+
+    #[test]
+    fn an_accepted_call_closes_after_the_grace_or_once_hung_up() {
+        let now = Utc::now();
+        let mut items = [
+            session("ACCEPTED", now - chrono::Duration::minutes(30), false),
+            session("ACCEPTED", now - chrono::Duration::minutes(90), false),
+            session("ACCEPTED", now + chrono::Duration::minutes(30), true),
+            session("DECLINED", now - chrono::Duration::days(3), false),
+        ];
+        mark_call_closed(&mut items, 60, now);
+        let closed: Vec<bool> = items.iter().map(|i| i.call_closed).collect();
+        assert_eq!(closed, [false, true, true, false]);
+    }
 }
