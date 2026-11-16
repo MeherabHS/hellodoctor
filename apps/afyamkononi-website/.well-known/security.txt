@@ -1,0 +1,4 @@
+Contact: mailto:info@rm-consultants.asia
+Expires: 2027-11-16T00:00:00.000Z
+Preferred-Languages: en, sw
+Canonical: https://afyamkononi.app/.well-known/security.txt
