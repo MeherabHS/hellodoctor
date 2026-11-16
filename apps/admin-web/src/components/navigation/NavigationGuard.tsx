@@ -67,8 +67,8 @@ export function NavigationGuard({children}:{children:ReactNode}) {
     const action=destination.current;destination.current=null;setDialog(false);if(action)void action();
   }
   return <Context.Provider value={guard}>{children}{dialog&&<div className="admin-modal-backdrop" style={{zIndex:10000}}><section role="alertdialog" aria-modal="true" aria-labelledby="unsaved-title" aria-describedby="unsaved-description" className="admin-modal-card" style={{maxWidth:480,padding:24}}>
-    <h2 id="unsaved-title">Leave this editor?</h2><p id="unsaved-description">{flags.pending?'An editor operation is still running. Stay until it finishes before leaving.':'You have unsaved content or an unconfirmed import. Discard it only if you intend to leave.'}</p>
-    <div className="cms-actions"><button type="button" autoFocus onClick={stay}>Stay</button><button type="button" disabled={flags.pending} onClick={leave}>Discard and Leave</button></div>
+    <h2 id="unsaved-title" className="afya-modal-title">Leave without saving?</h2><p id="unsaved-description" className="afya-modal-sub" style={{marginTop:8}}>{flags.pending?'Still saving. Wait a moment, then leave.':'Your changes have not been saved and will be lost.'}</p>
+    <div className="afya-guard-actions"><button type="button" className="afya-btn-secondary" autoFocus onClick={stay}>Keep editing</button><button type="button" className="afya-btn-danger" disabled={flags.pending} onClick={leave}>Discard changes</button></div>
   </section></div>}</Context.Provider>;
 }
 

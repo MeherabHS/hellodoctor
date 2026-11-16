@@ -969,6 +969,35 @@ async fn test_education_topics_and_videos_feed(pool: PgPool) {
     assert!(!all_ids.contains(&prep_video["id"].as_str().unwrap().to_owned()));
     assert_eq!(all_ids.len(), 2);
 
+    // The Admin Articles and Videos tabs list only their own kind.
+    let admin_ids = |kind: &'static str| {
+        let app = app.clone();
+        let admin = admin.clone();
+        async move {
+            let body = json_body(
+                get(
+                    &app,
+                    &format!("/api/v1/admin/articles?kind={kind}"),
+                    Some(&admin),
+                )
+                .await,
+            )
+            .await;
+            body["data"]["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|a| a["id"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        }
+    };
+    let video_id = prep_video["id"].as_str().unwrap().to_owned();
+    assert_eq!(admin_ids("video").await, vec![video_id.clone()]);
+    let admin_articles = admin_ids("article").await;
+    assert_eq!(admin_articles.len(), 2);
+    assert!(!admin_articles.contains(&video_id));
+    assert_eq!(admin_ids("content").await.len(), 3);
+
     let empty = json_body(get(&app, "/api/v1/articles?topic=CONDOMS", Some(&patient)).await).await;
     assert!(ids(&empty).is_empty());
     for bad in ["/api/v1/articles?topic=prep", "/api/v1/articles?kind=audio"] {
