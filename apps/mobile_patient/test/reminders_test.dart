@@ -23,10 +23,23 @@ class MemoryReminderStore implements ReminderStore {
 class FakeScheduler implements ReminderScheduler {
   final scheduled = <String>[], cancelled = <String>[];
   bool allowed = true, exact = true;
+
+  /// What the user does on the system "Alarms & reminders" page.
+  bool grantOnAsk = false;
+  int exactAsks = 0;
   @override
   Future<bool> ensurePermission() async => allowed;
   @override
-  Future<bool> ensureExactAlarms() async => exact;
+  Future<bool> ensureExactAlarms() async {
+    if (!exact) {
+      exactAsks++;
+      if (grantOnAsk) exact = true;
+    }
+    return exact;
+  }
+
+  @override
+  Future<bool> exactAlarmsAllowed() async => exact;
   @override
   Future<void> schedule(Reminder reminder,
       {required ReminderAlertText text, required DateTime now}) async {
@@ -339,6 +352,135 @@ void main() {
       expect(cubit.state.exactAlarmsAllowed, isFalse);
       expect(scheduler.scheduled, ['x']);
       await cubit.close();
+    });
+  });
+
+  group('clock-style repeats', () {
+    // now = Fri 13 Nov 2026 10:00
+    test('selected days ring on the next chosen day at the set time', () {
+      final r = reminder('d', DateTime(2026, 11, 2, 8), ReminderRepeat.weekly)
+          .copyWith(weekdays: {1, 3, 5}); // Mon, Wed, Fri
+      expect(r.ringDays, [1, 3, 5]);
+      // Friday 08:00 has gone, so next is Monday 16th.
+      expect(r.nextAlert(now), DateTime(2026, 11, 16, 8));
+      final rings = r.firstRings(now)..sort();
+      expect(rings, [
+        DateTime(2026, 11, 16, 8),
+        DateTime(2026, 11, 18, 8),
+        DateTime(2026, 11, 20, 8),
+      ]);
+    });
+
+    test('a future start on an unchosen day is not itself a ring', () {
+      // Starts Sat 14th, rings only on weekdays: first ring Mon 16th.
+      final r = reminder('d', DateTime(2026, 11, 14, 7), ReminderRepeat.weekly)
+          .copyWith(weekdays: {1, 2, 3, 4, 5});
+      expect(r.nextAlert(now), DateTime(2026, 11, 16, 7));
+    });
+
+    test('weekly reminders saved before day selection keep their weekday', () {
+      final r = Reminder.decodeList(
+              '[{"id":"x","category":"art","title":"T","note":"","at":"2026-11-04T08:00:00.000","repeat":"weekly"}]')
+          .single;
+      expect(r.ringDays, [DateTime.wednesday]);
+      expect(r.nextAlert(now), DateTime(2026, 11, 18, 8));
+    });
+
+    test('every 8 hours rings three times a day from the start time', () {
+      final r = reminder('h', DateTime(2026, 11, 1, 8), ReminderRepeat.hourly)
+          .copyWith(everyHours: 8);
+      expect(r.ringMinutesOfDay, [8 * 60, 16 * 60, 0]);
+      expect(r.nextAlert(now), DateTime(2026, 11, 13, 16));
+      expect(r.firstRings(now)..sort(), [
+        DateTime(2026, 11, 13, 16),
+        DateTime(2026, 11, 14, 0),
+        DateTime(2026, 11, 14, 8),
+      ]);
+    });
+
+    test('every hour uses 24 daily alarms, the most one reminder needs', () {
+      final r =
+          reminder('h', DateTime(2026, 11, 13, 9, 30), ReminderRepeat.hourly)
+              .copyWith(everyHours: 1);
+      expect(r.firstRings(now), hasLength(24));
+      expect(r.nextAlert(now), DateTime(2026, 11, 13, 10, 30));
+    });
+
+    test('days and interval survive storage', () {
+      final r = reminder('x', DateTime(2026, 11, 20, 8), ReminderRepeat.weekly)
+          .copyWith(weekdays: {6, 7});
+      final h = reminder('y', DateTime(2026, 11, 20, 6), ReminderRepeat.hourly)
+          .copyWith(everyHours: 12);
+      final back = Reminder.decodeList(Reminder.encodeList([r, h]));
+      expect(back[0].weekdays, {6, 7});
+      expect(back[1].repeat, ReminderRepeat.hourly);
+      expect(back[1].everyHours, 12);
+    });
+  });
+
+  group('exact alarm access', () {
+    RemindersCubit cubitWith(MemoryReminderStore store, FakeScheduler s) =>
+        RemindersCubit(
+            userId: 'user-a',
+            store: store,
+            scheduler: s,
+            text: _text,
+            clock: () => now);
+
+    test('granting on the first save re-arms every reminder on exact timing',
+        () async {
+      final store = MemoryReminderStore()
+        ..data['user-a'] = [reminder('old', DateTime(2026, 11, 20, 8))];
+      final scheduler = FakeScheduler()
+        ..exact = false
+        ..grantOnAsk = true;
+      final cubit = cubitWith(store, scheduler);
+      await cubit.load();
+      await cubit.add(reminder('new', DateTime(2026, 11, 13, 12)));
+      expect(cubit.state.exactAlarmsAllowed, isTrue);
+      expect(scheduler.scheduled, containsAll(['new', 'old']));
+      await cubit.close();
+    });
+
+    test('a refused request is asked once, not on every save', () async {
+      final scheduler = FakeScheduler()..exact = false;
+      final cubit = cubitWith(MemoryReminderStore(), scheduler);
+      await cubit.load();
+      await cubit.add(reminder('a', DateTime(2026, 11, 13, 12)));
+      await cubit.add(reminder('b', DateTime(2026, 11, 13, 13)));
+      expect(scheduler.exactAsks, 1);
+      expect(cubit.state.exactAlarmsAllowed, isFalse);
+      await cubit.close();
+    });
+
+    test('allowing later from Settings re-arms everything', () async {
+      final store = MemoryReminderStore()
+        ..data['user-a'] = [
+          reminder('a', DateTime(2026, 11, 20, 8)),
+          reminder('off', DateTime(2026, 11, 20, 8)).copyWith(enabled: false),
+        ];
+      final scheduler = FakeScheduler()..exact = false;
+      final cubit = cubitWith(store, scheduler);
+      await cubit.load();
+      expect(cubit.state.exactAlarmsAllowed, isFalse);
+      scheduler.exact = true; // turned on in Settings, app resumes
+      await cubit.refreshAlarmAccess();
+      expect(cubit.state.exactAlarmsAllowed, isTrue);
+      expect(scheduler.scheduled, ['a']);
+      await cubit.close();
+    });
+
+    test('the session re-arms on resume only when access changed', () async {
+      final store = MemoryReminderStore()
+        ..data['user-a'] = [reminder('a', DateTime(2099, 1, 1, 8))];
+      final scheduler = FakeScheduler()..exact = false;
+      final session = ReminderSession(store: store, scheduler: scheduler);
+      await session.start('user-a', _text);
+      await session.resume('user-a', _text);
+      expect(scheduler.scheduled, ['a']);
+      scheduler.exact = true;
+      await session.resume('user-a', _text);
+      expect(scheduler.scheduled, ['a', 'a']);
     });
   });
 }
