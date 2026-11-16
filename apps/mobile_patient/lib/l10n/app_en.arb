@@ -2215,7 +2215,7 @@
   "reminderNoteLabel": "Note (optional)",
   "reminderRepeatOnce": "Once",
   "reminderRepeatDaily": "Daily",
-  "reminderRepeatWeekly": "Weekly",
+  "reminderRepeatWeekly": "Selected days",
   "reminderRepeatMonthly": "Monthly",
   "reminderDefaultArt": "Take my ART medication",
   "reminderDefaultPrep": "Take my PrEP",
@@ -2346,7 +2346,7 @@
   "reminderAlarmSnooze": "Snooze 10 min",
   "reminderAlarmOn": "Alarm on",
   "reminderAlarmOff": "Alarm off",
-  "remindersExactAlarmsOff": "Exact alarms are off for AfyaMkononi, so a reminder may ring a few minutes late. To ring on time, allow \"Alarms & reminders\" for AfyaMkononi in your phone settings.",
+  "remindersExactAlarmsOff": "Reminders may ring late, or not at all while your phone is idle, because \"Alarms & reminders\" is off for AfyaMkononi. Allow it so every reminder rings on time.",
   "vaultFromDoctor": "Sent by your doctor",
   "vaultMyUploads": "Uploaded by you",
   "waitingRoomUploadTitle": "Before your consultation",
@@ -2585,5 +2585,80 @@
   "peerMessageRead": "Read",
   "peerMessageSent": "Sent",
   "peerSendTooltip": "Send",
-  "peerVerified": "Verified Peer"
+  "peerVerified": "Verified Peer",
+  "apptStatusLapsed": "Time passed",
+  "@apptStatusLapsed": {
+    "description": "Appointment status label: the booked time passed and the consultation was never started."
+  },
+  "consultStatusLapsedTitle": "This consultation's time has passed",
+  "@consultStatusLapsedTitle": {
+    "description": "Status screen title for a booking whose time passed unstarted."
+  },
+  "consultStatusLapsedBody": "It wasn't started during its booked time, so it can't be joined now. Please book a new consultation if you still need care.",
+  "@consultStatusLapsedBody": {
+    "description": "Status screen body for a booking whose time passed unstarted."
+  },
+  "reminderRepeatHourly": "Every few hours",
+  "reminderEveryHours": "{hours, plural, =1{Every hour} other{Every {hours} hours}}",
+  "@reminderEveryHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderDaysLabel": "Ring on",
+  "reminderEveryDay": "Every day",
+  "reminderWeekdays": "Weekdays",
+  "reminderWeekends": "Weekends",
+  "reminderPickDay": "Choose at least one day.",
+  "reminderIntervalLabel": "Ring every",
+  "reminderRingTimes": "Rings daily at {times}",
+  "@reminderRingTimes": {
+    "placeholders": {
+      "times": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderStartsLabel": "Starts",
+  "reminderRingsIn": "Rings in {time}",
+  "@reminderRingsIn": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reminderDurationMinutes": "{minutes} min",
+  "@reminderDurationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderDurationHours": "{hours} h {minutes} min",
+  "@reminderDurationHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "reminderDurationDays": "{days} d {hours} h",
+  "@reminderDurationDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "remindersExactAlarmsAllow": "Allow alarms & reminders"
 }

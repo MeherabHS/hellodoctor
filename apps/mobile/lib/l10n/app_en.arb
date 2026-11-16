@@ -24,6 +24,7 @@
   "appointmentStatusInConsultation": "In consultation",
   "appointmentStatusCompleted": "Completed",
   "appointmentStatusCancelled": "Cancelled",
+  "appointmentStatusLapsed": "Time passed",
   "appointmentStatusExpired": "Expired",
   "appointmentStatusRefunded": "Refunded",
   "appointmentStatusDisputed": "Under review",

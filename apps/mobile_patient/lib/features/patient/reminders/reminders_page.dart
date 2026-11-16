@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -58,8 +60,50 @@ String reminderRepeatLabel(AppLocalizations l, ReminderRepeat r) => switch (r) {
       ReminderRepeat.once => l.reminderRepeatOnce,
       ReminderRepeat.daily => l.reminderRepeatDaily,
       ReminderRepeat.weekly => l.reminderRepeatWeekly,
+      ReminderRepeat.hourly => l.reminderRepeatHourly,
       ReminderRepeat.monthly => l.reminderRepeatMonthly,
     };
+
+/// Short weekday name (1 = Monday) in the app's language.
+String reminderWeekdayLabel(String locale, int weekday) =>
+    DateFormat.E(locale).format(DateTime(2026, 11, 9 + weekday - 1));
+
+/// Times of day as the locale writes them, joined with dots.
+String reminderTimesLabel(String locale, List<int> minutesOfDay) => [
+      for (final m in [...minutesOfDay]..sort())
+        DateFormat.jm(locale).format(DateTime(2026, 1, 1, m ~/ 60, m % 60))
+    ].join(' · ');
+
+/// How a reminder repeats, as the card shows it: "Every 8 hours",
+/// "Mon, Wed, Fri", "Weekdays", "Daily"...
+String reminderRepeatSummary(AppLocalizations l, String locale, Reminder r) {
+  switch (r.repeat) {
+    case ReminderRepeat.hourly:
+      return l.reminderEveryHours(r.everyHours);
+    case ReminderRepeat.weekly:
+      final days = r.ringDays;
+      if (days.length == 7) return l.reminderEveryDay;
+      if (days.join() == '12345') return l.reminderWeekdays;
+      if (days.join() == '67') return l.reminderWeekends;
+      return days.map((d) => reminderWeekdayLabel(locale, d)).join(', ');
+    default:
+      return reminderRepeatLabel(l, r.repeat);
+  }
+}
+
+/// "Rings in 3 h 20 min", like a phone's clock app after setting an alarm.
+String reminderRingsIn(AppLocalizations l, Duration d) {
+  final minutes = (d.inSeconds / 60).ceil().clamp(1, 1 << 30);
+  final String time;
+  if (minutes < 60) {
+    time = l.reminderDurationMinutes(minutes);
+  } else if (minutes < 24 * 60) {
+    time = l.reminderDurationHours(minutes ~/ 60, minutes % 60);
+  } else {
+    time = l.reminderDurationDays(minutes ~/ (24 * 60), (minutes ~/ 60) % 24);
+  }
+  return l.reminderRingsIn(time);
+}
 
 /// Reminders (reference panel 5): Upcoming / Past tabs, a card per reminder
 /// and the privacy note. The reminders are the patient's own, stored on the
@@ -79,9 +123,25 @@ class RemindersPage extends StatefulWidget {
   State<RemindersPage> createState() => _RemindersPageState();
 }
 
-class _RemindersPageState extends State<RemindersPage> {
+class _RemindersPageState extends State<RemindersPage>
+    with WidgetsBindingObserver {
   RemindersCubit? _cubit;
   int _tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// Coming back from the system "Alarms & reminders" page: show the new
+  /// state and re-arm the reminders with it.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_cubit?.refreshAlarmAccess());
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -96,6 +156,7 @@ class _RemindersPageState extends State<RemindersPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _cubit?.close();
     super.dispose();
   }
@@ -160,13 +221,24 @@ class _RemindersPageState extends State<RemindersPage> {
                         background: PatientTokens.amberCard,
                         accent: PatientTokens.amberText),
                     const SizedBox(height: 14),
-                  ] else if (!state.exactAlarmsAllowed) ...[
+                  ] else if (!state.exactAlarmsAllowed &&
+                      state.items.any((r) => r.enabled && !r.isPast(now))) ...[
                     AfyaInfoCard(
                         icon: Icons.alarm_off_rounded,
                         title: l.moduleReminders,
                         body: l.remindersExactAlarmsOff,
                         background: PatientTokens.amberCard,
                         accent: PatientTokens.amberText),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.icon(
+                          onPressed: _cubit!.allowExactAlarms,
+                          style: FilledButton.styleFrom(
+                              backgroundColor: PatientTokens.amberText),
+                          icon: const Icon(Icons.alarm_on_rounded, size: 18),
+                          label: Text(l.remindersExactAlarmsAllow)),
+                    ),
                     const SizedBox(height: 14),
                   ],
                   if (state.loading)
@@ -188,6 +260,7 @@ class _RemindersPageState extends State<RemindersPage> {
                         padding: const EdgeInsets.only(bottom: 14),
                         child: _ReminderCard(
                             reminder: r,
+                            now: now,
                             when: r.nextAlert(now) ?? r.at,
                             locale: locale,
                             onEdit: () => _edit(r),
@@ -213,13 +286,14 @@ class _RemindersPageState extends State<RemindersPage> {
 class _ReminderCard extends StatelessWidget {
   const _ReminderCard(
       {required this.reminder,
+      required this.now,
       required this.when,
       required this.locale,
       required this.onEdit,
       required this.onToggle,
       required this.onDelete});
   final Reminder reminder;
-  final DateTime when;
+  final DateTime now, when;
   final String locale;
   final VoidCallback onEdit;
   final ValueChanged<bool> onToggle;
@@ -228,46 +302,67 @@ class _ReminderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
     final style = ReminderCategoryStyle.of(reminder.category);
+    final on = reminder.enabled;
+    final ink = on ? PatientTokens.navy : PatientTokens.navInactive;
     final date = DateFormat('EEE, d MMM', locale).format(when);
     final time = DateFormat.jm(locale).format(when);
+    final upcoming = when.isAfter(now);
     return AfyaCard(
       onTap: onEdit,
-      padding: const EdgeInsets.fromLTRB(12, 14, 4, 14),
+      padding: const EdgeInsets.fromLTRB(12, 14, 4, 12),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         AfyaIconTile(
             icon: style.icon,
-            color: style.color,
+            color: on ? style.color : PatientTokens.navInactive,
             background: style.background,
             size: 46),
         const SizedBox(width: 12),
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // The next ring time, large, as a clock app shows an alarm.
+            Text(time,
+                style: TextStyle(
+                    fontSize: 26,
+                    height: 1.1,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -.5,
+                    color: ink)),
+            const SizedBox(height: 4),
             Text(reminder.title,
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: PatientTokens.navy)),
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700, color: ink)),
             if (reminder.note.isNotEmpty) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(reminder.note,
                   style: const TextStyle(
                       fontSize: 12.5, height: 1.4, color: PatientTokens.ink)),
             ],
             const SizedBox(height: 8),
-            Text(
-                '$date  •  $time'
-                '${reminder.repeat == ReminderRepeat.once ? '' : '  •  ${reminderRepeatLabel(l, reminder.repeat)}'}',
-                style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: PatientTokens.ink)),
+            Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _Tag(
+                      icon: reminder.repeat == ReminderRepeat.once
+                          ? Icons.event_outlined
+                          : Icons.repeat_rounded,
+                      text: reminder.repeat == ReminderRepeat.once
+                          ? date
+                          : reminderRepeatSummary(l, locale, reminder)),
+                  if (on && upcoming)
+                    _Tag(
+                        icon: Icons.alarm_rounded,
+                        text: reminderRingsIn(l, when.difference(now)),
+                        highlight: true),
+                ]),
           ]),
         ),
         Column(mainAxisSize: MainAxisSize.min, children: [
           Semantics(
-            label: reminder.enabled ? l.reminderAlarmOn : l.reminderAlarmOff,
-            child: Switch(value: reminder.enabled, onChanged: onToggle),
+            label: on ? l.reminderAlarmOn : l.reminderAlarmOff,
+            child: Switch(value: on, onChanged: onToggle),
           ),
           IconButton(
               onPressed: onDelete,
@@ -275,6 +370,32 @@ class _ReminderCard extends StatelessWidget {
               icon: const Icon(Icons.delete_outline_rounded,
                   color: PatientTokens.navInactive)),
         ]),
+      ]),
+    );
+  }
+}
+
+class _Tag extends StatelessWidget {
+  const _Tag({required this.icon, required this.text, this.highlight = false});
+  final IconData icon;
+  final String text;
+  final bool highlight;
+  @override
+  Widget build(BuildContext context) {
+    final color = highlight ? PatientTokens.navActive : PatientTokens.ink;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+          color: highlight ? const Color(0xFFE3F6EC) : const Color(0xFFF1F4F3),
+          borderRadius: BorderRadius.circular(20)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(text,
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+        ),
       ]),
     );
   }
@@ -307,6 +428,13 @@ class _CreateReminderPageState extends State<CreateReminderPage> {
   late ReminderRepeat _repeat =
       widget.existing?.repeat ?? _defaultRepeat(_category);
   late DateTime _at = widget.existing?.at ?? _defaultTime();
+
+  /// Chosen ring days for "Selected days" (1 = Monday). Starts from the
+  /// saved days, or the start date's weekday.
+  late Set<int> _weekdays = {
+    ...(widget.existing?.ringDays ?? [_at.weekday])
+  };
+  late int _everyHours = widget.existing?.everyHours ?? 8;
   late final _title = TextEditingController(text: widget.existing?.title);
   late final _note = TextEditingController(text: widget.existing?.note);
 
@@ -412,6 +540,9 @@ class _CreateReminderPageState extends State<CreateReminderPage> {
     if (_repeat == ReminderRepeat.once && !_at.isAfter(widget.cubit.now)) {
       return setState(() => _error = l.reminderTimePast);
     }
+    if (_repeat == ReminderRepeat.weekly && _weekdays.isEmpty) {
+      return setState(() => _error = l.reminderPickDay);
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -424,13 +555,17 @@ class _CreateReminderPageState extends State<CreateReminderPage> {
             title: title,
             note: _note.text.trim(),
             at: _at,
-            repeat: _repeat))
+            repeat: _repeat,
+            weekdays: _repeat == ReminderRepeat.weekly ? _weekdays : const {},
+            everyHours: _everyHours))
         : await widget.cubit.update(existing.copyWith(
             category: _category,
             title: title,
             note: _note.text.trim(),
             at: _at,
             repeat: _repeat,
+            weekdays: _repeat == ReminderRepeat.weekly ? _weekdays : const {},
+            everyHours: _everyHours,
             enabled: true));
     if (!mounted) return;
     if (ok) {
@@ -505,8 +640,12 @@ class _CreateReminderPageState extends State<CreateReminderPage> {
                                 selected: _category,
                                 onSelected: _selectCategory),
                             const SizedBox(height: 16),
-                            _FieldLabel(Icons.calendar_month_outlined,
-                                l.reminderDateTimeLabel),
+                            _FieldLabel(
+                                Icons.calendar_month_outlined,
+                                _repeat == ReminderRepeat.once
+                                    ? l.reminderDateTimeLabel
+                                    : '${l.reminderDateTimeLabel} · '
+                                        '${l.reminderStartsLabel}'),
                             Container(
                               decoration: BoxDecoration(
                                   color: Colors.white.withValues(alpha: .8),
@@ -536,21 +675,50 @@ class _CreateReminderPageState extends State<CreateReminderPage> {
                             const SizedBox(height: 16),
                             _FieldLabel(
                                 Icons.repeat_rounded, l.reminderRepeatLabel),
-                            DropdownButtonFormField<ReminderRepeat>(
-                                key: ValueKey(_repeat),
-                                initialValue: _repeat,
-                                isExpanded: true,
-                                decoration: _input(null),
-                                items: [
-                                  for (final r in ReminderRepeat.values)
-                                    DropdownMenuItem(
-                                        value: r,
-                                        child: Text(reminderRepeatLabel(l, r),
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w700)))
-                                ],
-                                onChanged: (r) =>
-                                    setState(() => _repeat = r ?? _repeat)),
+                            _RepeatPicker(
+                                selected: _repeat,
+                                onSelected: (r) => setState(() {
+                                      _repeat = r;
+                                      _error = null;
+                                    })),
+                            if (_repeat == ReminderRepeat.weekly) ...[
+                              const SizedBox(height: 14),
+                              _FieldLabel(Icons.event_repeat_rounded,
+                                  l.reminderDaysLabel),
+                              _WeekdayPicker(
+                                  locale: locale,
+                                  selected: _weekdays,
+                                  onChanged: (days) => setState(() {
+                                        _weekdays = days;
+                                        _error = null;
+                                      })),
+                            ],
+                            if (_repeat == ReminderRepeat.hourly) ...[
+                              const SizedBox(height: 14),
+                              _FieldLabel(Icons.timelapse_rounded,
+                                  l.reminderIntervalLabel),
+                              _HourIntervalPicker(
+                                  selected: _everyHours,
+                                  onSelected: (h) =>
+                                      setState(() => _everyHours = h)),
+                              const SizedBox(height: 8),
+                              Text(
+                                  l.reminderRingTimes(reminderTimesLabel(
+                                      locale,
+                                      Reminder(
+                                              id: '',
+                                              category: _category,
+                                              title: '',
+                                              at: _at,
+                                              repeat: ReminderRepeat.hourly,
+                                              everyHours: _everyHours)
+                                          .ringMinutesOfDay)),
+                                  style: const TextStyle(
+                                      fontSize: 12.5,
+                                      height: 1.4,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF0B3D33))),
+                            ],
                             const SizedBox(height: 16),
                             _FieldLabel(Icons.sticky_note_2_outlined,
                                 l.reminderNoteLabel),
@@ -768,6 +936,146 @@ class _CategoryGrid extends StatelessWidget {
           ]),
         ),
     ]);
+  }
+}
+
+/// Repeat choices as selectable chips, like a clock app's repeat row.
+class _RepeatPicker extends StatelessWidget {
+  const _RepeatPicker({required this.selected, required this.onSelected});
+  final ReminderRepeat selected;
+  final ValueChanged<ReminderRepeat> onSelected;
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      for (final r in const [
+        ReminderRepeat.once,
+        ReminderRepeat.daily,
+        ReminderRepeat.weekly,
+        ReminderRepeat.hourly,
+        ReminderRepeat.monthly,
+      ])
+        _Choice(
+            label: reminderRepeatLabel(l, r),
+            selected: r == selected,
+            onTap: () => onSelected(r)),
+    ]);
+  }
+}
+
+/// Seven day toggles plus Every day / Weekdays / Weekends shortcuts.
+class _WeekdayPicker extends StatelessWidget {
+  const _WeekdayPicker(
+      {required this.locale, required this.selected, required this.onChanged});
+  final String locale;
+  final Set<int> selected;
+  final ValueChanged<Set<int>> onChanged;
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    bool isSet(Set<int> days) =>
+        selected.length == days.length && selected.containsAll(days);
+    const all = {1, 2, 3, 4, 5, 6, 7}, work = {1, 2, 3, 4, 5}, rest = {6, 7};
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Wrap(spacing: 6, runSpacing: 6, children: [
+        for (var d = 1; d <= 7; d++)
+          _Choice(
+              label: reminderWeekdayLabel(locale, d),
+              selected: selected.contains(d),
+              compact: true,
+              onTap: () => onChanged(selected.contains(d)
+                  ? ({...selected}..remove(d))
+                  : {...selected, d})),
+      ]),
+      const SizedBox(height: 8),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        _Choice(
+            label: l.reminderEveryDay,
+            selected: isSet(all),
+            outline: true,
+            onTap: () => onChanged({...all})),
+        _Choice(
+            label: l.reminderWeekdays,
+            selected: isSet(work),
+            outline: true,
+            onTap: () => onChanged({...work})),
+        _Choice(
+            label: l.reminderWeekends,
+            selected: isSet(rest),
+            outline: true,
+            onTap: () => onChanged({...rest})),
+      ]),
+    ]);
+  }
+}
+
+/// "Every 1, 2, 3, 4, 6, 8 or 12 hours", counted from the start time.
+class _HourIntervalPicker extends StatelessWidget {
+  const _HourIntervalPicker({required this.selected, required this.onSelected});
+  final int selected;
+  final ValueChanged<int> onSelected;
+  @override
+  Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      for (final h in reminderHourIntervals)
+        _Choice(
+            label: l.reminderEveryHours(h),
+            selected: h == selected,
+            onTap: () => onSelected(h)),
+    ]);
+  }
+}
+
+class _Choice extends StatelessWidget {
+  const _Choice(
+      {required this.label,
+      required this.selected,
+      required this.onTap,
+      this.compact = false,
+      this.outline = false});
+  final String label;
+  final bool selected, compact, outline;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final filled = selected && !outline;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: filled
+            ? PatientTokens.navActive
+            : selected
+                ? const Color(0xFFE3F6EC)
+                : Colors.white.withValues(alpha: .8),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(
+                color: selected ? PatientTokens.navActive : Colors.transparent,
+                width: 1.2)),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            constraints:
+                BoxConstraints(minWidth: compact ? 44 : 0, minHeight: 38),
+            padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 14),
+            // Sized to the label: an aligned Container would stretch to the
+            // whole row inside the Wrap.
+            child: Center(
+              widthFactor: 1,
+              heightFactor: 1,
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: filled ? Colors.white : const Color(0xFF0B3D33))),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

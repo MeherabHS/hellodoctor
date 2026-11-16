@@ -192,7 +192,8 @@ class _HistoryCard extends StatelessWidget {
                       fontSize: 12.5, color: PatientTokens.textSub)),
               const SizedBox(height: 6),
               Wrap(spacing: 8, runSpacing: 4, children: [
-                StatusChip(historyStatusLabel(l, item.status)),
+                StatusChip(
+                    historyStatusLabel(l, item.status, lapsed: item.lapsed)),
                 if (outcome != null)
                   Text(outcome,
                       style: const TextStyle(
@@ -207,8 +208,10 @@ class _HistoryCard extends StatelessWidget {
   }
 }
 
-String historyStatusLabel(AppLocalizations l, String status) =>
+String historyStatusLabel(AppLocalizations l, String status,
+        {bool lapsed = false}) =>
     switch (status) {
+      _ when lapsed => l.apptStatusLapsed,
       'PENDING_PAYMENT' => l.apptStatusPendingPayment,
       'CONFIRMED' => l.apptStatusConfirmed,
       'WAITING' => l.apptStatusWaiting,

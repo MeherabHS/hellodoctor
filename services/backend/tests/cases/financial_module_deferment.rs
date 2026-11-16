@@ -793,3 +793,96 @@ async fn test_appointment_detail_carries_routing_fields_for_owner_only(pool: PgP
     .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
+
+/// With payments deferred the booking still emails both sides: the patient's
+/// confirmation and the Doctor's "new consultation booked". The Doctor's
+/// email shows the time and reference, never the complaint or patient name.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_deferred_booking_emails_the_patient_and_the_doctor(pool: PgPool) {
+    let (_, pool, mut state) = test_app_and_state_with_config(pool, deferred_config()).await;
+    let transport = capture_transport();
+    state.email_transport = transport.clone();
+    let app = hellodoctor_backend::api::create_router(state);
+    let patient_token = fresh_patient_token(&pool).await;
+    sqlx::query(
+        "UPDATE users SET email = 'deferred.patient@example.test' \
+          WHERE id = (SELECT user_id FROM patient_profiles WHERE full_name = 'Race Test Patient' \
+                      ORDER BY created_at DESC LIMIT 1)",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let doctor_email: String = sqlx::query_scalar(
+        "SELECT u.email FROM doctor_profiles d JOIN users u ON u.id = d.user_id WHERE d.id = $1",
+    )
+    .bind(uid(DOCTOR1_PROFILE_ID))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let slot_id = first_bookable_slot(&app, &patient_token).await;
+    let booked = post_idem(
+        &app,
+        "/api/v1/appointments/book",
+        Some(&patient_token),
+        &serde_json::json!({
+            "doctor_id": DOCTOR1_PROFILE_ID,
+            "slot_id": slot_id,
+            "modality": "VIDEO",
+            "chief_complaint": "Persistent cough at night"
+        }),
+        &Uuid::new_v4().to_string(),
+    )
+    .await;
+    assert_eq!(booked.status(), StatusCode::CREATED);
+    wait_for_sent_emails(
+        &pool,
+        &["CONSULTATION_CONFIRMED", "CONSULTATION_BOOKED_DOCTOR"],
+    )
+    .await;
+
+    let mut queued: Vec<(String, String)> = sqlx::query_as(
+        "SELECT email_type, recipient_email FROM email_outbox \
+          WHERE email_type IN ('CONSULTATION_CONFIRMED', 'CONSULTATION_BOOKED_DOCTOR')",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    queued.sort();
+    assert_eq!(
+        queued,
+        vec![
+            (
+                "CONSULTATION_BOOKED_DOCTOR".to_string(),
+                doctor_email.clone()
+            ),
+            (
+                "CONSULTATION_CONFIRMED".to_string(),
+                "deferred.patient@example.test".to_string()
+            ),
+        ]
+    );
+    let sent = transport.sent.lock().unwrap().clone();
+    let doctor_mail = sent
+        .iter()
+        .find(|m| m.0 == doctor_email)
+        .expect("the Doctor's email was sent");
+    assert_eq!(
+        doctor_mail.1,
+        "A new consultation has been booked with you."
+    );
+    for body in [&doctor_mail.2, &doctor_mail.3] {
+        assert!(
+            !body.contains("cough"),
+            "no complaint in the Doctor's email"
+        );
+        assert!(
+            !body.contains("Race Test Patient"),
+            "no patient name in the Doctor's email"
+        );
+        assert!(body.contains("Video consultation") && body.contains("EAT"));
+    }
+    assert!(sent
+        .iter()
+        .any(|m| m.0 == "deferred.patient@example.test"
+            && m.1 == "You're booked! Your care, your way."));
+}

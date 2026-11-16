@@ -20,6 +20,7 @@ export type AdminPageId =
   | 'blogs'
   | 'facilities'
   | 'quizzes'
+  | 'videos'
   | 'topics'
   | 'team'
   | 'activity'
@@ -64,9 +65,10 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'Content',
     icon: FileText,
     pages: [
-      {id: 'blogs', label: 'Articles (Blog)'},
-      {id: 'topics', label: 'Topics & Categories'},
+      {id: 'blogs', label: 'Articles'},
+      {id: 'videos', label: 'Videos'},
       {id: 'quizzes', label: 'Quizzes'},
+      {id: 'topics', label: 'Topics & Categories'},
       {id: 'facilities', label: 'Facilities'},
     ],
   },

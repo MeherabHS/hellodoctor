@@ -117,12 +117,49 @@ class AfyaBrandHeader extends StatelessWidget {
             customBorder: const CircleBorder(),
             child: Padding(
               padding: const EdgeInsets.all(6),
-              child:
-                  AfyaInitialsAvatar(name: state.profile?.fullName, size: 36),
+              child: _HeaderAvatar(profile: deps.profile, state: state),
             ),
           ),
         ),
       ]),
     );
+  }
+}
+
+/// The signed-in patient's saved photo, or their initials when there is
+/// none. Shares [ProfileCubit]'s in-memory photo with the Profile screen, so
+/// a new photo appears here as soon as it is saved.
+class _HeaderAvatar extends StatefulWidget {
+  const _HeaderAvatar({required this.profile, required this.state});
+  final ProfileCubit profile;
+  final ProfileState state;
+  @override
+  State<_HeaderAvatar> createState() => _HeaderAvatarState();
+}
+
+class _HeaderAvatarState extends State<_HeaderAvatar> {
+  @override
+  void initState() {
+    super.initState();
+    // One attempt per header; a patient without a photo keeps the initials.
+    final s = widget.profile.state;
+    if (s.photoBytes == null && !s.photoLoading && !widget.profile.isClosed) {
+      widget.profile.loadPhoto();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = widget.state.photoBytes;
+    if (bytes == null) {
+      return AfyaInitialsAvatar(name: widget.state.profile?.fullName, size: 36);
+    }
+    return ClipOval(
+        child: Image.memory(bytes,
+            key: const ValueKey('home-header-photo'),
+            width: 36,
+            height: 36,
+            fit: BoxFit.cover,
+            gaplessPlayback: true));
   }
 }

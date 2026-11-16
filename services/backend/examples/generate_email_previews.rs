@@ -16,13 +16,15 @@
 use hellodoctor_backend::services::email_templates::{
     render_admin_login_otp, render_consultation_cancelled, render_consultation_confirmed,
     render_consultation_rescheduled, render_doctor_application_received, render_doctor_approved,
-    render_doctor_login_otp, render_doctor_rejected, render_password_changed,
-    render_password_reset_otp, render_patient_login_otp, render_patient_welcome,
-    render_payment_confirmed, render_peer_application_received, render_peer_approved,
-    render_peer_login_otp, render_peer_reinstated, render_peer_rejected, render_peer_suspended,
+    render_doctor_consultation_booked, render_doctor_login_otp, render_doctor_rejected,
+    render_password_changed, render_password_reset_otp, render_patient_login_otp,
+    render_patient_welcome, render_payment_confirmed, render_peer_application_received,
+    render_peer_approved, render_peer_login_otp, render_peer_reinstated, render_peer_rejected,
+    render_peer_session_booked, render_peer_session_cancelled, render_peer_session_confirmed,
+    render_peer_session_declined, render_peer_session_requested, render_peer_suspended,
     render_refund_processed, ConsultationCancelledParams, ConsultationConfirmedParams,
     ConsultationRescheduledParams, EmailAssets, EmailLinks, PaymentConfirmedParams,
-    RefundProcessedParams, RenderedEmail,
+    RefundProcessedParams, RenderedEmail, SessionDetails,
 };
 use std::fs;
 use std::path::Path;
@@ -85,6 +87,18 @@ fn main() {
         currency: "KES",
         refund_amount: "1,500.00",
         refund_date: "11 December 2026",
+    };
+    let consult = SessionDetails {
+        reference: "APT-20261115-7F3A2C1D",
+        date: "Monday, 17 November 2026",
+        time: "10:30 AM",
+        session_type: "Video consultation",
+    };
+    let session = SessionDetails {
+        reference: "9B41C0DE",
+        date: "Monday, 17 November 2026",
+        time: "2:00 PM",
+        session_type: "Chat",
     };
     let entries = vec![
         PreviewEntry {
@@ -210,6 +224,42 @@ fn main() {
             category: "Peer Navigator",
             description: "Live. Care app sign-in code for a Peer Navigator.",
             rendered: render_peer_login_otp("Grace", "482913", 5, &assets),
+        },
+        PreviewEntry {
+            file_name: "doctor_consultation_booked.html",
+            category: "Doctor",
+            description: "Sent to the Doctor when a consultation with them is confirmed.",
+            rendered: render_doctor_consultation_booked("Dr. Jane Njoroge", &consult, &assets, &links),
+        },
+        PreviewEntry {
+            file_name: "peer_session_requested.html",
+            category: "Peer Navigator",
+            description: "Sent to the Peer Navigator when a patient requests one of their times.",
+            rendered: render_peer_session_requested("Grace Wanjiku", &session, &assets),
+        },
+        PreviewEntry {
+            file_name: "peer_session_booked.html",
+            category: "Peer Navigator",
+            description: "Sent to the Peer Navigator when they accept a request.",
+            rendered: render_peer_session_booked("Grace Wanjiku", &session, &assets),
+        },
+        PreviewEntry {
+            file_name: "peer_session_cancelled.html",
+            category: "Peer Navigator",
+            description: "Sent to the Peer Navigator when the patient cancels a waiting request.",
+            rendered: render_peer_session_cancelled("Grace Wanjiku", &session, &assets),
+        },
+        PreviewEntry {
+            file_name: "peer_session_confirmed.html",
+            category: "Patient",
+            description: "Sent to the patient when their Peer Navigator accepts the request.",
+            rendered: render_peer_session_confirmed("Amani", "Grace Wanjiku", &session, &assets, &links),
+        },
+        PreviewEntry {
+            file_name: "peer_session_declined.html",
+            category: "Patient",
+            description: "Sent to the patient when the Peer Navigator can't take the request.",
+            rendered: render_peer_session_declined("Amani", &session, &assets, &links),
         },
     ];
 

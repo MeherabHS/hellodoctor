@@ -425,7 +425,10 @@ pub async fn list_own_appointments(
     // silently loses every row (RLS, not an error) rather than failing
     // loudly — caught by this endpoint's own integration test asserting a
     // booked appointment is actually returned, not just by code review.
-    let rows = sqlx::query(
+    // A booking whose time passed unstarted stays CONFIRMED in the database
+    // but is past, not upcoming: it must never reappear as "Upcoming".
+    let lapsed = crate::domain::join_window::lapsed_sql("$5");
+    let rows = sqlx::query(&format!(
         "SELECT a.id, a.appointment_number, a.doctor_id, a.modality::text AS modality, \
                 a.status::text AS status, a.consultation_fee, a.payment_policy::text AS payment_policy, a.clinical_outcome, \
                 a.completed_at, s.start_time, s.end_time, \
@@ -433,25 +436,30 @@ pub async fn list_own_appointments(
                 d.profile_picture_size_bytes, d.profile_picture_updated_at, \
                 c.expires_at AS chat_expires_at, c.is_locked AS chat_locked, \
                 cs.status::text AS consultation_session_status, cs.recovery_state AS consultation_recovery_state, \
-                cs.empty_room_deadline, cs.patient_present, cs.doctor_present \
+                cs.empty_room_deadline, cs.patient_present, cs.doctor_present, \
+                {lapsed} AS lapsed \
          FROM appointments a \
          JOIN doctor_schedule_slots s ON s.id = a.slot_id \
          JOIN doctor_public_directory d ON d.id = a.doctor_id \
          LEFT JOIN chat_conversations c ON c.appointment_id = a.id \
          LEFT JOIN consultation_sessions cs ON cs.appointment_id = a.id \
          WHERE a.patient_id = $1 \
-           AND ($4::text[] IS NULL OR a.status::text = ANY($4)) \
+           AND ($6::text IS NULL \
+             OR ($6 = 'upcoming' AND a.status::text = ANY($4) AND NOT {lapsed}) \
+             OR ($6 = 'past' AND (a.status::text = ANY($4) OR {lapsed}))) \
          ORDER BY \
-           CASE WHEN a.status::text IN ('PENDING_PAYMENT','CONFIRMED','WAITING','IN_CONSULTATION') THEN 0 ELSE 1 END ASC, \
-           CASE WHEN a.status::text IN ('PENDING_PAYMENT','CONFIRMED','WAITING','IN_CONSULTATION') THEN s.start_time END ASC, \
-           CASE WHEN a.status::text NOT IN ('PENDING_PAYMENT','CONFIRMED','WAITING','IN_CONSULTATION') THEN s.start_time END DESC, \
+           CASE WHEN (a.status::text IN ('PENDING_PAYMENT','CONFIRMED','WAITING','IN_CONSULTATION') AND NOT {lapsed}) THEN 0 ELSE 1 END ASC, \
+           CASE WHEN (a.status::text IN ('PENDING_PAYMENT','CONFIRMED','WAITING','IN_CONSULTATION') AND NOT {lapsed}) THEN s.start_time END ASC, \
+           CASE WHEN NOT (a.status::text IN ('PENDING_PAYMENT','CONFIRMED','WAITING','IN_CONSULTATION') AND NOT {lapsed}) THEN s.start_time END DESC, \
            a.id ASC \
-         LIMIT $2 OFFSET $3",
-    )
+         LIMIT $2 OFFSET $3"
+    ))
     .bind(id)
     .bind(limit)
     .bind(offset)
     .bind(status_filter)
+    .bind(state.config.agora_token_window_after_mins)
+    .bind(q.status.as_deref())
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;
@@ -482,6 +490,7 @@ pub async fn list_own_appointments(
                 "empty_room_deadline": r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("empty_room_deadline"),
                 "patient_present": r.get::<Option<bool>, _>("patient_present"),
                 "doctor_present": r.get::<Option<bool>, _>("doctor_present"),
+                "lapsed": r.get::<bool, _>("lapsed"),
                 // Server-derived join eligibility (single authoritative policy).
                 "join": crate::domain::join_window::evaluate(
                     &r.get::<String, _>("status"),

@@ -183,6 +183,7 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
                 requestId: c.requestId,
                 peerName: c.peerName,
                 requestStatus: c.requestStatus,
+                callClosed: c.callClosed,
                 myUserId: widget.myUserId)));
     if (mounted) refresh();
   }
@@ -252,7 +253,10 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
     _screenRefresh.attach(context);
   }
 
-  String _statusLabel(AppLocalizations l, String status) => switch (status) {
+  String _statusLabel(AppLocalizations l, String status,
+          {bool lapsed = false}) =>
+      switch (status) {
+        _ when lapsed => l.apptStatusLapsed,
         'PENDING_PAYMENT' => l.appointmentStatusPendingPayment,
         'CONFIRMED' => l.appointmentStatusConfirmed,
         'WAITING' => l.appointmentStatusWaiting,
@@ -378,8 +382,8 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
                                           crossAxisAlignment:
                                               WrapCrossAlignment.center,
                                           children: [
-                                            StatusChip(
-                                                _statusLabel(l, a.status)),
+                                            StatusChip(_statusLabel(l, a.status,
+                                                lapsed: a.lapsed)),
                                             Text(l.messagesChatConsultation,
                                                 style: const TextStyle(
                                                     fontSize: 11.5,

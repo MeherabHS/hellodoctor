@@ -599,6 +599,59 @@ async fn test_app_with_storage_fixture(
 /// directly rather than going through HTTP, while still exercising the real
 /// grant/policy set (e.g. confirming `hellodoctor_system_worker`'s notification
 /// grants actually work, not just that a superuser connection can do anything).
+/// Records every email the app sends (recipient, subject, html, text) so a
+/// test can check what each role actually receives. Nothing leaves the test.
+struct CaptureTransport {
+    sent: std::sync::Mutex<Vec<(String, String, String, String)>>,
+}
+
+#[async_trait::async_trait]
+impl hellodoctor_backend::services::email_transport::EmailTransport for CaptureTransport {
+    fn is_configured(&self) -> bool {
+        true
+    }
+    async fn send_email(
+        &self,
+        message: &hellodoctor_backend::services::email_transport::EmailMessage<'_>,
+    ) -> hellodoctor_backend::services::email_transport::EmailOutcome {
+        self.sent.lock().unwrap().push((
+            message.recipient.to_string(),
+            message.subject.to_string(),
+            message.html_body.unwrap_or_default().to_string(),
+            message.plain_text_body.to_string(),
+        ));
+        hellodoctor_backend::services::email_transport::EmailOutcome::SentToProvider {
+            provider_message_id: None,
+        }
+    }
+}
+
+fn capture_transport() -> std::sync::Arc<CaptureTransport> {
+    std::sync::Arc::new(CaptureTransport {
+        sent: std::sync::Mutex::new(Vec::new()),
+    })
+}
+
+/// Waits until every queued email of these types has been handed to the
+/// transport (delivery runs after commit on a spawned task).
+async fn wait_for_sent_emails(pool: &PgPool, types: &[&str]) {
+    let types: Vec<String> = types.iter().map(|t| t.to_string()).collect();
+    for _ in 0..250 {
+        let pending: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM email_outbox WHERE email_type = ANY($1) AND delivery_status = 'CREATED'",
+        )
+        .bind(&types)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        if pending == 0 {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    }
+    panic!("queued {types:?} emails were never sent");
+}
+
 async fn test_app_and_state(pool: PgPool) -> (axum::Router, PgPool, AppState) {
     test_app_and_state_with_config(pool, test_config()).await
 }

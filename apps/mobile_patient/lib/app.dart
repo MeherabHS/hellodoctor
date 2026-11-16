@@ -247,7 +247,8 @@ class _SignedInRoot extends StatefulWidget {
   State<_SignedInRoot> createState() => _SignedInRootState();
 }
 
-class _SignedInRootState extends State<_SignedInRoot> {
+class _SignedInRootState extends State<_SignedInRoot>
+    with WidgetsBindingObserver {
   late final ProfileRepository _profileRepo;
   late final ProfileCubit _profileCubit;
   late final HomeCubit _homeCubit;
@@ -261,6 +262,7 @@ class _SignedInRootState extends State<_SignedInRoot> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _profileRepo = ProfileRepository(widget.api,
         cache: widget.cache, connectivity: widget.connectivity);
     _profileCubit =
@@ -318,8 +320,20 @@ class _SignedInRootState extends State<_SignedInRoot> {
     }
   }
 
+  /// Back in the foreground (often from the system "Alarms & reminders"
+  /// page): re-arm reminders if their exact-alarm access changed meanwhile.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    final id = _profileCubit.state.profile?.userId;
+    if (id == null || id.isEmpty) return;
+    unawaited(
+        _reminders.resume(id, reminderAlertText(AppLocalizations.of(context))));
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _profileCubit.close();
     _homeCubit.close();
     _familyProfilesCubit.close();

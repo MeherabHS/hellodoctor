@@ -21,9 +21,10 @@ import { GrievancesPage } from '@/components/operations/GrievancesPage';
 import { PaymentsDeferred, SettlementsDeferred, SettingsDeferred } from '@/components/finance/FinanceDeferred';
 import { FacilityManager } from '@/components/facilities/FacilityManager';
 import { QuizManager } from '@/components/blogs/QuizManager';
+import { VideoManager } from '@/components/blogs/VideoManager';
 import {NavigationGuard,useAdminNavigation} from '@/components/navigation/NavigationGuard';
 import { AdminSidebar, pageTrail, type AdminPageId } from '@/components/shell/AdminSidebar';
-import { ChevronRight, LogOut, Search, Siren } from 'lucide-react';
+import { ChevronRight, LogOut, Search } from 'lucide-react';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useBackendSync, ModalitySplit } from '@/lib/useBackendSync';
@@ -298,7 +299,8 @@ function AdminPortalContent() {
     logs: { title: 'App Errors & Incidents', breadcrumb: 'Operations & Safety · Track, triage and resolve platform incidents' },
     grievances: { title: 'Consultation Grievances', breadcrumb: 'Operations & Safety · Complaints, adjudication and appeals' },
     compliance: { title: 'Rx & Q&A Audit', breadcrumb: 'Operations & Safety · Prescription and doctor answer review' },
-    blogs: { title: 'Articles (Blog)', breadcrumb: 'Content · Create, edit, publish and manage health articles' },
+    blogs: { title: 'Articles', breadcrumb: 'Content · Health articles by topic' },
+    videos: { title: 'Videos', breadcrumb: 'Content · YouTube videos for the Patient app' },
     quizzes: { title: 'Quizzes', breadcrumb: 'Content · Standalone quizzes for the Patient app' },
     topics: { title: 'Topics & Categories', breadcrumb: 'Content · Link article categories to Patient app topics' },
     team: { title: 'Admins & Invitations', breadcrumb: 'Admin Team · Invite and manage Admins' },
@@ -837,15 +839,6 @@ function AdminPortalContent() {
               />
             </div>
 
-            <button
-              type="button"
-              className="admin-16263-btn"
-              onClick={() => showToast('Emergency Bridge', 'The Kenya emergency contact is configured by deployment.', '🚨', 'info')}
-            >
-              <Siren size={16} aria-hidden />
-              <span>Emergency Helpline</span>
-            </button>
-
             <NotificationCenter pendingApplications={verificationQueue.length} onOpen={(page) => navigateAdmin(page)} />
 
             <div className="admin-user-pill">
@@ -1204,6 +1197,7 @@ function AdminPortalContent() {
           {activeAdminPage === 'blogs' && <div className="admin-page-view active" id="adminPage_blogs"><BlogManager /></div>}
           {activeAdminPage === 'facilities' && <div className="admin-page-view active" id="adminPage_facilities"><FacilityManager /></div>}
           {activeAdminPage === 'quizzes' && <div className="admin-page-view active" id="adminPage_quizzes"><QuizManager /></div>}
+          {activeAdminPage === 'videos' && <div className="admin-page-view active" id="adminPage_videos"><VideoManager /></div>}
           {activeAdminPage === 'topics' && <div className="admin-page-view active" id="adminPage_topics"><TopicsPage /></div>}
           {activeAdminPage === 'team' && <div className="admin-page-view active" id="adminPage_team"><AdminTeamPage /></div>}
           {activeAdminPage === 'peers' && <div className="admin-page-view active" id="adminPage_peers"><PeerNavigators /></div>}

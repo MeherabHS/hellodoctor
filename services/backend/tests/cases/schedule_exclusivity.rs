@@ -1577,9 +1577,11 @@ async fn pending_hold_appointment(
     patient_id: Uuid,
     hold_expires_at: DateTime<Utc>,
 ) -> Uuid {
-    let start = Utc::now()
-        + Duration::days(60)
-        + Duration::seconds(rand::thread_rng().gen_range(0..1_000_000));
+    // One hour apart per call: random starts could overlap the same Doctor's
+    // earlier slot in this test (no_overlapping_slots), a ~1% CI flake.
+    static NEXT_HOUR: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
+    let hour = NEXT_HOUR.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let start = Utc::now() + Duration::days(60) + Duration::hours(hour);
     let slot = raw_slot(pool, doctor1(), start, start + Duration::minutes(30)).await;
     let appointment_id = Uuid::new_v4();
     sqlx::query(

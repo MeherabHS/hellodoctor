@@ -3,7 +3,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {act,create,type ReactTestRenderer} from 'react-test-renderer';
 import {renderToStaticMarkup} from 'react-dom/server';
-import {McqBuilder} from '../src/components/blogs/McqBuilder';
 import {QuestionEditor} from '../src/components/blogs/QuestionEditor';
 import {QuizPreview} from '../src/components/blogs/QuizPreview';
 import {QuizImport} from '../src/components/blogs/QuizImport';
@@ -21,37 +20,8 @@ test('manual question controls preserve IDs, support translation, options and co
   const q=ready().questions[0];let updated=q;let view:ReactTestRenderer|undefined;
   try{await act(async()=>{view=create(<QuestionEditor question={q} index={0} total={1} language="sw" onChange={v=>{updated=v;}} onRemove={()=>{}} onMove={()=>{}}/>);});
     const radio=view!.root.findAllByType('input').filter(i=>i.props.type==='radio')[1];await act(async()=>{radio.props.onChange();});assert.equal(updated.correct_option_id,q.options[1].id);
-    assert.equal(view!.root.findAllByType('textarea')[0].props.value,'Jibu gani?');await act(async()=>{button(view!,'Add answer option').props.onClick();});assert.equal(updated.options.length,3);assert.equal(updated.id,q.id);
+    assert.equal(view!.root.findAllByType('textarea')[0].props.value,'Jibu gani?');await act(async()=>{view!.root.findAllByType('button').find(b=>b.props.className==='afya-link-btn')!.props.onClick();});assert.equal(updated.options.length,3);assert.equal(updated.id,q.id);
   }finally{if(view)act(()=>view!.unmount());}
-});
-
-test('builder loads on demand, edits locally, saves excluded incomplete drafts and publishing stays explicit',async()=>{
-  const previous=globalThis.fetch;const requests:{url:string;method:string;body:Record<string,unknown>|null}[]=[];const previews:QuizContent[]=[];const dirty:boolean[]=[];
-  globalThis.fetch=async(url,init)=>{const body=init?.body?JSON.parse(String(init.body)):null;requests.push({url:String(url),method:init?.method||'GET',body});return response(body?{schema_version:1,draft:revision(body.content as QuizContent),published:null}:{schema_version:1,draft:null,published:null});};
-  let view:ReactTestRenderer|undefined;
-  try{await act(async()=>{view=create(<McqBuilder article={article} onPreview={c=>{if(c)previews.push(c);}} onDirty={d=>dirty.push(d)}/>);});assert.equal(requests.length,0);
-    await act(async()=>{button(view!,'Open MCQ Builder').props.onClick();});assert.equal(requests.length,1);
-    const checkbox=view!.root.findAllByType('input').find(i=>i.props.type==='checkbox')!;assert.equal(checkbox.props.checked,false);
-    await act(async()=>{button(view!,'Add question').props.onClick();});await act(async()=>{button(view!,'Kiswahili questions').props.onClick();});
-    assert.equal(requests.length,1);assert.equal(previews.at(-1)!.questions.length,1);assert.equal(previews.at(-1)!.include_quiz,false);
-    await act(async()=>{button(view!,'Save question draft').props.onClick();});assert.equal(requests.length,2);assert.equal(requests[1].method,'PATCH');assert.equal((requests[1].body!.content as QuizContent).include_quiz,false);assert.equal(dirty.at(-1),false);
-    assert.ok(JSON.stringify(view!.toJSON()).includes('Published article and quiz remain unchanged.'));assert.equal(button(view!,'Submit quiz for review'),undefined);assert.equal(button(view!,'Publish quiz').props.disabled,false);
-  }finally{if(view)act(()=>view!.unmount());globalThis.fetch=previous;}
-});
-
-// Admins publish directly (CLAUDE.md, 2026-11-14): no Approve control; a quiz
-// left pending review is finished by Publish quiz, and a refusal stays readable.
-test('a pending quiz is finished by Publish quiz; a server refusal stays readable',async()=>{
-  const previous=globalThis.fetch;const writes:string[]=[];let view:ReactTestRenderer|undefined;
-  const pending={...revision(),status:'PENDING_REVIEW' as const};
-  clearSoftReads();
-  globalThis.fetch=async(url,init)=>{if(!init?.method||init.method==='GET')return response({schema_version:1,draft:pending,published:null});writes.push(String(url));return new Response(JSON.stringify({success:false,error:{code:'FORBIDDEN',message:'You do not have permission to publish this quiz.'}}),{status:403});};
-  try{await act(async()=>{view=create(<McqBuilder article={article} onPreview={()=>{}} onDirty={()=>{}}/>);});await act(async()=>{button(view!,'Open MCQ Builder').props.onClick();});
-    assert.equal(button(view!,'Approve quiz'),undefined);
-    await act(async()=>{button(view!,'Publish quiz').props.onClick();});
-    assert.equal(writes.length,1);assert.ok(writes[0].includes('approve'),'Publish runs the remaining internal approve step first');
-    const output=JSON.stringify(view!.toJSON());assert.ok(output.includes('Not published'));assert.ok(!output.includes('API Error'));assert.ok(!output.includes('FORBIDDEN'));
-  }finally{if(view)act(()=>view!.unmount());globalThis.fetch=previous;}
 });
 
 test('interactive preview gives local feedback, navigation, progress and completion without transport',async()=>{

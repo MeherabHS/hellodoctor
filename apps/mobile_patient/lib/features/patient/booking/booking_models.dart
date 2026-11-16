@@ -97,8 +97,12 @@ class AppointmentDetailDto {
     this.paymentStatus,
     this.holdExpiresAt,
     this.serverTime,
+    this.lapsed = false,
   });
   final String? paymentStatus;
+
+  /// See `AppointmentSummaryDto.lapsed`.
+  final bool lapsed;
   final DateTime? holdExpiresAt, serverTime;
   bool get isReady => const [
         'CONFIRMED',
@@ -120,6 +124,7 @@ class AppointmentDetailDto {
         serverTime: DateTime.tryParse(_textOf(j['server_time']))?.toUtc(),
         clinicalOutcome: j['clinical_outcome']?.toString(),
         completedAt: j['completed_at']?.toString(),
+        lapsed: j['lapsed'] == true,
       );
 }
 

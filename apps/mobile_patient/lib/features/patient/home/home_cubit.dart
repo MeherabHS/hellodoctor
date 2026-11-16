@@ -28,7 +28,7 @@ class HomeState {
   /// The single nearest upcoming confirmed/pending consultation, if any —
   /// shown on the Book Consultation landing.
   AppointmentSummaryDto? get nextUpcoming =>
-      upcoming.isEmpty ? null : upcoming.first;
+      upcoming.where((a) => !a.lapsed).firstOrNull;
 
   /// The consultation the Home card shows (product decision 2026-11-13,
   /// CLAUDE.md rule 2.4): visible only inside the server's window, which opens
@@ -38,6 +38,7 @@ class HomeState {
   AppointmentSummaryDto? homeCardAppointment([DateTime? now]) {
     if (fromCache) return null;
     for (final a in upcoming) {
+      if (a.lapsed) continue;
       if (!const ['CONFIRMED', 'WAITING', 'IN_CONSULTATION']
           .contains(a.status)) {
         continue;
