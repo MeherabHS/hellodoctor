@@ -269,6 +269,16 @@ async fn resolve_and_render(
         "CONSULTATION_CONFIRMED" => {
             resolve_consultation_confirmed(state, claim.related_entity_id).await
         }
+        "CONSULTATION_BOOKED_DOCTOR" => {
+            resolve_doctor_consultation_booked(state, claim.related_entity_id).await
+        }
+        "PEER_SESSION_REQUESTED"
+        | "PEER_SESSION_BOOKED"
+        | "PEER_SESSION_CANCELLED"
+        | "PEER_SESSION_CONFIRMED"
+        | "PEER_SESSION_DECLINED" => {
+            resolve_peer_session(state, &claim.email_type, claim.related_entity_id).await
+        }
         "CONSULTATION_RESCHEDULED" => resolve_rescheduled(state, claim.related_entity_id).await,
         "PAYMENT_CONFIRMED" => resolve_payment_confirmed(state, claim.related_entity_id).await,
         "REFUND_PROCESSED" => resolve_refund_processed(state, claim.related_entity_id).await,
@@ -331,6 +341,106 @@ async fn resolve_consultation_confirmed(
         &state.email_assets,
         &state.email_links,
     )))
+}
+
+/// The Doctor's copy of a confirmed booking: time, type and reference only.
+async fn resolve_doctor_consultation_booked(
+    state: &AppState,
+    appointment_id: Uuid,
+) -> Result<Option<RenderedEmail>, AppError> {
+    let Some(details) =
+        crate::services::AppointmentService::consultation_email_details(state, appointment_id)
+            .await?
+    else {
+        return Ok(None);
+    };
+    let modality: Option<String> =
+        sqlx::query_scalar("SELECT modality::text FROM appointments WHERE id = $1")
+            .bind(appointment_id)
+            .fetch_optional(&state.system_db)
+            .await?;
+    let session_type = if modality.as_deref() == Some("CHAT") {
+        "Chat consultation"
+    } else {
+        "Video consultation"
+    };
+    Ok(Some(tmpl::render_doctor_consultation_booked(
+        &details.doctor_name,
+        &tmpl::SessionDetails {
+            reference: &details.appointment_number,
+            date: &details.date_label,
+            time: &details.time_label,
+            session_type,
+        },
+        &state.email_assets,
+        &state.email_links,
+    )))
+}
+
+/// Peer-support session emails, rendered from the request at send time.
+/// The topic is never read here, so it can never reach an email.
+async fn resolve_peer_session(
+    state: &AppState,
+    email_type: &str,
+    request_id: Uuid,
+) -> Result<Option<RenderedEmail>, AppError> {
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        support_type: String,
+        start_time: chrono::DateTime<Utc>,
+        peer_name: String,
+        patient_name: String,
+    }
+    let row: Option<Row> = sqlx::query_as(
+        "SELECT r.support_type, s.start_time, p.full_name AS peer_name, pp.full_name AS patient_name \
+           FROM peer_requests r \
+           JOIN peer_slots s ON s.id = r.slot_id \
+           JOIN peer_profiles p ON p.id = r.peer_id \
+           JOIN patient_profiles pp ON pp.id = r.patient_id \
+          WHERE r.id = $1",
+    )
+    .bind(request_id)
+    .fetch_optional(&state.system_db)
+    .await?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    let local = row
+        .start_time
+        .with_timezone(&crate::services::notification_service::nairobi_offset());
+    let date = local.format("%A, %d %B %Y").to_string();
+    let time = local.format("%-I:%M %p").to_string();
+    let reference = request_id.to_string()[..8].to_uppercase();
+    let details = tmpl::SessionDetails {
+        reference: &reference,
+        date: &date,
+        time: &time,
+        session_type: if row.support_type == "CALL" {
+            "Voice/Video call"
+        } else {
+            "Chat"
+        },
+    };
+    let patient_first = row.patient_name.split_whitespace().next().unwrap_or("");
+    let assets = &state.email_assets;
+    let links = &state.email_links;
+    Ok(Some(match email_type {
+        "PEER_SESSION_REQUESTED" => {
+            tmpl::render_peer_session_requested(&row.peer_name, &details, assets)
+        }
+        "PEER_SESSION_BOOKED" => tmpl::render_peer_session_booked(&row.peer_name, &details, assets),
+        "PEER_SESSION_CANCELLED" => {
+            tmpl::render_peer_session_cancelled(&row.peer_name, &details, assets)
+        }
+        "PEER_SESSION_CONFIRMED" => tmpl::render_peer_session_confirmed(
+            patient_first,
+            &row.peer_name,
+            &details,
+            assets,
+            links,
+        ),
+        _ => tmpl::render_peer_session_declined(patient_first, &details, assets, links),
+    }))
 }
 
 async fn resolve_rescheduled(

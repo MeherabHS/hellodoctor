@@ -1876,6 +1876,287 @@ pub fn render_peer_reinstated(peer_name: &str, assets: &EmailAssets) -> Rendered
     )
 }
 
+// =====================================================================
+// Booking emails for every role (2026-11-15): the Doctor's "new
+// consultation booked" and the peer-support session emails for patients
+// and Peer Navigators. They never carry a consultation complaint, a peer
+// support topic or the patient's name: only the time, the type of
+// session and a reference, so an email seen by someone else reveals no
+// health detail.
+// =====================================================================
+
+struct SessionEmail<'a> {
+    subject: &'a str,
+    preheader: &'a str,
+    hero: &'a str,
+    hero_alt: &'a str,
+    greeting_name: &'a str,
+    intro: &'a [&'a str],
+    rows: &'a [(&'a str, &'a str)],
+    after: &'a [&'a str],
+    cta: Option<Cta<'a>>,
+    team: &'a str,
+    contact_label: &'a str,
+}
+
+fn render_session_email(email: SessionEmail<'_>, assets: &EmailAssets) -> RenderedEmail {
+    let footer = Footer {
+        contact_label: email.contact_label,
+        transactional_disclaimer: true,
+    };
+    let name = fallback_name(email.greeting_name);
+    let mut html = format!(
+        "<h1 style=\"margin:0 0 16px;font-size:20px;color:{teal};\">{subject}</h1>\
+<p style=\"margin:0 0 16px;\">Hello {name},</p>",
+        teal = palette::DEEP_TEAL,
+        subject = html_escape(email.subject),
+        name = html_escape(name),
+    );
+    let mut text = format!("{}\n\nHello {name},\n\n", email.subject);
+    for p in email.intro {
+        html.push_str(&format!(
+            "<p style=\"margin:0 0 16px;\">{}</p>",
+            html_escape(p)
+        ));
+        text.push_str(&format!("{p}\n\n"));
+    }
+    if !email.rows.is_empty() {
+        html.push_str(&detail_card_html(email.rows));
+        text.push_str(&format!("{}\n\n", detail_card_text(email.rows)));
+    }
+    for p in email.after {
+        html.push_str(&format!(
+            "<p style=\"margin:0 0 16px;\">{}</p>",
+            html_escape(p)
+        ));
+        text.push_str(&format!("{p}\n\n"));
+    }
+    html.push_str(&cta_button_html(email.cta));
+    text.push_str(&cta_text(email.cta));
+    html.push_str(&format!(
+        "<p style=\"margin:24px 0 0;\">With care,<br /><strong>{}</strong></p>",
+        html_escape(email.team)
+    ));
+    text.push_str(&format!(
+        "\nWith care,\n{}\n\n{}",
+        email.team,
+        footer_text(&footer)
+    ));
+    RenderedEmail {
+        subject: email.subject.to_string(),
+        html_body: layout(
+            email.subject,
+            email.preheader,
+            Some(email.hero),
+            email.hero_alt,
+            assets,
+            &html,
+            &footer,
+        ),
+        text_body: text,
+    }
+}
+
+/// Date, time and type of one booked session or consultation.
+pub struct SessionDetails<'a> {
+    pub reference: &'a str,
+    pub date: &'a str,
+    pub time: &'a str,
+    /// "Chat" or "Voice/Video call" (peer), "Video consultation" or
+    /// "Chat consultation" (doctor).
+    pub session_type: &'a str,
+}
+
+/// To the Doctor when a patient's consultation with them is confirmed.
+pub fn render_doctor_consultation_booked(
+    doctor_name: &str,
+    details: &SessionDetails<'_>,
+    assets: &EmailAssets,
+    links: &EmailLinks,
+) -> RenderedEmail {
+    let doctor = format!("Dr. {}", fallback_doctor_name(doctor_name));
+    render_session_email(
+        SessionEmail {
+            subject: "A new consultation has been booked with you.",
+            preheader: "A patient has booked a consultation with you on AfyaMkononi.",
+            hero: "hero-consultation.svg",
+            hero_alt: "Calendar illustration representing a booked consultation",
+            greeting_name: &doctor,
+            intro: &["A patient has booked a consultation with you on AfyaMkononi. It is confirmed and on your schedule."],
+            rows: &[
+                ("Consultation ID", details.reference),
+                ("Date", details.date),
+                ("Time", details.time),
+                ("Timezone", "EAT"),
+                ("Consultation type", details.session_type),
+            ],
+            after: &[
+                "Open the AfyaMkononi Care app or the Doctor portal to see the patient's details and join when the consultation window opens.",
+                "Patient details are shown only inside the app, never by email.",
+            ],
+            cta: links.doctor().map(|href| Cta {
+                label: "Open My Schedule",
+                href,
+            }),
+            team: "The AfyaMkononi Team",
+            contact_label: "Doctor support:",
+        },
+        assets,
+    )
+}
+
+fn peer_session_rows<'a>(details: &'a SessionDetails<'a>) -> [(&'a str, &'a str); 4] {
+    [
+        ("Date", details.date),
+        ("Time", details.time),
+        ("Timezone", "EAT"),
+        ("Support type", details.session_type),
+    ]
+}
+
+/// To the Peer Navigator when a patient requests one of their open times.
+pub fn render_peer_session_requested(
+    peer_name: &str,
+    details: &SessionDetails<'_>,
+    assets: &EmailAssets,
+) -> RenderedEmail {
+    render_session_email(
+        SessionEmail {
+            subject: "You have a new support request.",
+            preheader: "Someone has asked for a support session with you.",
+            hero: "hero-consultation.svg",
+            hero_alt: "Calendar illustration representing a requested session",
+            greeting_name: peer_first_name(peer_name),
+            intro: &["Someone has asked for a support session with you on AfyaMkononi."],
+            rows: &peer_session_rows(details),
+            after: &[
+                "Open the AfyaMkononi Care app to read the request and accept or decline it. The time is held for you until you answer.",
+                "What they would like to talk about is shown only inside the app, never by email.",
+            ],
+            cta: None,
+            team: PEER_TEAM,
+            contact_label: "Peer Navigator support:",
+        },
+        assets,
+    )
+}
+
+/// To the Peer Navigator when they accept a request: the session is booked.
+pub fn render_peer_session_booked(
+    peer_name: &str,
+    details: &SessionDetails<'_>,
+    assets: &EmailAssets,
+) -> RenderedEmail {
+    render_session_email(
+        SessionEmail {
+            subject: "Your support session is booked.",
+            preheader: "You accepted a support request. Here are the session details.",
+            hero: "hero-consultation.svg",
+            hero_alt: "Calendar illustration representing a booked session",
+            greeting_name: peer_first_name(peer_name),
+            intro: &["You accepted a support request. The session is now on your schedule."],
+            rows: &peer_session_rows(details),
+            after: &["The chat is open in the AfyaMkononi Care app. For a call, start it from the app at the session time."],
+            cta: None,
+            team: PEER_TEAM,
+            contact_label: "Peer Navigator support:",
+        },
+        assets,
+    )
+}
+
+/// To the Peer Navigator when the patient cancels a request still waiting.
+pub fn render_peer_session_cancelled(
+    peer_name: &str,
+    details: &SessionDetails<'_>,
+    assets: &EmailAssets,
+) -> RenderedEmail {
+    render_session_email(
+        SessionEmail {
+            subject: "A support request was cancelled.",
+            preheader: "A support request was cancelled and the time is open again.",
+            hero: "hero-consultation.svg",
+            hero_alt: "Calendar illustration representing a cancelled request",
+            greeting_name: peer_first_name(peer_name),
+            intro: &["A support request for one of your open times was cancelled. You don't need to do anything."],
+            rows: &peer_session_rows(details),
+            after: &["The time is open again for someone else to request."],
+            cta: None,
+            team: PEER_TEAM,
+            contact_label: "Peer Navigator support:",
+        },
+        assets,
+    )
+}
+
+/// To the patient when the Peer Navigator accepts their request.
+pub fn render_peer_session_confirmed(
+    patient_first_name: &str,
+    peer_name: &str,
+    details: &SessionDetails<'_>,
+    assets: &EmailAssets,
+    links: &EmailLinks,
+) -> RenderedEmail {
+    let peer = peer_first_name(peer_name);
+    let rows = [
+        ("Date", details.date),
+        ("Time", details.time),
+        ("Timezone", "EAT"),
+        ("Support type", details.session_type),
+        ("Peer Navigator", peer),
+    ];
+    render_session_email(
+        SessionEmail {
+            subject: "Your support session is confirmed.",
+            preheader: "Your Peer Navigator accepted your request.",
+            hero: "hero-consultation.svg",
+            hero_alt: "Calendar illustration representing a confirmed session",
+            greeting_name: patient_first_name,
+            intro: &["Good news! Your Peer Navigator accepted your request for a support session."],
+            rows: &rows,
+            after: &[
+                "Open the AfyaMkononi app and go to Peer Navigator to start chatting. For a call, join from the app at the session time.",
+                "Everything you share stays private between you and your Peer Navigator.",
+            ],
+            cta: links.patient().map(|href| Cta {
+                label: "Open AfyaMkononi",
+                href,
+            }),
+            team: PEER_TEAM,
+            contact_label: "Need help?",
+        },
+        assets,
+    )
+}
+
+/// To the patient when the Peer Navigator can't take their request.
+pub fn render_peer_session_declined(
+    patient_first_name: &str,
+    details: &SessionDetails<'_>,
+    assets: &EmailAssets,
+    links: &EmailLinks,
+) -> RenderedEmail {
+    render_session_email(
+        SessionEmail {
+            subject: "Your support request wasn't accepted.",
+            preheader: "Please choose another time or Peer Navigator.",
+            hero: "hero-consultation.svg",
+            hero_alt: "Calendar illustration representing a request that was not accepted",
+            greeting_name: patient_first_name,
+            intro: &["Your Peer Navigator couldn't take this support request."],
+            rows: &peer_session_rows(details),
+            after: &["Please open the AfyaMkononi app and choose another time or another Peer Navigator. Support is always here for you."],
+            cta: links.patient().map(|href| Cta {
+                label: "Choose another time",
+                href,
+            }),
+            team: PEER_TEAM,
+            contact_label: "Need help?",
+        },
+        assets,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

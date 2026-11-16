@@ -62,6 +62,9 @@ abstract class ReminderScheduler {
   /// reminders"). Asks once when they cannot. When false, alerts may be a
   /// few minutes late and the reminders screen says so.
   Future<bool> ensureExactAlarms();
+
+  /// Whether exact alarms are allowed right now, without asking.
+  Future<bool> exactAlarmsAllowed();
   Future<void> schedule(Reminder reminder,
       {required ReminderAlertText text, required DateTime now});
   Future<void> cancel(String reminderId);
@@ -90,51 +93,67 @@ class LocalReminderScheduler implements ReminderScheduler {
   }
 
   @override
+  Future<bool> exactAlarmsAllowed() async {
+    await LocalNotificationService.init();
+    return ReminderAlarm.exactAlarmsAllowed(_plugin);
+  }
+
+  @override
   Future<void> schedule(Reminder reminder,
       {required ReminderAlertText text, required DateTime now}) async {
     await LocalNotificationService.init();
     await cancel(reminder.id);
     if (!reminder.enabled) return;
-    final next = reminder.nextAlert(now);
-    if (next == null) return; // a one-time reminder already in the past
     final exact = await ReminderAlarm.exactAlarmsAllowed(_plugin);
-    // The alert instant is fixed in UTC from the device-local wall time.
-    // Repeats then match on the UTC clock components, which keeps the same
-    // local time wherever the device has no daylight-saving shift (Kenya).
-    final when = tz.TZDateTime.from(next.toUtc(), tz.UTC);
-    await _plugin.zonedSchedule(
-      idFor(reminder.id),
-      reminder.title,
-      reminder.note.isEmpty ? null : reminder.note,
-      when,
-      ReminderAlarm.details(
-          channelName: text.channelName,
-          doneLabel: text.doneLabel,
-          snoozeLabel: text.snoozeLabel),
-      androidScheduleMode: exact
-          ? AndroidScheduleMode.alarmClock
-          : AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      payload: ReminderAlarm.payload(
-          reminderId: reminder.id,
-          title: reminder.title,
-          note: reminder.note,
-          channelName: text.channelName,
-          doneLabel: text.doneLabel,
-          snoozeLabel: text.snoozeLabel),
-      matchDateTimeComponents: switch (reminder.repeat) {
-        ReminderRepeat.once => null,
-        ReminderRepeat.daily => DateTimeComponents.time,
-        ReminderRepeat.weekly => DateTimeComponents.dayOfWeekAndTime,
-        ReminderRepeat.monthly => DateTimeComponents.dayOfMonthAndTime,
-      },
-    );
+    final payload = ReminderAlarm.payload(
+        reminderId: reminder.id,
+        title: reminder.title,
+        note: reminder.note,
+        channelName: text.channelName,
+        doneLabel: text.doneLabel,
+        snoozeLabel: text.snoozeLabel);
+    final match = switch (reminder.repeat) {
+      ReminderRepeat.once => null,
+      ReminderRepeat.daily || ReminderRepeat.hourly => DateTimeComponents.time,
+      ReminderRepeat.weekly => DateTimeComponents.dayOfWeekAndTime,
+      ReminderRepeat.monthly => DateTimeComponents.dayOfMonthAndTime,
+    };
+    // One native alarm per ring: a weekly reminder has one per chosen day,
+    // an hourly one has one per daily ring time. Each repeats on its own
+    // (Android re-arms it when it fires), so the loop keeps going with the
+    // app closed. Nothing is left for the app to top up later.
+    final rings = reminder.firstRings(now);
+    for (var slot = 0;
+        slot < rings.length && slot < ReminderAlarm.maxSlots;
+        slot++) {
+      // The instant is fixed in UTC from the device-local wall time. Repeats
+      // then match on the UTC clock components, which keeps the same local
+      // time wherever the device has no daylight-saving shift (Kenya).
+      await _plugin.zonedSchedule(
+        ReminderAlarm.slotIdFor(reminder.id, slot),
+        reminder.title,
+        reminder.note.isEmpty ? null : reminder.note,
+        tz.TZDateTime.from(rings[slot].toUtc(), tz.UTC),
+        ReminderAlarm.details(
+            channelName: text.channelName,
+            doneLabel: text.doneLabel,
+            snoozeLabel: text.snoozeLabel),
+        androidScheduleMode: exact
+            ? AndroidScheduleMode.alarmClock
+            : AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: payload,
+        matchDateTimeComponents: match,
+      );
+    }
   }
 
   @override
   Future<void> cancel(String reminderId) async {
-    await _plugin.cancel(idFor(reminderId));
+    for (var slot = 0; slot < ReminderAlarm.maxSlots; slot++) {
+      await _plugin.cancel(ReminderAlarm.slotIdFor(reminderId, slot));
+    }
     await _plugin.cancel(ReminderAlarm.snoozeIdFor(reminderId));
   }
 }

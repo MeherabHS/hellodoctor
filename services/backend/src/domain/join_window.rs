@@ -97,6 +97,22 @@ pub fn denial_message(reason: &str) -> &'static str {
     }
 }
 
+/// SQL for "this booking's time passed and nobody started it": a CONFIRMED
+/// or WAITING appointment whose video window has closed, or whose chat is
+/// locked or expired (a chat with no conversation yet uses the video window).
+/// It stays CONFIRMED in the database, so every screen asks this instead of
+/// treating it as upcoming. Needs aliases `a` (appointments), `s`
+/// (doctor_schedule_slots), `c` (chat_conversations, LEFT JOIN) and the
+/// after-minutes as the bind parameter `after_param` (e.g. `"$5"`).
+pub fn lapsed_sql(after_param: &str) -> String {
+    format!(
+        "(a.status::text IN ('CONFIRMED','WAITING') AND CASE \
+           WHEN a.modality::text = 'CHAT' AND c.id IS NOT NULL \
+             THEN (c.is_locked OR c.expires_at <= clock_timestamp()) \
+           ELSE s.end_time + make_interval(mins => {after_param}::int) < clock_timestamp() END)"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

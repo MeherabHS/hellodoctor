@@ -177,21 +177,28 @@ pub async fn get_appointment(
         String,
         Option<i32>,
         Option<chrono::DateTime<chrono::Utc>>,
-    )> = sqlx::query_as(
+        bool,
+    )> = sqlx::query_as(&format!(
         "SELECT s.start_time, s.end_time, d.full_name, d.primary_specialty, \
-                d.profile_picture_size_bytes, d.profile_picture_updated_at \
-           FROM doctor_schedule_slots s \
-           JOIN doctor_public_directory d ON d.id = $2 \
-          WHERE s.id = $1",
-    )
-    .bind(apt.slot_id)
-    .bind(apt.doctor_id)
+                d.profile_picture_size_bytes, d.profile_picture_updated_at, \
+                {} AS lapsed \
+           FROM appointments a \
+           JOIN doctor_schedule_slots s ON s.id = a.slot_id \
+           JOIN doctor_public_directory d ON d.id = a.doctor_id \
+           LEFT JOIN chat_conversations c ON c.appointment_id = a.id \
+          WHERE a.id = $1",
+        crate::domain::join_window::lapsed_sql("$2")
+    ))
+    .bind(id)
+    .bind(state.config.agora_token_window_after_mins)
     .fetch_optional(&mut *tx)
     .await?;
     tx.commit().await?;
     let mut data = serde_json::to_value(apt).map_err(|e| AppError::internal(e.to_string()))?;
-    if let Some((start_time, end_time, doctor_name, specialty, photo_size, photo_updated)) = summary
+    if let Some((start_time, end_time, doctor_name, specialty, photo_size, photo_updated, lapsed)) =
+        summary
     {
+        data["lapsed"] = serde_json::json!(lapsed);
         let status = data["status"].as_str().unwrap_or_default().to_string();
         let modality = data["modality"].as_str().unwrap_or_default().to_string();
         data["start_time"] = serde_json::json!(start_time);

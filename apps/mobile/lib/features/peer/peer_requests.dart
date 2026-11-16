@@ -85,7 +85,8 @@ class _PeerRequestsTabState extends State<PeerRequestsTab> {
               chatId: r.conversationId!,
               requestId: r.id,
               name: r.patientName,
-              status: r.status)))
+              status: r.status,
+              callClosed: r.callClosed)))
       .then((_) => _reload());
 
   Future<void> _filter() async {
@@ -479,7 +480,8 @@ class _PeerRequestDetailPageState extends State<PeerRequestDetailPage> {
           chatId: r.conversationId!,
           requestId: r.id,
           name: r.patientName,
-          status: r.status)));
+          status: r.status,
+          callClosed: r.callClosed)));
 
   @override
   Widget build(BuildContext context) {
@@ -640,7 +642,7 @@ class _PeerRequestDetailPageState extends State<PeerRequestDetailPage> {
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                          if (accepted)
+                          if (accepted && !r.callClosed)
                             PeerPrimaryButton(
                                 key: const ValueKey('peer-detail-call'),
                                 label: 'Start Support Call',

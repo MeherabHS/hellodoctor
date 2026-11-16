@@ -24,6 +24,7 @@
   "appointmentStatusInConsultation": "Katika ushauri",
   "appointmentStatusCompleted": "Imekamilika",
   "appointmentStatusCancelled": "Imeghairiwa",
+  "appointmentStatusLapsed": "Muda umepita",
   "appointmentStatusExpired": "Muda umeisha",
   "appointmentStatusRefunded": "Malipo yamerejeshwa",
   "appointmentStatusDisputed": "Inakaguliwa",

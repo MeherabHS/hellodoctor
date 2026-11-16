@@ -1531,3 +1531,183 @@ async fn peer_inputs_reject_spoofing_files_and_treat_sql_as_text(pool: PgPool) {
         assert_eq!(sent.status(), StatusCode::UNPROCESSABLE_ENTITY, "{mime}");
     }
 }
+
+/// Peer-support sessions email both sides like a consultation does: the peer
+/// on a new request, a booking and a cancellation; the patient on a
+/// confirmation and a decline. No email carries the topic or, to the peer,
+/// the patient's name.
+#[sqlx::test(migrations = "./migrations")]
+async fn peer_session_emails_reach_both_sides_without_the_topic(pool: PgPool) {
+    let (_, pool, mut state) = test_app_and_state(pool).await;
+    let transport = capture_transport();
+    state.email_transport = transport.clone();
+    let app = hellodoctor_backend::api::create_router(state);
+    let patient_email = "session.patient@example.test";
+    sqlx::query("UPDATE users SET email = $1 WHERE id = $2")
+        .bind(patient_email)
+        .bind(uid(PATIENT_USER_ID))
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (peer, _peer_id, slots) =
+        approved_peer_with_slots(&app, &pool, PEER_EMAIL, "+254711220051", 3).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let mut ids = Vec::new();
+    for slot in &slots {
+        let made = request_slot(&app, &patient, slot).await;
+        assert_eq!(made.status(), StatusCode::CREATED);
+        ids.push(
+            json_body(made).await["data"]["id"]
+                .as_str()
+                .unwrap()
+                .to_string(),
+        );
+    }
+    for (path, token) in [
+        (format!("/api/v1/peer/requests/{}/accept", ids[0]), &peer),
+        (format!("/api/v1/peer/requests/{}/decline", ids[1]), &peer),
+        (format!("/api/v1/peer-requests/{}/cancel", ids[2]), &patient),
+    ] {
+        let response = post(&app, &path, Some(token), &serde_json::json!({})).await;
+        assert_eq!(response.status(), StatusCode::OK, "{path}");
+    }
+    let types = [
+        "PEER_SESSION_REQUESTED",
+        "PEER_SESSION_BOOKED",
+        "PEER_SESSION_CANCELLED",
+        "PEER_SESSION_CONFIRMED",
+        "PEER_SESSION_DECLINED",
+    ];
+    wait_for_sent_emails(&pool, &types).await;
+
+    let mut queued: Vec<(String, String)> = sqlx::query_as(
+        "SELECT email_type, recipient_email FROM email_outbox WHERE email_type LIKE 'PEER_SESSION_%'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    queued.sort();
+    let mut expected: Vec<(String, String)> = [
+        ("PEER_SESSION_BOOKED", PEER_EMAIL),
+        ("PEER_SESSION_CANCELLED", PEER_EMAIL),
+        ("PEER_SESSION_CONFIRMED", patient_email),
+        ("PEER_SESSION_DECLINED", patient_email),
+        ("PEER_SESSION_REQUESTED", PEER_EMAIL),
+        ("PEER_SESSION_REQUESTED", PEER_EMAIL),
+        ("PEER_SESSION_REQUESTED", PEER_EMAIL),
+    ]
+    .iter()
+    .map(|(t, r)| (t.to_string(), r.to_string()))
+    .collect();
+    expected.sort();
+    assert_eq!(queued, expected);
+
+    let sent = transport.sent.lock().unwrap().clone();
+    let subjects: Vec<&str> = sent.iter().map(|m| m.1.as_str()).collect();
+    for subject in [
+        "You have a new support request.",
+        "Your support session is booked.",
+        "A support request was cancelled.",
+        "Your support session is confirmed.",
+        "Your support request wasn't accepted.",
+    ] {
+        assert!(subjects.contains(&subject), "missing: {subject}");
+    }
+    for (recipient, subject, html, text) in sent
+        .iter()
+        .filter(|m| m.1.contains("support session") || m.1.contains("support request"))
+    {
+        for body in [html, text] {
+            assert!(
+                !body.contains("PrEP"),
+                "{subject}: the topic never reaches an email"
+            );
+            assert!(body.contains("EAT"), "{subject}: the session time is shown");
+            if recipient == PEER_EMAIL {
+                assert!(
+                    !body.contains("Patient User"),
+                    "{subject}: no patient name to the peer"
+                );
+            }
+        }
+    }
+    let confirmed = sent
+        .iter()
+        .find(|m| m.1 == "Your support session is confirmed.")
+        .unwrap();
+    assert!(confirmed.3.contains("Hello Patient,") && confirmed.3.contains("Neema"));
+}
+
+/// Once an accepted session's call window has passed, every list both sides
+/// read says the call is closed, so neither app offers "Start call" for it.
+#[sqlx::test(migrations = "./migrations")]
+async fn a_past_peer_session_reports_its_call_as_closed_on_every_list(pool: PgPool) {
+    let (app, pool, _state) = test_app_and_state(pool).await;
+    let (peer, _peer_id, slots) =
+        approved_peer_with_slots(&app, &pool, PEER_EMAIL, "+254711220043", 1).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let request = json_body(request_slot(&app, &patient, &slots[0]).await).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    post(
+        &app,
+        &format!("/api/v1/peer/requests/{request}/accept"),
+        Some(&peer),
+        &serde_json::json!({}),
+    )
+    .await;
+
+    let closed = |app: &axum::Router, path: &'static str, token: String, key: &'static str| {
+        let app = app.clone();
+        let request = request.clone();
+        async move {
+            let body = json_body(get(&app, path, Some(&token)).await).await;
+            body["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|r| r[key] == request.as_str())
+                .unwrap_or_else(|| panic!("{path} lists the request"))["call_closed"]
+                .clone()
+        }
+    };
+    assert_eq!(
+        closed(&app, "/api/v1/peer-requests", patient.clone(), "id").await,
+        false
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer/requests", peer.clone(), "id").await,
+        false
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer-chats", patient.clone(), "request_id").await,
+        false
+    );
+
+    // The call was held and hung up: the room cannot be reopened. (The
+    // time-based close is unit-tested in peer_repo; slot times are immutable.)
+    sqlx::query(
+        "INSERT INTO peer_call_sessions (request_id, channel_name, patient_user_id, peer_user_id, status, ended_at)          SELECT r.id, 'peer_' || replace(r.id::text, '-', ''), r.patient_user_id, r.peer_user_id, 'ENDED', now()          FROM peer_requests r WHERE r.id = $1",
+    )
+    .bind(Uuid::parse_str(&request).unwrap())
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        closed(&app, "/api/v1/peer-requests", patient.clone(), "id").await,
+        true
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer/requests", peer.clone(), "id").await,
+        true
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer-chats", patient.clone(), "request_id").await,
+        true
+    );
+    assert_eq!(
+        closed(&app, "/api/v1/peer-chats", peer.clone(), "request_id").await,
+        true
+    );
+}

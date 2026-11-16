@@ -32,12 +32,13 @@ test('a sensitive draft is published directly; the review steps run behind Publi
   const previous=stubWindow();const fetchBefore=globalThis.fetch;const paths:string[]=[];globalThis.fetch=stepServer(paths) as typeof fetch;
   let view:ReactTestRenderer|undefined;
   try{
-    await act(async()=>{view=create(<ArticleEditor initial={article} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
+    let closed:string|undefined;
+    await act(async()=>{view=create(<ArticleEditor initial={article} categories={[category]} onSaved={()=>{}} onClose={m=>{closed=m;}}/>);});
     const labels=view!.root.findAllByType('button').map(b=>b.children.join(''));
     for(const removed of ['Approve','Submit for review','Return'])assert.ok(!labels.includes(removed),removed);
     await act(async()=>{view!.root.findAllByType('button').find(b=>b.children.join('')==='Publish')!.props.onClick();});
     assert.deepEqual(paths.map(p=>p.split('/').pop()),['submit','approve','publish']);
-    assert.ok(JSON.stringify(view!.toJSON()).includes('Published. No announcement was sent.'));
+    assert.equal(closed,'Published “Health guide”.','publishing returns to the list');
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=previous;}
 });
 
@@ -59,7 +60,7 @@ test('a server refusal while publishing stays readable and keeps the article unp
     await act(async()=>{view=create(<ArticleEditor initial={article} categories={[category]} onSaved={()=>{}} onClose={()=>{}}/>);});
     await act(async()=>{view!.root.findAllByType('button').find(b=>b.children.join('')==='Publish')!.props.onClick();});
     const output=JSON.stringify(view!.toJSON());
-    assert.ok(output.includes('Not published'));assert.ok(!output.includes('API Error'));assert.ok(!output.includes('FORBIDDEN'));
+    assert.ok(output.includes('Not published'));assert.ok(output.includes('permission'));assert.ok(!output.includes('API Error'));assert.ok(!output.includes('FORBIDDEN'));
     assert.ok(!paths.some(p=>p.endsWith('/publish')));
     assert.ok(view!.root.findAllByType('button').some(b=>b.children.join('')==='Publish'),'Publish stays available to retry');
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=previous;}
@@ -70,18 +71,16 @@ test('failed cover upload preserves the saved draft and selection without report
   globalThis.window={addEventListener(){},removeEventListener(){}} as unknown as Window & typeof globalThis;
   globalThis.FileReader=class{result='data:image/png;base64,fixture';onload:(()=>void)|null=null;readAsDataURL(){this.onload?.();}abort(){}} as unknown as typeof FileReader;
   const requests:string[]=[];let refreshed=0;let view:ReactTestRenderer|undefined;
-  globalThis.fetch=async(url)=>{requests.push(String(url));return requests.length===1
-    ?new Response(JSON.stringify({success:true,data:{...article,version:2}}))
-    :new Response(JSON.stringify({success:false,error:{message:'Article media storage is not configured.'}}),{status:409});};
+  globalThis.fetch=async(url)=>{requests.push(String(url));return new Response(JSON.stringify({success:false,error:{message:'Article media storage is not configured.'}}),{status:409});};
   try{
     await act(async()=>{view=create(<ArticleEditor initial={article} categories={[category]} onSaved={()=>{refreshed++;}} onClose={()=>{}}/>);});
     await act(async()=>{view!.root.findAllByType('input').find(input=>input.props.type==='file')!.props.onChange({target:{files:[new File(['fixture'],'cover.png',{type:'image/png'})]}});});
     await act(async()=>{view!.root.findAllByType('button').find(button=>button.children.join('')==='Save draft')!.props.onClick();});
     const output=JSON.stringify(view!.toJSON());
-    assert.equal(requests.length,2);assert.ok(requests[1].endsWith(`/${article.id}?version=2`));assert.equal(refreshed,1);
-    assert.ok(output.includes('Text draft saved.'));assert.ok(output.includes('awaiting Azure Blob integration'));assert.ok(output.includes('No cover was uploaded.'));
-    // Icon-only button since the redesign: matched by its aria-label.
-    assert.ok(view!.root.findAllByType('button').some(button=>button.props['aria-label']==='Remove selected cover'));
+    // Unchanged text is not saved again; only the cover upload is sent.
+    assert.equal(requests.length,1);assert.ok(requests[0].endsWith(`/${article.id}?version=1`));assert.equal(refreshed,1);
+    assert.ok(output.includes('Text saved, but the image was not'));assert.ok(output.includes('awaiting Azure Blob integration'));
+    assert.ok(view!.root.findAllByType('button').some(button=>button.props['aria-label']==='Remove selected image'),'the chosen image is kept to retry');
     assert.ok(!output.includes('Draft saved.'));
     assert.ok(!output.includes('API Error'));
   }finally{if(view)act(()=>view!.unmount());globalThis.fetch=fetchBefore;globalThis.window=windowBefore;globalThis.FileReader=readerBefore;}
@@ -107,7 +106,7 @@ test('editor typing and language switching remain local; draft save and publishi
     assert.equal(requests.length,0);
     assert.ok(JSON.stringify(view!.toJSON()).includes('Edited unsaved text'));
     const buttons=()=>root.findAllByType('button');
-    await act(async()=>{buttons().find(b=>b.children.join('')==='Kiswahili')!.props.onClick();});
+    await act(async()=>{buttons().find(b=>b.children.join('')==='Kiswahili (optional)')!.props.onClick();});
     assert.equal(root.findByType('textarea').props.value,'');assert.equal(requests.length,0);
     await act(async()=>{buttons().find(b=>b.children.join('')==='Save draft')!.props.onClick();});
     assert.equal(requests.length,1);assert.equal(requests[0].body.version,1);assert.ok(requests[0].url.endsWith(`/admin/articles/${article.id}`));

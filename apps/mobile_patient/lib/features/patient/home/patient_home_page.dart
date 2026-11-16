@@ -349,47 +349,55 @@ class _ServiceGrid extends StatelessWidget {
     final modules = patientModules(context, nav);
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-      child: Column(children: [
-        for (var row = 0; row < 3; row++)
-          Padding(
-            padding: EdgeInsets.only(bottom: row == 2 ? 0 : 10),
-            child: IntrinsicHeight(
-              child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var col = 0; col < 3; col++) ...[
-                      if (col > 0) const SizedBox(width: 10),
-                      Expanded(
-                          child: AfyaServiceTile(
-                              icon: modules[row * 3 + col].icon,
-                              color: modules[row * 3 + col].color,
-                              background: modules[row * 3 + col].background,
-                              label: modules[row * 3 + col].label,
-                              enabled: !offline ||
-                                  modules[row * 3 + col].availableOffline,
-                              badge: offline &&
-                                      modules[row * 3 + col].availableOffline
-                                  ? AppLocalizations.of(context)
-                                      .offlineAvailable
-                                  : null,
-                              onTap: () {
-                                final m = modules[row * 3 + col];
-                                if (offline && !m.availableOffline) {
-                                  ScaffoldMessenger.of(context)
-                                    ..hideCurrentSnackBar()
-                                    ..showSnackBar(SnackBar(
-                                        content: Text(
-                                            AppLocalizations.of(context)
-                                                .offlineNeedsInternet)));
-                                } else {
-                                  m.open(context);
-                                }
-                              })),
-                    ],
-                  ]),
-            ),
-          ),
-      ]),
+      // Measured here, outside the rows' IntrinsicHeight: each tile is a
+      // third of the width less the two gaps, and its label has 4 px of
+      // padding either side.
+      child: LayoutBuilder(
+          builder: (context, c) => Column(children: [
+                for (var row = 0; row < 3; row++)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: row == 2 ? 0 : 10),
+                    child: IntrinsicHeight(
+                      child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (var col = 0; col < 3; col++) ...[
+                              if (col > 0) const SizedBox(width: 10),
+                              Expanded(
+                                  child: AfyaServiceTile(
+                                      icon: modules[row * 3 + col].icon,
+                                      color: modules[row * 3 + col].color,
+                                      background:
+                                          modules[row * 3 + col].background,
+                                      label: modules[row * 3 + col].label,
+                                      labelWidth: (c.maxWidth - 20) / 3 - 8,
+                                      enabled: !offline ||
+                                          modules[row * 3 + col]
+                                              .availableOffline,
+                                      badge: offline &&
+                                              modules[row * 3 + col]
+                                                  .availableOffline
+                                          ? AppLocalizations.of(context)
+                                              .offlineAvailable
+                                          : null,
+                                      onTap: () {
+                                        final m = modules[row * 3 + col];
+                                        if (offline && !m.availableOffline) {
+                                          ScaffoldMessenger.of(context)
+                                            ..hideCurrentSnackBar()
+                                            ..showSnackBar(SnackBar(
+                                                content: Text(AppLocalizations
+                                                        .of(context)
+                                                    .offlineNeedsInternet)));
+                                        } else {
+                                          m.open(context);
+                                        }
+                                      })),
+                            ],
+                          ]),
+                    ),
+                  ),
+              ])),
     );
   }
 }

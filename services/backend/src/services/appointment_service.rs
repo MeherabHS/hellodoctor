@@ -401,7 +401,29 @@ impl AppointmentService {
         // this booking never passes through PENDING_PAYMENT at all.
         crate::services::NotificationService::notify_booking_confirmed(&mut tx, apt_id).await?;
 
+        // Booking emails, as the paid path sends after its webhook: the
+        // patient's confirmation and the Doctor's "new consultation".
+        let mut booking_emails = Vec::new();
+        if let Some(email) = Self::patient_booking_email(state, patient_id).await? {
+            let id = Uuid::new_v4();
+            email_outbox_repo::enqueue_transactional(
+                &mut *tx,
+                id,
+                "CONSULTATION_CONFIRMED",
+                &email,
+                &format!("consultation-confirmed:{apt_id}"),
+                "APPOINTMENT",
+                apt_id,
+                email_outbox_repo::transactional_email_expiry(),
+            )
+            .await?;
+            booking_emails.push(id);
+        }
+        booking_emails
+            .extend(Self::queue_doctor_booking_email(state, &mut tx, apt_id, doctor_id).await?);
+
         tx.commit().await?;
+        Self::send_booking_emails(state, booking_emails);
 
         // The payment-worker role cannot write chat_conversations (RLS), so
         // activation runs in its own transactions right after the confirmed
@@ -649,6 +671,10 @@ impl AppointmentService {
                 .await?;
                 confirmation_outbox_ids.push(payment_id);
             }
+            confirmation_outbox_ids.extend(
+                Self::queue_doctor_booking_email(state, &mut payment_tx, apt.id, apt.doctor_id)
+                    .await?,
+            );
         }
         payment_tx.commit().await?;
 
@@ -669,6 +695,74 @@ impl AppointmentService {
         // `ensure_consultation_activated` re-checks the status itself.
         Self::ensure_consultation_activated(state, apt.id).await?;
         Ok(apt)
+    }
+
+    /// The patient's address for booking emails (a child's booking goes to
+    /// the guardian), read with the worker role. Looked up by profile, not
+    /// by appointment: this runs while the booking transaction is still
+    /// open, so another connection can't see the new appointment yet.
+    async fn patient_booking_email(
+        state: &AppState,
+        patient_id: PatientProfileId,
+    ) -> Result<Option<String>, AppError> {
+        let email: Option<Option<String>> = sqlx::query_scalar(
+            "SELECT COALESCE(pu.email, gu.email) \
+               FROM patient_profiles p \
+               LEFT JOIN patient_profiles g ON g.id = p.guardian_patient_id \
+               LEFT JOIN users pu ON pu.id = p.user_id \
+               LEFT JOIN users gu ON gu.id = g.user_id \
+              WHERE p.id = $1",
+        )
+        .bind(Uuid::from(patient_id))
+        .fetch_optional(&state.system_db)
+        .await?;
+        Ok(email.flatten().filter(|e| !e.is_empty()))
+    }
+
+    /// Queues the Doctor's "new consultation booked" email on the booking
+    /// transaction. The address is read with the worker role.
+    async fn queue_doctor_booking_email(
+        state: &AppState,
+        conn: &mut sqlx::PgConnection,
+        appointment_id: Uuid,
+        doctor_id: DoctorProfileId,
+    ) -> Result<Option<Uuid>, AppError> {
+        let email: Option<Option<String>> = sqlx::query_scalar(
+            "SELECT u.email FROM doctor_profiles d \
+               JOIN users u ON u.id = d.user_id \
+              WHERE d.id = $1",
+        )
+        .bind(Uuid::from(doctor_id))
+        .fetch_optional(&state.system_db)
+        .await?;
+        let Some(email) = email.flatten().filter(|e| !e.is_empty()) else {
+            return Ok(None);
+        };
+        let id = Uuid::new_v4();
+        email_outbox_repo::enqueue_transactional(
+            &mut *conn,
+            id,
+            "CONSULTATION_BOOKED_DOCTOR",
+            &email,
+            &format!("consultation-booked-doctor:{appointment_id}"),
+            "APPOINTMENT",
+            appointment_id,
+            email_outbox_repo::transactional_email_expiry(),
+        )
+        .await?;
+        Ok(Some(id))
+    }
+
+    fn send_booking_emails(state: &AppState, ids: Vec<Uuid>) {
+        if ids.is_empty() {
+            return;
+        }
+        let state = state.clone();
+        tokio::spawn(async move {
+            for id in ids {
+                crate::services::email_dispatch_worker::dispatch_now(&state, id).await;
+            }
+        });
     }
 
     /// Idempotently gives a confirmed appointment its consultation session
