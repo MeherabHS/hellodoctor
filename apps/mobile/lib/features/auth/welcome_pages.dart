@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app.dart';
+import '../../core/legal/legal_links.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/validation/kenya_phone.dart';
 import '../../core/widgets/afya_auth_widgets.dart';
@@ -594,6 +595,16 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
                                                       color: DoctorTokens
                                                           .fieldText)))
                                         ]),
+                                        // Full public versions on
+                                        // afyamkononi.app (Terms and Conduct
+                                        // are in-app only, above).
+                                        Padding(
+                                            padding:
+                                                const EdgeInsets.only(left: 48),
+                                            child: LegalWebLinks(
+                                                pages: legalWebPagesFor(
+                                                    'PEER_PRIVACY_NOTICE'),
+                                                color: DoctorTokens.primary)),
                                         const SizedBox(height: 8),
                                         AfyaPrimaryButton(
                                             label: 'Register as Peer Navigator',
