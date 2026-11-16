@@ -70,3 +70,6 @@ __pycache__/
 # Stray local benchmark env artifact (not matched by the exact-name rules
 # above because of a trailing `!` in the on-disk filename).
 services/backend/scripts/.bench_env_base.env!
+
+# AfyaMkononi website build output (apps/afyamkononi-website/tools/build.py)
+/apps/afyamkononi-website/dist/
