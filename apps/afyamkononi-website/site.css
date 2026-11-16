@@ -1,0 +1,345 @@
+@font-face{font-family:"Plus Jakarta Sans";src:url("assets/fonts/PlusJakartaSans.ttf") format("truetype");font-weight:200 800;font-style:normal;font-display:swap}
+/* AfyaMkononi — shared site layer (2026-11-16).
+   Loaded last on every page: glass navbar, footer, product sections and
+   layout fixes. Brand colours follow the AfyaMkononi apps. */
+:root{
+  --am-green:#009a73;--am-green-dark:#00765a;--am-green-deep:#0b5a45;--am-green-soft:#def5ed;
+  --am-teal:#17607a;--am-navy:#0b2a3f;--am-ink:#10212b;--am-sub:#33485a;--am-muted:#687773;
+  --am-ivory:#f3eee5;--am-line:rgba(16,33,43,.12);--am-terracotta:#d35d43;
+  --am-radius:22px;--am-shadow:0 24px 60px rgba(11,42,63,.14);
+  --am-header-h:88px;
+}
+
+/* ---------- Glass navbar ---------- */
+.am-header{position:fixed;inset:0 0 auto 0;z-index:100;padding:12px 20px 0;pointer-events:none}
+.am-header__bar{pointer-events:auto;max-width:1240px;margin:0 auto;height:76px;display:flex;align-items:center;gap:24px;padding:0 12px 0 20px;border-radius:999px;
+  background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7);
+  -webkit-backdrop-filter:blur(18px) saturate(170%);backdrop-filter:blur(18px) saturate(170%);
+  box-shadow:0 8px 32px rgba(11,42,63,.10),inset 0 1px 0 rgba(255,255,255,.8);transition:background .25s ease,box-shadow .25s ease}
+.am-header.is-scrolled .am-header__bar{background:rgba(255,255,255,.72);box-shadow:0 14px 40px rgba(11,42,63,.16),inset 0 1px 0 rgba(255,255,255,.9)}
+.am-brand{display:flex;align-items:center;gap:10px;flex-shrink:0;text-decoration:none;color:var(--am-ink)}
+.am-brand img{width:46px;height:46px;display:block}
+.am-brand__text strong{display:block;font:800 22px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:-.02em;color:var(--am-teal)}
+.am-brand__text small{display:block;margin-top:4px;font:700 11px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.06em;color:var(--am-green-dark);white-space:nowrap}
+.am-nav{display:flex;align-items:center;gap:2px;margin-left:auto}
+.am-nav a{position:relative;padding:11px 16px;border-radius:999px;font:700 15.5px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-sub);text-decoration:none;transition:background .2s ease,color .2s ease}
+.am-nav a:hover{background:rgba(0,154,115,.10);color:var(--am-green-deep)}
+.am-nav a[aria-current="page"]{background:rgba(0,154,115,.14);color:var(--am-green-deep)}
+.am-cta{display:inline-flex;align-items:center;gap:8px;flex-shrink:0;padding:15px 24px;border-radius:999px;font:800 15px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#fff !important;text-decoration:none;
+  background:var(--am-green);box-shadow:none;transition:background-color .2s ease,transform .2s ease}
+.am-cta:hover{background:var(--am-green-dark);transform:translateY(-1px)}
+.am-menu{display:none;margin-left:auto;width:48px;height:48px;border:0;border-radius:50%;background:rgba(255,255,255,.7);cursor:pointer;padding:0;place-items:center}
+.am-menu span{display:block;width:18px;height:2px;border-radius:2px;background:var(--am-ink);margin:4px auto;transition:transform .2s ease,opacity .2s ease}
+.am-menu[aria-expanded="true"] span:nth-child(1){transform:translateY(3px) rotate(45deg)}
+.am-menu[aria-expanded="true"] span:nth-child(2){transform:translateY(-3px) rotate(-45deg)}
+.am-mobile-nav{pointer-events:auto;display:none;max-width:1240px;margin:10px auto 0;padding:10px;border-radius:24px;
+  background:rgba(255,255,255,.82);border:1px solid rgba(255,255,255,.75);-webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%);box-shadow:0 18px 44px rgba(11,42,63,.18)}
+.am-mobile-nav a{display:block;padding:15px 18px;border-radius:14px;font:700 17px/1.2 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-ink);text-decoration:none}
+.am-mobile-nav a:hover,.am-mobile-nav a[aria-current="page"]{background:rgba(0,154,115,.10);color:var(--am-green-deep)}
+.am-mobile-nav .am-cta{display:flex;justify-content:center;margin-top:6px;padding:15px}
+.am-mobile-nav.is-open{display:block}
+.am-header-space{height:calc(var(--am-header-h) + 20px)}
+@media (max-width:1180px){.am-nav a{padding:10px 11px;font-size:14.5px}.am-brand__text small{display:none}}
+@media (max-width:960px){.am-nav,.am-header__bar>.am-cta{display:none}.am-menu{display:grid}.am-brand__text small{display:block}.am-header__bar{height:68px}.am-brand img{width:40px;height:40px}.am-brand__text strong{font-size:20px}:root{--am-header-h:78px}}
+@media (max-width:420px){.am-header{padding:10px 12px 0}.am-brand__text small{display:none}}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.am-header__bar,.am-mobile-nav{background:rgba(255,255,255,.96)}}
+
+/* Old headers are replaced; hide any leftovers defensively. */
+.v2-topbar,.v2-mobile-nav{display:none !important}
+
+/* ---------- Footer ---------- */
+.am-footer{margin-top:72px;background:var(--am-navy) !important;color:#d7e3e8 !important;border-radius:28px 28px 0 0;padding:56px 0 28px}
+.am-footer__inner{max-width:1200px;margin:0 auto;padding:0 28px;display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:40px}
+.am-footer .am-brand__text strong{color:#fff}.am-footer .am-brand__text small{color:#9fd9c6}
+.am-footer__note{margin:16px 0 0;max-width:320px;font:500 15px/1.6 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#a9bcc5}
+.am-footer__emergency{margin-top:18px;padding:12px 14px;border-radius:14px;background:rgba(211,93,67,.14);border:1px solid rgba(211,93,67,.35);font:600 12.5px/1.5 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#ffd9cf;max-width:320px}
+.am-footer__emergency a{color:#fff;text-decoration:underline}
+.am-footer h3{margin:4px 0 14px;font:800 11px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#fff}
+.am-footer__col a{display:block;padding:6px 0;font:500 15px/1.4 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#b9cad1;text-decoration:none}
+.am-footer__col a:hover{color:#fff}
+.am-footer__bottom{max-width:1200px;margin:40px auto 0;padding:22px 28px 0;border-top:1px solid rgba(255,255,255,.12);display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-between;font:500 12px/1.5 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#8ea4ae}
+@media (max-width:900px){.am-footer__inner{grid-template-columns:1fr 1fr}.am-footer__inner>div:first-child{grid-column:1/-1}}
+@media (max-width:520px){.am-footer{border-radius:22px 22px 0 0;padding-top:44px}.am-footer__inner{padding:0 20px;gap:28px 20px}.am-footer__bottom{padding:20px 20px 0;flex-direction:column}}
+.v2-footer{display:none !important}
+
+/* ---------- Home: hero ---------- */
+.am-hero-visual{position:relative;min-height:560px;display:grid;place-items:center}
+.am-hero-visual__glow{position:absolute;inset:4% 2% 6% 6%;border-radius:44% 56% 52% 48%/48% 42% 58% 52%;
+  background:radial-gradient(120% 120% at 20% 10%,#c9efe1 0%,#9fdcc8 38%,#5fb7a5 70%,#2c8c86 100%);filter:saturate(105%);box-shadow:inset 0 0 80px rgba(255,255,255,.35)}
+.am-hero-visual__mark{position:absolute;right:6%;top:6%;width:120px;opacity:.95;filter:drop-shadow(0 10px 22px rgba(11,42,63,.18))}
+.am-hero-visual .am-phone{position:relative;z-index:2;width:268px}
+.am-hero-visual .am-phone--back{position:absolute;z-index:1;width:226px;left:6%;bottom:6%;transform:rotate(-7deg);opacity:.96}
+.am-chip{position:absolute;z-index:3;display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;background:rgba(255,255,255,.78);border:1px solid rgba(255,255,255,.8);
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);box-shadow:0 10px 26px rgba(11,42,63,.14);font:800 12px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-ink)}
+.am-chip i{width:8px;height:8px;border-radius:50%;background:var(--am-green)}
+.am-chip--a{top:16%;left:2%}.am-chip--b{bottom:12%;right:0}
+@media (max-width:980px){.am-hero-visual{min-height:500px;margin-top:20px}}
+@media (max-width:560px){.am-hero-visual{min-height:440px}.am-hero-visual .am-phone{width:214px}.am-hero-visual .am-phone--back{width:176px;left:0}.am-hero-visual__mark{width:84px;right:2%}.am-chip--a{left:0;top:8%}.am-chip--b{right:0;bottom:4%}}
+
+/* ---------- Phone frame ---------- */
+.am-phone{position:relative;aspect-ratio:9/19.5;border-radius:42px;padding:10px;background:linear-gradient(145deg,#1d2b33,#0c151a);box-shadow:0 30px 70px rgba(11,42,63,.28),inset 0 0 0 2px rgba(255,255,255,.08)}
+.am-phone__screen{position:relative;width:100%;height:100%;border-radius:33px;overflow:hidden;background:#fff}
+.am-phone__screen img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+.am-phone:before{content:"";position:absolute;z-index:2;top:20px;left:50%;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#0c151a;box-shadow:0 0 0 2px rgba(255,255,255,.06)}
+
+/* ---------- Product sections (patients / doctors / peers) ---------- */
+.am-product{position:relative;margin:28px 0 0;padding:84px 64px;border-radius:32px;scroll-margin-top:100px;overflow:hidden}
+.am-product--patients{background:linear-gradient(160deg,#eef8f3 0%,#e3f3ec 100%)}
+.am-product--doctors{background:linear-gradient(160deg,#0b2a3f 0%,#0f3c4d 100%);color:#e6f1f4}
+.am-product--peers{background:linear-gradient(160deg,#fbf3e6 0%,#f4e8d6 100%)}
+.am-product__grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:72px;align-items:center}
+.am-product--reverse .am-product__grid{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr)}
+.am-product--reverse .am-product__device{order:2}
+.am-product__device{display:flex;flex-direction:column;align-items:center;gap:22px}
+.am-product__device .am-phone{width:min(320px,78vw)}
+.am-track{display:flex;height:100%;transition:transform .5s cubic-bezier(.22,.8,.25,1)}
+.am-slide{flex:0 0 100%;height:100%;margin:0}
+.am-eyebrow{margin:0 0 14px;font:800 11px/1.2 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--am-green-dark)}
+.am-product--doctors .am-eyebrow{color:#7fe0c2}
+.am-product--peers .am-eyebrow{color:#a65a1f}
+.am-product h2{margin:0;font:500 clamp(38px,4.4vw,60px)/1.02 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:-.035em;color:var(--am-ink)}
+.am-product h2 em{font-style:italic;color:var(--am-green-dark)}
+.am-product--doctors h2{color:#fff}.am-product--doctors h2 em{color:#8fe5cb}
+.am-product--peers h2 em{color:#b5652a}
+.am-lede{margin:18px 0 0;max-width:560px;font:500 18px/1.65 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-sub)}
+.am-product--doctors .am-lede{color:#b8ccd4}
+.am-card{margin-top:30px;padding:26px 28px;border-radius:var(--am-radius);background:rgba(255,255,255,.72);border:1px solid rgba(255,255,255,.85);box-shadow:var(--am-shadow);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.am-product--doctors .am-card{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);box-shadow:none}
+.am-card__meta{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.am-card__kicker{margin:0;font:800 11px/1.2 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--am-terracotta)}
+.am-product--doctors .am-card__kicker{color:#f0b56a}
+.am-card__count{font:500 26px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-terracotta)}
+.am-card__count small{font-size:14px;color:var(--am-muted)}
+.am-product--doctors .am-card__count{color:#f0b56a}.am-product--doctors .am-card__count small{color:#8ea4ae}
+.am-card h3{margin:12px 0 0;font:500 30px/1.12 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:-.02em;color:var(--am-ink);transition:opacity .18s ease}
+.am-product--doctors .am-card h3{color:#fff}
+.am-card p.am-card__desc{margin:10px 0 0;font:500 16.5px/1.65 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-sub);min-height:4.95em;transition:opacity .18s ease}
+.am-product--doctors .am-card p.am-card__desc{color:#c3d4da}
+.am-tags{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0;padding:0;list-style:none}
+.am-tags li{padding:8px 13px;border-radius:999px;background:rgba(0,154,115,.10);font:700 13px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-green-deep)}
+.am-product--doctors .am-tags li{background:rgba(143,229,203,.12);color:#a6ecd6}
+.am-product--peers .am-tags li{background:rgba(181,101,42,.12);color:#8a4b1c}
+.am-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:22px;padding-top:18px;border-top:1px solid var(--am-line)}
+.am-product--doctors .am-controls{border-color:rgba(255,255,255,.12)}
+.am-arrows{display:flex;gap:10px}
+.am-arrow{width:44px;height:44px;border-radius:50%;border:1px solid var(--am-line);background:#fff;display:grid;place-items:center;cursor:pointer;color:var(--am-ink);transition:background .2s ease,transform .2s ease}
+.am-arrow:hover{transform:translateY(-1px);background:var(--am-green-soft)}
+.am-arrow:focus-visible,.am-dot:focus-visible,.am-phone:focus-visible{outline:3px solid var(--am-green);outline-offset:3px}
+.am-arrow svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.am-product--doctors .am-arrow{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#fff}
+.am-dots{display:flex;gap:7px}
+.am-dot{width:9px;height:9px;padding:0;border:0;border-radius:999px;background:rgba(16,33,43,.2);cursor:pointer;transition:width .25s ease,background .25s ease}
+.am-dot[aria-selected="true"]{width:28px;background:var(--am-green)}
+.am-product--doctors .am-dot{background:rgba(255,255,255,.25)}.am-product--doctors .am-dot[aria-selected="true"]{background:#8fe5cb}
+.am-product--peers .am-dot[aria-selected="true"]{background:#b5652a}
+.am-note{margin:0;font:600 12px/1.5 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-muted);text-align:center}
+.am-product--doctors .am-note{color:#8ea4ae}
+.am-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;margin-top:26px}
+.am-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 22px;border-radius:999px;font:800 14px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;text-decoration:none;transition:transform .2s ease}
+.am-btn:hover{transform:translateY(-1px)}
+.am-btn--dark{background:var(--am-ink);color:#fff}
+.am-btn--light{background:#fff;color:var(--am-navy)}
+.am-btn--green{background:var(--am-green);color:#fff;box-shadow:none}
+.am-actions small{font:600 12.5px/1.4 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-muted)}
+.am-product--doctors .am-actions small{color:#8ea4ae}
+@media (max-width:980px){
+  .am-product{padding:56px 28px;border-radius:26px}
+  .am-product__grid,.am-product--reverse .am-product__grid{grid-template-columns:1fr;gap:40px}
+  .am-product--reverse .am-product__device{order:0}
+  .am-product__copy{order:-1}
+}
+@media (max-width:520px){
+  .am-product{padding:44px 20px;margin-top:18px}
+  .am-card{padding:22px 18px}.am-card h3{font-size:25px}
+  .am-product__device .am-phone{width:min(270px,76vw)}
+}
+@media (prefers-reduced-motion:reduce){.am-track{transition:none}}
+
+/* ---------- Home: fixes to existing sections ---------- */
+.am-rail{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin:34px 0 0;padding:18px 0;border-block:1px solid var(--am-line);list-style:none}
+.am-rail li{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.6);font:800 11px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--am-sub)}
+.am-rail li:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--am-green)}
+.v2-trust-copy .v2-eyebrow,.v2-about-copy .v2-eyebrow,.v2-section-intro .v2-eyebrow{position:static;display:block;margin:0 0 20px !important;line-height:1.3}
+.v2-trust-copy h2,.v2-about-copy h2,.v2-section-intro h2{line-height:.98 !important;margin-top:0 !important}
+.v2-about-stamp{align-items:center;justify-content:center;text-align:center;gap:16px;padding:34px !important}
+.v2-about-stamp span,.v2-about-stamp small{position:static !important}
+.v2-about-stamp strong{line-height:.86 !important}
+#get-app{scroll-margin-top:100px}
+.v2-hero h1 em{color:var(--am-terracotta)}
+
+/* ---------- Inner pages ---------- */
+.site-page .page-main,.site-page main#main{padding-top:0 !important;margin-top:0 !important}
+.site-page{background:#fbf9f4}
+
+/* ---------- Legal pages: layout that the trimmed Tailwind build lacked ---------- */
+.legal-page main table{width:100%}
+.legal-page .am-table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px}
+.legal-page .am-table-scroll table{min-width:620px}
+.legal-page [class*="sticky"][class*="top-24"]{top:104px !important}
+@media (max-width:1023px){.legal-page article,.legal-page main [class*="lg:col-span-8"]{min-width:0}}
+html{scroll-padding-top:104px}
+
+/* ---------- Contact ---------- */
+.am-contact{max-width:1100px;margin:0 auto;padding:24px 28px 0}
+.am-contact__hero h1{margin:0;font:500 clamp(40px,5vw,64px)/1.02 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:-.035em;color:var(--am-ink)}
+.am-contact__warn{margin:22px 0 0;max-width:640px;padding:14px 16px;border-radius:14px;background:#fdecea;border:1px solid #f3c2b8;font:500 14px/1.55 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#7a2618}
+.am-contact__warn a{color:#7a2618;text-decoration:underline;font-weight:700}
+.am-contact__grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:40px}
+.am-contact__card{padding:24px;border-radius:20px;background:#fff;border:1px solid var(--am-line);box-shadow:0 10px 30px rgba(11,42,63,.06)}
+.am-contact__card h2{margin:0;font:500 24px/1.15 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-ink)}
+.am-contact__card p{margin:8px 0 14px;font:500 14px/1.55 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-sub)}
+.am-contact__card>a{font:800 14px/1.4 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-green-dark);text-decoration:none;overflow-wrap:anywhere}
+.am-contact__card>a:hover{text-decoration:underline}
+.am-contact__card small{display:block;margin-top:8px;font:500 12.5px/1.5 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-muted)}
+.am-contact__card small a{color:var(--am-green-dark)}
+.am-contact__foot{margin:34px 0 0;font:500 13px/1.6 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-muted)}
+@media (max-width:900px){.am-contact__grid{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.am-contact{padding:8px 20px 0}.am-contact__grid{grid-template-columns:1fr}}
+
+/* legal pages: the missing decorative pattern image is not needed */
+.hd-pattern-layer{background-image:none !important}
+
+/* ---------- Home hero: photo + app ---------- */
+.am-hero-visual--photo{min-height:600px}
+.am-hero-photo{position:absolute;right:0;top:0;width:78%;height:92%;margin:0;border-radius:36px;overflow:hidden;box-shadow:0 30px 70px rgba(11,42,63,.22)}
+.am-hero-photo img{width:100%;height:100%;object-fit:cover;object-position:50% 20%;display:block}
+.am-hero-photo:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,42,63,0) 55%,rgba(11,42,63,.35) 100%)}
+.am-hero-visual--photo .am-phone{position:absolute;left:0;bottom:0;width:250px;z-index:2}
+.am-hero-visual--photo .am-chip--a{top:8%;left:6%}
+.am-hero-visual--photo .am-chip--b{bottom:16%;right:-10px}
+@media (max-width:980px){.am-hero-visual--photo{min-height:560px}}
+@media (max-width:560px){.am-hero-visual--photo{min-height:470px}.am-hero-photo{width:84%;height:88%;border-radius:26px}.am-hero-visual--photo .am-phone{width:180px}.am-hero-visual--photo .am-chip--b{right:0;bottom:6%}}
+.am-credit{display:block;margin-top:6px;font-size:11.5px;color:#8ea4ae}
+.am-credit a{color:#b9cad1;text-decoration:underline}
+
+/* ---------- Legal pages: reference layout (contents card left, article right) ---------- */
+.legal-page main [class*="lg:grid-cols-12"]{gap:48px !important}
+@media (min-width:1024px){
+  .legal-page main [class*="lg:grid-cols-12"]{grid-template-columns:320px minmax(0,1fr) !important;align-items:start}
+  .legal-page main aside[class*="lg:col-span-4"],.legal-page main article[class*="lg:col-span-8"]{grid-column:auto !important}
+}
+.legal-page main aside>div:first-child{background:linear-gradient(180deg,#f2faf6 0%,#f8fbfa 100%) !important;border:1px solid #d6ebe2 !important;border-radius:24px !important;padding:26px 24px !important;box-shadow:none !important;max-height:calc(100vh - 140px)}
+.legal-page main aside>div:first-child>div:first-child{border:0 !important;padding:0 0 14px !important;margin:0 0 6px !important}
+.legal-page main aside h2{display:flex;align-items:center;gap:9px;font:800 13px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif !important;letter-spacing:.08em !important;text-transform:uppercase;color:var(--am-green-dark) !important}
+.legal-page main aside h2 svg{width:17px;height:17px;flex-shrink:0}
+.legal-page main aside nav a{padding:7px 0 !important;font:600 14.5px/1.45 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif !important;color:#33485a !important;background:none !important;border-radius:0 !important}
+.legal-page main aside nav a:hover,.legal-page main aside nav a.is-active{color:var(--am-green-dark) !important}
+.legal-page main aside nav a>span:first-child{color:var(--am-green) !important;font-weight:800 !important;margin-right:6px !important}
+.legal-page main aside>div:nth-child(2){background:transparent !important;border:0 !important;border-top:1px solid #d6ebe2 !important;border-radius:0 !important;padding:22px 4px 0 !important;margin:0 20px}
+.legal-page main aside>div:nth-child(2)>div:first-child{display:flex;align-items:center;gap:8px;font:800 13px/1.2 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif !important;letter-spacing:.04em !important;text-transform:none !important;color:var(--am-ink) !important}
+.legal-page main aside>div:nth-child(2) a{font:600 14px/1.4 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif !important;color:var(--am-green-dark) !important}
+.legal-page main article[class*="lg:col-span-8"]{background:transparent !important;border:0 !important;box-shadow:none !important;padding:0 !important;max-width:780px}
+.legal-page main article p.lead{position:relative;margin:0 0 22px !important;padding:24px 28px !important;border-radius:18px;background:#f1f8f5;border:1px solid #d6ebe2 !important;font:500 18px/1.65 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif !important;color:var(--am-ink) !important}
+.legal-page main article p.lead:before{content:"Summary";display:block;margin-bottom:8px;font:800 12px/1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:var(--am-green-dark)}
+.legal-page main article section{border-color:#e6ece9 !important}
+.legal-page main article h2{font:800 clamp(24px,2.3vw,30px)/1.2 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif !important;letter-spacing:-.02em !important;color:var(--am-navy) !important;margin-top:8px !important}
+.legal-page main article h3,.legal-page main article h4{font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--am-navy) !important}
+.legal-page main article p,.legal-page main article li{font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:17.5px !important;line-height:1.75 !important;color:#4a5d68 !important}
+.legal-page main article strong{color:var(--am-ink) !important}
+.legal-page main article a{color:var(--am-green-dark) !important}
+.legal-page main article .font-mono{font-family:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:15px !important;line-height:1.6 !important;background:#f7faf9 !important;border-color:#e3eeea !important;border-radius:16px !important;padding:18px 20px !important}
+.legal-page main article .font-mono *{font-size:15px !important}
+.legal-page main header[class*="rounded-2xl"]{border-radius:28px !important;border-color:#e3eeea !important;box-shadow:0 18px 50px rgba(11,42,63,.06) !important}
+.legal-page main header h1{font:800 clamp(32px,4vw,48px)/1.1 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif !important;letter-spacing:-.03em !important;color:var(--am-navy) !important}
+.legal-page main header p{font-size:17px !important;line-height:1.65 !important}
+@media (max-width:1023px){.legal-page main article p,.legal-page main article li{font-size:16.5px !important}}
+
+/* About hero heading: same editorial serif as the rest of the site */
+.site-page h1.page-title{font:500 clamp(44px,5.4vw,72px)/1.02 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif !important;letter-spacing:-.035em !important;color:var(--am-ink) !important;margin:10px 0 0 !important}
+.site-page h1.page-title em{color:var(--am-green-dark) !important}
+
+/* Account deletion form feedback */
+.am-form-status{margin:12px 0 0;padding:12px 14px;border-radius:12px;background:#e9f7f1;border:1px solid #bfe6d5;font:600 13.5px/1.5 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#0b5a45}
+.am-form-status.is-error{background:#fdecea;border-color:#f3c2b8;color:#8a2a1a}
+#deletion-request-form [aria-invalid="true"]{border-color:#d35d43 !important;box-shadow:0 0 0 3px rgba(211,93,67,.15)}
+.legal-page main form p{font-size:12.5px !important;line-height:1.5 !important}
+.legal-page main form p.am-form-status{font-size:14px !important;color:inherit}
+.legal-page main form p.am-form-status:not(.is-error){color:#0b5a45 !important}
+.legal-page main form p.am-form-status.is-error{color:#8a2a1a !important}
+
+/* ---------- About preview: three-phone mockup (Peer / Patient / Doctor) ---------- */
+/* Same two-column layout as before; the mockup sits beside the paragraph at a fixed, modest size. */
+.v2-about{align-items:center}
+.v2-about>*{min-width:0}
+.am-mockup{margin:0;width:100%;max-width:520px;justify-self:start;background:none;box-shadow:none;overflow:visible}
+.am-mockup img{display:block;width:100%;height:auto;filter:drop-shadow(0 24px 28px rgba(11,42,63,.18)) drop-shadow(0 6px 10px rgba(11,42,63,.08))}
+@media (max-width:1000px){.am-mockup{max-width:440px;justify-self:center;margin:0 auto 10px}}
+
+.am-credit-link{font-size:12px;color:#8ea4ae !important;text-decoration:underline;text-underline-offset:2px}
+.am-credit-link:hover{color:#fff !important}
+.am-credits{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:560px){.am-credits{grid-template-columns:1fr}}
+
+/* ---------- One typeface: "Plus Jakarta Sans" (self-hosted, as in the apps) ---------- */
+/* The headings were set for a serif (weight 500, very tight tracking); retune them for the sans. */
+h1,h2,h3,.v2-hero h1,.v2-head-word,.v2-promise h2,.v2-cta h2{font-family:"Plus Jakarta Sans",system-ui,sans-serif !important}
+.v2-hero h1,.v2-section-intro h2,.v2-trust-copy h2,.v2-about-copy h2,.v2-promise h2,.v2-cta h2,.am-product h2,.am-contact__hero h1,.site-page h1.page-title,.site-page h2{font-weight:800 !important;letter-spacing:-0.035em !important;line-height:1.04 !important}
+.v2-hero h1{letter-spacing:-0.045em !important;line-height:.98 !important}
+.am-card h3,.am-contact__card h2,.v2-step-list h3,.v2-trust-list h3{font-weight:700 !important;letter-spacing:-0.015em !important}
+.v2-hero h1 em,.am-product h2 em,.site-page h1.page-title em{font-style:normal}
+.v2-step-number,.v2-trust-list>article>span,.am-card__count,.v4-feature-num{font-weight:700 !important;letter-spacing:-0.02em !important}
+
+/* ---------- Motion (site-wide) ----------
+   Smooth page-to-page cross-fades, scroll reveals added by site.js, and
+   small hover/press feedback. All of it is off for visitors who ask their
+   system for reduced motion. */
+@media (prefers-reduced-motion:no-preference){
+  @view-transition{navigation:auto}
+  ::view-transition-old(root){animation:am-vt-out .28s cubic-bezier(.4,0,1,1) both}
+  ::view-transition-new(root){animation:am-vt-in .42s cubic-bezier(.2,.7,.2,1) both}
+  .am-header{view-transition-name:am-header}
+  ::view-transition-group(am-header){animation-duration:.3s}
+
+  /* Header drops in on the first page load (not on page-to-page moves). */
+  html:not(.am-vt) .am-header__bar{animation:am-drop .8s cubic-bezier(.2,.7,.2,1) both}
+
+  /* Scroll reveal: site.js tags blocks with .am-reveal, then .is-in. */
+  .am-reveal{transition:opacity .8s cubic-bezier(.2,.7,.2,1) var(--am-d,0ms),translate .8s cubic-bezier(.2,.7,.2,1) var(--am-d,0ms),scale .8s cubic-bezier(.2,.7,.2,1) var(--am-d,0ms)}
+  .am-reveal:not(.is-in){opacity:0;translate:0 26px}
+  .am-reveal--zoom:not(.is-in){translate:0 18px;scale:.94}
+
+  /* Gentle float on the app phones and hero chips. */
+  .am-product__device{animation:am-float 7s ease-in-out infinite}
+  .am-product--doctors .am-product__device{animation-delay:-2.3s}
+  .am-product--peers .am-product__device{animation-delay:-4.6s}
+  .am-chip{animation:am-float 6s ease-in-out infinite}
+  .am-chip--b{animation-delay:-3s}
+
+  /* Hover and press feedback. */
+  .am-cta span[aria-hidden],.am-btn span[aria-hidden],.v2-button span[aria-hidden]{display:inline-block;transition:translate .25s cubic-bezier(.2,.7,.2,1)}
+  .am-cta:hover span[aria-hidden],.am-btn:hover span[aria-hidden],.v2-button:hover span[aria-hidden]{translate:4px 0}
+  .am-cta:active,.am-btn:active,.v2-button:active,.am-arrow:active,.am-dot:active{scale:.97}
+  .am-btn:hover{transform:translateY(-2px)}
+  .am-card,.am-contact__card{transition:translate .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s ease}
+  .am-card:hover,.am-contact__card:hover{translate:0 -4px;box-shadow:0 24px 54px rgba(11,42,63,.16)}
+  .am-nav a{transition:background-color .2s ease,color .2s ease}
+  .am-footer a{transition:color .2s ease,opacity .2s ease}
+
+  /* Thin reading-progress line under the header (supporting browsers). */
+  @supports (animation-timeline:scroll()){
+    .am-progress{position:fixed;inset:0 0 auto 0;z-index:101;height:3px;pointer-events:none;
+      background:var(--am-green);transform-origin:0 50%;scale:0 1;
+      animation:am-progress linear both;animation-timeline:scroll(root)}
+  }
+}
+@keyframes am-vt-out{to{opacity:0;translate:0 -10px}}
+@keyframes am-vt-in{from{opacity:0;translate:0 14px}}
+@keyframes am-drop{from{opacity:0;translate:0 -22px}}
+@keyframes am-float{0%,100%{translate:0 0}50%{translate:0 -10px}}
+@keyframes am-progress{to{scale:1 1}}
+
+/* ---------- Active nav link: green underline ----------
+   The link for the page you are on, or (on the home page) the section you
+   have scrolled into, gets a green bar under it. site.js keeps it in sync. */
+.am-nav a::after{content:"";position:absolute;left:16px;right:16px;bottom:3px;height:3px;border-radius:3px;
+  background:var(--am-green);transform:scaleX(0);transform-origin:50% 50%;transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.am-nav a.is-active,.am-nav a[aria-current="page"]{color:var(--am-green-deep)}
+.am-nav a.is-active::after,.am-nav a[aria-current="page"]::after{transform:scaleX(1)}
+.am-nav a[aria-current="page"]{background:transparent}
+.am-nav a[aria-current="page"]:hover{background:rgba(0,154,115,.10)}
+@media (max-width:1180px){.am-nav a::after{left:11px;right:11px}}
+.am-mobile-nav a.is-active{background:rgba(0,154,115,.10);color:var(--am-green-deep);box-shadow:inset 4px 0 0 var(--am-green)}
+.am-mobile-nav a[aria-current="page"]{box-shadow:inset 4px 0 0 var(--am-green)}
+
+/* Honeypot field: off-screen for people and screen readers; bots fill it. */
+.am-hp{position:absolute !important;left:-10000px !important;top:auto;width:1px;height:1px;overflow:hidden}
