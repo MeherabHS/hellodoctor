@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: 'AfyaMkononi — Central Hospital & Operations Command Portal',
   description: 'Enterprise administration, grievance adjudication, and monthly finance disbursements.',
+  // Browser-tab icon: the AfyaMkononi logo (/brand is public, so it shows on login too).
+  icons: { icon: '/brand/afya_logo.png', apple: '/brand/afya_logo.png' },
 };
 
 export default function RootLayout({
