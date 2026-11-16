@@ -14,15 +14,16 @@ void main() {
   });
 
   test('doctor and peer documents link to their website pages', () {
-    expect(legalWebPagesFor('DOCTOR_TERMS').map((p) => p.path),
-        ['/doctor-terms']);
+    expect(
+        legalWebPagesFor('DOCTOR_TERMS').map((p) => p.path), ['/doctor-terms']);
     expect(legalWebPagesFor('PRIVACY_NOTICE').map((p) => p.path),
         ['/privacy', '/data-retention']);
     expect(
         legalWebPagesFor('PROFESSIONAL_VERIFICATION_DECLARATION')
             .map((p) => p.path),
         ['/doctor-terms#professional-declaration']);
-    expect(legalWebPagesFor('TELEMEDICINE_PRACTITIONER_POLICY').map((p) => p.path),
+    expect(
+        legalWebPagesFor('TELEMEDICINE_PRACTITIONER_POLICY').map((p) => p.path),
         ['/doctor-terms#confidentiality']);
     expect(legalWebPagesFor('PEER_PRIVACY_NOTICE').map((p) => p.path),
         ['/peer-navigator-privacy', '/data-retention']);

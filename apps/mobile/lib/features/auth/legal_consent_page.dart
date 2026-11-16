@@ -161,18 +161,16 @@ class _LegalConsentState extends State<LegalConsentPage> {
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
                   color: DoctorTokens.navy)),
-          subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // The full public version on afyamkononi.app.
-                LegalWebLinks(
-                    pages: legalWebPagesFor(doc.type),
-                    color: DoctorTokens.primary),
-                TextButton(
-                    onPressed: () => _openDocument(doc),
-                    style: TextButton.styleFrom(padding: EdgeInsets.zero),
-                    child: const Text('View →')),
-              ])));
+          subtitle:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            // The full public version on afyamkononi.app.
+            LegalWebLinks(
+                pages: legalWebPagesFor(doc.type), color: DoctorTokens.primary),
+            TextButton(
+                onPressed: () => _openDocument(doc),
+                style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                child: const Text('View →')),
+          ])));
 
   @override
   Widget build(BuildContext context) => Scaffold(
