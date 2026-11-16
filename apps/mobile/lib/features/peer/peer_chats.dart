@@ -75,7 +75,8 @@ class _PeerChatsTabState extends State<PeerChatsTab> {
               chatId: c.id,
               requestId: c.requestId,
               name: c.name,
-              status: c.requestStatus)))
+              status: c.requestStatus,
+              callClosed: c.callClosed)))
       .then((_) => _reload());
 
   @override
@@ -269,9 +270,13 @@ class PeerChatPage extends StatefulWidget {
       required this.requestId,
       required this.name,
       required this.status,
+      this.callClosed = false,
       this.pickImage});
   final PeerRepository repo;
   final String chatId, requestId, name, status;
+
+  /// The session's call can no longer be started: no call button.
+  final bool callClosed;
 
   /// Injectable picker for tests: returns (bytes, mime) or null.
   final Future<(Uint8List, String)?> Function(ImageSource source)? pickImage;
@@ -514,7 +519,7 @@ class _PeerChatPageState extends State<PeerChatPage> {
                                             ? () => _viewImage(m)
                                             : null),
                                 ])),
-          if (widget.status == 'ACCEPTED')
+          if (widget.status == 'ACCEPTED' && !widget.callClosed)
             Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
                 child: Center(

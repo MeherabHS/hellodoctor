@@ -771,6 +771,7 @@ class _PatientPeerRequestsSectionState
               requestId: r.id,
               peerName: r.peerName,
               requestStatus: r.status,
+              callClosed: r.callClosed,
               myUserId: widget.myUserId)));
 
   @override
@@ -931,11 +932,15 @@ class PatientPeerChatPage extends StatefulWidget {
       required this.requestId,
       required this.peerName,
       required this.requestStatus,
+      this.callClosed = false,
       this.myUserId,
       this.pickImage});
   final PatientPeerRepository repo;
   final BookingRepository bookingRepo;
   final String chatId, requestId, peerName, requestStatus;
+
+  /// The session's call can no longer be started: no call button.
+  final bool callClosed;
   final String? myUserId;
 
   /// Injectable picker for tests: returns (bytes, mime) or null.
@@ -1313,12 +1318,13 @@ class _PatientPeerChatPageState extends State<PatientPeerChatPage> {
           const SizedBox(width: 4),
           _StatusPill(peerStatusLabel(l, widget.requestStatus)),
           const SizedBox(width: 6),
-          _CircleOutlineButton(
-              key: const ValueKey('peer-start-call'),
-              icon: Icons.call_outlined,
-              color: PatientTokens.primaryDark,
-              tooltip: l.peerStartCall,
-              onPressed: _call),
+          if (!widget.callClosed)
+            _CircleOutlineButton(
+                key: const ValueKey('peer-start-call'),
+                icon: Icons.call_outlined,
+                color: PatientTokens.primaryDark,
+                tooltip: l.peerStartCall,
+                onPressed: _call),
           Container(
               width: 1,
               height: 26,

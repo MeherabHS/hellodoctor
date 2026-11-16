@@ -20,6 +20,7 @@ AppointmentSummaryDto appointment({
   String status = 'CONFIRMED',
   String modality = 'VIDEO',
   String? clinicalOutcome,
+  bool lapsed = false,
 }) {
   final open = serverNow.add(opensIn);
   final start = open.add(const Duration(minutes: 15));
@@ -35,6 +36,7 @@ AppointmentSummaryDto appointment({
     'start_time': start.toIso8601String(),
     'end_time': end.toIso8601String(),
     'clinical_outcome': clinicalOutcome,
+    'lapsed': lapsed,
     'join': {
       'eligible': false,
       'reason': modality == 'VIDEO' ? 'NOT_YET_OPEN' : 'NOT_VIDEO',
@@ -114,6 +116,26 @@ void main() {
       for (final s in ['CANCELLED', 'EXPIRED', 'PENDING_PAYMENT', 'REFUNDED']) {
         expect(destinationFor(s), AppointmentDestinationKind.status);
       }
+    });
+
+    test('a booking whose time passed unstarted never opens a waiting room',
+        () {
+      for (final s in ['CONFIRMED', 'WAITING', 'IN_CONSULTATION']) {
+        expect(
+            destinationFor(s, lapsed: true), AppointmentDestinationKind.status);
+      }
+    });
+
+    test('a lapsed booking is never the upcoming one or the Home card', () {
+      final now = DateTime.now().toUtc();
+      final stale = appointment(
+          serverNow: now, opensIn: const Duration(minutes: -1), lapsed: true);
+      final next = appointment(
+          serverNow: now, opensIn: const Duration(days: 1), modality: 'CHAT');
+      final state = HomeState(upcoming: [stale, next]);
+      expect(state.nextUpcoming, same(next));
+      expect(state.homeCardAppointment(), isNull);
+      expect(HomeState(upcoming: [stale]).nextUpcoming, isNull);
     });
 
     testWidgets(

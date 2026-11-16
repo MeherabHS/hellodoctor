@@ -85,6 +85,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appointmentStatusCancelled => 'Cancelled';
 
   @override
+  String get appointmentStatusLapsed => 'Time passed';
+
+  @override
   String get appointmentStatusExpired => 'Expired';
 
   @override

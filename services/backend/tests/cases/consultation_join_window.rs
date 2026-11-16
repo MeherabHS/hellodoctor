@@ -308,3 +308,70 @@ async fn test_appointment_lists_carry_the_same_server_derived_join_state(pool: P
         .unwrap();
     assert_eq!(row["join"]["eligible"], true);
 }
+
+/// A booking nobody joined stays CONFIRMED in the database. Once its window
+/// has closed it is "lapsed": gone from Upcoming, listed under Past, and
+/// flagged on the single-appointment read a notification tap uses, so no app
+/// sends anyone to a waiting room for it.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_an_unjoined_booking_lapses_out_of_upcoming_once_its_window_closes(pool: PgPool) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    let b = book(&app, &pool).await;
+    let ids = |body: &serde_json::Value| -> Vec<String> {
+        body["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["id"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let list = |view: &'static str| {
+        let app = app.clone();
+        let token = b.patient.clone();
+        async move {
+            json_body(
+                get(
+                    &app,
+                    &format!("/api/v1/patients/me/appointments?status={view}"),
+                    Some(&token),
+                )
+                .await,
+            )
+            .await
+        }
+    };
+    let detail = |token: String| {
+        let app = app.clone();
+        async move {
+            json_body(
+                get(
+                    &app,
+                    &format!("/api/v1/appointments/{}", b.apt),
+                    Some(&token),
+                )
+                .await,
+            )
+            .await
+        }
+    };
+
+    // Ended 30 minutes ago: still inside the grace window, so still upcoming.
+    move_slot(&pool, b.slot, -40).await;
+    assert!(ids(&list("upcoming").await).contains(&b.apt.to_string()));
+    assert_eq!(detail(b.patient.clone()).await["data"]["lapsed"], false);
+
+    // Ended 90 minutes ago, never joined: lapsed.
+    move_slot(&pool, b.slot, -100).await;
+    assert!(!ids(&list("upcoming").await).contains(&b.apt.to_string()));
+    let past = list("past").await;
+    let row = past["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["id"] == b.apt.to_string())
+        .expect("a lapsed booking is listed under past");
+    assert_eq!(row["status"], "CONFIRMED");
+    assert_eq!(row["lapsed"], true);
+    assert_eq!(detail(b.patient.clone()).await["data"]["lapsed"], true);
+    assert_eq!(detail(b.doctor.clone()).await["data"]["lapsed"], true);
+}

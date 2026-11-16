@@ -242,6 +242,12 @@ abstract class AppLocalizations {
   /// **'Cancelled'**
   String get appointmentStatusCancelled;
 
+  /// No description provided for @appointmentStatusLapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Time passed'**
+  String get appointmentStatusLapsed;
+
   /// No description provided for @appointmentStatusExpired.
   ///
   /// In en, this message translates to:

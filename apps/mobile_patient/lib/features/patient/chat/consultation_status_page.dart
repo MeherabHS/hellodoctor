@@ -56,6 +56,11 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
 
   String get _status => detail?.status ?? widget.appointment.status;
 
+  /// Its time passed unstarted (server-decided); over, though still CONFIRMED.
+  bool get _lapsed =>
+      _activeStatuses.contains(_status) &&
+      (detail?.lapsed ?? widget.appointment.lapsed);
+
   @override
   void initState() {
     super.initState();
@@ -66,7 +71,9 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
         networkChanges: widget.repo.connectivity?.changes,
         hasError: () => error != null,
         enabled: () =>
-            _status != 'COMPLETED' && !_endedStatuses.contains(_status));
+            _status != 'COMPLETED' &&
+            !_endedStatuses.contains(_status) &&
+            !_lapsed);
   }
 
   Future<void> _ackOpen() async {
@@ -176,7 +183,8 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
     final video = a.modality == 'VIDEO';
     final status = _status;
     final known = detail != null;
-    final active = known && _activeStatuses.contains(status);
+    final lapsed = known && _lapsed;
+    final active = known && _activeStatuses.contains(status) && !lapsed;
     final completed = known && status == 'COMPLETED';
     final ended = known && _endedStatuses.contains(status);
     final notActive = known && !active && !completed && !ended;
@@ -199,12 +207,20 @@ class _ConsultationStatusPageState extends State<ConsultationStatusPage> {
                             ? l.consultStatusActiveVideoBody
                             : l.consultStatusActiveChatBody
                       )
-                    : ended
-                        ? (l.consultStatusEndedTitle, l.consultStatusEndedBody)
-                        : (
-                            l.consultStatusNotActiveTitle,
-                            l.consultStatusNotActiveBody
-                          );
+                    : lapsed
+                        ? (
+                            l.consultStatusLapsedTitle,
+                            l.consultStatusLapsedBody
+                          )
+                        : ended
+                            ? (
+                                l.consultStatusEndedTitle,
+                                l.consultStatusEndedBody
+                              )
+                            : (
+                                l.consultStatusNotActiveTitle,
+                                l.consultStatusNotActiveBody
+                              );
 
     return Scaffold(
         backgroundColor: PatientTokens.bg,

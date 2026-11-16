@@ -75,7 +75,8 @@ class _PeerNotificationsPageState extends State<PeerNotificationsPage> {
                 chatId: chat.id,
                 requestId: chat.requestId,
                 name: chat.name,
-                status: chat.requestStatus)));
+                status: chat.requestStatus,
+                callClosed: chat.callClosed)));
       } catch (e) {
         if (mounted) peerToast(context, peerErrorText(e));
       }

@@ -2585,5 +2585,17 @@
   "peerMessageRead": "Read",
   "peerMessageSent": "Sent",
   "peerSendTooltip": "Send",
-  "peerVerified": "Verified Peer"
+  "peerVerified": "Verified Peer",
+  "apptStatusLapsed": "Time passed",
+  "@apptStatusLapsed": {
+    "description": "Appointment status label: the booked time passed and the consultation was never started."
+  },
+  "consultStatusLapsedTitle": "This consultation's time has passed",
+  "@consultStatusLapsedTitle": {
+    "description": "Status screen title for a booking whose time passed unstarted."
+  },
+  "consultStatusLapsedBody": "It wasn't started during its booked time, so it can't be joined now. Please book a new consultation if you still need care.",
+  "@consultStatusLapsedBody": {
+    "description": "Status screen body for a booking whose time passed unstarted."
+  }
 }

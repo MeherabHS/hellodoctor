@@ -11,7 +11,11 @@ import 'post_consultation_page.dart';
 /// state — never from a notification title or an old cached list.
 enum AppointmentDestinationKind { waitingRoom, outcome, status }
 
-AppointmentDestinationKind destinationFor(String status) => switch (status) {
+AppointmentDestinationKind destinationFor(String status,
+        {bool lapsed = false}) =>
+    switch (status) {
+      // A booking whose time passed unstarted is over, whatever it says.
+      _ when lapsed => AppointmentDestinationKind.status,
       'CONFIRMED' ||
       'WAITING' ||
       'IN_CONSULTATION' =>
@@ -30,7 +34,7 @@ Widget appointmentDestinationPage({
   required FamilyProfilesCubit familyProfilesCubit,
   String? myUserId,
 }) =>
-    switch (destinationFor(appointment.status)) {
+    switch (destinationFor(appointment.status, lapsed: appointment.lapsed)) {
       AppointmentDestinationKind.waitingRoom => WaitingRoomPage(
           appointment: appointment,
           repo: repo,
