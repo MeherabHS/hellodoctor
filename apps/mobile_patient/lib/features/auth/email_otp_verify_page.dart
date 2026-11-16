@@ -240,10 +240,11 @@ class _LegalRow extends StatelessWidget {
         Expanded(
             child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(doc['title'].toString(),
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w600)),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
             // The full public version on afyamkononi.app.
             LegalWebLinks(
                 pages: legalWebPagesFor(doc['document_type'].toString()),
