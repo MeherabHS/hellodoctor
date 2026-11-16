@@ -36,6 +36,16 @@ class ReminderAlarm {
 
   static int idFor(String reminderId) =>
       stableNotificationId('patient_reminder:$reminderId');
+
+  /// Most native alarms one reminder can use: one per hour for an hourly
+  /// reminder, seven for a weekly one.
+  static const maxSlots = 24;
+
+  /// Id of a reminder's [slot]-th native alarm. Slot 0 keeps [idFor], so
+  /// reminders armed before multi-slot repeats are still found and cancelled.
+  static int slotIdFor(String reminderId, int slot) => slot == 0
+      ? idFor(reminderId)
+      : stableNotificationId('patient_reminder:$reminderId:$slot');
   static int snoozeIdFor(String reminderId) =>
       stableNotificationId('patient_reminder_snooze:$reminderId');
 

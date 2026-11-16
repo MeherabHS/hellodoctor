@@ -73,8 +73,13 @@ class RemindersCubit extends Cubit<RemindersState> {
 
   Future<void> load() async {
     final items = await store.load(userId);
+    var exact = state.exactAlarmsAllowed;
+    try {
+      exact = await scheduler.exactAlarmsAllowed();
+    } catch (_) {}
     if (isClosed) return;
-    emit(state.copyWith(loading: false, items: items));
+    emit(state.copyWith(
+        loading: false, items: items, exactAlarmsAllowed: exact));
   }
 
   /// Saves [next] as the full list, then brings [changed]'s alarm in line
@@ -88,11 +93,22 @@ class RemindersCubit extends Cubit<RemindersState> {
     }
     var allowed = state.notificationsAllowed;
     var exact = state.exactAlarmsAllowed;
+    var rearmAll = false;
     try {
       if (changed.enabled) {
         allowed = await scheduler.ensurePermission();
         if (allowed) {
-          exact = await scheduler.ensureExactAlarms();
+          // The system "Alarms & reminders" page opens at most once per
+          // visit; after that the screen's card offers it instead of
+          // interrupting every save.
+          final wasExact = await scheduler.exactAlarmsAllowed();
+          if (wasExact || _askedExact) {
+            exact = wasExact;
+          } else {
+            _askedExact = true;
+            exact = await scheduler.ensureExactAlarms();
+            rearmAll = exact;
+          }
           await scheduler.schedule(changed, text: text, now: now);
         }
       } else {
@@ -107,7 +123,52 @@ class RemindersCubit extends Cubit<RemindersState> {
           notificationsAllowed: allowed,
           exactAlarmsAllowed: exact));
     }
+    // Granting exact alarms only helps alarms armed afterwards: re-arm the
+    // others too, so none stays on late, inexact timing.
+    if (rearmAll) await _rearm(except: changed.id);
     return true;
+  }
+
+  bool _askedExact = false;
+
+  Future<void> _rearm({String? except}) async {
+    for (final r in state.items) {
+      if (r.id == except || !r.enabled) continue;
+      try {
+        await scheduler.schedule(r, text: text, now: now);
+      } catch (_) {}
+    }
+  }
+
+  /// Opens the system "Alarms & reminders" setting (the card's button) and,
+  /// once allowed, re-arms every reminder to ring at its exact time.
+  Future<void> allowExactAlarms() async {
+    bool exact;
+    try {
+      exact = await scheduler.ensureExactAlarms();
+    } catch (_) {
+      return;
+    }
+    if (isClosed) return;
+    final changed = exact != state.exactAlarmsAllowed;
+    emit(state.copyWith(exactAlarmsAllowed: exact));
+    if (changed) await _rearm();
+  }
+
+  /// Re-reads the exact-alarm setting without asking (the app came back to
+  /// the foreground, for example from Settings). If it changed, every
+  /// reminder is re-armed with the timing the system now allows; Android
+  /// also drops exact alarms itself when the setting is turned off.
+  Future<void> refreshAlarmAccess() async {
+    bool exact;
+    try {
+      exact = await scheduler.exactAlarmsAllowed();
+    } catch (_) {
+      return;
+    }
+    if (isClosed || exact == state.exactAlarmsAllowed) return;
+    emit(state.copyWith(exactAlarmsAllowed: exact));
+    await _rearm();
   }
 
   Future<bool> add(Reminder reminder) =>
@@ -150,9 +211,25 @@ class ReminderSession {
   final ReminderStore store;
   final ReminderScheduler scheduler;
   final _scheduled = <String>{};
+  bool? _exact;
+
+  /// Called when the app returns to the foreground. If the exact-alarm
+  /// setting changed while it was away (granted in Settings, or switched
+  /// off, which makes Android drop exact alarms), every reminder is re-armed
+  /// so it rings with the best timing the system now allows.
+  Future<void> resume(String userId, ReminderAlertText text) async {
+    try {
+      final exact = await scheduler.exactAlarmsAllowed();
+      if (exact == _exact) return;
+    } catch (_) {
+      return;
+    }
+    await start(userId, text);
+  }
 
   Future<void> start(String userId, ReminderAlertText text) async {
     try {
+      _exact = await scheduler.exactAlarmsAllowed();
       final now = DateTime.now();
       for (final r in await store.load(userId)) {
         if (!r.enabled) continue;
