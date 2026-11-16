@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/legal/legal_links.dart';
 import '../../core/network/api_client.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/patient_widgets.dart';
@@ -237,9 +238,18 @@ class _LegalRow extends StatelessWidget {
             onChanged: enabled ? onChanged : null,
             activeColor: PatientTokens.primary),
         Expanded(
-            child: Text(doc['title'].toString(),
+            child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(doc['title'].toString(),
                 style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w600))),
+                    fontSize: 14, fontWeight: FontWeight.w600)),
+            // The full public version on afyamkononi.app.
+            LegalWebLinks(
+                pages: legalWebPagesFor(doc['document_type'].toString()),
+                color: PatientTokens.primary),
+          ]),
+        )),
         TextButton(onPressed: onRead, child: const Text('Read')),
         const SizedBox(width: 6)
       ]));
