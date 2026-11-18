@@ -10,7 +10,7 @@ Date: 2026-11-13. Scope: `apps/mobile`. No release APK is built in this workflow
 | Android SDK | `C:\Users\CUBE\AppData\Local\Android\Sdk`, platform android-37, build-tools 36.0.0, emulator 37.2.13 |
 | `flutter doctor` | Flutter, Windows, connected device, network: pass. Android toolchain: warning. Chrome and Visual Studio missing (not needed) |
 | AVD | `Pixel_9`, running as `emulator-5554`, 1080 × 2424 at 420 dpi (about 411 dp wide), Android 17 |
-| Doctor app id | `com.example.hellodoctor_mobile` (Patient is `com.hellodoctor.patient`; both can be installed together) |
+| Doctor app id | `com.hellodoctor.doctor` (renamed 2026-11-17 from the `com.example.hellodoctor_mobile` template id; Patient is `com.hellodoctor.patient`; both can be installed together) |
 | Local backend | Listening on port 8080; Postgres and Redis containers up |
 | Local data | 2 patients, 1 admin, **0 doctors, 0 slots, 0 appointments** |
 | `adb` | Not on `PATH`; use `…\Android\Sdk\platform-tools\adb.exe` |

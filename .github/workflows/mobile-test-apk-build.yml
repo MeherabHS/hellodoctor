@@ -20,7 +20,8 @@ name: Mobile internal-test APK build (manual, approval-gated)
 #   - GOOGLE_SERVICES_JSON_DOCTOR (required for any build that selects the
 #     Doctor app): base64 of apps/mobile/android/app/google-services.json,
 #     the real Firebase Android client config for the afyamkononi-ec314
-#     project's com.example.hellodoctor_mobile app registration. These
+#     project's com.hellodoctor.doctor app registration (renamed from the
+#     com.example.hellodoctor_mobile template id on 2026-11-17). These
 #     builds exist specifically for real-device FCM end-to-end testing, so a
 #     missing Firebase config now fails the build closed rather than quietly
 #     producing a push-notification-dead APK.

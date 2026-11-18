@@ -1,4 +1,4 @@
-package com.example.hellodoctor_mobile
+package com.hellodoctor.doctor
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties

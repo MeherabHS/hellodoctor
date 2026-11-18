@@ -31,8 +31,22 @@ void main() {
         .toList();
     expect(channels, hasLength(6));
     final reminders =
-        channels.singleWhere((c) => c['id'] == 'CONSULTATION_REMINDERS');
-    expect(reminders['importance'], 4);
+        channels.singleWhere((c) => c['id'] == 'CONSULTATION_REMINDERS_V2');
+    // Forced sounds (2026-11-17): the urgent tone at maximum importance for
+    // reminders; every other channel high importance with the quick tone.
+    expect(reminders['importance'], 5);
+    expect(reminders['playSound'], true);
+    expect(reminders['sound'], 'afya_reminder_urgent');
+    for (final c in channels.where((c) => c != reminders)) {
+      expect(c['importance'], 4, reason: '${c['id']} must not be silent');
+      expect(c['playSound'], true);
+      expect(c['sound'], 'afya_notify_quick');
+    }
+    final deleted = calls
+        .where((c) => c.method == 'deleteNotificationChannel')
+        .map((c) => c.arguments)
+        .toSet();
+    expect(deleted, containsAll(NotificationChannels.legacyIds));
 
     await LocalNotificationService.showNow(
         id: 123,
@@ -46,8 +60,10 @@ void main() {
     expect(show['body'], 'Your consultation starts in 15 minutes.');
     expect(show['payload'], 'remote:synthetic-reminder');
     final android = show['platformSpecifics'] as Map;
-    expect(android['channelId'], 'CONSULTATION_REMINDERS');
-    expect(android['importance'], 4);
-    expect(android['priority'], 1);
+    expect(android['channelId'], 'CONSULTATION_REMINDERS_V2');
+    expect(android['importance'], 5);
+    expect(android['priority'], 2);
+    expect(android['playSound'], true);
+    expect(android['sound'], 'afya_reminder_urgent');
   });
 }
