@@ -610,6 +610,13 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
                                             label: 'Register as Peer Navigator',
                                             busy: busy,
                                             onPressed: busy ? null : _submit),
+                                        const SizedBox(height: 10),
+                                        const RegistrationLegalNotice(
+                                            text:
+                                                'By registering you agree to the AfyaMkononi Peer Navigator Privacy Notice and Privacy Policy.',
+                                            pages: peerRegistrationPages,
+                                            textColor: DoctorTokens.slate,
+                                            linkColor: DoctorTokens.primary),
                                         if (error != null)
                                           AfyaFormError(error!),
                                       ])),

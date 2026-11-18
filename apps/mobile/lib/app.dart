@@ -22,6 +22,7 @@ import 'core/widgets/afya_auth_widgets.dart';
 import 'core/widgets/startup_error_page.dart';
 import 'features/auth/auth_cubit.dart';
 import 'features/auth/forgot_password_page.dart';
+import 'core/legal/legal_links.dart';
 import 'features/auth/legal_consent_page.dart';
 import 'features/auth/welcome_pages.dart';
 import 'features/doctor/doctor_cubit.dart';
@@ -595,6 +596,13 @@ class _RegistrationState extends State<RegistrationPage> {
             label: 'Create Account',
             busy: busy,
             onPressed: _continueFromAccount),
+        const SizedBox(height: 10),
+        const RegistrationLegalNotice(
+            text: 'By registering you agree to the AfyaMkononi Doctor Terms '
+                'and Privacy Policy.',
+            pages: doctorRegistrationPages,
+            textColor: DoctorTokens.slate,
+            linkColor: DoctorTokens.primary),
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           const Text('Already have an account?',
