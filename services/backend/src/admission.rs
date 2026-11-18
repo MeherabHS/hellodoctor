@@ -57,6 +57,11 @@ pub enum Cost {
     Payment,
     Expensive,
     Normal,
+    /// Token refresh and logout (2026-11-18). Separate from `Auth` so that
+    /// refreshes from every signed-in user can never use up the sign-in
+    /// budget: the 2026-11-17 load test showed refresh alone reaching the
+    /// shared 240/min auth budget at about 3,600 active users.
+    Session,
 }
 impl Cost {
     pub fn label(self) -> &'static str {
@@ -69,6 +74,7 @@ impl Cost {
             Self::Payment => "payment",
             Self::Expensive => "expensive",
             Self::Normal => "normal",
+            Self::Session => "session",
         }
     }
     fn reserved(self) -> bool {
@@ -86,6 +92,9 @@ pub fn classify(method: &Method, path: &str) -> Cost {
     }
     if path.starts_with("/api/v1/webhooks/payment/") {
         return Cost::Webhook;
+    }
+    if matches!(path, "/api/v1/auth/refresh" | "/api/v1/auth/logout") {
+        return Cost::Session;
     }
     if path.starts_with("/api/v1/auth/") {
         return Cost::Auth;
@@ -145,8 +154,8 @@ impl Bucket {
 pub struct Admission {
     ordinary: Arc<Semaphore>,
     other_work: Arc<Semaphore>,
-    lanes: [Arc<Semaphore>; 8],
-    lane_tokens: [Mutex<Bucket>; 8],
+    lanes: [Arc<Semaphore>; 9],
+    lane_tokens: [Mutex<Bucket>; 9],
     last_limiter_report: Mutex<Option<Instant>>,
 }
 
@@ -262,15 +271,22 @@ impl Admission {
         // this ceiling changes only how much legitimate concurrent
         // confirmation traffic is admitted, never payment correctness under
         // concurrency.
+        // 2026-11-18 (docs/assurance/PERFORMANCE_REPORT.md §5): Consultation
+        // in-flight raised n.min(6) -> n.min(12) and Expensive n.min(2) ->
+        // n.min(4). The 65-minute soak showed both rejecting ordinary use
+        // (live chats, several admins on the dashboards at once) with backend
+        // CPU p95 17 % and Postgres p95 12 %; both stay well under the
+        // 10-connection API pool. Session (index 8) is new, sized like Payment.
         let limits = [
             2,
             4,
-            n.min(6),
+            n.min(12),
             auth_limit,
             n.min(4),
             n.min(8),
-            n.min(2),
+            n.min(4),
             n.min(64),
+            n.min(8),
         ];
         // Milestone 8.0R: Normal's local per-process rate (index 7) raised
         // from 100 to 400/s — still a bounded, evidence-justified global
@@ -295,7 +311,13 @@ impl Admission {
         // so the per-process bucket is not reintroduced as a tighter,
         // un-benchmarked bottleneck once the concurrency/Redis ceilings are
         // widened.
-        let rates = [10, 20, 60, 12, 8, 20, 20, 400];
+        //
+        // 2026-11-18 (docs/assurance/PERFORMANCE_REPORT.md §5): Consultation's
+        // local rate 60 -> 200/s (the apps now poll an active chat every 3 s,
+        // and 60/s capped open chats at ~600 at the old 10 s poll), Auth
+        // 12 -> 20/s (sign-ins; refresh moved to Session at 100/s). Each stays
+        // at or above its Redis budget below, as for Payment/Webhook.
+        let rates = [10, 20, 200, 20, 8, 20, 20, 400, 100];
         Self {
             ordinary: Arc::new(Semaphore::new(n.saturating_mul(2).min(128))),
             other_work: Arc::new(Semaphore::new(
@@ -399,7 +421,118 @@ pub fn reject(status: StatusCode, cost: Cost, reason: &'static str) -> Response 
         header::RETRY_AFTER,
         axum::http::HeaderValue::from_static("1"),
     );
+    response.extensions_mut().insert(EarlyRejection);
     response
+}
+
+/// Marks a response produced by [`reject`] before the request body was read.
+#[derive(Clone, Copy, Debug)]
+pub struct EarlyRejection;
+
+/// Largest unread body [`settle_unread_rejections`] reads and discards so the
+/// connection can be reused (an upload of 20 images at 40 KB is ~0.8 MB).
+const DRAIN_MAX_BYTES: u64 = 2 * 1024 * 1024;
+/// Longest it waits for that body; a slower sender gets `Connection: close`.
+const DRAIN_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// Router layer just outside admission control (2026-11-18, after the
+/// 2026-11-17 load test). A request that admission rejects never had its
+/// body read. Closing the connection with the body unread made the reverse
+/// proxy fail with 502 instead of passing on the 429/503: either it reused
+/// the connection for the next request, or (for a ~115 KB prescription
+/// upload) it was still sending the body when the socket closed.
+///
+/// So the unread body is read and discarded first, when it is small enough
+/// (at most [`DRAIN_MAX_BYTES`], declared by `Content-Length`) and arrives
+/// within [`DRAIN_TIMEOUT`]; the connection then stays usable. Otherwise the
+/// rejection says `Connection: close`. Requests that reach a handler, and
+/// rejections of requests without a body, are untouched. Draining holds no
+/// admission lease or database connection.
+pub async fn settle_unread_rejections(request: Request, next: Next) -> Response {
+    let declared = request
+        .headers()
+        .get(header::CONTENT_LENGTH)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.trim().parse::<u64>().ok());
+    let chunked = request.headers().contains_key(header::TRANSFER_ENCODING);
+    if !chunked && declared.unwrap_or(0) == 0 {
+        return next.run(request).await;
+    }
+    let (parts, body) = request.into_parts();
+    let unread = Arc::new(Mutex::new(None));
+    let body = axum::body::Body::new(Recoverable {
+        inner: Some(body),
+        polled: false,
+        unread: unread.clone(),
+    });
+    let mut response = next.run(Request::from_parts(parts, body)).await;
+    if response.extensions().get::<EarlyRejection>().is_none() {
+        return response;
+    }
+    let left = unread.lock().take();
+    let drained = match (left, declared) {
+        (Some(body), Some(len)) if !chunked && len <= DRAIN_MAX_BYTES => matches!(
+            tokio::time::timeout(
+                DRAIN_TIMEOUT,
+                axum::body::to_bytes(body, DRAIN_MAX_BYTES as usize)
+            )
+            .await,
+            Ok(Ok(_))
+        ),
+        _ => false,
+    };
+    if !drained {
+        response.headers_mut().insert(
+            header::CONNECTION,
+            axum::http::HeaderValue::from_static("close"),
+        );
+    }
+    response
+}
+
+/// A request body that, if dropped without ever being read, hands itself
+/// back through `unread` so [`settle_unread_rejections`] can drain it.
+struct Recoverable {
+    inner: Option<axum::body::Body>,
+    polled: bool,
+    unread: Arc<Mutex<Option<axum::body::Body>>>,
+}
+
+impl http_body::Body for Recoverable {
+    type Data = axum::body::Bytes;
+    type Error = axum::Error;
+
+    fn poll_frame(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Result<http_body::Frame<Self::Data>, Self::Error>>> {
+        let this = self.get_mut();
+        this.polled = true;
+        match this.inner.as_mut() {
+            Some(body) => std::pin::Pin::new(body).poll_frame(cx),
+            None => std::task::Poll::Ready(None),
+        }
+    }
+
+    fn is_end_stream(&self) -> bool {
+        self.inner.as_ref().is_none_or(|b| b.is_end_stream())
+    }
+
+    fn size_hint(&self) -> http_body::SizeHint {
+        self.inner
+            .as_ref()
+            .map_or_else(|| http_body::SizeHint::with_exact(0), |b| b.size_hint())
+    }
+}
+
+impl Drop for Recoverable {
+    fn drop(&mut self) {
+        if !self.polled {
+            if let Some(body) = self.inner.take() {
+                *self.unread.lock() = Some(body);
+            }
+        }
+    }
 }
 
 fn exhausted(pool: &sqlx::PgPool) -> bool {
@@ -467,7 +600,7 @@ pub async fn middleware(
     let relevant_pools: &[(&str, &sqlx::PgPool)] = match cost {
         Cost::Health => &[],
         Cost::Webhook => &[("payment", &state.payment_db)],
-        Cost::Auth => &[("auth", &state.auth_db)],
+        Cost::Auth | Cost::Session => &[("auth", &state.auth_db)],
         Cost::Payment => &[("auth", &state.auth_db), ("payment", &state.payment_db)],
         Cost::Expensive => &[
             ("auth", &state.auth_db),
@@ -554,9 +687,21 @@ pub async fn middleware(
         }
         let limit = match cost {
             Cost::Webhook => 1200,
-            Cost::Consultation => 3600,
-            Cost::Auth => 240,
-            Cost::Upload => 120,
+            // 2026-11-18 (docs/assurance/PERFORMANCE_REPORT.md §5), all well
+            // inside the measured hardware headroom:
+            // - Consultation 3600 -> 12000 (200/s): ~600 chats exchanging
+            //   messages at once at the apps' 3 s active poll, many more idle.
+            // - Auth 240 -> 1200 (20/s, about 10 sign-ins/s): sign-ins only;
+            //   token refresh and logout now have their own Session budget.
+            //   Brute force is still stopped per account and per IP breadth
+            //   by `ip_jail`.
+            // - Upload 120 -> 360 (6/s): 2/s refused legitimate uploads at
+            //   backend CPU p95 20 %; uploads keep their per-account limits.
+            // - Session 6000 (100/s): refreshes for every signed-in user.
+            Cost::Consultation => 12000,
+            Cost::Auth => 1200,
+            Cost::Upload => 360,
+            Cost::Session => 6000,
             // Milestone 8.0 booking-fairness remediation (2026-10-31): raised
             // from 300 (5/s) to 1200 (20/s), matching Webhook's own budget
             // exactly rather than an arbitrary new number — Payment
@@ -626,7 +771,11 @@ mod tests {
             );
             assert_eq!(
                 gate.lanes[Cost::Consultation.index()].available_permits(),
-                n.min(6)
+                n.min(12)
+            );
+            assert_eq!(
+                gate.lanes[Cost::Session.index()].available_permits(),
+                n.min(8)
             );
             assert_eq!(gate.lanes[Cost::Webhook.index()].available_permits(), 4);
             assert_eq!(gate.lanes[Cost::Health.index()].available_permits(), 2);
@@ -668,7 +817,8 @@ mod tests {
             (Cost::Auth, 4),
             (Cost::Upload, 4),
             (Cost::Payment, 8),
-            (Cost::Expensive, 2),
+            (Cost::Expensive, 4),
+            (Cost::Session, 8),
         ] {
             let gate = Admission::new(10);
             let mut held = Vec::new();
@@ -680,6 +830,22 @@ mod tests {
             assert!(gate.enter(Cost::Webhook).is_ok());
         }
     }
+    #[test]
+    fn refresh_and_logout_do_not_spend_the_sign_in_budget() {
+        for path in ["/api/v1/auth/refresh", "/api/v1/auth/logout"] {
+            assert_eq!(classify(&Method::POST, path), Cost::Session, "{path}");
+        }
+        for path in [
+            "/api/v1/auth/patient/login",
+            "/api/v1/auth/patient/verify-otp",
+            "/api/v1/auth/doctor/login",
+            "/api/v1/auth/admin/login",
+            "/api/v1/auth/password-reset/request",
+        ] {
+            assert_eq!(classify(&Method::POST, path), Cost::Auth, "{path}");
+        }
+    }
+
     #[test]
     fn route_priority_cannot_bypass_upload_lane() {
         assert_eq!(
@@ -708,5 +874,82 @@ mod tests {
         assert!(!bucket.take(now));
         assert!(bucket.take(now + Duration::from_millis(500)));
         assert!(!bucket.take(now + Duration::from_millis(500)));
+    }
+
+    /// A route that either rejects the way admission does (dropping the
+    /// unread request) or reads the body and echoes its length; wrapped in
+    /// [`settle_unread_rejections`]. Returns status, headers and body text.
+    async fn settled(
+        method: Method,
+        body: Vec<u8>,
+        reject_it: bool,
+    ) -> (StatusCode, axum::http::HeaderMap, String) {
+        use tower::ServiceExt;
+        let app = axum::Router::new()
+            .route(
+                "/x",
+                axum::routing::any(move |request: Request| async move {
+                    if reject_it {
+                        drop(request);
+                        reject(
+                            StatusCode::TOO_MANY_REQUESTS,
+                            Cost::Upload,
+                            "shared_class_budget",
+                        )
+                    } else {
+                        let bytes = axum::body::to_bytes(request.into_body(), usize::MAX)
+                            .await
+                            .unwrap();
+                        bytes.len().to_string().into_response()
+                    }
+                }),
+            )
+            .layer(axum::middleware::from_fn(settle_unread_rejections));
+        let mut req = axum::http::Request::builder().method(method).uri("/x");
+        if !body.is_empty() {
+            req = req.header(header::CONTENT_LENGTH, body.len());
+        }
+        let response = app
+            .oneshot(req.body(axum::body::Body::from(body)).unwrap())
+            .await
+            .unwrap();
+        let (parts, body) = response.into_parts();
+        let bytes = axum::body::to_bytes(body, usize::MAX).await.unwrap();
+        (
+            parts.status,
+            parts.headers,
+            String::from_utf8_lossy(&bytes).into_owned(),
+        )
+    }
+
+    #[tokio::test]
+    async fn rejected_upload_body_is_drained_and_connection_kept() {
+        let (status, headers, _) = settled(Method::POST, vec![7u8; 115 * 1024], true).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+        assert!(headers.get(header::CONNECTION).is_none());
+        assert_eq!(headers.get(header::RETRY_AFTER).unwrap(), "1");
+    }
+
+    #[tokio::test]
+    async fn rejected_oversized_body_closes_connection() {
+        let (status, headers, _) =
+            settled(Method::POST, vec![7u8; DRAIN_MAX_BYTES as usize + 1], true).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(headers.get(header::CONNECTION).unwrap(), "close");
+    }
+
+    #[tokio::test]
+    async fn rejection_without_body_is_untouched() {
+        let (status, headers, _) = settled(Method::GET, Vec::new(), true).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+        assert!(headers.get(header::CONNECTION).is_none());
+    }
+
+    #[tokio::test]
+    async fn admitted_requests_still_receive_their_whole_body() {
+        let (status, headers, text) = settled(Method::POST, vec![1u8; 300 * 1024], false).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(text, (300 * 1024).to_string());
+        assert!(headers.get(header::CONNECTION).is_none());
     }
 }

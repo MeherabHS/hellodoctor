@@ -118,7 +118,9 @@ impl ChatService {
             attachment_size: None,
             attachment_hash: None,
             is_read: false,
-            sent_at: Utc::now(),
+            // Microsecond precision, as PostgreSQL stores it: the API must return the
+            // same sent_at clients later compare with read receipts.
+            sent_at: chrono::SubsecRound::trunc_subsecs(Utc::now(), 6),
         };
         if let Err(error) = chat_repo::insert_message(&mut *tx, &msg).await {
             tx.rollback().await?;
@@ -235,7 +237,7 @@ impl ChatService {
         conversation_id: Uuid,
         before: Option<(DateTime<Utc>, Uuid)>,
         after: Option<(DateTime<Utc>, Uuid)>,
-    ) -> Result<Vec<ChatMessage>, AppError> {
+    ) -> Result<(Vec<ChatMessage>, Option<DateTime<Utc>>), AppError> {
         if ctx.role == UserRole::Doctor {
             ctx.verified_doctor_profile_id(state).await?;
         }
@@ -252,8 +254,69 @@ impl ChatService {
         if after.is_none() {
             messages.reverse();
         }
+        // Read receipt: how far the other party has read (same transaction,
+        // primary-key lookup), so a poll needs no extra request.
+        let counterpart_read_up_to: Option<DateTime<Utc>> = sqlx::query_scalar(
+            "SELECT max(last_read_at) FROM chat_read_markers \
+             WHERE conversation_id = $1 AND user_id <> $2",
+        )
+        .bind(conversation_id)
+        .bind(uuid::Uuid::from(ctx.user_id))
+        .fetch_one(&mut *tx)
+        .await?;
         consultation_trace::admin_read(&mut tx, ctx, "ADMIN_CHAT_VIEWED", "CHAT", conv.id).await?;
         tx.commit().await?;
-        Ok(messages)
+        Ok((messages, counterpart_read_up_to))
+    }
+
+    /// Records that the caller has read the conversation up to (and
+    /// including) `up_to_message_id`. Only the patient or the verified
+    /// doctor of the conversation may do this, for themselves; message rows
+    /// are never modified (they are immutable clinical records). Markers only
+    /// move forward. Returns the caller's read-up-to time.
+    pub async fn mark_read(
+        state: &AppState,
+        ctx: &AuthContext,
+        conversation_id: Uuid,
+        up_to_message_id: Uuid,
+    ) -> Result<DateTime<Utc>, AppError> {
+        match ctx.role {
+            UserRole::Doctor => {
+                ctx.verified_doctor_profile_id(state).await?;
+            }
+            UserRole::Patient => {}
+            _ => {
+                return Err(AppError::Forbidden(
+                    "Only consultation participants mark messages read.".into(),
+                ))
+            }
+        }
+        let mut tx = state.begin_authed(ctx).await?;
+        chat_repo::find_conversation(&mut *tx, conversation_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Chat conversation not found.".into()))?;
+        let read_up_to: DateTime<Utc> = sqlx::query_scalar(
+            "SELECT sent_at FROM chat_messages WHERE id = $1 AND conversation_id = $2",
+        )
+        .bind(up_to_message_id)
+        .bind(conversation_id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Message not found in this conversation.".into()))?;
+        let marker: DateTime<Utc> = sqlx::query_scalar(
+            "INSERT INTO chat_read_markers (conversation_id, user_id, last_read_at) \
+             VALUES ($1, $2, $3) \
+             ON CONFLICT (conversation_id, user_id) DO UPDATE \
+             SET last_read_at = GREATEST(chat_read_markers.last_read_at, EXCLUDED.last_read_at), \
+                 updated_at = clock_timestamp() \
+             RETURNING last_read_at",
+        )
+        .bind(conversation_id)
+        .bind(uuid::Uuid::from(ctx.user_id))
+        .bind(read_up_to)
+        .fetch_one(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(marker)
     }
 }

@@ -19,9 +19,37 @@ use std::any::Any;
 use std::time::Duration;
 use tower::ServiceBuilder;
 use tower_http::catch_panic::CatchPanicLayer;
+use tower_http::classify::ServerErrorsFailureClass;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
+
+/// Per-request failure logging. Deliberate load shedding (503 from admission
+/// control) is counted in `admission_rejected_total` and is not an error;
+/// logging each one at ERROR flooded the log during overload (2026-11-17 load
+/// test). Every other 5xx is still logged at ERROR here, and AppError also
+/// records genuine faults in `system_error_logs`.
+fn log_request_failure(
+    class: ServerErrorsFailureClass,
+    latency: std::time::Duration,
+    _span: &tracing::Span,
+) {
+    match class {
+        ServerErrorsFailureClass::StatusCode(status)
+            if status == axum::http::StatusCode::SERVICE_UNAVAILABLE =>
+        {
+            tracing::debug!(
+                latency_ms = latency.as_millis() as u64,
+                "request shed with 503"
+            )
+        }
+        other => tracing::error!(
+            classification = %other,
+            latency_ms = latency.as_millis() as u64,
+            "response failed"
+        ),
+    }
+}
 
 /// Hard ceiling on request bodies at the HTTP layer (prescription uploads are capped
 /// well below this in application logic already; this is the backstop).
@@ -187,11 +215,12 @@ pub fn create_router_with_metrics(state: AppState, metrics_handle: PrometheusHan
         .layer(from_fn_with_state(state.clone(), crate::api::middleware::web_auth::middleware))
         .layer(from_fn_with_state(state.clone(), global_guard_middleware))
         .layer(from_fn_with_state(state.clone(), crate::admission::middleware))
+        .layer(from_fn(crate::admission::settle_unread_rejections))
         .layer(from_fn_with_state(state.clone(), crate::api::middleware::transport_guard))
         .layer(cors)
         .layer(TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<axum::body::Body>| {
             tracing::debug_span!("request", method=%request.method(), path=request.uri().path())
-        }))
+        }).on_failure(log_request_failure))
         .layer(from_fn(telemetry::track_metrics))
         .layer(RequestBodyLimitLayer::new(MAX_REQUEST_BODY_BYTES))
         // Placed inside (closer to the handler than) `request_context`'s
@@ -646,6 +675,10 @@ fn protected_routes() -> Router<AppState> {
             "/chat/:conversation_id/messages",
             axum::routing::post(chat_handlers::send_chat_message)
                 .get(chat_handlers::get_chat_messages),
+        )
+        .route(
+            "/chat/:conversation_id/read",
+            axum::routing::post(chat_handlers::mark_chat_read),
         )
         // Doctor Wallet
         .route(

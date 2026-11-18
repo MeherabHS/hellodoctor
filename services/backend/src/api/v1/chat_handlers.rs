@@ -117,7 +117,7 @@ pub async fn get_chat_messages(
     {
         return Err(AppError::Validation("Invalid message cursor.".into()));
     }
-    let msgs = ChatService::get_messages(
+    let (msgs, counterpart_read_up_to) = ChatService::get_messages(
         &state,
         &ctx,
         conversation_id,
@@ -125,11 +125,48 @@ pub async fn get_chat_messages(
         query.after_time.zip(query.after_id),
     )
     .await?;
+    // Read receipt in a header so the body (a plain message array that
+    // existing clients parse) is unchanged and a delta poll needs no extra
+    // request: the other party has read every message sent at or before it.
+    let mut headers = HeaderMap::new();
+    if let Some(at) = counterpart_read_up_to {
+        if let Ok(value) = axum::http::HeaderValue::from_str(&at.to_rfc3339()) {
+            headers.insert(READ_UP_TO_HEADER, value);
+        }
+    }
+    Ok((
+        headers,
+        Json(ApiResponse {
+            success: true,
+            data: msgs
+                .iter()
+                .map(super::chat_attachment_handlers::public_message)
+                .collect::<Vec<_>>(),
+        }),
+    ))
+}
+
+/// Response header on `GET /chat/:id/messages`: the time up to which the
+/// other party has read the conversation (absent until they read anything).
+pub const READ_UP_TO_HEADER: &str = "x-chat-read-up-to";
+
+#[derive(Deserialize)]
+pub struct MarkReadRequest {
+    pub up_to_message_id: Uuid,
+}
+
+/// `POST /chat/:conversation_id/read` — the caller has read the conversation
+/// up to `up_to_message_id` (2026-11-17 read receipts).
+pub async fn mark_chat_read(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(conversation_id): Path<Uuid>,
+    Json(body): Json<MarkReadRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let at = ChatService::mark_read(&state, &ctx, conversation_id, body.up_to_message_id).await?;
     Ok(Json(ApiResponse {
         success: true,
-        data: msgs
-            .iter()
-            .map(super::chat_attachment_handlers::public_message)
-            .collect::<Vec<_>>(),
+        data: serde_json::json!({ "last_read_at": at }),
     }))
 }
