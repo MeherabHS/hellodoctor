@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/legal/legal_links.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/patient_widgets.dart';
 import 'auth_cubit.dart';
@@ -348,7 +349,14 @@ class _AuthEntryPageState extends State<AuthEntryPage> {
                   icon: Icons.person_add_alt_1_outlined,
                   busy: busy,
                   onPressed: busy ? null : submit),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              const RegistrationLegalNotice(
+                  text: 'By creating an account you agree to the AfyaMkononi '
+                      'Terms of Service and Privacy Policy.',
+                  pages: patientRegistrationPages,
+                  textColor: AuthColors.body,
+                  linkColor: AuthColors.link),
+              const SizedBox(height: 10),
               Center(
                   child: Wrap(alignment: WrapAlignment.center, children: [
                 const Text('Already have an account? ',

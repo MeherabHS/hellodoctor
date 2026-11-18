@@ -30,6 +30,9 @@ const _doctorConfidentiality =
 const _peerPrivacy =
     LegalWebPage('Peer Navigator Privacy Notice', '/peer-navigator-privacy');
 
+/// Linked under the Create account form: afyamkononi.app/terms and /privacy.
+const patientRegistrationPages = [_terms, _privacy];
+
 /// The website pages matching a legal document from `GET /legal/documents`.
 /// The ticked document is still the versioned text the server records; these
 /// are its full public versions. Empty for documents that exist only in the
@@ -99,4 +102,33 @@ class LegalWebLinks extends StatelessWidget {
         ),
     ]);
   }
+}
+
+/// "By registering you agree to ..." with the matching afyamkononi.app pages,
+/// shown under a registration form's submit button. The versioned documents
+/// are still accepted (ticked) later in sign-up; this makes the public
+/// versions visible before any details are entered.
+class RegistrationLegalNotice extends StatelessWidget {
+  const RegistrationLegalNotice(
+      {super.key,
+      required this.text,
+      required this.pages,
+      required this.textColor,
+      required this.linkColor,
+      this.onOpen});
+  final String text;
+  final List<LegalWebPage> pages;
+  final Color textColor;
+  final Color linkColor;
+  final void Function(LegalWebPage page)? onOpen;
+
+  @override
+  Widget build(BuildContext context) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+        Text(text,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, height: 1.35, color: textColor)),
+        const SizedBox(height: 2),
+        LegalWebLinks(pages: pages, color: linkColor, onOpen: onOpen),
+      ]);
 }
