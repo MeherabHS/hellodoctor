@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 > Latest completed security/Articles pass (2026-10-08): SECURITY_REGRESSION_GREEN; 50/50 Rust library, 129/129 serialized API, 44/44 Doctor Web, 13/13 Admin Web and 81/81 Flutter tests; both web builds and Flutter analysis pass. Direct Doctor publication has no Admin review. No slot approvals. Migration source/binary/database = 20261025000001. External TLS and sensitive Admin step-up remain open: PUBLIC_EXPOSURE_SECURITY_GATES_PARTIAL. [Evidence](audit_evidence/public-exposure-security.json).
 
 > Current public-exposure/session hardening and direct Doctor Articles (2026-10-08): [security controls and deployment requirements](PUBLIC_EXPOSURE_HARDENING.md), [Doctor Articles without Admin review](DOCTOR_ARTICLES.md). Earlier dated results below are historical snapshots. Slot approvals are explicitly excluded by product policy.

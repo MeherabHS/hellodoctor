@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Capacity Evidence Report — Local Load Test
 
 > **Status:** Item 6 of `docs/CHECKPOINT.md` §3 (realistic load testing + `MAX_ACTIVE_USERS` admission cap). This report supersedes the in-flight, interrupted state recorded in CHECKPOINT.md §7.

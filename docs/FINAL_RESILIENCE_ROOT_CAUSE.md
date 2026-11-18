@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Final Resilience Root Cause — Admission Capacity Policy — 20 October 2026
 
 Answers the specific engineering question raised during this continuation: is scaling `Admission::new()`'s capacity by the number of independent per-role PostgreSQL pools (×5) a safe change, and what does it actually do? This supersedes guesswork with traced code paths and measured data. It does **not** re-run or supersede the 19 October distributed/30,000-request HTTP load evidence in [`POST_IMPLEMENTATION_LOAD_RESULTS.md`](POST_IMPLEMENTATION_LOAD_RESULTS.md); `DB_POOL_PRESSURE_TEST` there remains `INCONCLUSIVE` for full network-level saturation. This document is scoped to the in-process admission-layer question only.

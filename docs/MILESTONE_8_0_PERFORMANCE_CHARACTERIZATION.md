@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Milestone 8.0 — Performance Characterization: Session Ramp, Booking
 # Investigation, Instrumentation, and the Real Root Cause
 

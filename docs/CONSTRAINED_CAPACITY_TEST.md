@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Constrained-VPS Capacity Test
 
 > **Status:** Follow-on to `docs/CAPACITY_EVIDENCE_REPORT.md` (which ran unconstrained, on the full developer laptop). This document asks a different, harder question: can the backend sustain the planned `MAX_ACTIVE_USERS=1200` pilot's traffic under resources that actually resemble a small production VPS, not a 12-core development machine?

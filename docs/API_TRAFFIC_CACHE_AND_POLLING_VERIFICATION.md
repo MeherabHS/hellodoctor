@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # API traffic, cache and polling correction
 
 Implementation started 2026-10-16; final acceptance completed 2026-10-17 (Asia/Dhaka). This pass builds on the completed consultation lifecycle milestone. Physical-device measurement is unavailable: ADB reports no device; the user authorized continuing without device verification. Video/Agora remains deferred.

@@ -1,0 +1,283 @@
+﻿# TYPE http_requests_total counter
+http_requests_total{method="POST",path="/api/v1/auth/patient/login",status="429"} 1559
+http_requests_total{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429"} 17
+http_requests_total{method="POST",path="/api/v1/auth/logout",status="200"} 2
+http_requests_total{method="GET",path="/metrics",status="200"} 12
+http_requests_total{method="POST",path="/api/v1/auth/refresh",status="429"} 3
+http_requests_total{method="GET",path="/healthz",status="200"} 12
+http_requests_total{method="POST",path="/api/v1/auth/doctor/login",status="200"} 17
+http_requests_total{method="POST",path="/api/v1/auth/doctor/login",status="429"} 637
+http_requests_total{method="POST",path="/api/v1/auth/refresh",status="200"} 2
+http_requests_total{method="POST",path="/api/v1/auth/patient/verify-otp",status="200"} 5
+http_requests_total{method="POST",path="/api/v1/auth/logout",status="429"} 3
+http_requests_total{method="POST",path="/api/v1/auth/patient/login",status="200"} 43
+http_requests_total{method="POST",path="/api/v1/auth/patient/verify-otp",status="429"} 38
+
+# TYPE admission_rejected_total counter
+admission_rejected_total{class="auth",reason="lane_rate_limit"} 1235
+admission_rejected_total{class="auth",reason="shared_class_budget"} 611
+
+# TYPE admission_accepted_total counter
+admission_accepted_total{class="auth"} 1091
+admission_accepted_total{class="health"} 25
+
+# TYPE argon2_operations_total counter
+argon2_operations_total 471
+
+# TYPE admission_inflight gauge
+admission_inflight{class="auth"} 0
+admission_inflight{class="health"} 1
+
+# TYPE db_pool_size gauge
+db_pool_size{role="finance"} 1
+db_pool_size{role="payment"} 1
+db_pool_size{role="api"} 1
+db_pool_size{role="auth"} 2
+
+# TYPE db_pool_idle gauge
+db_pool_idle{role="api"} 1
+db_pool_idle{role="payment"} 1
+db_pool_idle{role="finance"} 1
+db_pool_idle{role="auth"} 2
+
+# TYPE argon2_active_workers gauge
+argon2_active_workers 0
+
+# TYPE admission_permit_hold_by_endpoint_seconds summary
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0"} 0.000706964
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.5"} 0.0007766661006355484
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.9"} 0.000858005516906238
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.95"} 0.000858005516906238
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.99"} 0.000858005516906238
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.999"} 0.000858005516906238
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="1"} 0.001083287
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/healthz"} 0.013687085000000002
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/healthz"} 12
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0"} 0.001742122
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.5"} 0.002168542436319071
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.9"} 0.00353550184943342
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.95"} 0.00353550184943342
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.99"} 0.00353550184943342
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.999"} 0.00353550184943342
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="1"} 0.003809719
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/metrics"} 0.066826646
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/metrics"} 12
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/refresh",quantile="0"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/refresh",quantile="0.5"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/refresh",quantile="0.9"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/refresh",quantile="0.95"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/refresh",quantile="0.99"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/refresh",quantile="0.999"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/refresh",quantile="1"} 0
+admission_permit_hold_by_endpoint_seconds_sum{class="auth",endpoint="/api/v1/auth/refresh"} 0.010236842
+admission_permit_hold_by_endpoint_seconds_count{class="auth",endpoint="/api/v1/auth/refresh"} 2
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0"} 0.000373593
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.5"} 0.000565217452077702
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.9"} 0.0196417079285036
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.95"} 0.02042286815519031
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.99"} 0.02475073688375426
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="0.999"} 0.0319974196147227
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/doctor/login",quantile="1"} 0.049146908
+admission_permit_hold_by_endpoint_seconds_sum{class="auth",endpoint="/api/v1/auth/doctor/login"} 3.102587632
+admission_permit_hold_by_endpoint_seconds_count{class="auth",endpoint="/api/v1/auth/doctor/login"} 314
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/verify-otp",quantile="0"} 0.004982108
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/verify-otp",quantile="0.5"} 0.004982118769650993
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/verify-otp",quantile="0.9"} 0.004982118769650993
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/verify-otp",quantile="0.95"} 0.004982118769650993
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/verify-otp",quantile="0.99"} 0.004982118769650993
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/verify-otp",quantile="0.999"} 0.004982118769650993
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/verify-otp",quantile="1"} 0.004982108
+admission_permit_hold_by_endpoint_seconds_sum{class="auth",endpoint="/api/v1/auth/patient/verify-otp"} 0.035780663000000004
+admission_permit_hold_by_endpoint_seconds_count{class="auth",endpoint="/api/v1/auth/patient/verify-otp"} 5
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/login",quantile="0"} 0.000357992
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/login",quantile="0.5"} 0.0005711263868004627
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/login",quantile="0.9"} 0.02021561369396185
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/login",quantile="0.95"} 0.021457092881407153
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/login",quantile="0.99"} 0.027162986658029197
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/login",quantile="0.999"} 0.0453974194750144
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/patient/login",quantile="1"} 0.074736374
+admission_permit_hold_by_endpoint_seconds_sum{class="auth",endpoint="/api/v1/auth/patient/login"} 7.884485566000003
+admission_permit_hold_by_endpoint_seconds_count{class="auth",endpoint="/api/v1/auth/patient/login"} 768
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/logout",quantile="0"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/logout",quantile="0.5"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/logout",quantile="0.9"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/logout",quantile="0.95"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/logout",quantile="0.99"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/logout",quantile="0.999"} 0
+admission_permit_hold_by_endpoint_seconds{class="auth",endpoint="/api/v1/auth/logout",quantile="1"} 0
+admission_permit_hold_by_endpoint_seconds_sum{class="auth",endpoint="/api/v1/auth/logout"} 0.022428883
+admission_permit_hold_by_endpoint_seconds_count{class="auth",endpoint="/api/v1/auth/logout"} 2
+
+# TYPE admission_redis_check_seconds summary
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0"} 0.000343852
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.5"} 0.00045079402473833776
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.9"} 0.000584999228338368
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.95"} 0.0006818505702710069
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.99"} 0.0008276666935392516
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="0.999"} 0.002232350918325665
+admission_redis_check_seconds{class="auth",check="shared_class_budget",quantile="1"} 0.002549033
+admission_redis_check_seconds_sum{class="auth",check="shared_class_budget"} 0.5154437200000016
+admission_redis_check_seconds_count{class="auth",check="shared_class_budget"} 1091
+
+# TYPE db_acquire_seconds summary
+db_acquire_seconds{quantile="0"} 0.000210812
+db_acquire_seconds{quantile="0.5"} 0.00023439565599875408
+db_acquire_seconds{quantile="0.9"} 0.00043329142005372356
+db_acquire_seconds{quantile="0.95"} 0.0007693996451115715
+db_acquire_seconds{quantile="0.99"} 0.0007693996451115715
+db_acquire_seconds{quantile="0.999"} 0.0007693996451115715
+db_acquire_seconds{quantile="1"} 0.000778035
+db_acquire_seconds_sum 0.011456788999999998
+db_acquire_seconds_count 24
+
+# TYPE sqlx_pool_acquire_wait_seconds summary
+sqlx_pool_acquire_wait_seconds{quantile="0"} 0.000099124
+sqlx_pool_acquire_wait_seconds{quantile="0.5"} 0.0001527512106437976
+sqlx_pool_acquire_wait_seconds{quantile="0.9"} 0.0001903016651524257
+sqlx_pool_acquire_wait_seconds{quantile="0.95"} 0.0002025953266395908
+sqlx_pool_acquire_wait_seconds{quantile="0.99"} 0.0002629096732546838
+sqlx_pool_acquire_wait_seconds{quantile="0.999"} 0.00032369785233738704
+sqlx_pool_acquire_wait_seconds{quantile="1"} 0.000331371
+sqlx_pool_acquire_wait_seconds_sum 0.21365742599999998
+sqlx_pool_acquire_wait_seconds_count 1565
+
+# TYPE admission_permit_hold_seconds summary
+admission_permit_hold_seconds{class="health",quantile="0"} 0.000706964
+admission_permit_hold_seconds{class="health",quantile="0.5"} 0.0010833469222639597
+admission_permit_hold_seconds{class="health",quantile="0.9"} 0.00353550184943342
+admission_permit_hold_seconds{class="health",quantile="0.95"} 0.00353550184943342
+admission_permit_hold_seconds{class="health",quantile="0.99"} 0.00353550184943342
+admission_permit_hold_seconds{class="health",quantile="0.999"} 0.00353550184943342
+admission_permit_hold_seconds{class="health",quantile="1"} 0.003809719
+admission_permit_hold_seconds_sum{class="health"} 0.08051373100000002
+admission_permit_hold_seconds_count{class="health"} 24
+admission_permit_hold_seconds{class="auth",quantile="0"} 0.000357992
+admission_permit_hold_seconds{class="auth",quantile="0.5"} 0.0005679370175924117
+admission_permit_hold_seconds{class="auth",quantile="0.9"} 0.020102722646853047
+admission_permit_hold_seconds{class="auth",quantile="0.95"} 0.02117995596597595
+admission_permit_hold_seconds{class="auth",quantile="0.99"} 0.027293682413300286
+admission_permit_hold_seconds{class="auth",quantile="0.999"} 0.04914893922400121
+admission_permit_hold_seconds{class="auth",quantile="1"} 0.074736374
+admission_permit_hold_seconds_sum{class="auth"} 11.055519585999994
+admission_permit_hold_seconds_count{class="auth"} 1091
+
+# TYPE http_request_duration_seconds summary
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0"} 0.000804808
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.5"} 0.000864897090604231
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.9"} 0.0009533771062888238
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.95"} 0.0009533771062888238
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.99"} 0.0009533771062888238
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.999"} 0.0009533771062888238
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="1"} 0.001194731
+http_request_duration_seconds_sum{method="GET",path="/healthz",status="200"} 0.015029927999999996
+http_request_duration_seconds_count{method="GET",path="/healthz",status="200"} 12
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0"} 0.001829605
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.5"} 0.002279725984947038
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.9"} 0.0036424453489880366
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.95"} 0.0036424453489880366
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.99"} 0.0036424453489880366
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.999"} 0.0036424453489880366
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="1"} 0.003921302
+http_request_duration_seconds_sum{method="GET",path="/metrics",status="200"} 0.068175426
+http_request_duration_seconds_count{method="GET",path="/metrics",status="200"} 12
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="200",quantile="0"} 0.005047039
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="200",quantile="0.5"} 0.0050473091331414074
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="200",quantile="0.9"} 0.0050473091331414074
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="200",quantile="0.95"} 0.0050473091331414074
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="200",quantile="0.99"} 0.0050473091331414074
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="200",quantile="0.999"} 0.0050473091331414074
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="200",quantile="1"} 0.005047039
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/patient/verify-otp",status="200"} 0.036138024000000005
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/patient/verify-otp",status="200"} 5
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="429",quantile="0"} 0.000060502
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="429",quantile="0.5"} 0.00006049801294347632
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="429",quantile="0.9"} 0.00006049801294347632
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="429",quantile="0.95"} 0.00006049801294347632
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="429",quantile="0.99"} 0.00006049801294347632
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="429",quantile="0.999"} 0.00006049801294347632
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="429",quantile="1"} 0.000060502
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/refresh",status="429"} 0.000207207
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/refresh",status="429"} 3
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429",quantile="0"} 0.000070202
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429",quantile="0.5"} 0.00007799233256699182
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429",quantile="0.9"} 0.00011808568710179013
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429",quantile="0.95"} 0.00011808568710179013
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429",quantile="0.99"} 0.00011808568710179013
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429",quantile="0.999"} 0.00011808568710179013
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429",quantile="1"} 0.000119364
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429"} 0.0015630050000000001
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/doctor/verify-otp",status="429"} 17
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="429",quantile="0"} 0.000060752
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="429",quantile="0.5"} 0.00006075263893897803
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="429",quantile="0.9"} 0.00006075263893897803
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="429",quantile="0.95"} 0.00006075263893897803
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="429",quantile="0.99"} 0.00006075263893897803
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="429",quantile="0.999"} 0.00006075263893897803
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="429",quantile="1"} 0.000060752
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/logout",status="429"} 0.00021023599999999998
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/logout",status="429"} 3
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="429",quantile="0"} 0.000063213
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="429",quantile="0.5"} 0.00007305484944056203
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="429",quantile="0.9"} 0.00008264964438764398
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="429",quantile="0.95"} 0.00008514966916041449
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="429",quantile="0.99"} 0.00008514966916041449
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="429",quantile="0.999"} 0.00008514966916041449
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/verify-otp",status="429",quantile="1"} 0.000137515
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/patient/verify-otp",status="429"} 0.0029501309999999986
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/patient/verify-otp",status="429"} 38
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="200",quantile="0"} 0.019779125
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="200",quantile="0.5"} 0.02065288999712002
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="200",quantile="0.9"} 0.032119241123940385
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="200",quantile="0.95"} 0.032119241123940385
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="200",quantile="0.99"} 0.032119241123940385
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="200",quantile="0.999"} 0.032119241123940385
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="200",quantile="1"} 0.049285693
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/doctor/login",status="200"} 0.49880564200000005
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/doctor/login",status="200"} 17
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="429",quantile="0"} 0.000055382
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="429",quantile="0.5"} 0.0001611620730999564
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="429",quantile="0.9"} 0.017507953449263116
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="429",quantile="0.95"} 0.019133778114592093
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="429",quantile="0.99"} 0.02114609513220818
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="429",quantile="0.999"} 0.022597861125820653
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="429",quantile="1"} 0.024920356
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/patient/login",status="429"} 6.692270813
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/patient/login",status="429"} 1559
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="200",quantile="0"} 0.02034084
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="200",quantile="0.5"} 0.02298071213789859
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="200",quantile="0.9"} 0.036894233421098044
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="200",quantile="0.95"} 0.044936719359684865
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="200",quantile="0.99"} 0.0455156063423924
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="200",quantile="0.999"} 0.0455156063423924
+http_request_duration_seconds{method="POST",path="/api/v1/auth/patient/login",status="200",quantile="1"} 0.07490712
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/patient/login",status="200"} 1.37332991
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/patient/login",status="200"} 43
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="429",quantile="0"} 0.000064352
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="429",quantile="0.5"} 0.00015975006878308706
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="429",quantile="0.9"} 0.017557044414363072
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="429",quantile="0.95"} 0.01883384016883635
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="429",quantile="0.99"} 0.020591024172059387
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="429",quantile="0.999"} 0.023374723856091
+http_request_duration_seconds{method="POST",path="/api/v1/auth/doctor/login",status="429",quantile="1"} 0.023918048
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/doctor/login",status="429"} 2.678400401999997
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/doctor/login",status="429"} 637
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="200",quantile="0"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="200",quantile="0.5"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="200",quantile="0.9"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="200",quantile="0.95"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="200",quantile="0.99"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="200",quantile="0.999"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/refresh",status="200",quantile="1"} 0
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/refresh",status="200"} 0.010381305
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/refresh",status="200"} 2
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="200",quantile="0"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="200",quantile="0.5"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="200",quantile="0.9"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="200",quantile="0.95"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="200",quantile="0.99"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="200",quantile="0.999"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/auth/logout",status="200",quantile="1"} 0
+http_request_duration_seconds_sum{method="POST",path="/api/v1/auth/logout",status="200"} 0.022637071
+http_request_duration_seconds_count{method="POST",path="/api/v1/auth/logout",status="200"} 2
+
+

@@ -1,0 +1,77 @@
+﻿# TYPE http_requests_total counter
+http_requests_total{method="GET",path="/healthz",status="200"} 1
+
+# TYPE admission_accepted_total counter
+admission_accepted_total{class="health"} 2
+
+# TYPE admission_inflight gauge
+admission_inflight{class="health"} 1
+
+# TYPE db_pool_size gauge
+db_pool_size{role="api"} 1
+db_pool_size{role="payment"} 1
+db_pool_size{role="auth"} 1
+db_pool_size{role="finance"} 1
+
+# TYPE db_pool_idle gauge
+db_pool_idle{role="payment"} 1
+db_pool_idle{role="auth"} 1
+db_pool_idle{role="api"} 1
+db_pool_idle{role="finance"} 1
+
+# TYPE sqlx_pool_acquire_wait_seconds summary
+sqlx_pool_acquire_wait_seconds{quantile="0"} 0.000084312
+sqlx_pool_acquire_wait_seconds{quantile="0.5"} 0.00009191006292270334
+sqlx_pool_acquire_wait_seconds{quantile="0.9"} 0.00010988238017493884
+sqlx_pool_acquire_wait_seconds{quantile="0.95"} 0.00011413826024519556
+sqlx_pool_acquire_wait_seconds{quantile="0.99"} 0.000127665112023564
+sqlx_pool_acquire_wait_seconds{quantile="0.999"} 0.000127665112023564
+sqlx_pool_acquire_wait_seconds{quantile="1"} 0.000204429
+sqlx_pool_acquire_wait_seconds_sum 0.016525193999999997
+sqlx_pool_acquire_wait_seconds_count 112
+
+# TYPE db_acquire_seconds summary
+db_acquire_seconds{quantile="0"} 0.000199855
+db_acquire_seconds{quantile="0.5"} 0.00022123169033375087
+db_acquire_seconds{quantile="0.9"} 0.0003136289270444857
+db_acquire_seconds{quantile="0.95"} 0.0003136289270444857
+db_acquire_seconds{quantile="0.99"} 0.0003136289270444857
+db_acquire_seconds{quantile="0.999"} 0.0003136289270444857
+db_acquire_seconds{quantile="1"} 0.004133194
+db_acquire_seconds_sum 0.006248906999999998
+db_acquire_seconds_count 10
+
+# TYPE http_request_duration_seconds summary
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0"} 0.003132001
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.5"} 0.0031319482492428766
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.9"} 0.0031319482492428766
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.95"} 0.0031319482492428766
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.99"} 0.0031319482492428766
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.999"} 0.0031319482492428766
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="1"} 0.003132001
+http_request_duration_seconds_sum{method="GET",path="/healthz",status="200"} 0.003132001
+http_request_duration_seconds_count{method="GET",path="/healthz",status="200"} 1
+
+# TYPE admission_permit_hold_seconds summary
+admission_permit_hold_seconds{class="health",quantile="0"} 0.002971035
+admission_permit_hold_seconds{class="health",quantile="0.5"} 0.0029708712340214428
+admission_permit_hold_seconds{class="health",quantile="0.9"} 0.0029708712340214428
+admission_permit_hold_seconds{class="health",quantile="0.95"} 0.0029708712340214428
+admission_permit_hold_seconds{class="health",quantile="0.99"} 0.0029708712340214428
+admission_permit_hold_seconds{class="health",quantile="0.999"} 0.0029708712340214428
+admission_permit_hold_seconds{class="health",quantile="1"} 0.002971035
+admission_permit_hold_seconds_sum{class="health"} 0.002971035
+admission_permit_hold_seconds_count{class="health"} 1
+
+# TYPE admission_permit_hold_by_endpoint_seconds summary
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0"} 0.002971035
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.5"} 0.0029708712340214428
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.9"} 0.0029708712340214428
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.95"} 0.0029708712340214428
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.99"} 0.0029708712340214428
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.999"} 0.0029708712340214428
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="1"} 0.002971035
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/healthz"} 0.002971035
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/healthz"} 1
+
+

@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # HelloDoctor security integration acceptance — 20 October 2026
 
 Current source revision: `dca9b3c5fcdb6303d31abbb77d3a1fd4ac1f879f` with a dirty worktree. Evidence is synthetic and local. The security-audit workflow was applied, but this Windows session cannot provide the skill’s full OS-enforced target sandbox; no external or production endpoint was contacted.

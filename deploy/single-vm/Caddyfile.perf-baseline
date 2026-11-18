@@ -1,0 +1,23 @@
+# Performance-assurance proxy config (compose.perf-baseline.yml). Plain HTTP,
+# no access log (per-request logging would add load-generator-driven I/O the
+# production Caddyfile does not do at this volume).
+{
+    admin off
+    auto_https off
+}
+
+http://api.localhost {
+    reverse_proxy backend:8080
+}
+
+http://admin.localhost {
+    reverse_proxy admin-web:3000
+}
+
+http://doctor.localhost {
+    reverse_proxy doctor-web:3000
+}
+
+http://:8081 {
+    respond /healthz 200
+}

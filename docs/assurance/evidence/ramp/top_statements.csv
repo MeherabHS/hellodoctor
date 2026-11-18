@@ -1,0 +1,20 @@
+﻿125790,223550.0,1.78,23.4,SELECT * FROM doctor_public_directory WHERE professional_verification_status=$5 AND ($1::text IS NULL OR ($1=$6 AND ($4::bool OR consultation_fee_video > $7)) O
+21529,47739.2,2.22,15.2,SELECT doctor_user_id, doctor_language, patient_user_id, patient_language FROM appointment_notification_recipients($1)
+67357,41925.7,0.62,12.7,SELECT id, doctor_id, start_time, end_time, status, created_at FROM doctor_schedule_slots WHERE doctor_id = $1 AND status = $2 AND start_time > clock_timestamp(
+1496641,21642.1,0.01,9.1,SELECT p.id FROM public.peer_profiles p WHERE p.user_id = NULLIF(current_setting($1, $2), $3)::uuid
+3672,17726.3,4.83,36.3,SELECT s.id, s.peer_id, s.start_time, s.end_time, s.status FROM peer_slots s JOIN peer_profiles p ON p.id = s.peer_id AND p.approval_status = $2 WHERE s.peer_id
+8999,15530.7,1.73,15.6,SELECT * FROM doctor_public_directory ORDER BY full_name
+21529,13537.7,0.63,12.1,SELECT d.user_id, du.preferred_language, COALESCE(p.user_id, g.user_id), COALESCE(pu.preferred_language, gu.preferred_language) FROM appointm
+7462,12500.1,1.68,14.8,SELECT p.id, p.full_name, p.county, p.organization, p.bio, (SELECT min(s.start_time) FROM peer_slots s WHERE s.peer_id = p.id AND s.status = $1 AND s.start_time
+16697,10799.0,0.65,9.2,INSERT INTO consultation_trace_events(appointment_id,conversation_id,actor_role,event_type,resource_type,resource_id,result,reason_code,safe_metadata,client_typ
+11809,8773.0,0.74,12.5,INSERT INTO consultation_telemetry (id, session_id, call_duration_seconds, connection_state, packet_loss_percent, round_trip_time_ms, premature_end, prescriptio
+347732,7433.5,0.02,14.5,SELECT s.id,u.role::text,k.key_thumbprint FROM auth_sessions s JOIN users u ON u.id=s.user_id LEFT JOIN auth_session_device_keys k ON k.token_family_id=s.token_
+2268,7220.5,3.18,25.8,SELECT c.id, c.request_id, r.patient_display_name AS counterpart_name, r.support_type, r.status AS request_status, s.start_time, s.end_time, c.last_message_at, 
+43058,7144.4,0.17,5.9,INSERT INTO consultation_trace_events(appointment_id,conversation_id,actor_role,event_type,resource_type,resource_id,result,reason_code,safe_metadata,client_typ
+43058,6902.1,0.16,5.8,INSERT INTO notifications (id, user_id, type, title, body, related_entity_type, related_entity_id, scheduled_for, dedup_key, metadata, ttl_seconds) VALUES ($1,$
+44156,5474.8,0.12,8.2,SELECT EXISTS(SELECT $2 FROM appointments a JOIN doctor_profiles d ON d.id=a.doctor_id WHERE a.id=p_appointment AND ( current_setting($3,$4)=$5 OR (curr
+21529,5386.4,0.25,12.9,INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, complete
+8999,5340.5,0.59,6.8,SELECT id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, completed_at, created_at, u
+274411,4878.0,0.02,4.4,SELECT set_config($5,COALESCE((SELECT id::text FROM patient_profiles WHERE user_id=$1 AND $2=$6),$7),$8), set_config($9,COALESCE((SELECT id::text FROM doctor_pr
+8999,4495.2,0.50,7.9,SELECT id, user_id, full_name, date_of_birth, gender, blood_group, weight_kg, emergency_contact_phone, emergency_contact_relation, guardian_patient_id, relation
+5926,4441.1,0.75,11.1,INSERT INTO chat_messages (id, conversation_id, sender_id, content, attachment_bucket, attachment_object_key, attachment_mime, attachment_size, attachment_hash,

@@ -1,0 +1,51 @@
+﻿[
+    {
+        "container":  "hellodoctor-perf-baseline-azurite-1",
+        "memory_peak_bytes":  "65904640",
+        "memory_max_bytes":  "2147483648",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-backend-1",
+        "memory_peak_bytes":  "107630592",
+        "memory_max_bytes":  "1610612736",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-proxy-1",
+        "memory_peak_bytes":  "38912000",
+        "memory_max_bytes":  "134217728",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-admin-web-1",
+        "memory_peak_bytes":  "171200512",
+        "memory_max_bytes":  "469762048",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-doctor-web-1",
+        "memory_peak_bytes":  "104173568",
+        "memory_max_bytes":  "402653184",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-postgres-1",
+        "memory_peak_bytes":  "1440968704",
+        "memory_max_bytes":  "3221225472",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-redis-1",
+        "memory_peak_bytes":  "19783680",
+        "memory_max_bytes":  "402653184",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    }
+]

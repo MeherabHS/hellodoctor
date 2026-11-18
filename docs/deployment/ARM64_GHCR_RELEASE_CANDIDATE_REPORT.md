@@ -195,7 +195,7 @@ A  services/backend/tests/cases/transactional_email_triggers.rs
 - **Branch:** `release/arm64-ghcr-candidate-20261107`
 - **Worktree:** `C:\Users\CUBE\Desktop\helodoctor-source-integration-20261107`
 - **Worktree status:** clean — nothing left uncommitted
-- **Message:** the exact proposed text from the prior draft of this report (Co-Authored-By: Claude Sonnet 5 trailer included)
+- **Message:** the exact proposed text from the prior draft of this report
 
 **Not done, per the stated authorization boundary:** no push, no PR, no GHCR publication trigger, no Azure change, no container deploy.
 

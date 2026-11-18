@@ -1,0 +1,44 @@
+﻿[
+    {
+        "container":  "hellodoctor-perf-baseline-proxy-1",
+        "memory_peak_bytes":  "34480128",
+        "memory_max_bytes":  "134217728",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-admin-web-1",
+        "memory_peak_bytes":  "55808000",
+        "memory_max_bytes":  "469762048",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-doctor-web-1",
+        "memory_peak_bytes":  "52293632",
+        "memory_max_bytes":  "402653184",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-backend-1",
+        "memory_peak_bytes":  "82702336",
+        "memory_max_bytes":  "1610612736",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-postgres-1",
+        "memory_peak_bytes":  "1054543872",
+        "memory_max_bytes":  "3221225472",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    },
+    {
+        "container":  "hellodoctor-perf-baseline-redis-1",
+        "memory_peak_bytes":  "17395712",
+        "memory_max_bytes":  "402653184",
+        "oom":  "oom_kill 0",
+        "restart_count":  "0"
+    }
+]

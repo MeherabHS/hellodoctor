@@ -1,4 +1,4 @@
-<#
+﻿<#
   Milestone 8.0 full-telemetry sampler (2026-10-31). Captures, every
   IntervalSecs for DurationSecs, in one combined CSV correlated by
   timestamp: per-container CPU/memory (same cgroup-counter-delta method as
@@ -131,8 +131,11 @@ $prevRejected["rejPaymentLaneRate"] = Get-MetricValue $primeRaw 'admission_rejec
 $prevRejected["rejNormalLaneConc"] = Get-MetricValue $primeRaw 'admission_rejected_total\{class="normal",reason="lane_concurrency"\}'
 $prevRejected["rejNormalDepPressure"] = Get-MetricValue $primeRaw 'admission_rejected_total\{class="normal",reason="dependency_pressure"\}'
 
-$elapsed = 0
-while ($elapsed -lt $DurationSecs) {
+# Wall-clock pacing (2026-11-17): each tick's docker exec/psql/redis reads take
+# 1-2 s, so sleeping a fixed IntervalSecs drifted ~15% past DurationSecs and
+# away from a true 10 s cadence. Sleep only the remainder of each interval.
+$deadline = (Get-Date).AddSeconds($DurationSecs)
+while ((Get-Date) -lt $deadline) {
     $now = Get-Date
     $ts = $now.ToUniversalTime().ToString("o")
 
@@ -220,7 +223,8 @@ while ($elapsed -lt $DurationSecs) {
     ) -join ","
     Add-Content -Path $OutFile -Value $row
 
-    Start-Sleep -Seconds $IntervalSecs
-    $elapsed += $IntervalSecs
+    $spent = ((Get-Date) - $now).TotalMilliseconds
+    $rest = [math]::Max(0, $IntervalSecs * 1000 - $spent)
+    Start-Sleep -Milliseconds ([int]$rest)
 }
 Write-Host "Wrote full telemetry to $OutFile"

@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Post Implementation Security Acceptance — 20 October 2026
 
 Updated from **executed local development verification**, 19–20 October 2026. This is not formal sandbox certification or production acceptance. The owner authorized local toolchains/disposable services and froze original application source, tests, assertions, configuration and the security skill. Only new fixture/evidence files and these reports were changed.

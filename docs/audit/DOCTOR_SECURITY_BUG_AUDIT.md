@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](../assurance/README.md).
+
 # Doctor App — Bug / Security / Concurrency Audit (Agent B)
 
 Date: 2026-10-06/07. Independent adversarial audit against the live `cargo run`

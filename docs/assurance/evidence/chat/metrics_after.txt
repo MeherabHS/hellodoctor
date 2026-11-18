@@ -1,0 +1,253 @@
+﻿# TYPE admission_accepted_total counter
+admission_accepted_total{class="payment"} 2000
+admission_accepted_total{class="health"} 130
+admission_accepted_total{class="consultation"} 33057
+
+# TYPE admission_rejected_total counter
+admission_rejected_total{class="consultation",reason="shared_class_budget"} 11
+admission_rejected_total{class="consultation",reason="lane_rate_limit"} 54943
+admission_rejected_total{class="consultation",reason="lane_concurrency"} 933
+
+# TYPE http_requests_total counter
+http_requests_total{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200"} 24797
+http_requests_total{method="GET",path="/healthz",status="200"} 64
+http_requests_total{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503"} 211
+http_requests_total{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429"} 41219
+http_requests_total{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503"} 722
+http_requests_total{method="GET",path="/metrics",status="200"} 65
+http_requests_total{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201"} 8249
+http_requests_total{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429"} 13735
+http_requests_total{method="POST",path="/api/v1/appointments/book",status="201"} 2000
+
+# TYPE admission_inflight gauge
+admission_inflight{class="health"} 1
+admission_inflight{class="consultation"} 0
+admission_inflight{class="payment"} 0
+
+# TYPE db_pool_idle gauge
+db_pool_idle{role="payment"} 1
+db_pool_idle{role="api"} 6
+db_pool_idle{role="finance"} 0
+db_pool_idle{role="auth"} 6
+
+# TYPE db_pool_size gauge
+db_pool_size{role="payment"} 1
+db_pool_size{role="finance"} 0
+db_pool_size{role="api"} 6
+db_pool_size{role="auth"} 6
+
+# TYPE db_acquire_seconds summary
+db_acquire_seconds{quantile="0"} 0.000118174
+db_acquire_seconds{quantile="0.5"} 0.000333022656856248
+db_acquire_seconds{quantile="0.9"} 0.0007145196714903996
+db_acquire_seconds{quantile="0.95"} 0.0009150791183162916
+db_acquire_seconds{quantile="0.99"} 0.0014889262942117878
+db_acquire_seconds{quantile="0.999"} 0.002687080408651075
+db_acquire_seconds{quantile="1"} 0.003247299
+db_acquire_seconds_sum 15.7320595589999
+db_acquire_seconds_count 47178
+
+# TYPE admission_redis_check_seconds summary
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.5"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.9"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.95"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.99"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="0.999"} 0
+admission_redis_check_seconds{class="payment",check="shared_class_budget",quantile="1"} 0
+admission_redis_check_seconds_sum{class="payment",check="shared_class_budget"} 0.9126879569999995
+admission_redis_check_seconds_count{class="payment",check="shared_class_budget"} 2000
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0"} 0.000207691
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.5"} 0.0005137878965779633
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.9"} 0.0009307684448056646
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.95"} 0.0011898833195713922
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.99"} 0.001982294977895119
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="0.999"} 0.002638617891676183
+admission_redis_check_seconds{class="consultation",check="shared_class_budget",quantile="1"} 0.00403907
+admission_redis_check_seconds_sum{class="consultation",check="shared_class_budget"} 17.186772274000077
+admission_redis_check_seconds_count{class="consultation",check="shared_class_budget"} 33057
+
+# TYPE sqlx_pool_acquire_wait_seconds summary
+sqlx_pool_acquire_wait_seconds{quantile="0"} 0.000062372
+sqlx_pool_acquire_wait_seconds{quantile="0.5"} 0.0001665358370775638
+sqlx_pool_acquire_wait_seconds{quantile="0.9"} 0.0003642391023481674
+sqlx_pool_acquire_wait_seconds{quantile="0.95"} 0.000512351302632854
+sqlx_pool_acquire_wait_seconds{quantile="0.99"} 0.0009960630212450428
+sqlx_pool_acquire_wait_seconds{quantile="0.999"} 0.002311866608244715
+sqlx_pool_acquire_wait_seconds{quantile="1"} 0.004096517
+sqlx_pool_acquire_wait_seconds_sum 15.808271590999935
+sqlx_pool_acquire_wait_seconds_count 90499
+
+# TYPE admission_permit_hold_by_endpoint_seconds summary
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0"} 0.001022818
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.5"} 0.0011501073104108455
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.9"} 0.0012032849216759276
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.95"} 0.0012032849216759276
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.99"} 0.0012032849216759276
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.999"} 0.0012032849216759276
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="1"} 0.001558346
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/healthz"} 0.079185928
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/healthz"} 64
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0"} 0.005407983
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.5"} 0.0060330655035837925
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.9"} 0.007620601150479109
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.95"} 0.007620601150479109
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.99"} 0.007620601150479109
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="0.999"} 0.007620601150479109
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/metrics",quantile="1"} 0.008506095
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/metrics"} 0.3807990280000001
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/metrics"} 65
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.5"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.9"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.95"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.99"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="0.999"} 0
+admission_permit_hold_by_endpoint_seconds{class="payment",endpoint="/api/v1/appointments/book",quantile="1"} 0
+admission_permit_hold_by_endpoint_seconds_sum{class="payment",endpoint="/api/v1/appointments/book"} 46.103669558000064
+admission_permit_hold_by_endpoint_seconds_count{class="payment",endpoint="/api/v1/appointments/book"} 2000
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quantile="0"} 0.003059568
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quantile="0.5"} 0.006124243612676535
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quantile="0.9"} 0.013016987816434053
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quantile="0.95"} 0.014360124878229514
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quantile="0.99"} 0.019457940931385233
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quantile="0.999"} 0.08823954917809929
+admission_permit_hold_by_endpoint_seconds{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages",quantile="1"} 0.091840982
+admission_permit_hold_by_endpoint_seconds_sum{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages"} 214.72008177499973
+admission_permit_hold_by_endpoint_seconds_count{class="consultation",endpoint="/api/v1/chat/:conversation_id/messages"} 33057
+
+# TYPE chat_send_message_transaction_seconds summary
+chat_send_message_transaction_seconds{quantile="0"} 0.005379619
+chat_send_message_transaction_seconds{quantile="0.5"} 0.007654205671383947
+chat_send_message_transaction_seconds{quantile="0.9"} 0.010016715611465273
+chat_send_message_transaction_seconds{quantile="0.95"} 0.011293815319610604
+chat_send_message_transaction_seconds{quantile="0.99"} 0.017620363680760563
+chat_send_message_transaction_seconds{quantile="0.999"} 0.0855631984271608
+chat_send_message_transaction_seconds{quantile="1"} 0.085596882
+chat_send_message_transaction_seconds_sum 63.63901906499996
+chat_send_message_transaction_seconds_count 8249
+
+# TYPE http_request_duration_seconds summary
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0"} 0.001146803
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.5"} 0.001292340934589551
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.9"} 0.001328240656529371
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.95"} 0.001328240656529371
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.99"} 0.001328240656529371
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.999"} 0.001328240656529371
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="1"} 0.001675841
+http_request_duration_seconds_sum{method="GET",path="/healthz",status="200"} 0.08686910299999999
+http_request_duration_seconds_count{method="GET",path="/healthz",status="200"} 64
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0"} 0.005541428
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.5"} 0.006164797300615797
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.9"} 0.007774547506046523
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.95"} 0.007774547506046523
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.99"} 0.007774547506046523
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="0.999"} 0.007774547506046523
+http_request_duration_seconds{method="GET",path="/metrics",status="200",quantile="1"} 0.00864775
+http_request_duration_seconds_sum{method="GET",path="/metrics",status="200"} 0.38909500500000005
+http_request_duration_seconds_count{method="GET",path="/metrics",status="200"} 65
+http_request_duration_seconds{method="POST",path="/api/v1/appointments/book",status="201",quantile="0"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/appointments/book",status="201",quantile="0.5"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/appointments/book",status="201",quantile="0.9"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/appointments/book",status="201",quantile="0.95"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/appointments/book",status="201",quantile="0.99"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/appointments/book",status="201",quantile="0.999"} 0
+http_request_duration_seconds{method="POST",path="/api/v1/appointments/book",status="201",quantile="1"} 0
+http_request_duration_seconds_sum{method="POST",path="/api/v1/appointments/book",status="201"} 46.357677921000096
+http_request_duration_seconds_count{method="POST",path="/api/v1/appointments/book",status="201"} 2000
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201",quantile="0"} 0.008871133
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201",quantile="0.5"} 0.012369765874434889
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201",quantile="0.9"} 0.015652885236053515
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201",quantile="0.95"} 0.01789739659361947
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201",quantile="0.99"} 0.02459283798261676
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201",quantile="0.999"} 0.09184067350669026
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201",quantile="1"} 0.091965596
+http_request_duration_seconds_sum{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201"} 96.04442912700014
+http_request_duration_seconds_count{method="POST",path="/api/v1/chat/:conversation_id/messages",status="201"} 8249
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200",quantile="0"} 0.003175663
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200",quantile="0.5"} 0.0055492082319337525
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200",quantile="0.9"} 0.00781820710500598
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200",quantile="0.95"} 0.008525445314410532
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200",quantile="0.99"} 0.010749457184917113
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200",quantile="0.999"} 0.013298553362590348
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200",quantile="1"} 0.013525138
+http_request_duration_seconds_sum{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200"} 122.88581464799991
+http_request_duration_seconds_count{method="GET",path="/api/v1/chat/:conversation_id/messages",status="200"} 24797
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0"} 0.000038771
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.5"} 0.00008475888018470906
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.9"} 0.00016084007106205496
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.95"} 0.0002199082744053675
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.99"} 0.00043808393620467935
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.999"} 0.0013910449844365676
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="1"} 0.00159232
+http_request_duration_seconds_sum{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429"} 1.4653851130000175
+http_request_duration_seconds_count{method="POST",path="/api/v1/chat/:conversation_id/messages",status="429"} 13735
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0"} 0.000039932
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.5"} 0.000084016274294801
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.9"} 0.00015756065949647517
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.95"} 0.00023345994603917225
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.99"} 0.0005429463585767047
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="0.999"} 0.001277947469935602
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429",quantile="1"} 0.001988416
+http_request_duration_seconds_sum{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429"} 4.301997688000034
+http_request_duration_seconds_count{method="GET",path="/api/v1/chat/:conversation_id/messages",status="429"} 41219
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0"} 0.000051842
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.5"} 0.00008730524330510102
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.9"} 0.00015781295833775996
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.95"} 0.0002977965472227941
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.99"} 0.0006083865958160762
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.999"} 0.0008351493150954225
+http_request_duration_seconds{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="1"} 0.000953237
+http_request_duration_seconds_sum{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503"} 0.09205635799999998
+http_request_duration_seconds_count{method="GET",path="/api/v1/chat/:conversation_id/messages",status="503"} 722
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0"} 0.000052972
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.5"} 0.00008756755230265539
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.9"} 0.0001632382065505755
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.95"} 0.00023538218802428935
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.99"} 0.00041746909893577343
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="0.999"} 0.00041746909893577343
+http_request_duration_seconds{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503",quantile="1"} 0.000450397
+http_request_duration_seconds_sum{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503"} 0.024446296000000003
+http_request_duration_seconds_count{method="POST",path="/api/v1/chat/:conversation_id/messages",status="503"} 211
+
+# TYPE admission_permit_hold_seconds summary
+admission_permit_hold_seconds{class="health",quantile="0"} 0.001022818
+admission_permit_hold_seconds{class="health",quantile="0.5"} 0.005407869765256665
+admission_permit_hold_seconds{class="health",quantile="0.9"} 0.007620601150479109
+admission_permit_hold_seconds{class="health",quantile="0.95"} 0.007620601150479109
+admission_permit_hold_seconds{class="health",quantile="0.99"} 0.007620601150479109
+admission_permit_hold_seconds{class="health",quantile="0.999"} 0.007620601150479109
+admission_permit_hold_seconds{class="health",quantile="1"} 0.008506095
+admission_permit_hold_seconds_sum{class="health"} 0.4599849560000001
+admission_permit_hold_seconds_count{class="health"} 129
+admission_permit_hold_seconds{class="payment",quantile="0"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.5"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.9"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.95"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.99"} 0
+admission_permit_hold_seconds{class="payment",quantile="0.999"} 0
+admission_permit_hold_seconds{class="payment",quantile="1"} 0
+admission_permit_hold_seconds_sum{class="payment"} 46.103669558000064
+admission_permit_hold_seconds_count{class="payment"} 2000
+admission_permit_hold_seconds{class="consultation",quantile="0"} 0.003059568
+admission_permit_hold_seconds{class="consultation",quantile="0.5"} 0.006124243612676535
+admission_permit_hold_seconds{class="consultation",quantile="0.9"} 0.013016987816434053
+admission_permit_hold_seconds{class="consultation",quantile="0.95"} 0.014360124878229514
+admission_permit_hold_seconds{class="consultation",quantile="0.99"} 0.019457940931385233
+admission_permit_hold_seconds{class="consultation",quantile="0.999"} 0.08823954917809929
+admission_permit_hold_seconds{class="consultation",quantile="1"} 0.091840982
+admission_permit_hold_seconds_sum{class="consultation"} 214.72008177499973
+admission_permit_hold_seconds_count{class="consultation"} 33057
+
+# TYPE chat_advisory_lock_wait_seconds summary
+chat_advisory_lock_wait_seconds{quantile="0"} 0.000084634
+chat_advisory_lock_wait_seconds{quantile="0.5"} 0.00016780633120597023
+chat_advisory_lock_wait_seconds{quantile="0.9"} 0.00039370839727023065
+chat_advisory_lock_wait_seconds{quantile="0.95"} 0.0005924168515313773
+chat_advisory_lock_wait_seconds{quantile="0.99"} 0.0011436847095180247
+chat_advisory_lock_wait_seconds{quantile="0.999"} 0.0019411008355898216
+chat_advisory_lock_wait_seconds{quantile="1"} 0.00349504
+chat_advisory_lock_wait_seconds_sum 1.569932834000002
+chat_advisory_lock_wait_seconds_count 8249
+
+
