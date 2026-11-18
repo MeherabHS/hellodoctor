@@ -178,8 +178,8 @@ Labels used:
   - Selecting file invokes `handlePatientFileSelection(e)`:
     - Enforces `MAX_PRESCRIPTION_IMAGES = 5` **as literally coded in the `index.html` prototype
       source**, retained here as historical/original reference. **Production correction:** the
-      actual backend/Doctor-Web cap is now 20 images per consultation at 40 KB each
-      (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`, `MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024`) —
+      actual backend/Doctor-Web cap is now 20 images per consultation at 600 KB each
+      (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`, `MAX_PRESCRIPTION_IMAGE_BYTES = 600 * 1024`) —
       see docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md. The prototype file itself was not
       changed by that update.
     - Triggers warning toast if user selects > the cap.

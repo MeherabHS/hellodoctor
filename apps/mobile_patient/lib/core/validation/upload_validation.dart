@@ -9,10 +9,10 @@ import 'dart:typed_data';
 const int kPatientMaxImagesPerConsultation = 20;
 const int kPatientMinImagesPerConsultation = 1;
 
-/// Deliberately does NOT replicate the backend's 40KB-per-image compression
+/// Deliberately does NOT replicate the backend's per-image compression
 /// math here. `services/backend/src/services/upload_security_service.rs`
 /// already guarantees every accepted image independently fits
-/// `MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024` bytes server-side, and never
+/// `MAX_PRESCRIPTION_IMAGE_BYTES = 600 * 1024` bytes server-side, and never
 /// rejects an upload for being hard to compress — only for genuinely invalid
 /// content (wrong magic bytes, dangerous PDF markers). Client-side logic only
 /// needs to produce accurate "1 to 20 photos" copy and a count/mime

@@ -191,7 +191,8 @@ class _PatientChatPageState extends State<PatientChatPage> {
     if (source == null || !mounted) return;
     final XFile? file;
     try {
-      file = await ImagePicker().pickImage(source: source, imageQuality: 85);
+      file = await ImagePicker().pickImage(
+          source: source, imageQuality: 85, maxWidth: 2000, maxHeight: 2000);
     } catch (_) {
       if (mounted) _attachProblem(l10n.chatAttachInvalid);
       return;

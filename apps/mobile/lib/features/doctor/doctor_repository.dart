@@ -598,7 +598,7 @@ class DoctorRepository {
     }
   }
 
-  /// Compression/resizing and the 40KB ceiling are entirely server-side
+  /// Compression and the profile-picture ceiling (40 KB) are server-side
   /// (`UploadSecurityService`) — this client sends the picked image's bytes
   /// unmodified, the same "server is the sole source of truth on size"
   /// choice already made for Rx-photo uploads.

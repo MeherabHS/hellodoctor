@@ -3621,8 +3621,8 @@ class _ChatThreadState extends State<ChatThreadPage> {
   /// clinical photo is not left in a generic disk cache.
   Future<void> _attachPhoto(ImageSource source) async {
     try {
-      final file =
-          await ImagePicker().pickImage(source: source, imageQuality: 85);
+      final file = await ImagePicker().pickImage(
+          source: source, imageQuality: 85, maxWidth: 2000, maxHeight: 2000);
       if (file == null || !mounted) return;
       final name = file.name.toLowerCase();
       final png = name.endsWith('.png');
@@ -4177,9 +4177,11 @@ class _ScannerState extends State<ScannerPage> {
     final picker = ImagePicker();
     final List<XFile> selected;
     if (source == ImageSource.gallery) {
-      selected = await picker.pickMultiImage(imageQuality: 85);
+      selected = await picker.pickMultiImage(
+          imageQuality: 85, maxWidth: 2000, maxHeight: 2000);
     } else {
-      final one = await picker.pickImage(source: source, imageQuality: 85);
+      final one = await picker.pickImage(
+          source: source, imageQuality: 85, maxWidth: 2000, maxHeight: 2000);
       selected = one == null ? <XFile>[] : [one];
     }
     if (selected.isEmpty || !mounted) return;

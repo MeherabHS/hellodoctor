@@ -14,7 +14,7 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Q:** *What is the doctor earnings platform charge?*  
   **A:** **Strictly 20% withheld platform charge**, displayed via a 3-tier calculation ($G \to C \to N$) with mandatory basis note.
 - **Q:** *How many prescriptions can a patient upload?*  
-  **A:** **1 to 20 images maximum per consultation** (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`), each independently compressed to at most 40 KB (`MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024`), never a shared/divided batch budget. See docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md.
+  **A:** **1 to 20 images maximum per consultation** (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`), each independently compressed to at most 600 KB (`MAX_PRESCRIPTION_IMAGE_BYTES = 600 * 1024`; 40 KB until 2026-11-18), never a shared/divided batch budget. See docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md.
 - **Q:** *Where is the emergency call button placed?*  
   **A:** **Directly above Upcoming Consultation** on `view-0`, labeled "Emergency Contact" (no "24/7" prefix), dialing `16263` (or local equivalent).
 - **Q:** *What languages are supported?*  

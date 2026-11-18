@@ -23,7 +23,7 @@ export function Rx({profile,appointments,appointment,pages,setPages,select,actio
     try {
       for(let index=0;index<files.length;index++){
         if(!isCurrent())break;
-        setPreparing(`Compressing photo ${index+1} of ${files.length} to 40 KB or less...`);
+        setPreparing(`Compressing photo ${index+1} of ${files.length} to 600 KB or less...`);
         try {
           const file=await compressRxPhoto(files[index],isCurrent);
           if(!isCurrent())break;
@@ -38,7 +38,7 @@ export function Rx({profile,appointments,appointment,pages,setPages,select,actio
     if(!appointment||lock.current||preparingLock.current)return;lock.current=true;setBusy(true);setError('');
     const version=runtimeGeneration();
     try {
-      await uploadPrescriptionPages(pageRef.current,notes,only,async (page,progress)=>{if(page.file.size>RX_PAGE_MAX_BYTES)throw new ApiError(422,'PHOTO_TOO_LARGE','This photo exceeds 40 KB. Remove it and select it again to compress.');const image=await base64(page.file);if(version!==runtimeGeneration())throw new DOMException('Session changed','AbortError');return uploadPrescription<RecordDto>(appointment.id,{base64_photo:image,doctor_notes:page.uploadNotes,mime_type:page.file.type},page.requestKey,progress);},setPages,()=>version===runtimeGeneration(),errorText);
+      await uploadPrescriptionPages(pageRef.current,notes,only,async (page,progress)=>{if(page.file.size>RX_PAGE_MAX_BYTES)throw new ApiError(422,'PHOTO_TOO_LARGE','This photo exceeds 600 KB. Remove it and select it again to compress.');const image=await base64(page.file);if(version!==runtimeGeneration())throw new DOMException('Session changed','AbortError');return uploadPrescription<RecordDto>(appointment.id,{base64_photo:image,doctor_notes:page.uploadNotes,mime_type:page.file.type},page.requestKey,progress);},setPages,()=>version===runtimeGeneration(),errorText);
     } catch(e){if(!(e instanceof DOMException&&e.name==='AbortError'))setError(errorText(e));} finally {lock.current=false;setBusy(false);}
   }
   function remove(page:RxPage){if(busy||preparingLock.current||page.state==='UPLOADED')return;URL.revokeObjectURL(page.preview);setPages(pages.filter(p=>p.key!==page.key));setFocused(0);}
@@ -48,7 +48,7 @@ export function Rx({profile,appointments,appointment,pages,setPages,select,actio
   const stateTone:Record<RxPage['state'],'slate'|'blue'|'green'|'red'>={LOCAL:'slate',UPLOADING:'blue',UPLOADED:'green',FAILED:'red'};
   const stateLabel:Record<RxPage['state'],string>={LOCAL:'Ready to send',UPLOADING:'Uploading',UPLOADED:'Sent',FAILED:'Failed'};
   return <section id="webRxWorkspace" className="am-stack" style={{gap:22}}>
-    <PageHeader title="Prescription (Rx)" subtitle="Photograph or scan your handwritten prescription. 1 to 5 pages, each compressed to 40 KB or less." back={{label:'Consultation room',onClick:back}}>
+    <PageHeader title="Prescription (Rx)" subtitle="Photograph or scan your handwritten prescription. 1 to 5 pages, each compressed to 600 KB or less." back={{label:'Consultation room',onClick:back}}>
       <Badge tone="green">{pages.length}/5 pages</Badge>
     </PageHeader>
     <div className="am-grid main-side" style={{alignItems:'start'}}>
@@ -63,7 +63,7 @@ export function Rx({profile,appointments,appointment,pages,setPages,select,actio
             <button className="am-rx-thumb" aria-label={`Preview prescription page ${index+1}`} onClick={()=>setFocused(index)}><img src={p.preview} alt={`Prescription page ${index+1}`}/></button>
             <figcaption>
               <div className="am-row between"><strong className="am-strong">Page {index+1}</strong><Badge tone={stateTone[p.state]}>{p.state==='UPLOADED'?'Server confirmed':stateLabel[p.state]}</Badge></div>
-              <span className="am-faint">{Math.ceil(p.file.size/1024)} KB of 40 KB{p.originalBytes!==undefined&&` · was ${Math.ceil(p.originalBytes/1024)} KB`}</span>
+              <span className="am-faint">{Math.ceil(p.file.size/1024)} KB of 600 KB{p.originalBytes!==undefined&&` · was ${Math.ceil(p.originalBytes/1024)} KB`}</span>
               {p.state==='UPLOADING'&&<><progress className="am-meter" max={100} value={p.uploadProgress==null?undefined:p.uploadProgress*100} aria-label={`Uploading prescription page ${index+1}`}/><span className="am-faint" role="status">{p.uploadProgress==null?'Preparing upload…':p.uploadProgress>=1?'Waiting for server confirmation…':`${Math.floor(p.uploadProgress*100)}% sent`}</span></>}
               {p.error&&<p role="alert" className="am-error-text">{p.error}</p>}
               <div className="am-row" style={{gap:6}}>{p.state==='FAILED'&&<button className="am-btn soft sm" disabled={disabled} onClick={()=>void upload(p.key)}>Retry</button>}{p.state!=='UPLOADED'&&<button className="am-btn danger sm" disabled={disabled} onClick={()=>remove(p)}><Icon name="trash" size={14}/>Remove</button>}</div>

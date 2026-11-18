@@ -60,9 +60,11 @@
    - Doctor earnings must always be computed and presented using the 3-step formula:
      $$\text{Gross Earnings} \longrightarrow \text{20\% Withheld Platform Charge} \longrightarrow \text{Final Net Take-Home}$$
    - The mandatory note: *"Total calculation is based including the platform charge 20%"* must be rendered on all earnings views, **except** Doctor Web's Earnings page and Statement, which omit it intentionally (changed 2026-11-14 by product-owner instruction; the Doctor Web dashboard, Doctor mobile and Admin Web keep it).
-3. **Multi-Prescription Upload Cap (1 to 20 Images, 40 KB Per Image)**:
+3. **Multi-Prescription Upload Cap (1 to 20 Images, 600 KB Per Image) (changed 2026-11-18 by product-owner instruction; was 40 KB)**:
    - Patient pre-consultation intake allows uploading between 1 and 20 prescription/lab photos per consultation (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`), scoped to the current consultation only (never lifetime/account-wide, never summed across consultations). Selections beyond 20 must be rejected or capped with user notification.
-   - Every prescription/Rx image (Patient intake and Doctor Rx alike) is compressed toward its OWN independent `MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024` (40 KB) ceiling — never a shared/batch budget divided by image count. This bounds Patient aggregate per-consultation storage at 20 × 40 KB = 800 KB.
+   - Every prescription/Rx image (Patient intake and Doctor Rx alike, and chat, peer-chat and verification images) is compressed toward its OWN independent `MAX_PRESCRIPTION_IMAGE_BYTES = 600 * 1024` (600 KB) ceiling — never a shared/batch budget divided by image count. 40 KB made prescription photos unreadable. This bounds Patient aggregate per-consultation storage at 20 × 600 KB = 12 MB.
+   - Profile pictures keep their own 40 KB ceiling (`MAX_PROFILE_PICTURE_BYTES`).
+   - The mobile apps' image pickers resize photos to at most 2000 px (the server's own maximum) before upload, so uploads stay small and fast on mobile data; the server remains the size authority.
    - The Doctor's own Rx page-count cap (5 pages per appointment) is a separate, unrelated limit and is unaffected by this item.
 4. **Patient Home and Emergency Contact (changed 2026-11-12 and 2026-11-13 by product-owner instruction)**:
    - The Patient Home dashboard has no Emergency Contact banner and no search field (search removed 2026-11-17 by product-owner instruction). Its layout is: header, greeting, the Upcoming Consultation card (see below), the hero banner, the 3 x 3 grid of nine modules and the bottom navigation, with the grid sized so all nine modules fit on screen without scrolling on ordinary phones.

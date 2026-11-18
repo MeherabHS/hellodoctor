@@ -1,8 +1,9 @@
 // Match the current server's single-page budget and resizing policy. The server
 // still validates/sanitizes the image; browser compression only reduces transfer.
-export const RX_PAGE_MAX_BYTES = 40 * 1024;
+// Changed 2026-11-18 (product owner): 600 KB per image; 40 KB was unreadable.
+export const RX_PAGE_MAX_BYTES = 600 * 1024;
 export const RX_SOURCE_MAX_BYTES = 10 * 1024 * 1024;
-const qualities = [0.8, 0.65, 0.5, 0.35, 0.2, 0.05, 0.01];
+const qualities = [0.85, 0.8, 0.75, 0.7, 0.6, 0.5, 0.35, 0.2, 0.05, 0.01];
 
 export async function encodeWithinRxBudget(width: number, height: number, mime: string,
   encode: (width: number, height: number, quality: number) => Promise<Blob>,
@@ -21,7 +22,7 @@ export async function encodeWithinRxBudget(width: number, height: number, mime: 
       if (blob.size > 0 && blob.size <= RX_PAGE_MAX_BYTES && blob.type === mime) return blob;
       if (!blob.size || blob.type !== mime) throw new Error('Unable to compress this photo. Choose another JPEG or PNG.');
     }
-    if (edge <= 8) throw new Error('Unable to fit this photo within 40 KB. Choose another photo.');
+    if (edge <= 8) throw new Error('Unable to fit this photo within 600 KB. Choose another photo.');
     edge = Math.max(8, Math.floor(edge / 2));
   }
 }

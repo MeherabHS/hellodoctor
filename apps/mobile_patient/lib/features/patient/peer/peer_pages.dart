@@ -1023,8 +1023,8 @@ class _PatientPeerChatPageState extends State<PatientPeerChatPage> {
   /// Camera or gallery; the picker's own copy is deleted once read.
   Future<(Uint8List, String)?> _pick(ImageSource source) async {
     final l = AppLocalizations.of(context);
-    final file =
-        await ImagePicker().pickImage(source: source, imageQuality: 85);
+    final file = await ImagePicker().pickImage(
+        source: source, imageQuality: 85, maxWidth: 2000, maxHeight: 2000);
     if (file == null) return null;
     final name = file.name.toLowerCase();
     final mime = name.endsWith('.png')

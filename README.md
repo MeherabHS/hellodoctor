@@ -245,7 +245,7 @@ Step-by-step procedures: [Azure VM operator runbook](docs/deployment/AZURE_VM_OP
 | Video join refused | Outside the consultation's join window | Joining opens shortly before the start time; check server time, not device time |
 | No push notification | FCM not configured, permission denied, battery optimisation or app force-stopped | [FCM setup](docs/FCM_SETUP.md), "Delivery reliability"; the in-app inbox still has every notification |
 | Reminder late or silent | Exact-alarm permission off (Android 12+) | Settings, Apps, Special access, Alarms and reminders |
-| Upload rejected | Over 20 images per consultation or an image over 40 KB after compression | Business rule; see [`CLAUDE.md`](CLAUDE.md) rule 3 |
+| Upload rejected | Over 20 images per consultation, or a file over 10 MB before compression (images are then compressed to 600 KB each) | Business rule; see [`CLAUDE.md`](CLAUDE.md) rule 3 |
 | App cannot reach the API | Wrong `API_BASE_URL` or plain HTTP in a release build | Rebuild with the correct `--dart-define`; HTTPS is required |
 | Backend tests fail only in parallel | Shared Redis state | Re-run with `--test-threads=1` |
 
