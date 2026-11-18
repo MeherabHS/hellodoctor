@@ -138,7 +138,8 @@ async function responseFor(res: Response, rtcMint = false) {
     const status = res.status;
     return failure(status, data.error?.code ?? `HTTP_${status}`, status >= 500 ? (status === 503 ? (String(data.error?.message).includes('STORAGE_UNAVAILABLE') ? 'STORAGE_UNAVAILABLE' : 'Service temporarily unavailable. Please retry.') : 'Unable to complete this request. Use the reference ID when contacting support.') : data.error?.message ?? 'Request could not be completed.', data.meta?.request_id);
   }
-  return NextResponse.json(rtcMint ? sanitizeRtcTokenResponse(data) : sanitize(data), { status: res.status, headers: { 'Cache-Control': 'private, no-store', 'X-Request-Id':res.headers.get('X-Request-Id')||'' } });
+  const readUpTo = res.headers.get('X-Chat-Read-Up-To');
+  return NextResponse.json(rtcMint ? sanitizeRtcTokenResponse(data) : sanitize(data), { status: res.status, headers: { 'Cache-Control': 'private, no-store', 'X-Request-Id':res.headers.get('X-Request-Id')||'', ...(readUpTo ? { 'X-Chat-Read-Up-To': readUpTo } : {}) } });
 }
 async function access() {
   const scope = (await cookies()).get(SCOPE)?.value;

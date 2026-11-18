@@ -139,3 +139,22 @@ test('backoff jitter never drops below the base backoff for that step', async ()
   assert.ok(delays[4] >= 8000 && delays[4] <= 8000*1.2, `delay ${delays[4]} out of bounds`);
   stop();
 });
+
+test('baseDelay sets the interval for every poll (chat: 3 s active, 30 s idle)', async () => {
+  const window = new EventTarget();
+  const document = Object.assign(new EventTarget(), {visibilityState:'visible'});
+  const delays:number[] = [];
+  let tick = () => {};
+  let base = 3000;
+  const stop = startScheduleSync(async () => {}, {
+    window:window as Window, document:document as Document, online:()=>true,
+    every:(callback,ms)=>{delays.push(ms);tick=callback;return 1;}, cancel:()=>{}
+  }, 10000, {baseDelay:()=>base, jitterRatio:0});
+  tick(); await flush();
+  base = 30000;
+  tick(); await flush();
+  stop();
+  assert.equal(delays[0], 3000);
+  assert.ok(delays.includes(30000), `expected a 30 s poll in ${delays}`);
+  assert.ok(!delays.includes(10000), 'the fixed interval is not used when baseDelay is given');
+});
