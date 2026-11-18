@@ -43,15 +43,17 @@ void main() {
                 onOpen: (page) => opened.add(page.path)))));
     expect(find.text('By registering you agree.'), findsOneWidget);
     for (final url in const [
+      'afyamkononi.app/peer-terms',
       'afyamkononi.app/peer-navigator-privacy',
       'afyamkononi.app/privacy'
     ]) {
       expect(find.text(url), findsOneWidget);
     }
     await tester.tap(find.text(const [
+      'afyamkononi.app/peer-terms',
       'afyamkononi.app/peer-navigator-privacy',
       'afyamkononi.app/privacy'
     ].first));
-    expect(opened, ['/peer-navigator-privacy']);
+    expect(opened, ['/peer-terms']);
   });
 }

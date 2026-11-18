@@ -29,18 +29,21 @@ const _doctorConfidentiality =
     LegalWebPage('Doctor Terms', '/doctor-terms#confidentiality');
 const _peerPrivacy =
     LegalWebPage('Peer Navigator Privacy Notice', '/peer-navigator-privacy');
+const _peerTerms = LegalWebPage('Peer Navigator Terms', '/peer-terms');
+const _peerConduct =
+    LegalWebPage('Peer Navigator Terms', '/peer-terms#conduct-safeguarding');
 
 /// Linked under the Doctor registration form: /doctor-terms and /privacy.
 const doctorRegistrationPages = [_doctorTerms, _privacy];
 
-/// Linked under the Peer Navigator registration form:
-/// /peer-navigator-privacy and /privacy (Peer Terms are in-app only).
-const peerRegistrationPages = [_peerPrivacy, _privacy];
+/// Linked under the Peer Navigator registration form: /peer-terms,
+/// /peer-navigator-privacy and /privacy.
+const peerRegistrationPages = [_peerTerms, _peerPrivacy, _privacy];
 
 /// The website pages matching a legal document from `GET /legal/documents`.
 /// The ticked document is still the versioned text the server records; these
 /// are its full public versions. Empty for documents that exist only in the
-/// app (Peer Terms, Peer Conduct & Safeguarding, marketing preferences).
+/// app (marketing preferences).
 List<LegalWebPage> legalWebPagesFor(String documentType) =>
     switch (documentType) {
       'PATIENT_TERMS' => const [_terms],
@@ -51,7 +54,9 @@ List<LegalWebPage> legalWebPagesFor(String documentType) =>
       'PRIVACY_NOTICE' => const [_privacy, _retention],
       'PROFESSIONAL_VERIFICATION_DECLARATION' => const [_doctorDeclaration],
       'TELEMEDICINE_PRACTITIONER_POLICY' => const [_doctorConfidentiality],
+      'PEER_TERMS' => const [_peerTerms],
       'PEER_PRIVACY_NOTICE' => const [_peerPrivacy, _retention],
+      'PEER_CONDUCT_SAFEGUARDING' => const [_peerConduct],
       _ => const [],
     };
 
