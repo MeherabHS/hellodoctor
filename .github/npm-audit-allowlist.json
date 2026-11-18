@@ -1,0 +1,12 @@
+{
+  "_comment": "Advisories the CI npm audit gate may ignore. Each entry needs a reason and an expiry; an expired entry fails CI again. An allowlisted advisory that reaches production dependencies always fails. See .github/scripts/npm_audit_gate.mjs.",
+  "advisories": [
+    {
+      "id": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "reason": "ReDoS in picomatch <= 4.0.7 with no patched release yet. Reached only through developer tooling (typescript-eslint, eslint-config-next, tailwindcss build) on project-controlled glob patterns; not in production dependencies of either web app.",
+      "approved": "2026-11-18",
+      "expires": "2026-12-31"
+    }
+  ]
+}
