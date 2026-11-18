@@ -874,6 +874,7 @@
   "reminderAlarmSnooze": "Ahirisha dakika 10",
   "reminderAlarmOn": "Kengele imewashwa",
   "reminderAlarmOff": "Kengele imezimwa",
+  "remindersAlarmFailed": "Kikumbusho chako kimehifadhiwa, lakini kengele yake haikuweza kuwekwa kwenye simu hii. Kizime na ukiwashe tena; tatizo likiendelea, wasiliana na msaada.",
   "remindersExactAlarmsOff": "Vikumbusho vinaweza kulia kwa kuchelewa, au kutolia kabisa simu ikiwa imetulia, kwa sababu \"Kengele na vikumbusho\" imezimwa kwa AfyaMkononi. Iruhusu ili kila kikumbusho kilie kwa wakati.",
   "vaultFromDoctor": "Imetumwa na daktari wako",
   "vaultMyUploads": "Ulizopakia wewe",
