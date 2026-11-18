@@ -19,7 +19,7 @@ import 'booking_repository.dart';
 /// 1–20-photos-per-consultation business rule (`CLAUDE.md` §2.3,
 /// `kPatientMaxImagesPerConsultation`) — plan §4's view-4/intake-modal row
 /// calls this out explicitly as a fidelity fix, not a deviation. Server-side
-/// per-image compression (40 KB ceiling) is the sole size authority; this
+/// per-image compression (600 KB ceiling) is the sole size authority; this
 /// modal only enforces count and mime type client-side.
 class PreConsultIntakeModal extends StatefulWidget {
   const PreConsultIntakeModal({
@@ -191,15 +191,19 @@ class _PreConsultIntakeModalState extends State<PreConsultIntakeModal> {
   }
 
   Future<void> _pickGallery() async {
-    final picked = await ImagePicker().pickMultiImage(imageQuality: 85);
+    final picked = await ImagePicker()
+        .pickMultiImage(imageQuality: 85, maxWidth: 2000, maxHeight: 2000);
     for (final file in picked) {
       await _addXFile(file);
     }
   }
 
   Future<void> _pickCamera() async {
-    final picked = await ImagePicker()
-        .pickImage(source: ImageSource.camera, imageQuality: 85);
+    final picked = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 2000,
+        maxHeight: 2000);
     if (picked != null) await _addXFile(picked);
   }
 

@@ -63,8 +63,8 @@ class _ProfilePhotoAvatarState extends State<ProfilePhotoAvatar> {
     final cubit = context.read<DoctorCubit>();
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final picked =
-          await ImagePicker().pickImage(source: source, imageQuality: 85);
+      final picked = await ImagePicker().pickImage(
+          source: source, imageQuality: 85, maxWidth: 2000, maxHeight: 2000);
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
       final mimeType = mimeTypeForPickedPhoto(picked.path);

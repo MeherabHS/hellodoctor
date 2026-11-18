@@ -15,18 +15,26 @@ pub const MAX_UPLOAD_BYTES: usize = 10 * 1024 * 1024; // 10 MB
 /// aggressive compression target.
 const MAX_IMAGE_DIMENSION: u32 = 2000;
 
-/// Per-image compression ceiling — product rule, not a shared batch budget:
-/// EVERY accepted prescription/Rx image has its OWN independent maximum
-/// normalized size, never divided by how many images are in the same
-/// submission. A prior version of this constant (`TOTAL_BATCH_BUDGET_BYTES`,
-/// 400 KB) was a BATCH-wide budget split across however many images were
-/// uploaded together (e.g. a 5-image submission got 80 KB each) — that
-/// "total ÷ count" shape was a product mistake, not a safety requirement; see
-/// docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md. 40 KiB
-/// (40 * 1024 = 40,960 bytes), matching this codebase's existing
-/// decimal-multiplier-of-1024 convention for byte constants (see
-/// `MAX_UPLOAD_BYTES` above).
-pub const MAX_PRESCRIPTION_IMAGE_BYTES: usize = 40 * 1024;
+/// Per-image compression ceiling for clinical images — product rule, not a
+/// shared batch budget: EVERY accepted prescription/intake photo, Rx page,
+/// chat clinical image, peer-chat image and verification image has its OWN
+/// independent maximum normalized size, never divided by how many images are
+/// in the same submission.
+///
+/// Changed 2026-11-18 by product-owner instruction from 40 KB to 600 KB: at
+/// 40 KB a phone photo of a prescription page was often unreadable. 600 KiB
+/// keeps a 2000px page sharp at JPEG quality ~75-85 while bounding a full
+/// 20-image consultation at 12 MB. The earlier 40 KB rule is recorded in
+/// docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md (superseded).
+pub const MAX_PRESCRIPTION_IMAGE_BYTES: usize = 600 * 1024;
+
+/// Profile pictures are shown as small avatars, so they keep the original
+/// 40 KiB ceiling (product owner, 2026-11-18).
+pub const MAX_PROFILE_PICTURE_BYTES: usize = 40 * 1024;
+
+/// JPEG quality the encoder starts at. High enough that an ordinary document
+/// photo at `MAX_IMAGE_DIMENSION` fits the clinical budget on the first pass.
+const START_JPEG_QUALITY: u8 = 85;
 
 /// Final design decision: the per-image budget is a GUARANTEE, not a
 /// best-effort target — "the idea is system will auto compress whatever is
@@ -100,12 +108,29 @@ impl Drop for SanitizeWork {
 }
 
 impl UploadSecurityService {
-    /// Every image is compressed toward the same fixed per-image budget
-    /// (`MAX_PRESCRIPTION_IMAGE_BYTES`) regardless of how many images are
-    /// being submitted together in the same logical request — the patient
-    /// pre-consultation intake upload (now up to 20 images) and the doctor's
+    /// Every clinical image is compressed toward the same fixed per-image
+    /// budget (`MAX_PRESCRIPTION_IMAGE_BYTES`) regardless of how many images
+    /// are being submitted together in the same logical request — the patient
+    /// pre-consultation intake upload (up to 20 images) and the doctor's
     /// one-photo-per-call Rx upload both call this the same way.
     pub async fn sanitize_async(bytes: Vec<u8>, mime: String) -> Result<Vec<u8>, AppError> {
+        Self::sanitize_async_within(bytes, mime, MAX_PRESCRIPTION_IMAGE_BYTES).await
+    }
+
+    /// Profile pictures: same validation and sanitization, smaller budget
+    /// (`MAX_PROFILE_PICTURE_BYTES`).
+    pub async fn sanitize_profile_picture_async(
+        bytes: Vec<u8>,
+        mime: String,
+    ) -> Result<Vec<u8>, AppError> {
+        Self::sanitize_async_within(bytes, mime, MAX_PROFILE_PICTURE_BYTES).await
+    }
+
+    async fn sanitize_async_within(
+        bytes: Vec<u8>,
+        mime: String,
+        budget: usize,
+    ) -> Result<Vec<u8>, AppError> {
         // Reject cheap size/MIME/magic failures before reserving a decoder or
         // scheduling blocking work. Full decoding remains inside the bulkhead.
         Self::validated_format(&bytes, &mime)?;
@@ -117,7 +142,7 @@ impl UploadSecurityService {
         tokio::task::spawn_blocking(move || {
             let _permit = permit;
             let _work = SanitizeWork::start();
-            Self::validate_and_sanitize(&bytes, &mime)
+            Self::validate_and_sanitize_within(&bytes, &mime, budget)
         })
         .await
         .map_err(|_| AppError::internal("Upload validation failed.".into()))?
@@ -133,6 +158,15 @@ impl UploadSecurityService {
     /// construction. That column exists for a *future* async re-scan path,
     /// not because this function can itself produce anything else yet.
     pub fn validate_and_sanitize(bytes: &[u8], mime_type: &str) -> Result<Vec<u8>, AppError> {
+        Self::validate_and_sanitize_within(bytes, mime_type, MAX_PRESCRIPTION_IMAGE_BYTES)
+    }
+
+    /// [`Self::validate_and_sanitize`] with an explicit per-image byte budget.
+    pub fn validate_and_sanitize_within(
+        bytes: &[u8],
+        mime_type: &str,
+        budget: usize,
+    ) -> Result<Vec<u8>, AppError> {
         let Some(format) = Self::validated_format(bytes, mime_type)? else {
             Self::validate_pdf_structure(bytes)?;
             return Ok(bytes.to_vec());
@@ -150,7 +184,7 @@ impl UploadSecurityService {
         })?;
 
         let decoded = Self::downscale_if_needed(decoded, MAX_IMAGE_DIMENSION);
-        let sanitized = Self::compress_to_target(decoded, format, MAX_PRESCRIPTION_IMAGE_BYTES)?;
+        let sanitized = Self::compress_to_target(decoded, format, budget)?;
 
         if sanitized.len() > MAX_UPLOAD_BYTES {
             return Err(AppError::PayloadTooLarge(
@@ -273,16 +307,17 @@ impl UploadSecurityService {
     /// Encodes as JPEG at a single resolution, iteratively lowering quality
     /// until the result fits `target_bytes` or `min_quality` (the absolute
     /// technical floor) is reached — whichever comes first. Starts at
-    /// quality 80 (comparable to the unconditional default this whole scheme
-    /// replaced) so an already-small image/target typically succeeds on the
-    /// first pass without any extra quality loss.
+    /// `START_JPEG_QUALITY` so an ordinary document photo succeeds on the
+    /// first pass. Steps down by 5 while quality is still high (so the result
+    /// lands just under the budget at the best quality that fits), then by
+    /// 15 below 50 so a pathological input still reaches the floor quickly.
     fn encode_jpeg_within_target(
         img: &DynamicImage,
         target_bytes: usize,
         min_quality: u8,
     ) -> Result<Vec<u8>, AppError> {
         let rgb = img.to_rgb8();
-        let mut quality: u8 = 80;
+        let mut quality: u8 = START_JPEG_QUALITY;
         loop {
             let mut buf = Vec::new();
             image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buf, quality)
@@ -293,7 +328,8 @@ impl UploadSecurityService {
             if buf.len() <= target_bytes || quality <= min_quality {
                 return Ok(buf);
             }
-            quality = quality.saturating_sub(15).max(min_quality);
+            let step = if quality > 50 { 5 } else { 15 };
+            quality = quality.saturating_sub(step).max(min_quality);
         }
     }
 
@@ -799,7 +835,7 @@ mod tests {
     /// LOW-frequency pattern, not per-pixel random noise or a dense sawtooth
     /// — a real document photo is mostly large, smooth, highly-compressible
     /// regions (which is exactly why compressing it hard enough to meet the
-    /// tight 40 KB per-image ceiling is realistic); a denser/higher-frequency
+    /// tight per-image ceiling is realistic); a denser/higher-frequency
     /// pattern here would both misrepresent real input and made an earlier
     /// version of this test suite take minutes to run (confirmed directly,
     /// not assumed) chasing a target genuine phone photos don't need to.
@@ -820,9 +856,9 @@ mod tests {
 
     #[test]
     fn single_image_uses_close_to_its_full_budget_not_needlessly_over_compressed() {
-        // One image gets the whole 40 KB ceiling to itself — it should land
-        // close to that budget, not be hammered down toward the absolute
-        // technical floors for no reason.
+        // One image gets the whole clinical ceiling to itself — it must keep
+        // the full 2000px resolution (text stays legible), not be hammered
+        // down toward the absolute technical floors for no reason.
         let original = synthetic_large_photo(ImageFormat::Jpeg, 3000);
         let sanitized =
             UploadSecurityService::validate_and_sanitize(&original, "image/jpeg").unwrap();
@@ -835,67 +871,60 @@ mod tests {
         );
         assert!(
             sanitized.len() <= MAX_PRESCRIPTION_IMAGE_BYTES,
-            "must fit the 40 KB per-image ceiling, got {} bytes",
-            sanitized.len()
-        );
-        // Should use a meaningful fraction of its budget, not collapse to a
-        // tiny fraction of it.
-        assert!(
-            sanitized.len() >= MAX_PRESCRIPTION_IMAGE_BYTES / 4,
-            "expected the image to use close to its full budget, got only {} bytes",
+            "must fit the per-image ceiling, got {} bytes",
             sanitized.len()
         );
 
         let decoded = image::load_from_memory_with_format(&sanitized, ImageFormat::Jpeg)
             .expect("sanitized output must still decode as a valid JPEG");
-        assert!(decoded.width() <= MAX_IMAGE_DIMENSION);
-        assert!(decoded.height() <= MAX_IMAGE_DIMENSION);
+        assert_eq!(decoded.width(), MAX_IMAGE_DIMENSION);
+        assert_eq!(decoded.height(), MAX_IMAGE_DIMENSION);
     }
 
     #[test]
-    fn five_images_each_independently_fit_the_40kb_ceiling_not_a_divided_share() {
-        // Product rule under test: each image gets its OWN independent 40 KB
+    fn five_images_each_independently_fit_the_ceiling_not_a_divided_share() {
+        // Product rule under test: each image gets its OWN independent
         // ceiling, never a shared batch budget divided by image count (the
-        // prior, incorrect "400 KB / N images" behavior). This asserts EACH
-        // of 5 images, compressed independently, individually fits the full
-        // 40 KB ceiling, and that the 5-image combined total exceeds a
-        // single image's budget — proving no batch-wide division occurred
-        // (under the old divided-by-5 behavior the total could never have
-        // cleared that bar).
-        let mut total = 0usize;
+        // prior, incorrect "400 KB / N images" behavior). Each of 5 images,
+        // compressed independently, fits the full ceiling and keeps the full
+        // 2000px resolution, which a divided share would have forced down.
         for side in [3000u32, 2800, 3200, 2600, 3000] {
             let original = synthetic_large_photo(ImageFormat::Jpeg, side);
             let sanitized =
                 UploadSecurityService::validate_and_sanitize(&original, "image/jpeg").unwrap();
             let decoded = image::load_from_memory_with_format(&sanitized, ImageFormat::Jpeg)
                 .expect("each sanitized output must still decode as a valid JPEG");
-            assert!(decoded.width() <= MAX_IMAGE_DIMENSION);
-            assert!(decoded.height() <= MAX_IMAGE_DIMENSION);
+            assert_eq!(decoded.width(), MAX_IMAGE_DIMENSION);
+            assert_eq!(decoded.height(), MAX_IMAGE_DIMENSION);
             assert!(
                 sanitized.len() <= MAX_PRESCRIPTION_IMAGE_BYTES,
-                "each image must independently fit the 40 KB ceiling, got {} bytes",
+                "each image must independently fit the ceiling, got {} bytes",
                 sanitized.len()
             );
-            total += sanitized.len();
         }
-        // If the old divide-by-batch-size behavior were still present, each
-        // image would be capped at 40 KB / 5 = 8 KB and the 5-image total
-        // could never exceed 40 KB. Proving the total clears that bar
-        // demonstrates each image really did get its own full ceiling.
-        assert!(
-            total > MAX_PRESCRIPTION_IMAGE_BYTES,
-            "5 independently-compressed images should sum to more than a single \
-             image's budget, proving no batch-wide division occurred: got {total} bytes"
-        );
     }
 
     #[test]
-    fn large_png_is_downscaled_and_compressed_toward_its_own_40kb_budget() {
+    fn profile_pictures_keep_the_40kb_ceiling() {
+        let original = synthetic_large_photo(ImageFormat::Jpeg, 3000);
+        let sanitized = UploadSecurityService::validate_and_sanitize_within(
+            &original,
+            "image/jpeg",
+            MAX_PROFILE_PICTURE_BYTES,
+        )
+        .unwrap();
+        assert!(sanitized.len() <= MAX_PROFILE_PICTURE_BYTES);
+        image::load_from_memory_with_format(&sanitized, ImageFormat::Jpeg)
+            .expect("sanitized output must still decode as a valid JPEG");
+    }
+
+    #[test]
+    fn large_png_is_downscaled_and_compressed_toward_its_own_budget() {
         // PNG is lossless, so the same pattern encodes far larger than as
         // JPEG; a smaller side keeps the *original* fixture itself under the
         // 10 MB input gate while still comfortably exceeding
         // `MAX_IMAGE_DIMENSION` so the downscale path is genuinely exercised.
-        // PNG has no quality knob, so hitting the 40 KB ceiling requires the
+        // PNG has no quality knob, so hitting the ceiling requires the
         // iterative downscale-and-retry loop (not just one fixed resize).
         let original = synthetic_large_photo(ImageFormat::Png, 2200);
         let sanitized =
@@ -907,13 +936,13 @@ mod tests {
             original.len(),
             sanitized.len()
         );
-        // The guarantee: the fixed 40 KB per-image budget must never be
+        // The guarantee: the fixed per-image budget must never be
         // exceeded, even though PNG has no quality knob to trade — only the
         // downscale-and-retry loop, which must be willing to go all the way
         // to `ABSOLUTE_MIN_IMAGE_DIMENSION` if truly necessary.
         assert!(
             sanitized.len() <= MAX_PRESCRIPTION_IMAGE_BYTES,
-            "must fit the 40 KB per-image ceiling, got {} bytes",
+            "must fit the per-image ceiling, got {} bytes",
             sanitized.len()
         );
 
@@ -927,7 +956,7 @@ mod tests {
 
     #[test]
     fn small_image_is_not_needlessly_degraded() {
-        // A tiny image (well under the 40 KB ceiling) should pass through on
+        // A tiny image (well under the ceiling) should pass through on
         // an early iteration, not get hammered down toward the absolute
         // technical floors for no reason.
         let original = synthetic_large_photo(ImageFormat::Jpeg, 20);
@@ -962,7 +991,7 @@ mod tests {
         // proven here against JPEG's actual worst case (uncompressible
         // per-pixel noise) rather than the realistic, much-more-compressible
         // document fixture used elsewhere in this file. Each image is
-        // checked independently against its own fixed 40 KB ceiling — there
+        // checked independently against its own fixed ceiling — there
         // is no shared/divided batch budget to check against.
         for side in [2200u32, 2100, 2300, 2000, 2200] {
             let original = synthetic_worst_case_noise(ImageFormat::Jpeg, side);
@@ -972,7 +1001,7 @@ mod tests {
                 );
             assert!(
                 sanitized.len() <= MAX_PRESCRIPTION_IMAGE_BYTES,
-                "must never exceed the 40 KB per-image ceiling, even for worst-case noise \
+                "must never exceed the per-image ceiling, even for worst-case noise \
                  input: got {} bytes",
                 sanitized.len()
             );
@@ -995,14 +1024,14 @@ mod tests {
         // trip the separate, pre-existing, intentionally-unrelated 10 MB
         // *input* rejection limit before compression even starts. 1400x1400
         // (~5.9 MB raw) stays under that input gate while still being far
-        // larger than the 40 KB per-image budget, so the compression
+        // larger than the per-image budget, so the compression
         // guarantee itself is still genuinely exercised.
         let original = synthetic_worst_case_noise(ImageFormat::Png, 1400);
         let sanitized = UploadSecurityService::validate_and_sanitize(&original, "image/png")
             .expect("a hard-to-compress image must never be rejected for being hard to compress");
         assert!(
             sanitized.len() <= MAX_PRESCRIPTION_IMAGE_BYTES,
-            "must never exceed the 40 KB per-image ceiling even for worst-case noise, got {} bytes",
+            "must never exceed the per-image ceiling even for worst-case noise, got {} bytes",
             sanitized.len()
         );
         image::load_from_memory_with_format(&sanitized, ImageFormat::Png)

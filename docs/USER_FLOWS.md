@@ -66,8 +66,8 @@ flowchart TD
   - Image upload accepts `image/*,application/pdf` with a hard limit of 5 photos (`MAX_PRESCRIPTION_IMAGES = 5`)
     **as literally coded in the `index.html` prototype source**, retained as historical/original
     reference — the prototype file itself was not changed. **Production correction:** the actual
-    backend/Doctor-Web cap is now 20 photos per consultation at 40 KB each
-    (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`, `MAX_PRESCRIPTION_IMAGE_BYTES = 40 * 1024`) — see
+    backend/Doctor-Web cap is now 20 photos per consultation at 600 KB each
+    (`PATIENT_MAX_IMAGES_PER_CONSULTATION = 20`, `MAX_PRESCRIPTION_IMAGE_BYTES = 600 * 1024`) — see
     docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md.
   - Excess photos are rejected/truncated past the cap, and the user receives a warning toast.
 - **Payment payment hold Rule:** Funds are placed into `PAYMENT_HELD` in `adminTransactionStore`. The consulting doctor does not receive a balance credit until clinical consultation completes without dispute.

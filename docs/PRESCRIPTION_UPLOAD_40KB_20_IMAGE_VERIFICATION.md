@@ -1,3 +1,8 @@
+> **Superseded 2026-11-18 (product-owner instruction).** The per-image ceiling is now **600 KB**
+> (`MAX_PRESCRIPTION_IMAGE_BYTES = 600 * 1024`); 40 KB made prescription photos unreadable.
+> Profile pictures keep 40 KB. The per-image (never divided) rule and the 20-image cap below still
+> apply. Current rules: [`VALIDATION_RULES.md`](VALIDATION_RULES.md), `CLAUDE.md` rule 3.
+
 # Prescription/Rx Image Storage Contract Change — 40 KB Per Image, 20 Images Per Consultation
 
 ## Old contract (what was wrong)

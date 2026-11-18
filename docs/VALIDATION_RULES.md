@@ -124,17 +124,18 @@ before storage — new behavior, not present when the 10 MB limit above was firs
 
 **The target is a FIXED PER-IMAGE ceiling, never a shared/divided batch budget.** Every
 prescription/intake image — regardless of how many images are submitted together in the same
-request — is compressed toward its own independent **40 KB** (`MAX_PRESCRIPTION_IMAGE_BYTES =
-40 * 1024 = 40,960` bytes) ceiling. A patient's pre-consultation intake request can contain
+request — is compressed toward its own independent **600 KB** (`MAX_PRESCRIPTION_IMAGE_BYTES =
+600 * 1024 = 614,400` bytes) ceiling (changed 2026-11-18 from 40 KB, which made prescription
+photos unreadable; profile pictures keep 40 KB via `MAX_PROFILE_PICTURE_BYTES`). A patient's pre-consultation intake request can contain
 1-20 photos per consultation; a 20-photo submission must have EACH photo independently land
-at/under 40 KB, for a resulting maximum aggregate of 20 × 40 KB = 800 KB per consultation (never
-divided, e.g. a 20-image submission does NOT get a shared 800 KB pool split 20 ways — each image
-gets the full 40 KB). The doctor's Smart Rx upload submits one photo per API call and is held to
-the same 40 KB per-image ceiling; the doctor's own page-count cap (5 pages per appointment) is a
+at/under 600 KB, for a resulting maximum aggregate of 20 × 600 KB = 12 MB per consultation (never
+divided, e.g. a 20-image submission does NOT get a shared 12 MB pool split 20 ways — each image
+gets the full 600 KB). The doctor's Smart Rx upload submits one photo per API call and is held to
+the same 600 KB per-image ceiling; the doctor's own page-count cap (5 pages per appointment) is a
 separate, unrelated limit. See docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md for the
-full before/after contract and test evidence.
+earlier 40 KB contract (superseded) and its test evidence.
 
-**The 40 KB per-image budget is a guarantee, not a best-effort target.** The system auto-compresses
+**The per-image budget is a guarantee, not a best-effort target.** The system auto-compresses
 whatever is uploaded to fit the budget; the photo is stored regardless of how hard it is to
 compress — there is no rejection on compression-difficulty grounds. (The separate 10 MB *input*
 rejection limit above is unrelated and unaffected: that is about refusing absurdly huge raw
@@ -143,8 +144,8 @@ uploads before compression even starts, not about how compressible the content t
 - Images wider or taller than **2000px** are first downscaled (aspect-ratio preserved) to fit
   within that bound — a generous first pass that cuts a typical modern phone-camera photo's pixel
   count (and therefore size) by 80-90% before any further compression is even attempted.
-- JPEGs are then re-encoded toward the fixed 40 KB target, iteratively stepping encoder quality
-  down from 80. If the target still isn't hit, the image is progressively downscaled further and
+- JPEGs are then re-encoded toward the fixed 600 KB target, stepping encoder quality down from 85
+  in steps of 5 (steps of 15 below quality 50). If the target still isn't hit, the image is progressively downscaled further and
   the quality search repeats — this continues, going lower on both quality and resolution, until
   the target is met.
 - PNGs go through the same downscale-and-retry loop; since PNG is lossless (no quality knob),
@@ -157,7 +158,7 @@ uploads before compression even starts, not about how compressible the content t
   are essentially never reached: JPEG's quantization crushes even genuinely incompressible
   per-pixel noise down to well under the budget once quality drops low enough, and PNG's downscale
   loop converges well before 8px for the same reason. See
-  docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md for measured sizes under the 40 KB
+  docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md for measured sizes under the earlier 40 KB
   contract, including the deliberately worst-case synthetic-noise fixture.
 - The original format is never converted (PNG stays PNG, JPEG stays JPEG) — only re-compressed —
   so the stored MIME type always matches the originally declared one.

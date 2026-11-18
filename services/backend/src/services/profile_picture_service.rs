@@ -73,7 +73,8 @@ impl ProfilePictureService {
     ) -> Result<(), AppError> {
         validate_profile_photo_mime(&mime_type)?;
         // PHASE A — no transaction held across this CPU-bound work.
-        let sanitized = UploadSecurityService::sanitize_async(bytes, mime_type.clone()).await?;
+        let sanitized =
+            UploadSecurityService::sanitize_profile_picture_async(bytes, mime_type.clone()).await?;
         let hash = format!("{:x}", Sha256::digest(&sanitized));
         let object_key = format!("avatars/patient/{}/{}.bin", patient_id, Uuid::now_v7());
 
@@ -179,7 +180,8 @@ impl ProfilePictureService {
     ) -> Result<(), AppError> {
         validate_profile_photo_mime(&mime_type)?;
         // PHASE A
-        let sanitized = UploadSecurityService::sanitize_async(bytes, mime_type.clone()).await?;
+        let sanitized =
+            UploadSecurityService::sanitize_profile_picture_async(bytes, mime_type.clone()).await?;
         let hash = format!("{:x}", Sha256::digest(&sanitized));
         let object_key = format!("avatars/doctor/{}/{}.bin", doctor_id, Uuid::now_v7());
 

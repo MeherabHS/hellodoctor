@@ -13,9 +13,9 @@ use uuid::Uuid;
 /// Patient pre-consultation intake image cap, scoped to a single appointment
 /// (consultation) — never lifetime/account-wide and never summed across
 /// consultations, since the backing count query itself is per-appointment.
-/// Each image independently fits `MAX_PRESCRIPTION_IMAGE_BYTES` (40 KB), so
+/// Each image independently fits `MAX_PRESCRIPTION_IMAGE_BYTES` (600 KB), so
 /// this cap also bounds aggregate per-consultation storage at
-/// 20 * 40 KB = 800 KB. See
+/// 20 * 600 KB = 12 MB. See
 /// docs/PRESCRIPTION_UPLOAD_40KB_20_IMAGE_VERIFICATION.md.
 pub const PATIENT_MAX_IMAGES_PER_CONSULTATION: usize = 20;
 
@@ -91,7 +91,7 @@ impl PrescriptionService {
         }
 
         let mut sanitized_files = Vec::new();
-        // Each file is compressed toward its OWN independent 40 KB ceiling —
+        // Each file is compressed toward its OWN independent ceiling —
         // never a shared budget divided across however many files are in
         // this request. See UploadSecurityService's own doc comments for the
         // full reasoning. No DB transaction is open during this loop.
@@ -326,7 +326,7 @@ impl PrescriptionService {
                 "image/jpeg".into()
             }
         });
-        // Same fixed 40 KB per-image ceiling as the patient side — not a
+        // Same fixed per-image ceiling as the patient side — not a
         // divided batch budget. The doctor's own 5-page-per-appointment cap
         // below is unrelated and unchanged.
         let sanitized = UploadSecurityService::sanitize_async(photo_bytes, mime.clone()).await?;

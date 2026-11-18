@@ -27,6 +27,7 @@ use hellodoctor_backend::seed::{
     PATIENT_PROFILE_ID, PATIENT_USER_ID, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_DOCTOR1_EMAIL,
     SEED_DOCTOR1_PASSWORD,
 };
+use hellodoctor_backend::services::upload_security_service::MAX_PRESCRIPTION_IMAGE_BYTES;
 use http_body_util::BodyExt;
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use object_store::ObjectStoreExt;
@@ -9481,8 +9482,8 @@ async fn test_prescription_image_count_cap_is_isolated_per_consultation(pool: Pg
 /// The specific boundary scenario the spec calls out directly: current count
 /// = 19, then several simultaneous valid single-image uploads race for the
 /// last slot. Only one may win; the final count must be exactly 20, never
-/// more, and aggregate stored bytes must never exceed 20 * 40 KB = 819,200
-/// bytes (each image independently fits its own 40 KB ceiling — see
+/// more, and aggregate stored bytes must never exceed 20 x the per-image
+/// ceiling (each image independently fits its own ceiling — see
 /// `prescription_service.rs`/`upload_security_service.rs`).
 #[sqlx::test(migrations = "./migrations")]
 async fn test_nineteen_then_concurrent_single_uploads_never_exceed_twenty(pool: PgPool) {
@@ -9548,8 +9549,8 @@ async fn test_nineteen_then_concurrent_single_uploads_never_exceed_twenty(pool: 
     .await
     .unwrap();
     assert!(
-        total_bytes <= 20 * 40 * 1024,
-        "aggregate stored bytes for a full 20-image consultation must never exceed 20*40KB=819200, got {total_bytes}"
+        total_bytes <= 20 * MAX_PRESCRIPTION_IMAGE_BYTES as i64,
+        "aggregate stored bytes for a full 20-image consultation must never exceed 20 x the per-image ceiling, got {total_bytes}"
     );
 }
 
@@ -18391,7 +18392,7 @@ async fn test_pre_e2e_clinical_attachment_shared_private_persistent_and_idempote
         results[0]["data"]["attachment"]["size_bytes"]
             .as_i64()
             .unwrap()
-            <= 40 * 1024
+            <= MAX_PRESCRIPTION_IMAGE_BYTES as i64
     );
     let list = format!("/api/v1/chat/{conversation}/messages");
     let p = json_body(get(&app, &list, Some(&patient)).await).await;
@@ -18406,7 +18407,7 @@ async fn test_pre_e2e_clinical_attachment_shared_private_persistent_and_idempote
     let bytes = STANDARD
         .decode(file["data"]["base64_content"].as_str().unwrap())
         .unwrap();
-    assert!(bytes.len() <= 40 * 1024);
+    assert!(bytes.len() <= MAX_PRESCRIPTION_IMAGE_BYTES);
     assert!(bytes.starts_with(&[0xff, 0xd8, 0xff]));
     let doctor_file = json_body(get(&app, &view, Some(&doctor)).await).await;
     assert_eq!(doctor_file["data"], file["data"]);

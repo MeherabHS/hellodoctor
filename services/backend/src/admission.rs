@@ -430,7 +430,7 @@ pub fn reject(status: StatusCode, cost: Cost, reason: &'static str) -> Response 
 pub struct EarlyRejection;
 
 /// Largest unread body [`settle_unread_rejections`] reads and discards so the
-/// connection can be reused (an upload of 20 images at 40 KB is ~0.8 MB).
+/// connection can be reused (a sanitized clinical image is at most 600 KB).
 const DRAIN_MAX_BYTES: u64 = 2 * 1024 * 1024;
 /// Longest it waits for that body; a slower sender gets `Connection: close`.
 const DRAIN_TIMEOUT: Duration = Duration::from_secs(2);

@@ -345,8 +345,8 @@ class _PeerChatPageState extends State<PeerChatPage> {
   /// Camera or gallery; the picker's own copy is deleted once read so the
   /// photo is not left in a generic disk cache.
   Future<(Uint8List, String)?> _pick(ImageSource source) async {
-    final file =
-        await ImagePicker().pickImage(source: source, imageQuality: 85);
+    final file = await ImagePicker().pickImage(
+        source: source, imageQuality: 85, maxWidth: 2000, maxHeight: 2000);
     if (file == null) return null;
     final name = file.name.toLowerCase();
     final png = name.endsWith('.png');

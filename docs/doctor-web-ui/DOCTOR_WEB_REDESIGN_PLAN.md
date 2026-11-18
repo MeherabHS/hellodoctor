@@ -42,7 +42,7 @@ contracts and tests are preserved.
 
 ## Proposal items omitted (no backend, not approved)
 
-Structured Rx form (medication/dosage/frequency): Rx stays photo pages (max 5, 40 KB each) ·
+Structured Rx form (medication/dosage/frequency): Rx stays photo pages (max 5, 600 KB each) ·
 general clinical attachments · screen share and device pickers · consultation type per
 slot/appointment · No-Show status · aggregate stats endpoints (tiles computed only where the
 loaded data is complete, otherwise omitted) · doctor-initiated chats, lab orders,
