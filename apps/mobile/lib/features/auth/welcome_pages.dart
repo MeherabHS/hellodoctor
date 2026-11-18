@@ -596,15 +596,15 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
                                                           .fieldText)))
                                         ]),
                                         // Full public versions on
-                                        // afyamkononi.app (Terms and Conduct
-                                        // are in-app only, above).
+                                        // afyamkononi.app.
                                         Padding(
                                             padding:
                                                 const EdgeInsets.only(left: 48),
-                                            child: LegalWebLinks(
-                                                pages: legalWebPagesFor(
-                                                    'PEER_PRIVACY_NOTICE'),
-                                                color: DoctorTokens.primary)),
+                                            child: LegalWebLinks(pages: [
+                                              ...legalWebPagesFor('PEER_TERMS'),
+                                              ...legalWebPagesFor(
+                                                  'PEER_PRIVACY_NOTICE'),
+                                            ], color: DoctorTokens.primary)),
                                         const SizedBox(height: 8),
                                         AfyaPrimaryButton(
                                             label: 'Register as Peer Navigator',
@@ -613,7 +613,7 @@ class _PeerRegistrationState extends State<PeerRegistrationPage> {
                                         const SizedBox(height: 10),
                                         const RegistrationLegalNotice(
                                             text:
-                                                'By registering you agree to the AfyaMkononi Peer Navigator Privacy Notice and Privacy Policy.',
+                                                'By registering you agree to the AfyaMkononi Peer Navigator Terms, Peer Navigator Privacy Notice and Privacy Policy.',
                                             pages: peerRegistrationPages,
                                             textColor: DoctorTokens.slate,
                                             linkColor: DoctorTokens.primary),

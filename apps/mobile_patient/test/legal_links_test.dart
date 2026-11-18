@@ -15,8 +15,14 @@ void main() {
 
   test('documents without a public page get no link', () {
     expect(legalWebPagesFor('MARKETING_COMMUNICATIONS'), isEmpty);
-    expect(legalWebPagesFor('PEER_TERMS'), isEmpty);
     expect(legalWebPagesFor('SOMETHING_NEW'), isEmpty);
+  });
+
+  test('peer terms and conduct link the public /peer-terms page', () {
+    expect(legalWebPagesFor('PEER_TERMS').single.uri.toString(),
+        'https://afyamkononi.app/peer-terms');
+    expect(legalWebPagesFor('PEER_CONDUCT_SAFEGUARDING').single.path,
+        '/peer-terms#conduct-safeguarding');
   });
 
   test('links point at the public website over https', () {
