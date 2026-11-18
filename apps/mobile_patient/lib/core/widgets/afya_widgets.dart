@@ -120,8 +120,15 @@ class AfyaServiceTile extends StatelessWidget {
       required this.onTap,
       this.enabled = true,
       this.badge,
-      this.labelWidth});
+      this.labelWidth,
+      this.height});
   final IconData icon;
+
+  /// A fixed height from a grid that sizes its rows to fill the screen
+  /// (Home). Only the icon shrinks to fit; the label keeps the natural tile's
+  /// size and three lines, so every card's text matches. The grid uses this
+  /// only when [minHeight] fits. Null keeps the natural size.
+  final double? height;
 
   /// The label's width, from a parent grid that knows it (rows here use
   /// IntrinsicHeight). Without it the label measures itself.
@@ -152,56 +159,107 @@ class AfyaServiceTile extends StatelessWidget {
           child: InkWell(
             onTap: onTap,
             borderRadius: BorderRadius.circular(14),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 14, 4, 12),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                AfyaIconTile(
-                    icon: icon,
-                    color: enabled ? color : const Color(0xFFA9B1B6),
-                    background: enabled ? background : const Color(0xFFE6E9EB),
-                    size: 52),
-                const SizedBox(height: 9),
-                // Up to three lines, never splitting a word: longer Swahili
-                // labels and large system text shrink to fit.
-                AfyaFitText(label,
-                    maxLines: 3,
-                    maxWidth: labelWidth,
-                    style: TextStyle(
-                        fontSize: 13,
-                        height: 1.25,
-                        fontWeight: FontWeight.w600,
-                        color: enabled
-                            ? PatientTokens.ink
-                            : const Color(0xFF98A2A8))),
-                if (badge != null) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                        color: const Color(0xFFCDEEDB),
-                        borderRadius: BorderRadius.circular(12)),
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.download_done_rounded,
-                            size: 13, color: PatientTokens.primaryDark),
-                        const SizedBox(width: 3),
-                        Text(badge!,
-                            maxLines: 1,
-                            style: const TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                color: PatientTokens.primaryDark)),
-                      ]),
-                    ),
+            child: height != null && badge == null
+                ? _compact(context, height!)
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 14, 4, 12),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      AfyaIconTile(
+                          icon: icon,
+                          color: enabled ? color : const Color(0xFFA9B1B6),
+                          background:
+                              enabled ? background : const Color(0xFFE6E9EB),
+                          size: 52),
+                      const SizedBox(height: 9),
+                      // Up to three lines, never splitting a word: longer Swahili
+                      // labels and large system text shrink to fit.
+                      AfyaFitText(label,
+                          maxLines: 3,
+                          maxWidth: labelWidth,
+                          style: TextStyle(
+                              fontSize: 13,
+                              height: 1.25,
+                              fontWeight: FontWeight.w600,
+                              color: enabled
+                                  ? PatientTokens.ink
+                                  : const Color(0xFF98A2A8))),
+                      if (badge != null) ...[
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                              color: const Color(0xFFCDEEDB),
+                              borderRadius: BorderRadius.circular(12)),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child:
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.download_done_rounded,
+                                  size: 13, color: PatientTokens.primaryDark),
+                              const SizedBox(width: 3),
+                              Text(badge!,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: PatientTokens.primaryDark)),
+                            ]),
+                          ),
+                        ),
+                      ],
+                    ]),
                   ),
-                ],
-              ]),
-            ),
           ),
         ),
       );
+
+  static const _minIcon = 32.0, _maxIcon = 52.0, _gap = 7.0, _minPad = 8.0;
+  static const _restPad = 12.0;
+
+  /// Label line height in logical pixels at the current text scale.
+  static double labelLineHeight(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(13) * 1.25;
+
+  /// The shortest fixed height that keeps three full-size label lines and the
+  /// smallest icon.
+  static double minHeight(BuildContext context) =>
+      2 * _minPad + _minIcon + _gap + 3 * labelLineHeight(context);
+
+  Widget _compact(BuildContext context, double h) {
+    final labelHeight = 3 * labelLineHeight(context);
+    final spare = h - _gap - labelHeight;
+    // Keep the natural tile's breathing room above the icon when there is
+    // space; give up icon size before padding, down to the minimums.
+    final iconSize = (spare - 2 * _restPad).clamp(_minIcon, _maxIcon);
+    final pad = ((spare - iconSize) / 2).clamp(_minPad, 16.0);
+    const lines = 3;
+    const gap = _gap;
+    return Padding(
+      // Top-aligned like the natural tile, so icons line up across a row
+      // whether a label takes one line or three.
+      padding: EdgeInsets.fromLTRB(4, pad, 4, 0),
+      child: Column(children: [
+        AfyaIconTile(
+            icon: icon,
+            color: enabled ? color : const Color(0xFFA9B1B6),
+            background: enabled ? background : const Color(0xFFE6E9EB),
+            size: iconSize),
+        const SizedBox(height: gap),
+        Flexible(
+          child: AfyaFitText(label,
+              maxLines: lines,
+              maxWidth: labelWidth,
+              style: TextStyle(
+                  fontSize: 13,
+                  height: 1.25,
+                  fontWeight: FontWeight.w600,
+                  color:
+                      enabled ? PatientTokens.ink : const Color(0xFF98A2A8))),
+        ),
+      ]),
+    );
+  }
 }
 
 /// Back-arrow title bar used by pushed screens (reference panels 2-8, 11).

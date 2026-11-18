@@ -4,41 +4,76 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
-/// Android notification channels used throughout the app. Fixed, meaningful
-/// channels mirroring `apps/mobile`'s Doctor-side design — never one generic
-/// channel, and never everything marked max-importance.
+/// The app's two notification sounds (product owner, 2026-11-17: every
+/// notification plays one of these, no exceptions). Files are in
+/// `android/app/src/main/res/raw/`, kept from resource shrinking by
+/// `res/raw/keep.xml`.
+class NotificationSounds {
+  const NotificationSounds._();
+
+  /// Looping urgent tone: personal reminders and the 15-minute consultation
+  /// reminder. Played on the alarm stream, so it rings on silent/vibrate.
+  static const urgent =
+      RawResourceAndroidNotificationSound('afya_reminder_urgent');
+
+  /// Short tone: every other notification, on the normal notification stream.
+  static const quick = RawResourceAndroidNotificationSound('afya_notify_quick');
+}
+
+/// Android notification channels used throughout the app.
+///
+/// A channel's sound and importance are fixed by Android once the channel
+/// exists, so the forced-sound channels (2026-11-17) use new `_V2` ids and
+/// [legacyIds] are deleted at start-up. The backend names these same ids in
+/// its pushes (`notification_transport.rs::android_channel_id`).
 class NotificationChannels {
   const NotificationChannels._();
 
   static const consultationReminders = AndroidNotificationChannel(
-    'CONSULTATION_REMINDERS',
+    'CONSULTATION_REMINDERS_V2',
     'Consultation reminders',
     description: 'Reminders shortly before a scheduled consultation starts.',
-    importance: Importance.high,
+    importance: Importance.max,
+    playSound: true,
+    sound: NotificationSounds.urgent,
+    audioAttributesUsage: AudioAttributesUsage.alarm,
+    enableVibration: true,
   );
   static const messages = AndroidNotificationChannel(
-    'MESSAGES',
+    'MESSAGES_V2',
     'Messages',
     description: 'New consultation chat messages.',
     importance: Importance.high,
+    playSound: true,
+    sound: NotificationSounds.quick,
+    enableVibration: true,
   );
   static const appointments = AndroidNotificationChannel(
-    'APPOINTMENTS',
+    'APPOINTMENTS_V2',
     'Appointments',
     description: 'Booking confirmations and consultation outcomes.',
     importance: Importance.high,
+    playSound: true,
+    sound: NotificationSounds.quick,
+    enableVibration: true,
   );
   static const grievance = AndroidNotificationChannel(
-    'GRIEVANCE',
+    'GRIEVANCE_V2',
     'Grievance updates',
     description: 'Updates on a submitted grievance report.',
-    importance: Importance.defaultImportance,
+    importance: Importance.high,
+    playSound: true,
+    sound: NotificationSounds.quick,
+    enableVibration: true,
   );
   static const general = AndroidNotificationChannel(
-    'GENERAL',
+    'GENERAL_V2',
     'General',
     description: 'Other account and app notifications.',
-    importance: Importance.low,
+    importance: Importance.high,
+    playSound: true,
+    sound: NotificationSounds.quick,
+    enableVibration: true,
   );
 
   static const all = [
@@ -47,6 +82,17 @@ class NotificationChannels {
     appointments,
     grievance,
     general,
+  ];
+
+  /// Channels replaced by the forced-sound set; deleted at start-up so they
+  /// no longer show in the phone's notification settings.
+  static const legacyIds = [
+    'CONSULTATION_REMINDERS',
+    'MESSAGES',
+    'APPOINTMENTS',
+    'GRIEVANCE',
+    'GENERAL',
+    'patient_reminder_alarms_v1',
   ];
 
   /// Maps a backend `notification_type` to the channel it should display on.
@@ -140,6 +186,13 @@ class LocalNotificationService {
     }
     final androidImpl = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
+    for (final id in NotificationChannels.legacyIds) {
+      try {
+        await androidImpl?.deleteNotificationChannel(id);
+      } catch (_) {
+        // Already gone (or never created on this device).
+      }
+    }
     for (final channel in NotificationChannels.all) {
       await androidImpl?.createNotificationChannel(channel);
     }
@@ -188,14 +241,23 @@ class LocalNotificationService {
       title,
       body,
       NotificationDetails(
+        // The channel's own sound, repeated here because Android before 8.0
+        // (no channels) takes the sound from each notification.
         android: AndroidNotificationDetails(
           channel.id,
           channel.name,
           channelDescription: channel.description,
           importance: channel.importance,
-          priority: channel.importance == Importance.high
-              ? Priority.high
-              : Priority.defaultPriority,
+          priority: channel.importance == Importance.max
+              ? Priority.max
+              : Priority.high,
+          playSound: true,
+          sound: channel.sound,
+          audioAttributesUsage: channel.audioAttributesUsage,
+          enableVibration: true,
+          // A notice shown on its push and again by the inbox poll (same id)
+          // sounds once.
+          onlyAlertOnce: true,
         ),
       ),
       payload: payload,

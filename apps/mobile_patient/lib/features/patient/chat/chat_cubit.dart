@@ -22,6 +22,8 @@ class ChatState {
     this.uploadingImage = false,
     this.imageError,
     this.imagePending = false,
+    this.peerReadUpTo,
+    this.pendingText,
   });
   final bool loading, sending, notSent, serverLocked, hasOlder, loadingOlder;
   final String? error;
@@ -31,6 +33,22 @@ class ChatState {
   final bool uploadingImage, imagePending;
   final String? imageError;
   final List<ChatMessageDto> messages;
+
+  /// The other party has read every message sent at or before this time
+  /// (server read receipt); null until they read anything.
+  final DateTime? peerReadUpTo;
+
+  /// Text of the message being sent, shown as a "Sending…" bubble until the
+  /// server confirms it.
+  final String? pendingText;
+
+  /// Delivery state of one of the caller's own messages.
+  MessageReceipt receiptFor(ChatMessageDto m) {
+    final read = peerReadUpTo;
+    return read != null && !m.sentAt.toUtc().isAfter(read)
+        ? MessageReceipt.read
+        : MessageReceipt.sent;
+  }
 
   ChatState copyWith({
     bool? loading,
@@ -44,6 +62,8 @@ class ChatState {
     bool? uploadingImage,
     Object? imageError = _unset,
     bool? imagePending,
+    Object? peerReadUpTo = _unset,
+    Object? pendingText = _unset,
   }) =>
       ChatState(
         loading: loading ?? this.loading,
@@ -59,16 +79,77 @@ class ChatState {
             ? this.imageError
             : imageError as String?,
         imagePending: imagePending ?? this.imagePending,
+        peerReadUpTo: identical(peerReadUpTo, _unset)
+            ? this.peerReadUpTo
+            : peerReadUpTo as DateTime?,
+        pendingText: identical(pendingText, _unset)
+            ? this.pendingText
+            : pendingText as String?,
       );
 }
+
+/// Sending (in flight, before the server confirms), sent (stored by the
+/// server), read (the other party has read up to it).
+enum MessageReceipt { sending, sent, read }
 
 /// Owns one consultation-scoped thread. Both Patient and Doctor clients
 /// refresh the same authoritative history while their threads are open.
 class ChatCubit extends Cubit<ChatState> {
-  ChatCubit(this.repo, {required this.conversationId})
+  ChatCubit(this.repo, {required this.conversationId, this.myUserId})
       : super(const ChatState());
   final ChatRepository repo;
   final String conversationId;
+
+  /// The signed-in user's id: messages from anyone else are incoming and are
+  /// marked read once shown. Without it no read receipt is sent.
+  final String? myUserId;
+  DateTime? _lastActivity;
+  String? _lastMarkedRead;
+
+  /// Adaptive polling (2026-11-17): every 3 s while the conversation is
+  /// active (a message sent or received in the last 2 minutes), 10 s for the
+  /// next 10 minutes, then 30 s. Replaces the fixed 10 s poll that made every
+  /// open chat cost the same whether anyone was typing or not.
+  Duration pollInterval(DateTime now) {
+    final last = _lastActivity;
+    if (last == null) return const Duration(seconds: 10);
+    final quiet = now.difference(last);
+    if (quiet < const Duration(minutes: 2)) return const Duration(seconds: 3);
+    if (quiet < const Duration(minutes: 12)) {
+      return const Duration(seconds: 10);
+    }
+    return const Duration(seconds: 30);
+  }
+
+  /// After every successful fetch: picks up the other party's read receipt,
+  /// notes activity when a new message arrived, and records that the newest
+  /// incoming message has been read (once per message, best-effort).
+  void _afterRefresh(List<ChatMessageDto> fetched) {
+    if (isClosed) return;
+    final receipt = repo.peerReadUpTo(conversationId);
+    if (receipt != null && receipt != state.peerReadUpTo) {
+      emit(state.copyWith(peerReadUpTo: receipt));
+    }
+    if (fetched.isNotEmpty && state.messages.isNotEmpty) {
+      final newest = state.messages.last.sentAt;
+      if (_lastActivity == null || newest.isAfter(_lastActivity!)) {
+        _lastActivity = newest.toLocal();
+      }
+    }
+    final me = myUserId;
+    if (me == null) return;
+    for (final m in state.messages.reversed) {
+      if (m.senderId == me) continue;
+      if (m.id != _lastMarkedRead) {
+        _lastMarkedRead = m.id;
+        unawaited(repo.markRead(conversationId, m.id).catchError((Object _) {
+          _lastMarkedRead = null; // retried on the next refresh
+        }));
+      }
+      break;
+    }
+  }
+
   void Function(bool succeeded)? onRefreshOutcome;
   bool _loadInFlight = false;
 
@@ -139,6 +220,7 @@ class ChatCubit extends Cubit<ChatState> {
           messages: merge(state.messages, messages),
           hasOlder:
               state.messages.isEmpty ? messages.length == 50 : state.hasOlder));
+      _afterRefresh(messages);
     } catch (e) {
       onRefreshOutcome?.call(false);
       if (isClosed) return;
@@ -166,6 +248,7 @@ class ChatCubit extends Cubit<ChatState> {
           messages: merge(state.messages, messages),
           hasOlder:
               state.messages.isEmpty ? messages.length == 50 : state.hasOlder));
+      _afterRefresh(messages);
     } catch (_) {
       onRefreshOutcome?.call(false);
       // Intentionally silent — see doc comment above.
@@ -177,16 +260,23 @@ class ChatCubit extends Cubit<ChatState> {
   Future<void> send(String content) async {
     final trimmed = content.trim();
     if (trimmed.isEmpty || state.sending || state.serverLocked) return;
-    emit(state.copyWith(sending: true));
+    emit(state.copyWith(sending: true, pendingText: trimmed));
+    _lastActivity = DateTime.now();
     try {
-      await repo.sendMessage(conversationId, trimmed);
+      final sent = await repo.sendMessage(conversationId, trimmed);
       if (isClosed) return;
-      emit(state.copyWith(sending: false, notSent: false));
+      // The stored message replaces the "Sending…" bubble in the same frame.
+      emit(state.copyWith(
+          sending: false,
+          notSent: false,
+          pendingText: null,
+          messages: merge(state.messages, [sent])));
       await load();
     } catch (e) {
       if (isClosed) return;
       emit(state.copyWith(
           sending: false,
+          pendingText: null,
           notSent: true,
           serverLocked:
               e is ApiException && (e.status == 403 || e.status == 409)));

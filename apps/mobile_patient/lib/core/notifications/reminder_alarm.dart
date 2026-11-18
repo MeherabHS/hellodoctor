@@ -13,7 +13,8 @@ import 'notification_ids.dart';
 /// - Scheduled with Android's alarm-clock mode when exact alarms are allowed,
 ///   so the alert fires on time even in Doze; otherwise inexact (the reminders
 ///   screen says so).
-/// - Its own channel with the system alarm sound, alarm audio usage, maximum
+/// - Its own channel with the app's urgent tone (product owner, 2026-11-17,
+///   replacing the system alarm sound), alarm audio usage, maximum
 ///   importance and the "insistent" flag: the sound repeats until the patient
 ///   acts on it, and stops by itself after [ringFor].
 /// - Done and Snooze actions work from the notification without opening the
@@ -24,7 +25,10 @@ import 'notification_ids.dart';
 class ReminderAlarm {
   const ReminderAlarm._();
 
-  static const channelId = 'patient_reminder_alarms_v1';
+  /// v2: the urgent-tone channel (a channel's sound cannot change once
+  /// created). Re-arming at sign-in moves existing alarms onto it, and the
+  /// v1 channel is deleted at start-up.
+  static const channelId = 'patient_reminder_alarms_v2';
   static const doneAction = 'reminder_done';
   static const snoozeAction = 'reminder_snooze';
   static const snoozeFor = Duration(minutes: 10);
@@ -63,8 +67,8 @@ class ReminderAlarm {
           category: AndroidNotificationCategory.alarm,
           visibility: NotificationVisibility.private,
           playSound: true,
-          sound: const UriAndroidNotificationSound(
-              'content://settings/system/alarm_alert'),
+          sound:
+              const RawResourceAndroidNotificationSound('afya_reminder_urgent'),
           audioAttributesUsage: AudioAttributesUsage.alarm,
           enableVibration: true,
           additionalFlags: Int32List.fromList([_flagInsistent]),

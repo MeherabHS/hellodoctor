@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/l10n/kenya_time.dart';
+import '../../../core/notifications/battery_optimization.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/time_format.dart';
@@ -24,14 +25,15 @@ import 'upcoming_consultation_section.dart';
 
 /// Home dashboard, rebuilt to reference panel 1 of
 /// `docs/design/afyamkononi-patient-ui-reference.jpeg`: brand header, greeting
-/// card, search field, hero banner and the 3 x 3 grid of the nine modules,
-/// all visible without scrolling on a 411 dp wide phone at text scale 1.0.
-/// Narrower screens and larger text scroll.
+/// card, hero banner and the 3 x 3 grid of the nine modules. The grid's rows
+/// share the height left on screen, so everything is visible without
+/// scrolling on ordinary phones; only a screen too small for legible cards
+/// (or very large system text) scrolls.
 ///
 /// Differences from the panel, each by product-owner decision:
 /// - Card 3 reads "Book Consultation" (v2.1 brief, M03).
-/// - The search field opens the Services directory. It does not search
-///   doctors (v2.1 brief: no homepage doctor search).
+/// - No search field (removed 2026-11-17): it only opened the Services
+///   directory, which the bottom navigation already does.
 ///
 /// The Emergency Contact banner and the family-profile switcher are not on
 /// Home. The Upcoming Consultation card appears only inside the server's
@@ -88,6 +90,8 @@ class _PatientHomePageState extends State<PatientHomePage> {
       context.read<HomeCubit>().load();
       context.read<ProfileCubit>().load();
       context.read<FamilyProfilesCubit>().load();
+      // Once per install: how to stop this phone delaying reminders.
+      unawaited(BatteryOptimization.maybePrompt(context));
     });
   }
 
@@ -128,28 +132,40 @@ class _PatientHomePageState extends State<PatientHomePage> {
                                 .connectivity
                                 ?.isOffline ??
                             false);
-                    return ListView(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      children: [
-                        AfyaBrandHeader(
-                            deps: AppHeaderDeps.of(context, widget.nav)),
-                        _GreetingCard(name: name),
-                        _SearchField(onTap: widget.nav.openServices),
+                    Widget box(Widget child) =>
+                        SliverToBoxAdapter(child: child);
+                    return CustomScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      slivers: [
+                        box(AfyaBrandHeader(
+                            deps: AppHeaderDeps.of(context, widget.nav))),
+                        box(_GreetingCard(name: name)),
                         if (!offline && homeState.homeCardAppointment() != null)
-                          _UpcomingCard(
+                          box(_UpcomingCard(
                               appointment: homeState.homeCardAppointment()!,
                               onOpen: () => openWaitingRoomFor(
-                                  context, homeState.homeCardAppointment()!)),
+                                  context, homeState.homeCardAppointment()!))),
                         if (offline)
-                          _OfflineBanner(onRetry: _reload)
+                          box(_OfflineBanner(onRetry: _reload))
                         else
-                          _HeroBanner(
+                          box(_HeroBanner(
                               onExplore: () =>
-                                  openEducation(context, widget.nav)),
-                        _ServiceGrid(nav: widget.nav, offline: offline),
+                                  openEducation(context, widget.nav))),
+                        // The grid takes exactly the height left on screen,
+                        // measured from the viewport and the slivers above,
+                        // never the scroll position, so it cannot change
+                        // while scrolling.
+                        SliverLayoutBuilder(
+                            builder: (context, sc) => box(_ServiceGrid(
+                                nav: widget.nav,
+                                offline: offline,
+                                available: offline
+                                    ? null
+                                    : sc.viewportMainAxisExtent -
+                                        sc.precedingScrollExtent))),
                         if (offline)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                          box(Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
                             child: AfyaInfoCard(
                                 icon: Icons.info_outline_rounded,
                                 title: AppLocalizations.of(context)
@@ -158,7 +174,7 @@ class _PatientHomePageState extends State<PatientHomePage> {
                                     .offlineLimitedBody,
                                 background: PatientTokens.mintCard,
                                 accent: PatientTokens.primaryDark),
-                          ),
+                          )),
                       ],
                     );
                   },
@@ -202,51 +218,6 @@ class _GreetingCard extends StatelessWidget {
       ]),
     );
   }
-}
-
-/// The reference's search pill. It is an entry point to the Services
-/// directory, not a text search: there is no search backend for services or
-/// topics, and the v2.1 brief rules out a homepage doctor search.
-class _SearchField extends StatelessWidget {
-  const _SearchField({required this.onTap});
-  final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-        child: Semantics(
-          button: true,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 44),
-            decoration: BoxDecoration(
-                color: PatientTokens.surface,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: PatientTokens.softShadow),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-              child: InkWell(
-                onTap: onTap,
-                borderRadius: BorderRadius.circular(14),
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                  child: Row(children: [
-                    const Icon(Icons.search_rounded,
-                        size: 21, color: PatientTokens.navInactive),
-                    const SizedBox(width: 8),
-                    Expanded(
-                        child: Text(AppLocalizations.of(context).homeSearchHint,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 12.5, color: PatientTokens.hint))),
-                  ]),
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
 }
 
 class _HeroBanner extends StatelessWidget {
@@ -336,19 +307,75 @@ class _HeroArt extends StatelessWidget {
       );
 }
 
-/// The nine modules as a 3 x 3 grid, each row sized to its tallest card.
+/// The nine modules as a 3 x 3 grid.
+///
+/// Given [available] (the screen height left below the banner), the three
+/// rows share it equally so all nine cards are on screen with no scrolling;
+/// each card's icon shrinks to its row and every label keeps its full size.
+/// When a row cannot hold a full-size label (a very small screen or very
+/// large system text), or offline, each row instead takes its tallest card's
+/// natural height and Home scrolls.
 class _ServiceGrid extends StatelessWidget {
-  const _ServiceGrid({required this.nav, this.offline = false});
+  const _ServiceGrid({required this.nav, this.offline = false, this.available});
   final PatientShellNav nav;
+  final double? available;
+
+  static const _top = 12.0, _bottom = 10.0, _gap = 10.0;
+  static const _maxRow = 136.0;
 
   /// Offline design: modules that need the network are greyed out and
   /// explain themselves when tapped; the two that work offline are marked.
   final bool offline;
+
+  /// Row height of the fill-the-screen layout, or null when not legible.
+  double? _fittedRow(BuildContext context) {
+    final space = available;
+    if (space == null || !space.isFinite) return null;
+    final row = (space - _top - _bottom - 2 * _gap) / 3;
+    if (row < AfyaServiceTile.minHeight(context)) return null;
+    return row > _maxRow ? _maxRow : row;
+  }
+
   @override
   Widget build(BuildContext context) {
     final modules = patientModules(context, nav);
+    final fitted = _fittedRow(context);
+    if (fitted != null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, _top, 20, _bottom),
+        child: LayoutBuilder(
+            builder: (context, c) => Column(children: [
+                  for (var row = 0; row < 3; row++)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: row == 2 ? 0 : _gap),
+                      child: SizedBox(
+                        height: fitted,
+                        child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (var col = 0; col < 3; col++) ...[
+                                if (col > 0) const SizedBox(width: _gap),
+                                Expanded(
+                                    child: AfyaServiceTile(
+                                        icon: modules[row * 3 + col].icon,
+                                        color: modules[row * 3 + col].color,
+                                        background:
+                                            modules[row * 3 + col].background,
+                                        label: modules[row * 3 + col].label,
+                                        labelWidth:
+                                            (c.maxWidth - 2 * _gap) / 3 - 8,
+                                        height: fitted,
+                                        onTap: () => modules[row * 3 + col]
+                                            .open(context))),
+                              ],
+                            ]),
+                      ),
+                    ),
+                ])),
+      );
+    }
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      padding: const EdgeInsets.fromLTRB(20, _top, 20, _bottom),
       // Measured here, outside the rows' IntrinsicHeight: each tile is a
       // third of the width less the two gaps, and its label has 4 px of
       // padding either side.

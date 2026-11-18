@@ -111,10 +111,12 @@ Future<void> openNotificationDestination(BuildContext context,
               .push(MaterialPageRoute<void>(builder: (_) => page!)));
           // Only explicit user interaction after authorization marks a notice read.
           if (notificationUuid(id)) unawaited(_recordOpened(cubit, id!));
-        } else if (fromInbox &&
-            notificationUuid(id) &&
-            context.mounted &&
-            gate.current) {
+        } else if (notificationUuid(id) && context.mounted && gate.current) {
+          // A notice with no screen of its own (greetings, announcements)
+          // opens the inbox. Tapping it, in the inbox or as the phone's system
+          // notification, is the explicit open, so it is recorded the same
+          // way. It used to be recorded only for taps inside the inbox, so a
+          // system tap left it unread on Home until "Mark all as read".
           unawaited(_recordOpened(cubit, id!));
         }
       } catch (_) {
