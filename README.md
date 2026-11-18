@@ -274,9 +274,14 @@ full size. How to add or replace captures: [`docs/screenshots/README.md`](docs/s
 
 ### Doctor Web and Admin Web
 
-| Doctor Web dashboard | Doctor Web chat | Admin overview | Admin doctor verification |
-|---|---|---|---|
-| _`docs/screenshots/doctor-web-dashboard.png`_ | _`docs/screenshots/doctor-web-chat.png`_ | _`docs/screenshots/admin-overview.png`_ | _`docs/screenshots/admin-verification.png`_ |
+| Doctor Web dashboard | Doctor Web chat |
+|:---:|:---:|
+| <a href="docs/screenshots/doctor-web-dashboard.jpg"><img src="docs/screenshots/doctor-web-dashboard.jpg" alt="Doctor Web dashboard" width="400"></a> | <a href="docs/screenshots/doctor-web-chat.jpg"><img src="docs/screenshots/doctor-web-chat.jpg" alt="Doctor Web patient chat" width="400"></a> |
+| **Admin overview** | **Admin doctor verification** |
+| <a href="docs/screenshots/admin-overview.jpg"><img src="docs/screenshots/admin-overview.jpg" alt="Admin real-time operations overview" width="400"></a> | <a href="docs/screenshots/admin-verification.jpg"><img src="docs/screenshots/admin-verification.jpg" alt="Admin doctor verification queue" width="400"></a> |
+
+Doctor Web captures use the labelled design-preview fixtures (sample patients, not real people);
+Admin captures come from the local development stack.
 
 ### Design references
 
