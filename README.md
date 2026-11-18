@@ -257,20 +257,20 @@ passwords.**
 
 ## Screenshots
 
-Current builds follow the reference boards below. Captures of the shipping apps go in
-[`docs/screenshots/`](docs/screenshots/README.md) under the file names listed there.
+Captured from current Android builds with test accounts (no real patient data). Click an image for
+full size. How to add or replace captures: [`docs/screenshots/README.md`](docs/screenshots/README.md).
 
 ### Patient app
 
-| Home | Video consultation | Health records | Messages |
-|---|---|---|---|
-| _`docs/screenshots/patient-home.png`_ | _`docs/screenshots/patient-video.png`_ | _`docs/screenshots/patient-records.png`_ | _`docs/screenshots/patient-chat.png`_ |
+| Home | HIV prevention | Find a doctor | Health Vault |
+|:---:|:---:|:---:|:---:|
+| <a href="docs/screenshots/patient-home.jpg"><img src="docs/screenshots/patient-home.jpg" alt="Patient Home" width="180"></a> | <a href="docs/screenshots/patient-prevention.jpg"><img src="docs/screenshots/patient-prevention.jpg" alt="HIV Prevention and Sexual Health" width="180"></a> | <a href="docs/screenshots/patient-find-doctor.jpg"><img src="docs/screenshots/patient-find-doctor.jpg" alt="Find a Doctor" width="180"></a> | <a href="docs/screenshots/patient-health-vault.jpg"><img src="docs/screenshots/patient-health-vault.jpg" alt="Health Vault" width="180"></a> |
 
 ### Care app (doctors and peer navigators)
 
-| Home dashboard | Appointment queue | Consultation | Clinical notes |
-|---|---|---|---|
-| _`docs/screenshots/care-home.png`_ | _`docs/screenshots/care-queue.png`_ | _`docs/screenshots/care-consultation.png`_ | _`docs/screenshots/care-notes.png`_ |
+| Home dashboard | Consultation schedule | Appointments | Consultation chats |
+|:---:|:---:|:---:|:---:|
+| <a href="docs/screenshots/care-home.jpg"><img src="docs/screenshots/care-home.jpg" alt="Care app Home dashboard" width="180"></a> | <a href="docs/screenshots/care-schedule.jpg"><img src="docs/screenshots/care-schedule.jpg" alt="Consultation schedule" width="180"></a> | <a href="docs/screenshots/care-appointments.jpg"><img src="docs/screenshots/care-appointments.jpg" alt="Appointments" width="180"></a> | <a href="docs/screenshots/care-chats.jpg"><img src="docs/screenshots/care-chats.jpg" alt="Consultation chats" width="180"></a> |
 
 ### Doctor Web and Admin Web
 
