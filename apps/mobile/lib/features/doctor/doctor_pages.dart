@@ -15,6 +15,7 @@ import '../../core/network/api_client.dart';
 import '../../core/network/screen_refresh.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/time/kenya_time.dart';
+import '../../core/utils/upload_image_shrink.dart';
 import '../../core/validation/kenya_phone.dart';
 import '../../core/widgets/doctor_widgets.dart';
 import '../auth/auth_cubit.dart';
@@ -3590,10 +3591,17 @@ class _ChatThreadState extends State<ChatThreadPage> {
       Uint8List bytes;
       try {
         if (!mounted) return;
-        if (file.size > 10 * 1024 * 1024) {
+        // Files skips the photo picker's own resize, so shrink here; the
+        // 10 MB limit applies to what is actually uploaded.
+        if (file.size > 30 * 1024 * 1024) {
           throw const ApiException(413, 'Select an image smaller than 10 MB.');
         }
-        bytes = file.bytes ?? await File(file.path!).readAsBytes();
+        bytes = await shrinkImageForUpload(
+            file.bytes ?? await File(file.path!).readAsBytes(),
+            png: file.extension?.toLowerCase() == 'png');
+        if (bytes.length > 10 * 1024 * 1024) {
+          throw const ApiException(413, 'Select an image smaller than 10 MB.');
+        }
       } finally {
         await FilePicker.platform.clearTemporaryFiles();
       }
@@ -4227,7 +4235,12 @@ class _ScannerState extends State<ScannerPage> {
     });
     final repo = context.read<DoctorCubit>().repo;
     try {
-      final bytes = await File(page.file.path).readAsBytes();
+      final raw = await File(page.file.path).readAsBytes();
+      // Pages chosen through Files skip the photo picker's resize.
+      final bytes = page.isPdf || !page.fromFilePicker
+          ? raw
+          : await shrinkImageForUpload(raw,
+              png: raw.length >= 4 && raw[0] == 0x89 && raw[1] == 0x50);
       if (bytes.length > 10 * 1024 * 1024) {
         throw const ApiException(413, 'This page exceeds the 10 MB limit.');
       }
