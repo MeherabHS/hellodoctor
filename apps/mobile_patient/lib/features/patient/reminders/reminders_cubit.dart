@@ -8,7 +8,8 @@ class RemindersState {
       {this.loading = true,
       this.items = const [],
       this.notificationsAllowed = true,
-      this.exactAlarmsAllowed = true});
+      this.exactAlarmsAllowed = true,
+      this.alarmFailed = false});
   final bool loading;
   final List<Reminder> items;
 
@@ -20,6 +21,11 @@ class RemindersState {
   /// False when Android does not allow exact alarms ("Alarms & reminders"),
   /// so alerts may come a few minutes late. The screen says so.
   final bool exactAlarmsAllowed;
+
+  /// True when the last save could not set the device alarm although
+  /// notifications are allowed (a scheduling error, not a permission). The
+  /// screen says so rather than blaming the notification setting.
+  final bool alarmFailed;
 
   /// Reminders that will still alert (or are switched off but would), soonest
   /// first.
@@ -40,13 +46,15 @@ class RemindersState {
           {bool? loading,
           List<Reminder>? items,
           bool? notificationsAllowed,
-          bool? exactAlarmsAllowed}) =>
+          bool? exactAlarmsAllowed,
+          bool? alarmFailed}) =>
       RemindersState(
           loading: loading ?? this.loading,
           items: items ?? this.items,
           notificationsAllowed:
               notificationsAllowed ?? this.notificationsAllowed,
-          exactAlarmsAllowed: exactAlarmsAllowed ?? this.exactAlarmsAllowed);
+          exactAlarmsAllowed: exactAlarmsAllowed ?? this.exactAlarmsAllowed,
+          alarmFailed: alarmFailed ?? this.alarmFailed);
 }
 
 /// A signed-in patient's own reminders: load, add, edit, switch on/off and
@@ -94,6 +102,7 @@ class RemindersCubit extends Cubit<RemindersState> {
     var allowed = state.notificationsAllowed;
     var exact = state.exactAlarmsAllowed;
     var rearmAll = false;
+    var failed = false;
     try {
       if (changed.enabled) {
         allowed = await scheduler.ensurePermission();
@@ -109,7 +118,11 @@ class RemindersCubit extends Cubit<RemindersState> {
             exact = await scheduler.ensureExactAlarms();
             rearmAll = exact;
           }
-          await scheduler.schedule(changed, text: text, now: now);
+          try {
+            await scheduler.schedule(changed, text: text, now: now);
+          } catch (_) {
+            failed = true;
+          }
         }
       } else {
         await scheduler.cancel(changed.id);
@@ -121,7 +134,8 @@ class RemindersCubit extends Cubit<RemindersState> {
       emit(state.copyWith(
           items: next,
           notificationsAllowed: allowed,
-          exactAlarmsAllowed: exact));
+          exactAlarmsAllowed: exact,
+          alarmFailed: failed));
     }
     // Granting exact alarms only helps alarms armed afterwards: re-arm the
     // others too, so none stays on late, inexact timing.

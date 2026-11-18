@@ -2356,6 +2356,7 @@
   "reminderAlarmSnooze": "Snooze 10 min",
   "reminderAlarmOn": "Alarm on",
   "reminderAlarmOff": "Alarm off",
+  "remindersAlarmFailed": "Your reminder was saved, but its alarm could not be set on this phone. Switch it off and on again; if this keeps happening, contact support.",
   "remindersExactAlarmsOff": "Reminders may ring late, or not at all while your phone is idle, because \"Alarms & reminders\" is off for AfyaMkononi. Allow it so every reminder rings on time.",
   "vaultFromDoctor": "Sent by your doctor",
   "vaultMyUploads": "Uploaded by you",

@@ -24,6 +24,10 @@ class FakeScheduler implements ReminderScheduler {
   final scheduled = <String>[], cancelled = <String>[];
   bool allowed = true, exact = true;
 
+  /// Simulates the platform refusing to set the alarm (e.g. a release-build
+  /// plugin error) while notifications are allowed.
+  bool failSchedule = false;
+
   /// What the user does on the system "Alarms & reminders" page.
   bool grantOnAsk = false;
   int exactAsks = 0;
@@ -44,6 +48,7 @@ class FakeScheduler implements ReminderScheduler {
   Future<void> schedule(Reminder reminder,
       {required ReminderAlertText text, required DateTime now}) async {
     if (!reminder.enabled) return;
+    if (failSchedule) throw StateError('Missing type parameter.');
     scheduled.add(reminder.id);
   }
 
@@ -342,6 +347,26 @@ void main() {
           Reminder.decodeList(Reminder.encodeList(
               [decoded.single.copyWith(enabled: false)])).single.enabled,
           isFalse);
+    });
+
+    test(
+        'an alarm that cannot be set is reported as such, not as notifications off',
+        () async {
+      final scheduler = FakeScheduler()..failSchedule = true;
+      final store = MemoryReminderStore();
+      final cubit = cubitWith(store, scheduler);
+      await cubit.load();
+      expect(
+          await cubit.add(reminder('x', DateTime(2026, 11, 13, 12))), isTrue);
+      expect(store.data['user-a']!.single.id, 'x');
+      expect(cubit.state.notificationsAllowed, isTrue);
+      expect(cubit.state.alarmFailed, isTrue);
+
+      scheduler.failSchedule = false;
+      await cubit.setEnabled('x', true);
+      expect(cubit.state.alarmFailed, isFalse);
+      expect(scheduler.scheduled, ['x']);
+      await cubit.close();
     });
 
     test('without exact alarms the state says alerts may be late', () async {

@@ -12,3 +12,16 @@
 -keepclassmembers class * extends android.content.BroadcastReceiver {
     public <init>();
 }
+
+# flutter_local_notifications stores scheduled notifications (every reminder
+# alarm) with Gson 2.8.9, which ships no R8 rules. R8 full mode strips the
+# generic signature of its `new TypeToken<ArrayList<NotificationDetails>>(){}`,
+# so zonedSchedule() fails in release builds only ("Missing type parameter")
+# and no reminder alarm is ever set. Keep the signatures Gson reads.
+-keepattributes Signature, InnerClasses, EnclosingMethod, *Annotation*
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep,allowobfuscation,allowshrinking class com.google.gson.reflect.TypeToken
+-keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
+-keepclassmembers,allowobfuscation class * {
+  @com.google.gson.annotations.SerializedName <fields>;
+}

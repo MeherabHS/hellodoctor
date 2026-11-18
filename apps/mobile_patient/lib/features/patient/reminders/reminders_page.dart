@@ -221,6 +221,14 @@ class _RemindersPageState extends State<RemindersPage>
                         background: PatientTokens.amberCard,
                         accent: PatientTokens.amberText),
                     const SizedBox(height: 14),
+                  ] else if (state.alarmFailed) ...[
+                    AfyaInfoCard(
+                        icon: Icons.alarm_off_rounded,
+                        title: l.moduleReminders,
+                        body: l.remindersAlarmFailed,
+                        background: PatientTokens.amberCard,
+                        accent: PatientTokens.amberText),
+                    const SizedBox(height: 14),
                   ] else if (!state.exactAlarmsAllowed &&
                       state.items.any((r) => r.enabled && !r.isPast(now))) ...[
                     AfyaInfoCard(
