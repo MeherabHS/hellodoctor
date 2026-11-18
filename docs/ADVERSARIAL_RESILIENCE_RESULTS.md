@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Adversarial resilience results — 19 October 2026 (Asia/Dhaka)
 
 **Milestone acceptance: INCONCLUSIVE. Do not treat this change as launch approval.**

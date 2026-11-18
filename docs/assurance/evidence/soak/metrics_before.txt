@@ -1,0 +1,77 @@
+﻿# TYPE http_requests_total counter
+http_requests_total{method="GET",path="/healthz",status="200"} 2
+
+# TYPE admission_accepted_total counter
+admission_accepted_total{class="health"} 3
+
+# TYPE db_pool_size gauge
+db_pool_size{role="api"} 1
+db_pool_size{role="payment"} 1
+db_pool_size{role="finance"} 1
+db_pool_size{role="auth"} 1
+
+# TYPE admission_inflight gauge
+admission_inflight{class="health"} 1
+
+# TYPE db_pool_idle gauge
+db_pool_idle{role="api"} 1
+db_pool_idle{role="finance"} 1
+db_pool_idle{role="payment"} 1
+db_pool_idle{role="auth"} 1
+
+# TYPE sqlx_pool_acquire_wait_seconds summary
+sqlx_pool_acquire_wait_seconds{quantile="0"} 0.000077864
+sqlx_pool_acquire_wait_seconds{quantile="0.5"} 0.00009156146743334129
+sqlx_pool_acquire_wait_seconds{quantile="0.9"} 0.00011010236484736609
+sqlx_pool_acquire_wait_seconds{quantile="0.95"} 0.00012915464994530057
+sqlx_pool_acquire_wait_seconds{quantile="0.99"} 0.00016952671483079222
+sqlx_pool_acquire_wait_seconds{quantile="0.999"} 0.00016952671483079222
+sqlx_pool_acquire_wait_seconds{quantile="1"} 0.000180034
+sqlx_pool_acquire_wait_seconds_sum 0.07041947900000006
+sqlx_pool_acquire_wait_seconds_count 615
+
+# TYPE admission_permit_hold_seconds summary
+admission_permit_hold_seconds{class="health",quantile="0"} 0.000939271
+admission_permit_hold_seconds{class="health",quantile="0.5"} 0.0009391831703023796
+admission_permit_hold_seconds{class="health",quantile="0.9"} 0.0009391831703023796
+admission_permit_hold_seconds{class="health",quantile="0.95"} 0.0009391831703023796
+admission_permit_hold_seconds{class="health",quantile="0.99"} 0.0009391831703023796
+admission_permit_hold_seconds{class="health",quantile="0.999"} 0.0009391831703023796
+admission_permit_hold_seconds{class="health",quantile="1"} 0.00300456
+admission_permit_hold_seconds_sum{class="health"} 0.003943831
+admission_permit_hold_seconds_count{class="health"} 2
+
+# TYPE http_request_duration_seconds summary
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0"} 0.001063507
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.5"} 0.0010635956081654378
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.9"} 0.0010635956081654378
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.95"} 0.0010635956081654378
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.99"} 0.0010635956081654378
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.999"} 0.0010635956081654378
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="1"} 0.003153998
+http_request_duration_seconds_sum{method="GET",path="/healthz",status="200"} 0.004217505
+http_request_duration_seconds_count{method="GET",path="/healthz",status="200"} 2
+
+# TYPE admission_permit_hold_by_endpoint_seconds summary
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0"} 0.000939271
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.5"} 0.0009391831703023796
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.9"} 0.0009391831703023796
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.95"} 0.0009391831703023796
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.99"} 0.0009391831703023796
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.999"} 0.0009391831703023796
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="1"} 0.00300456
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/healthz"} 0.003943831
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/healthz"} 2
+
+# TYPE db_acquire_seconds summary
+db_acquire_seconds{quantile="0"} 0.000218161
+db_acquire_seconds{quantile="0.5"} 0.0002420176180120055
+db_acquire_seconds{quantile="0.9"} 0.00027661054043769226
+db_acquire_seconds{quantile="0.95"} 0.0004686285860989876
+db_acquire_seconds{quantile="0.99"} 0.0004686285860989876
+db_acquire_seconds{quantile="0.999"} 0.0004686285860989876
+db_acquire_seconds{quantile="1"} 0.004195222
+db_acquire_seconds_sum 0.007073374
+db_acquire_seconds_count 12
+
+

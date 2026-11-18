@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # HelloDoctor economic, resilience and authentication implementation report
 
 19 October 2026, Asia/Dhaka. **Implementation delivered; full security acceptance

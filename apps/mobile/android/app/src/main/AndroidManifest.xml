@@ -58,7 +58,7 @@
              `NotificationChannels.forType`. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="GENERAL" />
+            android:value="GENERAL_V2" />
         <!-- Required by flutter_local_notifications for AlarmManager delivery
              while the Flutter process is backgrounded, and rescheduling after
              reboot or an in-place APK update. -->

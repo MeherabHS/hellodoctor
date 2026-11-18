@@ -1,3 +1,5 @@
+import 'local_notification_service.dart';
+import 'notification_ids.dart';
 import 'notification_taps.dart';
 import 'dart:async';
 
@@ -43,7 +45,8 @@ class PushNotificationService {
     try {
       if (_disposed) return;
       final messaging = FirebaseMessaging.instance;
-      _foregroundSubscription = FirebaseMessaging.onMessage.listen((_) {
+      _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
+        unawaited(showForegroundPush(message));
         unawaited(handleForegroundMessage());
       });
       _openedSubscription =
@@ -83,6 +86,29 @@ class PushNotificationService {
       // diagnostics instead of silently disappearing.
       ClientErrorReporter.observe(error, stack,
           screen: 'Notifications', operation: 'push_init');
+    }
+  }
+
+  /// Shows a push that arrives while the app is open, with its own title and
+  /// text, on its type's channel and sound (product owner, 2026-11-17: a
+  /// notification must never be silent or wait for the inbox poll). Android
+  /// does not display FCM notifications for a foreground app. Uses the id
+  /// the inbox poll would use, so the notice never shows twice.
+  static Future<void> showForegroundPush(RemoteMessage message) async {
+    final notice = message.notification;
+    final id = message.data['notification_id'];
+    if (notice == null || id is! String || id.isEmpty) return;
+    try {
+      await LocalNotificationService.showNow(
+        id: stableNotificationId(remoteEventKey(id)),
+        channel: NotificationChannels.forType(
+            '${message.data['notification_type'] ?? ''}'),
+        title: notice.title ?? '',
+        body: notice.body ?? '',
+        payload: remoteEventKey(id),
+      );
+    } catch (_) {
+      // Display is best-effort; the inbox still refreshes below.
     }
   }
 

@@ -9,6 +9,56 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get batteryPromptTitle => 'Get reminders on time';
+
+  @override
+  String get batteryPromptBody =>
+      'Your phone may stop this app in the background to save battery. That can delay or block consultation reminders and messages. To get them on time, allow the app to run in the background.';
+
+  @override
+  String get batteryPromptLater => 'Not now';
+
+  @override
+  String get batteryPromptOpenSettings => 'Open settings';
+
+  @override
+  String get batteryStepsSamsung =>
+      'Tap Open settings, then Battery, and choose Unrestricted. Also check that this app is not under Sleeping apps (Settings > Battery > Background usage limits).';
+
+  @override
+  String get batteryStepsTranssion =>
+      'Tap Open settings, then Battery, and allow background running (turn battery optimisation off). In Phone Master, allow this app to auto-start.';
+
+  @override
+  String get batteryStepsXiaomi =>
+      'Tap Open settings, then Battery saver, and choose No restrictions. Then turn on Autostart.';
+
+  @override
+  String get batteryStepsOppo =>
+      'Tap Open settings, then Battery, and turn on Allow background activity. Also allow Auto launch.';
+
+  @override
+  String get batteryStepsVivo =>
+      'Tap Open settings, then Battery, and allow high background power consumption. Also allow Auto-start.';
+
+  @override
+  String get batteryStepsHuawei =>
+      'Tap Open settings, then Battery, then App launch. Set this app to Manage manually and turn on all three switches.';
+
+  @override
+  String get batteryStepsOther =>
+      'Tap Open settings, then Battery, and choose Unrestricted (or Don\'t optimise).';
+
+  @override
+  String get chatReceiptSending => 'Sending';
+
+  @override
+  String get chatReceiptSent => 'Sent';
+
+  @override
+  String get chatReceiptRead => 'Read';
+
+  @override
   String get notificationsTitle => 'Notifications';
 
   @override

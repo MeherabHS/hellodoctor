@@ -63,10 +63,15 @@ struct Sample {
 struct Fixtures {
     base_url: String,
     client: reqwest::Client,
-    patient_phones: Vec<String>,
+    patient_emails: Vec<String>,
     doctor_emails: Vec<String>,
     rr_patient: AtomicUsize,
     rr_doctor: AtomicUsize,
+    /// AUTH_DISTRIBUTED_CLIENT_IPS=1 (2026-11-17): send a random client
+    /// address in X-Forwarded-For on every request, for a backend that trusts
+    /// this load generator as its proxy. Models many users on different
+    /// networks; unset models everyone behind one address (one carrier NAT).
+    distributed_ips: bool,
 }
 
 async fn timed_post(
@@ -75,12 +80,21 @@ async fn timed_post(
     body: &serde_json::Value,
 ) -> (u16, Duration, serde_json::Value) {
     let start = Instant::now();
-    let res = f
-        .client
-        .post(format!("{}{}", f.base_url, path))
-        .json(body)
-        .send()
-        .await;
+    let mut req = f.client.post(format!("{}{}", f.base_url, path)).json(body);
+    if f.distributed_ips {
+        use rand::Rng;
+        let mut r = rand::thread_rng();
+        req = req.header(
+            "X-Forwarded-For",
+            format!(
+                "10.{}.{}.{}",
+                r.gen_range(0..=255),
+                r.gen_range(0..=255),
+                r.gen_range(1..=254)
+            ),
+        );
+    }
+    let res = req.send().await;
     match res {
         Ok(r) => {
             let status = r.status().as_u16();
@@ -91,51 +105,16 @@ async fn timed_post(
     }
 }
 
-/// One full Patient lifecycle: OTP request -> verify+login -> refresh ->
-/// logout -> re-login (a second OTP request+verify). Every one of these is a
-/// real backend round trip against the real otp_repo/auth_sessions tables.
+/// One full Patient lifecycle, as the Patient app signs in today (2026-11-17;
+/// the phone-only OTP endpoints this harness used were retired): email +
+/// password (real Argon2id verify) -> one-time code -> refresh -> logout ->
+/// sign in again. Identities: scripts/seed_auth_stress_patients.sql.
 async fn patient_lifecycle(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>) {
-    let idx = f.rr_patient.fetch_add(1, Ordering::Relaxed) % f.patient_phones.len();
-    let phone = &f.patient_phones[idx];
+    let idx = f.rr_patient.fetch_add(1, Ordering::Relaxed) % f.patient_emails.len();
+    let email = &f.patient_emails[idx];
 
-    let (status, elapsed, body) = timed_post(
-        f,
-        "/api/v1/auth/register-otp",
-        &json!({"phone_number": phone}),
-    )
-    .await;
-    let _ = tx.send(Sample {
-        label: "patient_otp_request",
-        elapsed,
-        status,
-    });
-    if Outcome::classify(status) != Outcome::Success {
-        return;
-    }
-    let Some(code) = body["data"]["debug_otp_code"]
-        .as_str()
-        .map(|s| s.to_string())
-    else {
-        return; // dev-otp flags not enabled on the target — nothing more to exercise.
-    };
-
-    let (status, elapsed, body) = timed_post(
-        f,
-        "/api/v1/auth/verify-otp-and-login",
-        &json!({"phone_number": phone, "otp_code": code}),
-    )
-    .await;
-    let _ = tx.send(Sample {
-        label: "patient_otp_verify",
-        elapsed,
-        status,
-    });
-    if Outcome::classify(status) != Outcome::Success {
-        return;
-    }
-    let Some(refresh_token) = body["data"]["refresh_token"]
-        .as_str()
-        .map(|s| s.to_string())
+    let Some(refresh_token) =
+        patient_sign_in(f, tx, email, "patient_password_login", "patient_otp_verify").await
     else {
         return;
     };
@@ -168,35 +147,53 @@ async fn patient_lifecycle(f: &Fixtures, tx: &mpsc::UnboundedSender<Sample>) {
         status,
     });
 
-    // Re-login: a fresh OTP cycle proves the account can log back in after
-    // the previous session was revoked, not just that the first login worked.
+    // Signing in again proves the account works after its session was revoked.
+    let _ = patient_sign_in(f, tx, email, "relogin", "relogin_otp_verify").await;
+}
+
+/// Patient email + password, then the one-time code. Returns the refresh
+/// token on success.
+async fn patient_sign_in(
+    f: &Fixtures,
+    tx: &mpsc::UnboundedSender<Sample>,
+    email: &str,
+    login_label: &'static str,
+    verify_label: &'static str,
+) -> Option<String> {
     let (status, elapsed, body) = timed_post(
         f,
-        "/api/v1/auth/register-otp",
-        &json!({"phone_number": phone}),
+        "/api/v1/auth/patient/login",
+        &json!({"email": email, "password": BENCHMARK_DOCTOR_PASSWORD}),
     )
     .await;
-    if Outcome::classify(status) == Outcome::Success {
-        if let Some(code) = body["data"]["debug_otp_code"].as_str() {
-            let (status, elapsed, _) = timed_post(
-                f,
-                "/api/v1/auth/verify-otp-and-login",
-                &json!({"phone_number": phone, "otp_code": code}),
-            )
-            .await;
-            let _ = tx.send(Sample {
-                label: "relogin",
-                elapsed,
-                status,
-            });
-            return;
-        }
-    }
     let _ = tx.send(Sample {
-        label: "relogin",
+        label: login_label,
         elapsed,
         status,
     });
+    if Outcome::classify(status) != Outcome::Success {
+        return None;
+    }
+    let challenge = body["data"]["challenge_token"].as_str()?.to_string();
+    // Development OTP mode only (the benchmark stack); never present in production.
+    let code = body["data"]["debug_otp_code"].as_str()?.to_string();
+    let (status, elapsed, body) = timed_post(
+        f,
+        "/api/v1/auth/patient/verify-otp",
+        &json!({"challenge_token": challenge, "otp_code": code}),
+    )
+    .await;
+    let _ = tx.send(Sample {
+        label: verify_label,
+        elapsed,
+        status,
+    });
+    if Outcome::classify(status) != Outcome::Success {
+        return None;
+    }
+    body["data"]["refresh_token"]
+        .as_str()
+        .map(|s| s.to_string())
 }
 
 /// One full Doctor lifecycle: real Argon2id password login -> MFA challenge
@@ -345,12 +342,17 @@ async fn main() {
         .await
         .expect("connect to benchmark Postgres");
 
-    let patient_phones: Vec<String> = sqlx::query_scalar(
-        "SELECT phone_number FROM users WHERE phone_number LIKE '+25472%' ORDER BY phone_number",
+    let patient_emails: Vec<String> = sqlx::query_scalar(
+        "SELECT email FROM users WHERE phone_number LIKE '+25472%' \
+         AND email LIKE 'capacity.patient.%@example.invalid' ORDER BY email",
     )
     .fetch_all(&pg)
     .await
-    .expect("load patient phones");
+    .expect("load auth-stress patient emails (run scripts/seed_auth_stress_patients.sql first)");
+    if patient_emails.is_empty() {
+        eprintln!("No auth-stress patients found — run scripts/seed_auth_stress_patients.sql against this database first.");
+        std::process::exit(1);
+    }
     let doctor_emails: Vec<String> = sqlx::query_scalar(
         "SELECT email FROM users WHERE phone_number LIKE '+25475%' AND email IS NOT NULL ORDER BY email",
     )
@@ -364,21 +366,34 @@ async fn main() {
     }
 
     println!(
-        "Identities: {} patients (OTP), {} doctors (password+MFA)\n",
-        patient_phones.len(),
+        "Identities: {} patients (password+OTP), {} doctors (password+MFA)\n",
+        patient_emails.len(),
         doctor_emails.len()
     );
 
     let fixtures = Arc::new(Fixtures {
         base_url,
-        client: reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()
-            .unwrap(),
-        patient_phones,
+        // AUTH_HOST_HEADER (2026-11-17): lets the run go through the Caddy
+        // proxy's name-based vhost, the path a real phone takes, like
+        // capacity_test.rs's CAPACITY_HOST_HEADER. Unset = unchanged.
+        client: {
+            let mut b = reqwest::Client::builder().timeout(Duration::from_secs(10));
+            if let Ok(h) = env::var("AUTH_HOST_HEADER") {
+                let mut headers = reqwest::header::HeaderMap::new();
+                headers.insert(
+                    reqwest::header::HOST,
+                    reqwest::header::HeaderValue::from_str(&h)
+                        .expect("AUTH_HOST_HEADER must be a valid header value"),
+                );
+                b = b.default_headers(headers);
+            }
+            b.build().unwrap()
+        },
+        patient_emails,
         doctor_emails,
         rr_patient: AtomicUsize::new(0),
         rr_doctor: AtomicUsize::new(0),
+        distributed_ips: env::var("AUTH_DISTRIBUTED_CLIENT_IPS").as_deref() == Ok("1"),
     });
 
     let (tx, mut rx) = mpsc::unbounded_channel::<Sample>();

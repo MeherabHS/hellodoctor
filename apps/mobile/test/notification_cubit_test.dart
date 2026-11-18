@@ -58,12 +58,15 @@ class StubNotificationRepository extends NotificationRepository {
   Future<void> markRead(String id) async {
     markedReadIds.add(id);
     if (failMarkRead) throw const ApiException(409, 'Already read elsewhere');
+    // A real server's count drops once the read is applied.
+    if (unreadCountResponse > 0) unreadCountResponse--;
   }
 
   @override
   Future<int> markAllRead() async {
     markAllReadCalls++;
     if (failMarkAllRead) throw const ApiException(409, 'Server error');
+    unreadCountResponse = 0;
     return listResponse.length;
   }
 }

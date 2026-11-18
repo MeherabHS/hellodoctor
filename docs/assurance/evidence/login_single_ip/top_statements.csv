@@ -1,0 +1,20 @@
+﻿2,7.6,3.81,4.9,SELECT id, user_id, full_name, date_of_birth, gender, blood_group, weight_kg, emergency_contact_phone, emergency_contact_relation, guardian_patient_id, relation
+1,5.1,5.08,5.1,SELECT a.id, s.end_time FROM appointments a JOIN doctor_schedule_slots s ON s.id = a.slot_id WHERE a.status = $3 AND a.modality = $4 AND clock_timestamp() >= s.
+3,3.6,1.19,1.9,INSERT INTO audit_events (id, actor_id, actor_role, action, resource_type, resource_id, session_id, request_id, ip_hash, result, reason, before_data, after_data
+1,2.5,2.52,2.5,SELECT email FROM users WHERE phone_number LIKE $1 AND email LIKE $2 ORDER BY email
+6,2.0,0.34,1.5,INSERT INTO auth_sessions (id, user_id, token_family_id, refresh_token_hash, device_fingerprint, ip_hash, user_agent, created_at, last_used_at, rotated_at, revo
+1,1.7,1.74,1.7,SELECT p.id AS patient_id, COALESCE(p.user_id, g.user_id) AS user_id, COALESCE(pu.preferred_language, gu.preferred_language) AS language FROM patient_profiles p
+7,1.6,0.23,0.8,SELECT count(*) FROM pg_locks WHERE NOT granted
+142,1.5,0.01,0.0,SELECT EXISTS(SELECT $2 FROM notifications WHERE dedup_key = $1)
+1,1.5,1.48,1.5,SELECT d.id AS profile_id, d.user_id FROM doctor_profiles d JOIN users u ON u.id = d.user_id WHERE d.professional_verification_status = $1 AND u.is_active = $2 
+1,1.5,1.46,1.5,SELECT j.appointment_id, COALESCE(p.user_id, g.user_id) FROM appointment_expiry_cleanup_jobs j JOIN appointments a ON a.id=j.appointment_id JOIN patient_profile
+1,1.3,1.34,1.3,SELECT cleanup_consultation_trace($1)
+1,1.1,1.08,1.1,SELECT email FROM users WHERE phone_number LIKE $1 AND email IS NOT NULL ORDER BY email
+2,0.9,0.44,0.7,INSERT INTO patient_auth_challenges (token,email,phone_number,password_hash,user_id,flow,code_hash,expires_at,registration_profile) VALUES ($1,$2,$3,$4,$5,$6,$7
+7,0.9,0.12,0.2,SELECT count(*) FROM pg_stat_activity WHERE state=$1 AND pid <> pg_backend_pid()
+25,0.4,0.02,0.0,SELECT title_template, body_template FROM notification_templates WHERE template_key = $1 AND locale = $2 AND enabled = TRUE
+12,0.3,0.03,0.1,SELECT $2 FROM ONLY "public"."users" x WHERE "id" OPERATOR(pg_catalog.=) $1 FOR KEY SHARE OF x
+7,0.3,0.04,0.0,SELECT version FROM _sqlx_migrations WHERE success = true ORDER BY version
+1,0.3,0.26,0.3,INSERT INTO pending_mfa_challenges (token, user_id, code_hash, expires_at, created_at) VALUES ($1, $2, $3, $4, $5)
+3,0.2,0.06,0.1,UPDATE auth_sessions SET revoked_at = $2 WHERE token_family_id = $1 AND revoked_at IS NULL
+3,0.2,0.06,0.1,UPDATE auth_sessions SET rotated_at = $2, last_used_at = $2 WHERE id = $1 AND rotated_at IS NULL AND revoked_at IS NULL AND expires_at > $2

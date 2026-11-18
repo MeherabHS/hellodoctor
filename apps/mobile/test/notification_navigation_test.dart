@@ -99,6 +99,15 @@ class NavigationRepo extends NotificationRepository {
   }
 }
 
+/// A server whose unread count reflects reads: 1 until the notice is
+/// marked read, then 0. The inbox's own refresh fetches the count before
+/// the read lands, which is the race the badge has to survive.
+class ReadAwareRepo extends NavigationRepo {
+  ReadAwareRepo(super.api);
+  @override
+  Future<int> unreadCount() async => reads > 0 ? 0 : 1;
+}
+
 void main() {
   for (final language in ['en', 'sw']) {
     testWidgets('inbox opens its authorized appointment in $language',
@@ -376,5 +385,33 @@ void main() {
         (await NotificationDestination.load(repo, noticeId, doctor: true)).kind,
         NotificationDestinationKind.doctorArticle);
     expect(api.requests.last, '/doctor/articles/$entityId');
+  });
+
+  testWidgets(
+      'a system tap on a notice with no screen of its own (a Peer Navigator request) '
+      'opens the inbox and marks that notice read, so the badge clears',
+      (tester) async {
+    NotificationTaps.clear();
+    final repo = ReadAwareRepo(NavigationApi()
+      ..type = 'PEER_REQUEST_NEW'
+      ..entityType = 'PEER_REQUEST');
+    addTearDown(repo.api.dispose);
+    final cubit = NotificationCubit(repo);
+    addTearDown(cubit.close);
+    await cubit.load();
+    expect(cubit.state.unreadCount, 1);
+    await tester.pumpWidget(BlocProvider.value(
+        value: cubit,
+        child: MaterialApp(
+            home: NotificationNavigationHost(
+                cubit: cubit, child: const Scaffold(body: Text('Home'))),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales)));
+    NotificationTaps.receive({'notification_id': noticeId});
+    await tester.pumpAndSettle();
+    expect(find.byType(NotificationCenterPage), findsOneWidget);
+    expect(repo.reads, 1);
+    expect(cubit.state.unreadCount, 0);
+    NotificationTaps.clear();
   });
 }

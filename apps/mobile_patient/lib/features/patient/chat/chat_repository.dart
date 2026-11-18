@@ -19,6 +19,32 @@ class ChatRepository {
   final ApiClient api;
   final ConnectivityService? connectivity;
   final _pendingMessages = <String, ({String content, String key})>{};
+
+  /// Per conversation: the time up to which the other party has read it, from
+  /// the `X-Chat-Read-Up-To` header of every messages fetch (no extra request).
+  final _peerReadUpTo = <String, DateTime>{};
+  DateTime? peerReadUpTo(String conversation) => _peerReadUpTo[conversation];
+
+  void _recordReceipt(String conversation, dynamic response) {
+    try {
+      final raw = response.headers?.value('x-chat-read-up-to');
+      if (raw is! String || raw.isEmpty) return;
+      final at = DateTime.parse(raw).toUtc();
+      final known = _peerReadUpTo[conversation];
+      if (known == null || at.isAfter(known)) _peerReadUpTo[conversation] = at;
+    } catch (_) {
+      // A missing or malformed receipt only means no read tick yet.
+    }
+  }
+
+  /// `POST /chat/:id/read`: this user has read the conversation up to
+  /// [messageId]. Best-effort; a failure is retried with the next message.
+  Future<void> markRead(String conversation, String messageId) async {
+    requireOnline();
+    await api.post('/chat/$conversation/read',
+        data: {'up_to_message_id': messageId});
+  }
+
   Future<void> acknowledge(
       String appointment, String? conversation, String event,
       {List<String> messages = const [],
@@ -39,11 +65,12 @@ class ChatRepository {
   Future<List<ChatMessageDto>> newerMessages(
       String conversation, ChatMessageDto after) async {
     requireOnline();
-    final raw = _listData(_data(await api.get('/chat/$conversation/messages',
-        query: {
-          'after_time': after.sentAt.toUtc().toIso8601String(),
-          'after_id': after.id
-        })));
+    final response = await api.get('/chat/$conversation/messages', query: {
+      'after_time': after.sentAt.toUtc().toIso8601String(),
+      'after_id': after.id
+    });
+    _recordReceipt(conversation, response);
+    final raw = _listData(_data(response));
     return raw
         .map(
             (e) => ChatMessageDto.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -62,6 +89,11 @@ class ChatRepository {
         .map(
             (e) => ChatMessageDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
+  }
+
+  dynamic _receipted(String conversation, dynamic response) {
+    _recordReceipt(conversation, response);
+    return response;
   }
 
   bool get isOffline => connectivity?.isOffline == true;
@@ -161,8 +193,8 @@ class ChatRepository {
   Future<List<ChatMessageDto>> messages(String conversationId) async {
     try {
       requireOnline();
-      final raw =
-          _listData(_data(await api.get('/chat/$conversationId/messages')));
+      final raw = _listData(_data(_receipted(
+          conversationId, await api.get('/chat/$conversationId/messages'))));
       return raw
           .map((e) =>
               ChatMessageDto.fromJson(Map<String, dynamic>.from(e as Map)))

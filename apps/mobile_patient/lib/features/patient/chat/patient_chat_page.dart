@@ -59,7 +59,8 @@ class _PatientChatPageState extends State<PatientChatPage> {
     _input.addListener(() {
       if (mounted) setState(() {});
     });
-    _cubit = ChatCubit(widget.repo, conversationId: widget.conversation.id)
+    _cubit = ChatCubit(widget.repo,
+        conversationId: widget.conversation.id, myUserId: widget.myUserId)
       ..onRefreshOutcome = _refreshObserved
       ..load();
     unawaited(_ack('CHAT_OPENED'));
@@ -79,6 +80,8 @@ class _PatientChatPageState extends State<PatientChatPage> {
       if (mounted) setState(() {});
     },
         interval: const Duration(seconds: 10),
+        // 3 s while the conversation is active, easing to 30 s when quiet.
+        intervalFor: () => _cubit.pollInterval(DateTime.now()),
         networkChanges: widget.repo.connectivity?.changes,
         enabled: () =>
             !widget.conversation.isExpired && !_cubit.state.serverLocked);
@@ -146,6 +149,8 @@ class _PatientChatPageState extends State<PatientChatPage> {
     if (text.trim().isEmpty || widget.conversation.isExpired) return;
     await _cubit.send(text);
     if (mounted && !_cubit.state.notSent) _input.clear();
+    // Sending makes the chat active: poll fast from now, not after the idle wait.
+    _screenRefresh.reschedule();
   }
 
   /// Paperclip: take a photo or choose one from the gallery, then send it
@@ -260,8 +265,17 @@ class _PatientChatPageState extends State<PatientChatPage> {
                     reverse: true,
                     scrollCacheExtent: const ScrollCacheExtent.pixels(0),
                     padding: const EdgeInsets.all(16),
-                    itemCount: state.messages.length + 1,
-                    itemBuilder: (_, i) {
+                    itemCount: state.messages.length +
+                        1 +
+                        (state.pendingText != null ? 1 : 0),
+                    itemBuilder: (_, index) {
+                      // A message being sent shows at the bottom (index 0 of
+                      // this reversed list) until the server stores it.
+                      final pending = state.pendingText;
+                      if (pending != null && index == 0) {
+                        return _PendingBubble(text: pending);
+                      }
+                      final i = pending != null ? index - 1 : index;
                       if (i == state.messages.length) {
                         return state.hasOlder
                             ? TextButton(
@@ -285,6 +299,7 @@ class _PatientChatPageState extends State<PatientChatPage> {
                       return _ChatBubble(
                           message: m,
                           fromMe: fromMe,
+                          receipt: fromMe ? state.receiptFor(m) : null,
                           onViewAttachment: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -614,9 +629,15 @@ class _ExpiryBar extends StatelessWidget {
 /// consultation chat reads as one consistent design across both apps.
 class _ChatBubble extends StatelessWidget {
   const _ChatBubble(
-      {required this.message, required this.fromMe, this.onViewAttachment});
+      {required this.message,
+      required this.fromMe,
+      this.receipt,
+      this.onViewAttachment});
   final ChatMessageDto message;
   final bool fromMe;
+
+  /// Sent / Read ticks on the patient's own messages (2026-11-17).
+  final MessageReceipt? receipt;
   final VoidCallback? onViewAttachment;
 
   @override
@@ -663,12 +684,84 @@ class _ChatBubble extends StatelessWidget {
                     child: const Text('View image')),
               ],
               const SizedBox(height: 4),
-              Text(time,
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: fromMe ? Colors.white70 : PatientTokens.textSub)),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(time,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color:
+                            fromMe ? Colors.white70 : PatientTokens.textSub)),
+                if (receipt != null) ...[
+                  const SizedBox(width: 4),
+                  ReceiptTick(receipt: receipt!),
+                ],
+              ]),
             ]),
       ),
     );
   }
+}
+
+/// The delivery tick on the patient's own message: a clock while sending,
+/// one tick once stored, two highlighted ticks once the doctor has read it.
+class ReceiptTick extends StatelessWidget {
+  const ReceiptTick({super.key, required this.receipt});
+  final MessageReceipt receipt;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final (icon, color, label) = switch (receipt) {
+      MessageReceipt.sending => (
+          Icons.schedule_rounded,
+          Colors.white70,
+          l10n.chatReceiptSending
+        ),
+      MessageReceipt.sent => (
+          Icons.done_rounded,
+          Colors.white70,
+          l10n.chatReceiptSent
+        ),
+      MessageReceipt.read => (
+          Icons.done_all_rounded,
+          const Color(0xFFB9F6CA),
+          l10n.chatReceiptRead
+        ),
+    };
+    return Semantics(
+      label: label,
+      child:
+          Icon(icon, size: 15, color: color, key: ValueKey('receipt-$receipt')),
+    );
+  }
+}
+
+/// The message being sent, until the server stores it.
+class _PendingBubble extends StatelessWidget {
+  const _PendingBubble({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          key: const ValueKey('message-pending'),
+          constraints:
+              BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .82),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: PatientTokens.primary.withValues(alpha: .75),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(text,
+                    style: const TextStyle(color: Colors.white, height: 1.45)),
+                const SizedBox(height: 4),
+                const ReceiptTick(receipt: MessageReceipt.sending),
+              ]),
+        ),
+      );
 }

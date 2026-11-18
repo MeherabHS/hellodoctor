@@ -3,7 +3,7 @@ import { startScheduleSync } from '../lib/schedule-sync';
 import { ClinicalAttachment } from './ClinicalAttachment';
 import { compressRxPhoto } from '../lib/rx-compression';
 import { useEffect, useRef, useState } from 'react';
-import { api, errorText, post, useResource, runtimeGeneration } from '../lib/client';
+import { api, chatReceipts, errorText, post, useResource, runtimeGeneration } from '../lib/client';
 import { Appointment, Conversation, Message, Profile, chatLocked, messageSide, consultationContext, compareMessageInstants } from '../lib/contracts';
 import { Avatar, Badge, PageHeader, State, demographics } from './Common';
 import { Icon } from './Icons';
@@ -81,6 +81,11 @@ export function ChatThread({ chat, profile, appointment, onBack, action, gap, vi
   const feed=useRef<HTMLDivElement>(null);
   const threadRef=useRef(thread);threadRef.current=thread;
   const acknowledged=useRef(new Set<string>());
+  // Read receipts and adaptive polling (2026-11-17).
+  const [readUpTo,setReadUpTo]=useState<string|null>(chatReceipts.get(chat.id)??null);
+  const lastActivity=useRef<number|null>(null);
+  const lastMarkedRead=useRef<string|null>(null);
+  const pollDelay=()=>{const last=lastActivity.current;if(last===null)return 10000;const quiet=Date.now()-last;return quiet<120000?3000:quiet<720000?10000:30000;};
   const merge=(old:Message[],next:Message[])=>[...new Map([...old,...next].map(m=>[m.id,m])).values()].sort((a,b)=>compareMessageInstants(a.sent_at,b.sent_at)||a.id.localeCompare(b.id));
   const messages={...latest,data:thread,setData:setThread};
   useEffect(()=>{
@@ -102,20 +107,25 @@ export function ChatThread({ chat, profile, appointment, onBack, action, gap, vi
       paging.current=true;
       try {
         const known=threadRef.current;
-        if(!known.length){const next=await api<Message[]>(`chat/${chat.id}/messages`);if(!stopped)setThread(old=>merge(old,next));}
+        let gotNew=false;
+        if(!known.length){const next=await api<Message[]>(`chat/${chat.id}/messages`);if(!stopped)setThread(old=>merge(old,next));gotNew=next.length>0;}
         else {let after=known[known.length-1];for(let page=0;page<4&&!stopped;page++){
           const query=new URLSearchParams({after_time:after.sent_at,after_id:after.id});
           const next=await api<Message[]>(`chat/${chat.id}/messages?${query}`);
           if(stopped)break;
           setThread(old=>merge(old,next));
+          if(next.length)gotNew=true;
           if(next.length<50)break;
           after=next[next.length-1];
         }}
         lastRefreshFailed=false;
+        const receipt=chatReceipts.get(chat.id);
+        if(!stopped&&receipt)setReadUpTo(receipt);
+        if(gotNew&&known.length)lastActivity.current=Date.now();
       }
       catch(e){if(!stopped)setError(errorText(e));lastRefreshFailed=true;}finally{paging.current=false;}
     };
-    const stop=startScheduleSync(refresh,{window,document,online:()=>navigator.onLine,every:(cb,ms)=>window.setInterval(cb,ms),cancel:id=>window.clearInterval(id as number)},10000,{hasError:()=>lastRefreshFailed});
+    const stop=startScheduleSync(refresh,{window,document,online:()=>navigator.onLine,every:(cb,ms)=>window.setInterval(cb,ms),cancel:id=>window.clearInterval(id as number)},10000,{hasError:()=>lastRefreshFailed,baseDelay:pollDelay});
     return()=>{stopped=true;stop();};
   },[chat.id,visible]);
   useEffect(()=>{
@@ -125,6 +135,13 @@ export function ChatThread({ chat, profile, appointment, onBack, action, gap, vi
       if(!ids.length)return;
       ids.forEach(id=>acknowledged.current.add(id));
       void post(`appointments/${chat.appointment_id}/trace-ack`,{event:'CHAT_READ_ACKNOWLEDGED',conversation_id:chat.id,message_ids:ids}).catch(()=>{ids.forEach(id=>acknowledged.current.delete(id));});
+      // Read receipt for the patient: up to the newest incoming message seen.
+      const order=new Map(threadRef.current.map((m,i)=>[m.id,i]));
+      const newestSeen=[...ids].sort((a,b)=>(order.get(b)??-1)-(order.get(a)??-1))[0];
+      if(newestSeen&&newestSeen!==lastMarkedRead.current&&(order.get(newestSeen)??-1)>(order.get(lastMarkedRead.current??'')??-1)){
+        lastMarkedRead.current=newestSeen;
+        void post(`chat/${chat.id}/read`,{up_to_message_id:newestSeen}).catch(()=>{lastMarkedRead.current=null;});
+      }
     },{root:feed.current,threshold:0.1});
     feed.current.querySelectorAll('[data-incoming="true"]').forEach(element=>observer.observe(element));
     return()=>observer.disconnect();
@@ -171,6 +188,7 @@ export function ChatThread({ chat, profile, appointment, onBack, action, gap, vi
     if(submission.current?.content!==value) submission.current={content:value,key:crypto.randomUUID()};
     try {
       const message=await post<Message>(`chat/${chat.id}/messages`,{content:value},submission.current.key);
+      lastActivity.current=Date.now();
       messages.setData(previous=>[...(previous??[]).filter(m=>m.id!==message.id),message]);setContent('');submission.current=null;
     } catch(e) { setError(errorText(e)); if(e instanceof Error && 'status' in e && (e.status===403 || e.status===409)) setServerLocked(true); }
     finally {busyRef.current=false;setSending(false);}
@@ -195,7 +213,7 @@ export function ChatThread({ chat, profile, appointment, onBack, action, gap, vi
       <State compact loading={messages.loading&&!thread.length} error={messages.error||error} retry={()=>void messages.refresh()}/>
       {messages.data?.map(m=>{const side=messageSide(m,profile.user_id);return <div key={m.id} data-message-id={m.id} data-incoming={m.sender_id!==profile.user_id} className={`am-bubble-row ${side}`} data-sender-side={side}>
         <Avatar name={side==='doctor'?profile.full_name:chat.patient_display_name} size="sm"/>
-        <div className="am-bubble">{m.content&&<p className="am-pre">{m.content}</p>}{m.attachment_id&&<ClinicalAttachment conversation={chat.id} message={m.id} size={m.attachment?.size_bytes}/>}<time>{date(m.sent_at)} · {time(m.sent_at)}</time></div>
+        <div className="am-bubble">{m.content&&<p className="am-pre">{m.content}</p>}{m.attachment_id&&<ClinicalAttachment conversation={chat.id} message={m.id} size={m.attachment?.size_bytes}/>}<time>{date(m.sent_at)} · {time(m.sent_at)}{side==='doctor'&&<span className="am-receipt" data-read={!!readUpTo&&Date.parse(m.sent_at)<=Date.parse(readUpTo)} aria-label={readUpTo&&Date.parse(m.sent_at)<=Date.parse(readUpTo)?'Read':'Sent'}>{readUpTo&&Date.parse(m.sent_at)<=Date.parse(readUpTo)?' ✓✓':' ✓'}</span>}</time></div>
       </div>;})}
       {messages.data?.length===0&&<State compact icon="chat" empty="No messages yet" hint={locked?undefined:'Say hello to start the conversation.'}/>}
     </div>

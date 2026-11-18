@@ -14,6 +14,7 @@ class ScreenRefresh with WidgetsBindingObserver, RouteAware {
     required this.interval,
     this.enabled,
     this.hasError,
+    this.intervalFor,
     Stream<NetworkStatus>? networkChanges,
     Duration? maxInterval,
     math.Random? random,
@@ -27,6 +28,12 @@ class ScreenRefresh with WidgetsBindingObserver, RouteAware {
   }
   final FutureOr<void> Function() refresh;
   final Duration interval;
+
+  /// Optional: the base interval right now, read before every poll, so a
+  /// screen can poll faster while it is active (chat, 2026-11-17). Failure
+  /// backoff applies on top. Null keeps the fixed [interval].
+  final Duration Function()? intervalFor;
+  Duration get _base => intervalFor?.call() ?? interval;
   final bool Function()? enabled;
 
   /// Optional: lets a screen/cubit that already tracks its own error state
@@ -63,9 +70,9 @@ class ScreenRefresh with WidgetsBindingObserver, RouteAware {
   /// to 20% bounded jitter, so many clients recovering from the same outage
   /// don't retry in lockstep.
   Duration get currentInterval {
-    if (_consecutiveFailures == 0) return interval;
+    if (_consecutiveFailures == 0) return _base;
     final shift = _consecutiveFailures.clamp(0, 6);
-    var backoff = interval * (1 << shift);
+    var backoff = _base * (1 << shift);
     if (backoff > maxInterval) backoff = maxInterval;
     final jitterBoundMs = (backoff.inMilliseconds * 0.2).round();
     final jitterMs = jitterBoundMs > 0 ? _random.nextInt(jitterBoundMs) : 0;
@@ -82,7 +89,15 @@ class ScreenRefresh with WidgetsBindingObserver, RouteAware {
 
   void _start() {
     if (_timer != null || _disposed) return;
-    _arm(interval);
+    _arm(_base);
+  }
+
+  /// Re-arms the next poll from now with the current interval: used when
+  /// activity starts (a message sent, a push received) so a quiet screen does
+  /// not keep waiting out its long idle interval.
+  void reschedule() {
+    if (_disposed || _inFlight != null) return;
+    _arm(currentInterval);
   }
 
   void _arm(Duration delay, {bool recovery = false}) {

@@ -1,0 +1,20 @@
+﻿18429,12647.8,0.69,7.6,INSERT INTO consultation_trace_events(appointment_id,conversation_id,actor_role,event_type,resource_type,resource_id,result,reason_code,safe_metadata,client_typ
+8249,6630.0,0.80,9.4,INSERT INTO chat_messages (id, conversation_id, sender_id, content, attachment_bucket, attachment_object_key, attachment_mime, attachment_size, attachment_hash,
+8249,5858.0,0.71,7.4,SELECT chat_counterparty_user($1)
+33046,5753.5,0.17,4.3,SELECT id, appointment_id, patient_id, doctor_id, expires_at, is_locked, created_at FROM chat_conversations WHERE id = $1
+24797,4896.3,0.20,8.5,SELECT id,conversation_id,sender_id,content,attachment_bucket,attachment_object_key,attachment_mime,attachment_size,attachment_hash,is_read,sent_at FROM chat_me
+2000,4581.3,2.29,6.5,SELECT doctor_user_id, doctor_language, patient_user_id, patient_language FROM appointment_notification_recipients($1)
+64578,4005.4,0.06,1.7,SELECT d.id FROM public.doctor_profiles d WHERE d.user_id = NULLIF(current_setting($1, $2), $3)::uuid
+8249,3338.0,0.40,3.7,SELECT CASE WHEN d.user_id=NULLIF(current_setting($2,$3),$4)::uuid THEN COALESCE(p.user_id,g.user_id) ELSE d.user_id END FROM chat_conversations c JOIN doctor
+28678,2841.3,0.10,1.6,SELECT EXISTS(SELECT $2 FROM appointments a JOIN doctor_profiles d ON d.id=a.doctor_id WHERE a.id=p_appointment AND ( current_setting($3,$4)=$5 OR (curr
+18429,1674.8,0.09,1.2,NEW.conversation_id IS NOT NULL AND NOT EXISTS(SELECT $27 FROM chat_conversations c WHERE c.id=NEW.conversation_id AND c.appointment_id=NEW.appointment_id)
+288545,1599.8,0.01,1.7,SELECT EXISTS ( SELECT $3 FROM patient_profiles pp WHERE pp.id = p_patient_profile_id AND (pp.user_id = p_requesting_user_id 
+8249,1559.3,0.19,1.9,INSERT INTO notifications (id, user_id, type, title, body, related_entity_type, related_entity_id, scheduled_for, dedup_key, metadata, ttl_seconds) VALUES ($1,$
+8249,1485.4,0.18,2.0,NOT EXISTS(SELECT $15 FROM chat_conversations c JOIN appointments a ON a.id=c.appointment_id WHERE c.id=NEW.conversation_id AND NOT c.is_locked AND c.expires_
+8249,1414.5,0.17,7.0,UPDATE public.chat_conversations SET last_message_at = GREATEST(COALESCE(last_message_at, NEW.sent_at), NEW.sent_at) WHERE id = NEW.conversation_id
+2000,1354.0,0.68,2.9,SELECT d.user_id, du.preferred_language, COALESCE(p.user_id, g.user_id), COALESCE(pu.preferred_language, gu.preferred_language) FROM appointm
+8249,1241.5,0.15,1.4,SELECT NOT EXISTS(SELECT $3 FROM chat_messages WHERE conversation_id=$1 AND sender_id=$2)
+35046,1152.3,0.03,1.9,SELECT s.id,u.role::text,k.key_thumbprint FROM auth_sessions s JOIN users u ON u.id=s.user_id LEFT JOIN auth_session_device_keys k ON k.token_family_id=s.token_
+43046,1089.0,0.03,1.2,SELECT set_config($5,COALESCE((SELECT id::text FROM patient_profiles WHERE user_id=$1 AND $2=$6),$7),$8), set_config($9,COALESCE((SELECT id::text FROM doctor_pr
+10249,1081.0,0.11,18.5,SELECT id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, completed_at, created_at, u
+8249,902.0,0.11,1.0,SELECT NOT is_locked AND expires_at>clock_timestamp() FROM chat_conversations WHERE id=$1

@@ -366,11 +366,41 @@ class DoctorRepository {
     });
   }
 
+  /// Per conversation: the time up to which the patient has read it, from the
+  /// `X-Chat-Read-Up-To` header of every messages fetch (2026-11-17).
+  final _peerReadUpTo = <String, DateTime>{};
+  DateTime? peerReadUpTo(String conversation) => _peerReadUpTo[conversation];
+
+  dynamic _receipted(String conversation, dynamic response) {
+    try {
+      final raw = response.headers?.value('x-chat-read-up-to');
+      if (raw is String && raw.isNotEmpty) {
+        final at = DateTime.parse(raw).toUtc();
+        final known = _peerReadUpTo[conversation];
+        if (known == null || at.isAfter(known)) {
+          _peerReadUpTo[conversation] = at;
+        }
+      }
+    } catch (_) {
+      // A missing or malformed receipt only means no read tick yet.
+    }
+    return response;
+  }
+
+  /// `POST /chat/:id/read`: the doctor has read up to [messageId].
+  Future<void> markChatRead(String conversation, String messageId) async {
+    requireOnline();
+    await api.post('/chat/$conversation/read',
+        data: {'up_to_message_id': messageId});
+  }
+
   Future<List<MessageDto>> newerMessages(
       String conversation, MessageDto after) async {
     requireOnline();
-    final raw = listData(data(await api.get('/chat/$conversation/messages',
-        query: {'after_time': after.sentAt, 'after_id': after.id})));
+    final raw = listData(data(_receipted(
+        conversation,
+        await api.get('/chat/$conversation/messages',
+            query: {'after_time': after.sentAt, 'after_id': after.id}))));
     return raw
         .map((e) => MessageDto.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
@@ -401,7 +431,8 @@ class DoctorRepository {
         }
       }
       requireOnline();
-      final raw = listData(data(await api.get('/chat/$id/messages')));
+      final raw =
+          listData(data(_receipted(id, await api.get('/chat/$id/messages'))));
       final all = <String, dynamic>{};
       if (cachedMessages?.data is Map) {
         all.addAll(Map<String, dynamic>.from(cachedMessages!.data as Map));

@@ -1,0 +1,200 @@
+# Performance-assurance overlay (2026-11-17). Disposable, local-only.
+#
+#   docker compose --env-file .env.perf-baseline -f compose.yml -f compose.perf-baseline.yml up -d
+#   docker compose --env-file .env.perf-baseline -f compose.yml -f compose.perf-baseline.yml \
+#       run --rm loadgen capacity_test        # (see docs/assurance/PERFORMANCE_REPORT.md)
+#
+# What it is: the approved six-service single-VM production topology from
+# compose.yml (postgres, redis, backend, admin-web, doctor-web, Caddy) sharing
+# exactly four cores (`cpuset: 0-3`) with compose.yml's own memory caps
+# (5.8 GiB of service caps inside the 4 vCPU / 8 GiB target shape), plus a
+# load generator pinned to the OTHER cores (`4-11`) so it never competes with
+# the system under test.
+#
+# Deliberate differences from production, all disclosed in the report:
+#  - platform linux/amd64: this laptop is x86-64. compose.yml pins linux/arm64
+#    (the Ubuntu ARM64 production target); running that here would mean QEMU
+#    emulation and meaningless numbers. Results are x86-64 evidence.
+#  - Plain HTTP through Caddy (no TLS termination cost), synthetic data only.
+#  - GLOBAL_IP_RATE_LIMIT_PER_MIN raised: every synthetic user arrives from the
+#    load generator's one IP. All per-account limiters, admission control,
+#    JWT/ABAC/RLS stay at production values.
+#  - ENVIRONMENT=development + dev OTP, same as the Milestone 8 runs, so the
+#    Admin/Doctor web workload can sign in without a real SMS provider.
+name: hellodoctor-perf-baseline
+
+x-amd64: &amd64
+  platform: linux/amd64
+
+services:
+  postgres:
+    <<: *amd64
+    ports: ["127.0.0.1:55532:5432"]
+    volumes: ["perf-baseline-pgdata:/var/lib/postgresql/data"]
+  redis:
+    <<: *amd64
+    ports: ["127.0.0.1:56479:6379"]
+    volumes: ["perf-baseline-redisdata:/data"]
+  backend:
+    <<: *amd64
+    # 51000 = Azurite (shares this network namespace), used only to create
+    # its two storage containers after each restore.
+    ports: ["127.0.0.1:58380:8080", "127.0.0.1:51000:10000"]
+    volumes: ["perf-baseline-journal:/var/lib/hellodoctor/erasure"]
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      APP_DB_HOST: postgres
+      APP_DB_PORT: "5432"
+      APP_DB_NAME: ${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      SEED_DEV_DATA: "true"
+      DEV_AUTH_OTP_ENABLED: "true"
+      DEV_SIMULATION_ENABLED: "true"
+      PUBLIC_API_BASE_URL: http://api.localhost
+      ALLOWED_ORIGINS: http://admin.localhost,http://doctor.localhost
+      # Empty (nothing trusted) except in the distributed-login scenario,
+      # which sets PERF_TRUSTED_PROXY_IPS=172.30.84.20 (the load generator).
+      TRUSTED_PROXY_IPS: "${PERF_TRUSTED_PROXY_IPS:-}"
+      # Uploads go to the Azurite emulator (service below). The backend only
+      # accepts a loopback emulator endpoint, so Azurite shares this
+      # container's network namespace. Production uses real Azure Blob,
+      # which is outside the VM, so Azurite runs on the load-generator CPUs.
+      STORAGE_PROVIDER: azure
+      STORAGE_ENCRYPTION_KEY_B64: ${PERF_STORAGE_ENCRYPTION_KEY_B64}
+      AZURE_STORAGE_ACCOUNT_NAME: devstoreaccount1
+      AZURE_STORAGE_AUTH_MODE: azurite
+      AZURE_STORAGE_USE_EMULATOR: "true"
+      AZURE_STORAGE_ENDPOINT: http://127.0.0.1:10000
+      AZURITE_BLOB_STORAGE_URL: http://127.0.0.1:10000
+      AZURE_STORAGE_CLINICAL_CONTAINER: clinical-private
+      AZURE_STORAGE_ARTICLE_CONTAINER: article-media
+      RECOVERY_MODE: "false"
+      EXTERNAL_ERASURE_JOURNAL_PATH: ""
+      GLOBAL_IP_RATE_LIMIT_PER_MIN: "100000"
+      DB_POOL_MAX_CONNECTIONS_PER_ROLE: "10"
+      # Production setting while no payment gateway is integrated: bookings
+      # are confirmed at once with no checkout or webhook. The backend's own
+      # default is "enabled", so this must be explicit. Set
+      # PERF_FINANCIAL_MODULE_MODE=enabled only for the payment-path appendix.
+      FINANCIAL_MODULE_MODE: "${PERF_FINANCIAL_MODULE_MODE:-deferred}"
+    healthcheck:
+      test: [CMD-SHELL, "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /healthz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3 && timeout 5 grep -q \"200 OK\" <&3'"]
+      interval: 10s
+      timeout: 8s
+      start_period: 90s
+      retries: 12
+  admin-web:
+    <<: *amd64
+    ports: []
+    environment:
+      ENVIRONMENT: development
+      ADMIN_WEB_ORIGIN: http://admin.localhost
+      BACKEND_URL: http://backend:8080
+      WEB_PROXY_SECRET: ""
+      TURNSTILE_SITE_KEY: ""
+      TURNSTILE_SECRET_KEY: ""
+      DEV_AUTH_OTP_ENABLED: "true"
+      DEV_SIMULATION_ENABLED: "true"
+      REDIS_URL: redis://redis:6379
+    healthcheck:
+      test: [CMD-SHELL, "node -e \"require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      start_period: 45s
+      retries: 8
+  doctor-web:
+    <<: *amd64
+    ports: []
+    environment:
+      ENVIRONMENT: development
+      DOCTOR_WEB_ORIGIN: http://doctor.localhost
+      BACKEND_URL: http://backend:8080
+      WEB_PROXY_SECRET: ""
+      TURNSTILE_SITE_KEY: ""
+      TURNSTILE_SECRET_KEY: ""
+      DEV_AUTH_OTP_ENABLED: "true"
+      DEV_SIMULATION_ENABLED: "true"
+    healthcheck:
+      test: [CMD-SHELL, "node -e \"require('net').connect(3000,'127.0.0.1').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      start_period: 45s
+      retries: 8
+  proxy:
+    <<: *amd64
+    volumes: ["./Caddyfile.perf-baseline:/etc/caddy/Caddyfile:ro", "perf-baseline-caddydata:/data", "perf-baseline-caddyconfig:/config"]
+    environment:
+      API_HOST: api.localhost
+      ADMIN_HOST: admin.localhost
+      DOCTOR_HOST: doctor.localhost
+      ACME_EMAIL: test@example.invalid
+      WEB_PROXY_SECRET: ""
+
+  # Stand-in for Azure Blob Storage (external to the VM in production), so it
+  # runs on the load-generator CPUs and outside the 8 GB budget.
+  azurite:
+    <<: *amd64
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    network_mode: "service:backend"
+    cpuset: "4-11"
+    mem_limit: 2g
+    command: ["azurite-blob", "--blobHost", "0.0.0.0", "--blobPort", "10000", "--inMemoryPersistence", "--loose", "--skipApiVersionCheck"]
+    restart: unless-stopped
+
+  # Load generator: NOT part of the system under test. Pinned away from the
+  # four server cores. Runs only on demand (`run --rm loadgen ...`).
+  loadgen:
+    <<: *amd64
+    profiles: [loadgen]
+    image: hellodoctor-loadgen:perf-6f02b84
+    build:
+      context: ../../services/backend
+      dockerfile: bench/loadgen.Dockerfile
+    cpuset: "4-11"
+    mem_limit: 4g
+    env_file: ["${BACKEND_ENV_FILE}"]
+    environment:
+      CAPACITY_BASE_URL: http://proxy:80
+      CAPACITY_HOST_HEADER: api.localhost
+      CAPACITY_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      WEB_BASE_URL: http://proxy:80
+      WEB_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Synthetic fixture accounts; the restore script resets both to this
+      # documented never-production benchmark password before every run.
+      WEB_ADMIN_EMAIL: admin@hellodoctor.health
+      WEB_DOCTOR_EMAIL: sabrina.akter@hellodoctor.health
+      WEB_ADMIN_PASSWORD: AuthStressBenchmark-2026!
+      WEB_DOCTOR_PASSWORD: AuthStressBenchmark-2026!
+      RUST_LOG: warn
+    volumes: ["../../docs/assurance/evidence:/evidence"]
+    networks: [app, data]
+
+  # Same image, fixed address, for the login scenario only: the backend can be
+  # told to trust it as a proxy (PERF_TRUSTED_PROXY_IPS) so each request may
+  # carry its own client address, modelling users on many different networks.
+  authgen:
+    <<: *amd64
+    profiles: [loadgen]
+    image: hellodoctor-loadgen:perf-6f02b84
+    cpuset: "4-11"
+    mem_limit: 2g
+    env_file: ["${BACKEND_ENV_FILE}"]
+    environment:
+      AUTH_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      RUST_LOG: warn
+    volumes: ["../../docs/assurance/evidence:/evidence"]
+    networks:
+      app: {ipv4_address: 172.30.84.20}
+      data: {}
+
+networks:
+  data:
+    internal: false
+
+volumes:
+  perf-baseline-pgdata: {external: false, name: perf-baseline-pgdata}
+  perf-baseline-redisdata: {external: false, name: perf-baseline-redisdata}
+  perf-baseline-caddydata: {external: false, name: perf-baseline-caddydata}
+  perf-baseline-caddyconfig: {external: false, name: perf-baseline-caddyconfig}
+  perf-baseline-journal: {external: false, name: perf-baseline-journal}

@@ -1,0 +1,20 @@
+﻿931,1508.5,1.62,3.0,SELECT * FROM doctor_public_directory WHERE professional_verification_status=$5 AND ($1::text IS NULL OR ($1=$6 AND ($4::bool OR consultation_fee_video > $7)) O
+530,1088.2,2.05,4.9,SELECT doctor_user_id, doctor_language, patient_user_id, patient_language FROM appointment_notification_recipients($1)
+542,427.6,0.79,1.6,SELECT id, doctor_id, start_time, end_time, status, created_at FROM doctor_schedule_slots WHERE doctor_id = $1 AND status = $2 AND start_time > clock_timestamp(
+530,319.5,0.60,1.1,SELECT d.user_id, du.preferred_language, COALESCE(p.user_id, g.user_id), COALESCE(pu.preferred_language, gu.preferred_language) FROM appointm
+14182,193.4,0.01,0.2,SELECT p.id FROM public.peer_profiles p WHERE p.user_id = NULLIF(current_setting($1, $2), $3)::uuid
+112,180.6,1.61,3.8,SELECT * FROM doctor_public_directory ORDER BY full_name
+1060,162.2,0.15,3.0,INSERT INTO consultation_trace_events(appointment_id,conversation_id,actor_role,event_type,resource_type,resource_id,result,reason_code,safe_metadata,client_typ
+30,155.3,5.18,6.4,SELECT s.id, s.peer_id, s.start_time, s.end_time, s.status FROM peer_slots s JOIN peer_profiles p ON p.id = s.peer_id AND p.approval_status = $2 WHERE s.peer_id
+240,142.4,0.59,2.0,INSERT INTO consultation_trace_events(appointment_id,conversation_id,actor_role,event_type,resource_type,resource_id,result,reason_code,safe_metadata,client_typ
+1060,140.9,0.13,0.7,INSERT INTO notifications (id, user_id, type, title, body, related_entity_type, related_entity_id, scheduled_for, dedup_key, metadata, ttl_seconds) VALUES ($1,$
+530,117.0,0.22,2.6,INSERT INTO appointments (id, appointment_number, patient_id, doctor_id, slot_id, modality, status, consultation_fee, payment_policy, clinical_outcome, complete
+2344,114.3,0.05,0.2,SELECT d.id FROM public.doctor_profiles d WHERE d.user_id = NULLIF(current_setting($1, $2), $3)::uuid
+841,107.4,0.13,0.4,SELECT EXISTS(SELECT $2 FROM appointments a JOIN doctor_profiles d ON d.id=a.doctor_id WHERE a.id=p_appointment AND ( current_setting($3,$4)=$5 OR (curr
+300,103.6,0.35,1.7,UPDATE peer_slots SET status = $3 WHERE id = $1 AND status = $2
+3901,101.8,0.03,0.1,SELECT s.id,u.role::text,k.key_thumbprint FROM auth_sessions s JOIN users u ON u.id=s.user_id LEFT JOIN auth_session_device_keys k ON k.token_family_id=s.token_
+710,98.4,0.14,0.4,INSERT INTO notifications (id, user_id, type, title, body, related_entity_type, related_entity_id, scheduled_for, dedup_key, metadata, ttl_seconds) VALUES ($1,$
+300,88.0,0.29,1.9,UPDATE peer_slots SET status = $2 WHERE id = $1 AND status = $3
+530,85.3,0.16,1.9,INSERT INTO consultation_trace_events(appointment_id,conversation_id,actor_role,event_type,resource_type,resource_id,result,reason_code,safe_metadata,client_typ
+5416,85.3,0.02,0.1,SELECT set_config($5,COALESCE((SELECT id::text FROM patient_profiles WHERE user_id=$1 AND $2=$6),$7),$8), set_config($9,COALESCE((SELECT id::text FROM doctor_pr
+300,81.4,0.27,1.1,INSERT INTO peer_requests (id, patient_id, patient_user_id, peer_id, peer_user_id, slot_id, support_type, topic, patient_display_name, patient_age_range) VALUES

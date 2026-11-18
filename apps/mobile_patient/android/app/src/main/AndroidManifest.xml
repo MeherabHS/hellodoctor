@@ -67,7 +67,7 @@
              `NotificationChannels.forType`. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="GENERAL" />
+            android:value="GENERAL_V2" />
         <!-- flutter_local_notifications: delivers scheduled (personal reminder)
              notifications and restores them after a reboot or app update. -->
         <receiver

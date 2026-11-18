@@ -15,6 +15,8 @@ export function startScheduleSync(refresh: () => Promise<void>, browser: {
   cancel: (timer: unknown) => void;
 }, milliseconds = 15000, options?: {
   hasError?: () => boolean;
+  /** Current base interval, read before every poll (chat polls faster while active). */
+  baseDelay?: () => number;
   maxMilliseconds?: number;
   jitterRatio?: number;
   random?: () => number;
@@ -30,10 +32,11 @@ export function startScheduleSync(refresh: () => Promise<void>, browser: {
   const jitterRatio = options?.jitterRatio ?? 0.2;
   const random = options?.random ?? Math.random;
 
+  const base = () => options?.baseDelay?.() ?? milliseconds;
   const currentDelay = () => {
-    if (consecutiveFailures === 0) return milliseconds;
+    if (consecutiveFailures === 0) return base();
     const shift = Math.min(consecutiveFailures, 6);
-    const backoff = Math.min(milliseconds * 2 ** shift, maxMs);
+    const backoff = Math.min(base() * 2 ** shift, maxMs);
     return backoff + random() * backoff * jitterRatio;
   };
 
@@ -76,7 +79,7 @@ export function startScheduleSync(refresh: () => Promise<void>, browser: {
     armNext(250 + Math.floor(random() * 1751));
   };
 
-  if (options?.initial) onTick(); else armNext(milliseconds);
+  if (options?.initial) onTick(); else armNext(base());
   browser.window.addEventListener('focus', onChange);
   browser.window.addEventListener('online', onChange);
   browser.document.addEventListener('visibilitychange', onChange);

@@ -49,6 +49,14 @@ async function performRequest<T>(path: string, options: RequestInit = {}): Promi
       throw new DOMException('Account changed', 'AbortError');
     }
     if (serverScope) scope = serverScope;
+    // Read receipt on chat message reads (2026-11-17): the patient has read
+    // the conversation up to this time.
+    const receiptPath = /^\/api\/proxy\/chat\/([0-9a-f-]{36})\/messages(?:\?|$)/i.exec(path);
+    const readUpTo = res.headers.get('X-Chat-Read-Up-To');
+    if (receiptPath && readUpTo) {
+      const known = chatReceipts.get(receiptPath[1]);
+      if (!known || Date.parse(readUpTo) > Date.parse(known)) chatReceipts.set(receiptPath[1], readUpTo);
+    }
     let json;
     try { json = await res.json(); }
     catch (error) {
@@ -76,6 +84,8 @@ async function performRequest<T>(path: string, options: RequestInit = {}): Promi
   } finally { pending.delete(controller); }
 }
 export const api = <T,>(path: string, options?: RequestInit) => request<T>('/api/proxy/' + path, options);
+/** Latest read receipt per conversation id (the other party read up to this ISO time). */
+export const chatReceipts = new Map<string, string>();
 export async function authorizedDocument(path: string): Promise<Blob> {
   const version = generation;
   const controller = new AbortController();

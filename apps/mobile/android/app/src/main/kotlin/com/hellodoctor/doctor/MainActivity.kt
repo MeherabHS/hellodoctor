@@ -1,4 +1,4 @@
-package com.example.hellodoctor_mobile
+package com.hellodoctor.doctor
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -20,6 +20,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         DeviceProof.register(flutterEngine, this)
+        BatteryOptimization.register(flutterEngine, this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "hellodoctor/build_metadata")
             .setMethodCallHandler { call, result ->
                 if (call.method != "get") { result.notImplemented() }

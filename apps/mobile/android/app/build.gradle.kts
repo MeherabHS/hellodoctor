@@ -30,7 +30,7 @@ if (internalTestKeystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.example.hellodoctor_mobile"
+    namespace = "com.hellodoctor.doctor"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -44,7 +44,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.hellodoctor_mobile"
+        applicationId = "com.hellodoctor.doctor"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

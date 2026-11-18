@@ -886,3 +886,247 @@ async fn test_deferred_booking_emails_the_patient_and_the_doctor(pool: PgPool) {
         .any(|m| m.0 == "deferred.patient@example.test"
             && m.1 == "You're booked! Your care, your way."));
 }
+
+/// Production runs with payments deferred, so this is the path real patients
+/// take. Several different patients press "Book" on the same slot at the
+/// same instant: the slot's row lock (`doctor_repo::try_lock_slot`) admits
+/// exactly one; every other attempt gets 409 (or is shed by admission
+/// control before reaching the database). No duplicate appointment, no
+/// payment record, and the slot ends BOOKED. Added 2026-11-17: the existing
+/// deferred double-booking test books twice as one patient, one after the
+/// other, so simultaneous attempts by different patients were untested.
+async fn deferred_simultaneous_bookings_have_one_winner(pool: PgPool, attempts: usize) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    let slot_id = schedule_slot_fixture(&app, &pool, "AVAILABLE", 0).await;
+    let mut tokens = Vec::with_capacity(attempts);
+    for _ in 0..attempts {
+        tokens.push(fresh_patient_token(&pool).await);
+    }
+    // The Patient app's own payload: no gateway, no payment method.
+    let payload = serde_json::json!({
+        "doctor_id": DOCTOR1_PROFILE_ID,
+        "slot_id": slot_id,
+        "modality": "VIDEO",
+    });
+
+    let mut handles = Vec::with_capacity(attempts);
+    for token in tokens {
+        let app = app.clone();
+        let payload = payload.clone();
+        handles.push(tokio::spawn(async move {
+            post_idem(
+                &app,
+                "/api/v1/appointments/book",
+                Some(&token),
+                &payload,
+                &Uuid::new_v4().to_string(),
+            )
+            .await
+        }));
+    }
+    let (mut created, mut conflicts, mut shed) = (0, 0, 0);
+    for h in handles {
+        let response = h.await.unwrap();
+        match response.status() {
+            StatusCode::CREATED => {
+                let body = json_body(response).await;
+                assert_eq!(body["data"]["status"], "CONFIRMED");
+                assert!(body["data"]["payment_session_id"].is_null());
+                created += 1;
+            }
+            StatusCode::CONFLICT => conflicts += 1,
+            _ => {
+                assert_controlled_shedding(response).await;
+                shed += 1;
+            }
+        }
+    }
+    assert_eq!(
+        created, 1,
+        "exactly one of {attempts} simultaneous bookings wins"
+    );
+    assert_eq!(
+        conflicts + shed,
+        attempts - 1,
+        "every other attempt is told the slot is taken, or shed before any work"
+    );
+    assert!(conflicts >= 1, "at least one loser reached the slot lock");
+
+    let slot_status: String =
+        sqlx::query_scalar("SELECT status::text FROM doctor_schedule_slots WHERE id=$1")
+            .bind(slot_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(slot_status, "BOOKED");
+    let appointments: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM appointments WHERE slot_id=$1")
+            .bind(slot_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(appointments, 1, "no duplicate appointment for the slot");
+    let transactions: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM transactions t JOIN appointments a ON a.id = t.appointment_id \
+         WHERE a.slot_id = $1",
+    )
+    .bind(slot_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        transactions, 0,
+        "payments are deferred: no payment record at all"
+    );
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_deferred_two_patients_booking_one_slot_at_once_one_wins(pool: PgPool) {
+    deferred_simultaneous_bookings_have_one_winner(pool, 2).await;
+}
+
+#[sqlx::test(migrations = "./migrations")]
+async fn test_deferred_fifty_patients_booking_one_slot_at_once_one_wins(pool: PgPool) {
+    deferred_simultaneous_bookings_have_one_winner(pool, 50).await;
+}
+
+/// Sends a chat message and returns its id and server send time.
+async fn send_chat(
+    app: &axum::Router,
+    token: &str,
+    conv: Uuid,
+    text: &str,
+) -> (Uuid, chrono::DateTime<chrono::Utc>) {
+    let res = post_idem(
+        app,
+        &format!("/api/v1/chat/{conv}/messages"),
+        Some(token),
+        &serde_json::json!({ "content": text }),
+        &Uuid::new_v4().to_string(),
+    )
+    .await;
+    assert!(res.status().is_success(), "send failed: {}", res.status());
+    let body = json_body(res).await;
+    (
+        Uuid::parse_str(body["data"]["id"].as_str().unwrap()).unwrap(),
+        body["data"]["sent_at"].as_str().unwrap().parse().unwrap(),
+    )
+}
+
+/// The other party's read-up-to time from a messages poll, if any.
+async fn read_up_to(
+    app: &axum::Router,
+    token: &str,
+    conv: Uuid,
+) -> Option<chrono::DateTime<chrono::Utc>> {
+    let res = get(app, &format!("/api/v1/chat/{conv}/messages"), Some(token)).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    res.headers()
+        .get("x-chat-read-up-to")
+        .map(|v| v.to_str().unwrap().parse().unwrap())
+}
+
+async fn mark_read(
+    app: &axum::Router,
+    token: &str,
+    conv: Uuid,
+    message: Uuid,
+) -> axum::http::Response<axum::body::Body> {
+    post(
+        app,
+        &format!("/api/v1/chat/{conv}/read"),
+        Some(token),
+        &serde_json::json!({ "up_to_message_id": message }),
+    )
+    .await
+}
+
+/// Read receipts (2026-11-17): the doctor reading the patient's message shows
+/// up on the patient's next poll as a read-up-to time, carried in a header so
+/// the message body is unchanged. Markers only move forward, and no message
+/// row is modified (messages are immutable clinical records).
+#[sqlx::test(migrations = "./migrations")]
+async fn test_chat_read_receipt_reaches_the_sender_on_their_next_poll(pool: PgPool) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    unprice_doctor1(&pool).await;
+    let patient = fresh_patient_token(&pool).await;
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let (apt_id, _) = book_deferred(&app, &patient, "CHAT").await;
+    let conv = conversation_id_for(&app, &patient, apt_id).await;
+
+    let (first, first_at) = send_chat(&app, &patient, conv, "First").await;
+    let (second, second_at) = send_chat(&app, &patient, conv, "Second").await;
+    assert_eq!(read_up_to(&app, &patient, conv).await, None, "not read yet");
+
+    // The doctor reads up to the second message.
+    let res = mark_read(&app, &doctor, conv, second).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(read_up_to(&app, &patient, conv).await, Some(second_at));
+    // The receipt is about the doctor's reading, not the patient's.
+    assert_eq!(read_up_to(&app, &doctor, conv).await, None);
+
+    // Marking an earlier message later never moves the receipt backwards.
+    assert_eq!(
+        mark_read(&app, &doctor, conv, first).await.status(),
+        StatusCode::OK
+    );
+    assert_eq!(read_up_to(&app, &patient, conv).await, Some(second_at));
+    assert!(first_at <= second_at);
+
+    // The patient reading the doctor's reply is visible to the doctor.
+    let (reply, reply_at) = send_chat(&app, &doctor, conv, "Reply").await;
+    assert_eq!(
+        mark_read(&app, &patient, conv, reply).await.status(),
+        StatusCode::OK
+    );
+    assert_eq!(read_up_to(&app, &doctor, conv).await, Some(reply_at));
+
+    // Message rows themselves were never modified.
+    let flipped: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM chat_messages WHERE conversation_id = $1 AND is_read",
+    )
+    .bind(conv)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(flipped, 0);
+}
+
+/// Only the conversation's own patient and doctor can record that they read
+/// it, and only with a message from that conversation: an unrelated patient
+/// cannot see the conversation (404), an admin viewing it never marks it read
+/// (403), and a message id from another conversation is refused (404).
+#[sqlx::test(migrations = "./migrations")]
+async fn test_chat_read_receipts_refuse_outsiders_admins_and_foreign_messages(pool: PgPool) {
+    let (app, pool) = test_app_with_config(pool, deferred_config()).await;
+    unprice_doctor1(&pool).await;
+    let patient = fresh_patient_token(&pool).await;
+    let other = fresh_patient_token(&pool).await;
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let (apt_id, _) = book_deferred(&app, &patient, "CHAT").await;
+    let conv = conversation_id_for(&app, &patient, apt_id).await;
+    let (msg, _) = send_chat(&app, &patient, conv, "Hello").await;
+
+    assert_eq!(
+        mark_read(&app, &other, conv, msg).await.status(),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        mark_read(&app, &admin, conv, msg).await.status(),
+        StatusCode::FORBIDDEN
+    );
+
+    let (other_apt, _) = book_deferred(&app, &other, "CHAT").await;
+    let other_conv = conversation_id_for(&app, &other, other_apt).await;
+    let (foreign, _) = send_chat(&app, &other, other_conv, "Elsewhere").await;
+    assert_eq!(
+        mark_read(&app, &patient, conv, foreign).await.status(),
+        StatusCode::NOT_FOUND
+    );
+
+    let markers: i64 = sqlx::query_scalar("SELECT count(*) FROM chat_read_markers")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(markers, 0, "no refused attempt left a marker behind");
+}

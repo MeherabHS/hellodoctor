@@ -98,6 +98,90 @@ abstract class AppLocalizations {
     Locale('sw')
   ];
 
+  /// No description provided for @batteryPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Get reminders on time'**
+  String get batteryPromptTitle;
+
+  /// No description provided for @batteryPromptBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your phone may stop this app in the background to save battery. That can delay or block consultation reminders and messages. To get them on time, allow the app to run in the background.'**
+  String get batteryPromptBody;
+
+  /// No description provided for @batteryPromptLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get batteryPromptLater;
+
+  /// No description provided for @batteryPromptOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get batteryPromptOpenSettings;
+
+  /// No description provided for @batteryStepsSamsung.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Open settings, then Battery, and choose Unrestricted. Also check that this app is not under Sleeping apps (Settings > Battery > Background usage limits).'**
+  String get batteryStepsSamsung;
+
+  /// No description provided for @batteryStepsTranssion.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Open settings, then Battery, and allow background running (turn battery optimisation off). In Phone Master, allow this app to auto-start.'**
+  String get batteryStepsTranssion;
+
+  /// No description provided for @batteryStepsXiaomi.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Open settings, then Battery saver, and choose No restrictions. Then turn on Autostart.'**
+  String get batteryStepsXiaomi;
+
+  /// No description provided for @batteryStepsOppo.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Open settings, then Battery, and turn on Allow background activity. Also allow Auto launch.'**
+  String get batteryStepsOppo;
+
+  /// No description provided for @batteryStepsVivo.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Open settings, then Battery, and allow high background power consumption. Also allow Auto-start.'**
+  String get batteryStepsVivo;
+
+  /// No description provided for @batteryStepsHuawei.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Open settings, then Battery, then App launch. Set this app to Manage manually and turn on all three switches.'**
+  String get batteryStepsHuawei;
+
+  /// No description provided for @batteryStepsOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap Open settings, then Battery, and choose Unrestricted (or Don\'t optimise).'**
+  String get batteryStepsOther;
+
+  /// No description provided for @chatReceiptSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending'**
+  String get chatReceiptSending;
+
+  /// No description provided for @chatReceiptSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent'**
+  String get chatReceiptSent;
+
+  /// No description provided for @chatReceiptRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read'**
+  String get chatReceiptRead;
+
   /// No description provided for @notificationsTitle.
   ///
   /// In en, this message translates to:

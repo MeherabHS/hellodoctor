@@ -88,7 +88,7 @@ export function safeBackendPath(path: string, method: string): boolean {
     ['GET', `doctor/consultations/${id}/summary`], ['GET', 'doctor/qna/questions'],
     ['POST', `doctor/qna/questions/${id}/answers`], ['GET', 'doctor/wallet/(?:summary|ledger|statements|payout-methods)'],
     ['POST', `chat/${id}/attachments`], ['GET', `chat/${id}/messages/${id}/attachment`],
-    ['GET|POST', `chat/${id}/messages`], ['POST', `consultations/${id}/(?:complete|complete-no-rx|prescription)`],
+    ['GET|POST', `chat/${id}/messages`], ['POST', `chat/${id}/read`], ['POST', `consultations/${id}/(?:complete|complete-no-rx|prescription)`],
     ['POST', `consultations/${id}/(?:rtc-token|telemetry|telemetry/events)`],
     ['GET', `consultations/${id}/join-eligibility`],
     ['GET', 'notifications(?:/unread-count)?'], ['POST', `notifications/(?:read-all|${id}/read)`],

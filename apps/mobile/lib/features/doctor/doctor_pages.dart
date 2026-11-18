@@ -3293,6 +3293,52 @@ class _ChatThreadState extends State<ChatThreadPage> {
   bool notSent = false;
   bool serverClosed = false;
   String? error;
+
+  /// Read receipts and adaptive polling (2026-11-17): how far the patient has
+  /// read, the text being sent (shown as "Sending…"), the last activity and
+  /// the newest incoming message already marked read.
+  DateTime? _peerReadUpTo;
+  String? _pendingText;
+  DateTime? _lastActivity;
+  String? _lastMarkedRead;
+
+  /// 3 s while active (a message in the last 2 minutes), 10 s for the next
+  /// 10 minutes, then 30 s — instead of a fixed 10 s for every open chat.
+  Duration _pollInterval(DateTime now) {
+    final last = _lastActivity;
+    if (last == null) return const Duration(seconds: 10);
+    final quiet = now.difference(last);
+    if (quiet < const Duration(minutes: 2)) return const Duration(seconds: 3);
+    if (quiet < const Duration(minutes: 12)) {
+      return const Duration(seconds: 10);
+    }
+    return const Duration(seconds: 30);
+  }
+
+  /// After every successful fetch: picks up the patient's read receipt, notes
+  /// activity, and marks the newest patient message read (once each).
+  void _afterRefresh(List<MessageDto> fetched) {
+    if (!mounted) return;
+    final cubit = context.read<DoctorCubit>();
+    final receipt = cubit.repo.peerReadUpTo(widget.chat.id);
+    if (receipt != null && receipt != _peerReadUpTo) {
+      setState(() => _peerReadUpTo = receipt);
+    }
+    if (fetched.isNotEmpty) _lastActivity = DateTime.now();
+    final me = cubit.state.profile?.userId;
+    if (me == null) return;
+    for (final m in messages.reversed) {
+      if (m.senderId == me) continue;
+      if (m.id != _lastMarkedRead) {
+        _lastMarkedRead = m.id;
+        unawaited(cubit.repo
+            .markChatRead(widget.chat.id, m.id)
+            .catchError((Object _) => _lastMarkedRead = null));
+      }
+      break;
+    }
+  }
+
   @override
   void dispose() {
     _screenRefresh.dispose();
@@ -3332,6 +3378,7 @@ class _ChatThreadState extends State<ChatThreadPage> {
             messages = merge(messages, next);
             error = null;
           });
+          _afterRefresh(next);
         }
       } catch (_) {
         _refreshFailure ??= DateTime.now().toUtc();
@@ -3341,6 +3388,7 @@ class _ChatThreadState extends State<ChatThreadPage> {
       }
     },
         interval: const Duration(seconds: 10),
+        intervalFor: () => _pollInterval(DateTime.now()),
         enabled: () => !widget.chat.isClosed && !serverClosed,
         hasError: () => _refreshFailure != null,
         networkChanges: context.read<DoctorCubit>().connectivity?.changes);
@@ -3432,6 +3480,7 @@ class _ChatThreadState extends State<ChatThreadPage> {
       if (messages.isEmpty) hasOlder = next.length == 50;
       messages = merge(messages, next);
       error = null;
+      _afterRefresh(next);
     } catch (_) {
       error = 'Unable to load this conversation.';
     } finally {
@@ -3452,10 +3501,25 @@ class _ChatThreadState extends State<ChatThreadPage> {
   /// (`prototype/index.html` ~14763).
   Future<void> _sendText(String text) async {
     if (text.isEmpty || sending || widget.chat.isClosed || serverClosed) return;
-    setState(() => sending = true);
+    setState(() {
+      sending = true;
+      _pendingText = text;
+    });
+    _lastActivity = DateTime.now();
     try {
-      await context.read<DoctorCubit>().repo.sendMessage(widget.chat.id, text);
-      if (mounted) setState(() => notSent = false);
+      final sent = await context
+          .read<DoctorCubit>()
+          .repo
+          .sendMessage(widget.chat.id, text);
+      if (mounted) {
+        // The stored message replaces the "Sending…" bubble in one frame.
+        setState(() {
+          notSent = false;
+          _pendingText = null;
+          messages = merge(messages, [MessageDto.fromJson(sent)]);
+        });
+      }
+      _screenRefresh.reschedule();
       await load();
       // Refresh the bounded conversation-list cache after a confirmed send.
       if (mounted) await context.read<DoctorCubit>().loadAll();
@@ -3470,7 +3534,12 @@ class _ChatThreadState extends State<ChatThreadPage> {
       }
       if (mounted) showError(context, e);
     } finally {
-      if (mounted) setState(() => sending = false);
+      if (mounted) {
+        setState(() {
+          sending = false;
+          _pendingText = null;
+        });
+      }
     }
   }
 
@@ -3651,8 +3720,15 @@ class _ChatThreadState extends State<ChatThreadPage> {
                               scrollCacheExtent:
                                   const ScrollCacheExtent.pixels(0),
                               padding: const EdgeInsets.all(16),
-                              itemCount: messages.length + 1,
-                              itemBuilder: (_, i) {
+                              itemCount: messages.length +
+                                  1 +
+                                  (_pendingText != null ? 1 : 0),
+                              itemBuilder: (_, index) {
+                                final pending = _pendingText;
+                                if (pending != null && index == 0) {
+                                  return _PendingDoctorBubble(text: pending);
+                                }
+                                final i = pending != null ? index - 1 : index;
                                 if (i == messages.length) {
                                   return hasOlder
                                       ? TextButton(
@@ -3672,6 +3748,8 @@ class _ChatThreadState extends State<ChatThreadPage> {
                                 return ClinicalMessageBubble(
                                     message: m,
                                     myUserId: myUserId,
+                                    receipt:
+                                        receiptFor(m.sentAt, _peerReadUpTo),
                                     onViewAttachment: () => Navigator.push(
                                         c,
                                         MaterialPageRoute(
@@ -5827,3 +5905,33 @@ Widget readOnly(String label, String value) => Padding(
     child: InputDecorator(
         decoration: InputDecoration(labelText: label),
         child: Text(value.isEmpty ? '—' : value)));
+
+/// The doctor's message being sent, until the server stores it.
+class _PendingDoctorBubble extends StatelessWidget {
+  const _PendingDoctorBubble({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          key: const ValueKey('message-pending'),
+          constraints:
+              BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * .82),
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+              color: DoctorTokens.primary.withValues(alpha: .75),
+              borderRadius: BorderRadius.circular(12)),
+          child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(text,
+                    style: const TextStyle(color: Colors.white, height: 1.45)),
+                const SizedBox(height: 4),
+                const ReceiptTick(receipt: MessageReceipt.sending),
+              ]),
+        ),
+      );
+}

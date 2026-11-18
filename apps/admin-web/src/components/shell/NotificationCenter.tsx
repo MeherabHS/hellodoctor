@@ -3,6 +3,7 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {Bell, X} from 'lucide-react';
 import {request} from '../../lib/api';
 import {describeNotice, type AdminNotice, type NoticePage, type NoticeView} from '../../lib/notificationText';
+import {isNoticeNew, MAX_VIEWED, withViewed} from '../../lib/noticeSeen';
 
 /**
  * Admin notifications (product owner, 2026-11-14): every Admin gets a pop-up
@@ -29,6 +30,19 @@ function readSeen(): number {
 function writeSeen(value: number) {
   try { window.localStorage.setItem(SEEN_KEY, String(value)); } catch { /* storage unavailable: unread resets on reload */ }
 }
+// Notices opened one at a time from their pop-up. Opening the bell still marks
+// everything up to the newest notice seen; this covers a pop-up's "View", which
+// otherwise left that notice counted as new until the bell was opened.
+const VIEWED_KEY = 'afya-admin-notifications-viewed';
+function readViewed(): string[] {
+  try {
+    const v: unknown = JSON.parse(window.localStorage.getItem(VIEWED_KEY) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(-MAX_VIEWED) : [];
+  } catch { return []; }
+}
+function writeViewed(ids: string[]) {
+  try { window.localStorage.setItem(VIEWED_KEY, JSON.stringify(ids.slice(-MAX_VIEWED))); } catch { /* storage unavailable */ }
+}
 const TIME = new Intl.DateTimeFormat('en-GB', {timeZone: 'Africa/Nairobi', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false});
 
 export function NotificationCenter({pendingApplications, onOpen}: {pendingApplications: number; onOpen: (page: NoticePage) => void}) {
@@ -38,6 +52,7 @@ export function NotificationCenter({pendingApplications, onOpen}: {pendingApplic
   // No items exist until the first fetch, so reading storage here cannot
   // change the server-rendered output.
   const [seen, setSeen] = useState(() => (typeof window === 'undefined' ? 0 : readSeen()));
+  const [viewed, setViewed] = useState<string[]>(() => (typeof window === 'undefined' ? [] : readViewed()));
   const cursor = useRef<string | null>(null);
   const known = useRef(new Set<string>());
   const panel = useRef<HTMLDivElement>(null);
@@ -84,7 +99,8 @@ export function NotificationCenter({pendingApplications, onOpen}: {pendingApplic
     return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
   }, [open]);
 
-  const unread = items.filter(i => new Date(i.at).getTime() > seen).length;
+  const isNew = (i: AdminNotice) => isNoticeNew(i.at, i.id, seen, viewed);
+  const unread = items.filter(isNew).length;
   const badge = unread + (pendingApplications > 0 ? 1 : 0);
 
   function toggle() {
@@ -96,7 +112,13 @@ export function NotificationCenter({pendingApplications, onOpen}: {pendingApplic
     }
   }
   function go(page: NoticePage, popupId?: string) {
-    if (popupId) dismiss(popupId);
+    if (popupId) {
+      dismiss(popupId);
+      if (items.some(i => i.id === popupId) && !viewed.includes(popupId)) {
+        const next = withViewed(viewed, popupId);
+        setViewed(next); writeViewed(next);
+      }
+    }
     setOpen(false);
     onOpen(page);
   }
@@ -122,9 +144,8 @@ export function NotificationCenter({pendingApplications, onOpen}: {pendingApplic
             {items.length === 0 && pendingApplications === 0 && <p className="afya-notify-empty">Nothing new. You will see a pop-up here when something happens.</p>}
             {items.map(n => {
               const v = describeNotice(n);
-              const isNew = new Date(n.at).getTime() > seen;
               return (
-                <button type="button" key={n.id} className={`afya-notify-item tone-${v.tone}${isNew ? ' is-new' : ''}`} onClick={() => go(v.page)}>
+                <button type="button" key={n.id} className={`afya-notify-item tone-${v.tone}${isNew(n) ? ' is-new' : ''}`} onClick={() => go(v.page)}>
                   <span className="afya-notify-dot" aria-hidden />
                   <span><strong>{v.title}</strong><small>{v.body} · {TIME.format(new Date(n.at))} EAT</small></span>
                 </button>

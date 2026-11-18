@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Milestone 8.0 — Three Verification Items (JWT admission identity, booking
 # fairness, CPU measurement) and the booking-fairness fix
 

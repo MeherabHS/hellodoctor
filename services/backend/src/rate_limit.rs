@@ -163,9 +163,25 @@ pub async fn check_global_ip_limit(
     check_and_increment(pool, &format!("ratelimit:global:{ip}"), limit_per_min, 60).await
 }
 
-/// Directly brute-force-shaped: fails closed, same principle as `ip_jail`.
+/// Sign-in and password-reset attempts allowed per IP address per 15 minutes,
+/// successful or not (2026-11-18; was 5). Mobile carriers in Kenya put many
+/// users behind one public IP (CGNAT), so 5 locked out everyone behind a
+/// busy carrier address after a handful of ordinary sign-ins. Brute force is
+/// stopped by `ip_jail` instead, unchanged: an account locks after 5 failed
+/// attempts from any IP, and an IP that fails against 20 different accounts
+/// is jailed. This remains a volume backstop for one address.
+pub const LOGIN_ATTEMPTS_PER_IP_PER_15_MIN: u32 = 300;
+
+/// Volume backstop per IP for sign-in endpoints: fails closed, same principle
+/// as `ip_jail`.
 pub async fn check_login_attempt_limit(pool: &Pool, ip: &str) -> Result<(), AppError> {
-    check_and_increment(pool, &format!("ratelimit:login:{ip}"), 5, 900).await
+    check_and_increment(
+        pool,
+        &format!("ratelimit:login:{ip}"),
+        LOGIN_ATTEMPTS_PER_IP_PER_15_MIN,
+        900,
+    )
+    .await
 }
 
 /// Resource-exhaustion guard: fails closed when the store is unavailable.

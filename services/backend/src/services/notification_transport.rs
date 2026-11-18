@@ -37,34 +37,50 @@ pub struct PushOptions {
 /// `apps/mobile/lib/core/notifications/local_notification_service.dart`
 /// (Doctor) and
 /// `apps/mobile_patient/lib/core/notifications/local_notification_service.dart`
-/// (Patient). Falls back to `"GENERAL"` for any type not explicitly listed
+/// (Patient). Falls back to `"GENERAL_V2"` for any type not explicitly listed
 /// or any unrecognized role, exactly like both Dart `forType()` functions do
 /// — a new notification kind or an unexpected role must never fail delivery,
 /// it should just land somewhere reasonable (both apps' channel sets include
 /// a `GENERAL` channel) until this map is extended to match.
+///
+/// 2026-11-17: the `_V2` ids are the apps' forced-sound channels (Android
+/// fixes a channel's sound once created, so new ids were needed); see
+/// [`notification_sound`].
 pub fn android_channel_id(notification_type: &str, recipient_role: &str) -> &'static str {
     match recipient_role {
         "DOCTOR" => match notification_type {
-            "CONSULTATION_REMINDER_15M" => "CONSULTATION_REMINDERS",
-            "DAILY_CONSULTATION_SUMMARY" => "DAILY_SCHEDULE",
-            "NEW_CHAT_MESSAGE" => "MESSAGES",
+            "CONSULTATION_REMINDER_15M" => "CONSULTATION_REMINDERS_V2",
+            "DAILY_CONSULTATION_SUMMARY" => "DAILY_SCHEDULE_V2",
+            "NEW_CHAT_MESSAGE" => "MESSAGES_V2",
             "REGISTRATION_VERIFIED" | "REGISTRATION_REJECTED" | "ARTICLE_STATUS_CHANGED" => {
-                "ACCOUNT"
+                "ACCOUNT_V2"
             }
-            "EARNING_CREDITED" | "PAYOUT_PAID" => "FINANCIAL",
-            _ => "GENERAL",
+            "EARNING_CREDITED" | "PAYOUT_PAID" => "FINANCIAL_V2",
+            _ => "GENERAL_V2",
         },
         // Patient and any other/unrecognized role share the Patient app's
-        // channel set — "GENERAL" always exists there too, so an
+        // channel set — "GENERAL_V2" always exists there too, so an
         // unanticipated role never fails to resolve to a real channel.
         _ => match notification_type {
-            "CONSULTATION_REMINDER_15M" => "CONSULTATION_REMINDERS",
-            "NEW_CHAT_MESSAGE" => "MESSAGES",
+            "CONSULTATION_REMINDER_15M" => "CONSULTATION_REMINDERS_V2",
+            "NEW_CHAT_MESSAGE" => "MESSAGES_V2",
             "BOOKING_HOLD_CREATED" | "BOOKING_HOLD_ONE_MINUTE" | "BOOKING_HOLD_EXPIRED" => {
-                "APPOINTMENTS"
+                "APPOINTMENTS_V2"
             }
-            _ => "GENERAL",
+            _ => "GENERAL_V2",
         },
+    }
+}
+
+/// The sound a push plays (product owner, 2026-11-17: every notification
+/// plays one of the app's two tones, no exceptions). The name is the Android
+/// `res/raw` resource in both apps; iOS uses the same name with `.wav` once
+/// the file is in the app bundle, and plays the default sound until then.
+/// On Android 8+ the channel's own sound applies; this covers older phones.
+pub fn notification_sound(notification_type: &str) -> &'static str {
+    match notification_type {
+        "CONSULTATION_REMINDER_15M" => "afya_reminder_urgent",
+        _ => "afya_notify_quick",
     }
 }
 
@@ -226,13 +242,30 @@ impl FcmTransport {
 /// terminated app falling back to the Android manifest's
 /// `default_notification_channel_id` (the low-importance `GENERAL` channel)
 /// for every notification type regardless of its real importance.
+/// How long FCM/APNs keep trying to deliver a push to an offline phone when
+/// the caller set no expiry of its own (2026-11-18, product-owner decision).
+/// The 15-minute consultation reminder is useless once the consultation has
+/// started, so it expires after 15 minutes; everything else (messages,
+/// appointment changes, prescriptions, account notices) still matters later
+/// and is kept for 24 hours instead of the previous 1 hour. Window-bound
+/// pushes (`CONSULTATION_READY`, rejoin) always pass their own shorter TTL.
+pub fn default_push_ttl_seconds(notification_type: &str) -> i32 {
+    match notification_type {
+        "CONSULTATION_REMINDER_15M" => 900,
+        _ => 86_400,
+    }
+}
+
 fn build_fcm_message(
     push_token: &str,
     title: &str,
     body: &str,
     options: &PushOptions,
 ) -> serde_json::Value {
-    let ttl = options.ttl_seconds.unwrap_or(3600).clamp(0, 2_419_200);
+    let ttl = options
+        .ttl_seconds
+        .unwrap_or_else(|| default_push_ttl_seconds(&options.notification_type))
+        .clamp(0, 2_419_200);
     let mut data = serde_json::Map::new();
     data.insert(
         "notification_id".into(),
@@ -249,10 +282,15 @@ fn build_fcm_message(
         data.insert("related_entity_id".into(), value.clone().into());
     }
     let channel_id = android_channel_id(&options.notification_type, &options.recipient_role);
+    let sound = notification_sound(&options.notification_type);
     let mut android = serde_json::json!({
         "ttl": format!("{}s", ttl),
         "priority": "high",
-        "notification": {"channel_id": channel_id}
+        "notification": {
+            "channel_id": channel_id,
+            "sound": sound,
+            "notification_priority": "PRIORITY_MAX"
+        }
     });
     if let Some(key) = options.collapse_key.as_ref() {
         android["collapse_key"] = serde_json::Value::String(key.clone());
@@ -263,7 +301,7 @@ fn build_fcm_message(
             "notification": {"title": title, "body": body},
             "data": data,
             "android": android,
-            "apns": {"headers": {"apns-expiration": (Utc::now().timestamp() + i64::from(ttl)).to_string()}, "payload": {"aps": {"sound": "default"}}}
+            "apns": {"headers": {"apns-expiration": (Utc::now().timestamp() + i64::from(ttl)).to_string()}, "payload": {"aps": {"sound": format!("{sound}.wav")}}}
         }
     });
     if let Some(key) = options.collapse_key.as_ref() {
@@ -385,15 +423,15 @@ mod m8_g13_channel_routing_tests {
     #[test]
     fn doctor_channel_mapping_matches_dart_source() {
         let cases = [
-            ("CONSULTATION_REMINDER_15M", "CONSULTATION_REMINDERS"),
-            ("DAILY_CONSULTATION_SUMMARY", "DAILY_SCHEDULE"),
-            ("NEW_CHAT_MESSAGE", "MESSAGES"),
-            ("REGISTRATION_VERIFIED", "ACCOUNT"),
-            ("REGISTRATION_REJECTED", "ACCOUNT"),
-            ("ARTICLE_STATUS_CHANGED", "ACCOUNT"),
-            ("EARNING_CREDITED", "FINANCIAL"),
-            ("PAYOUT_PAID", "FINANCIAL"),
-            ("SOME_UNMAPPED_FUTURE_TYPE", "GENERAL"),
+            ("CONSULTATION_REMINDER_15M", "CONSULTATION_REMINDERS_V2"),
+            ("DAILY_CONSULTATION_SUMMARY", "DAILY_SCHEDULE_V2"),
+            ("NEW_CHAT_MESSAGE", "MESSAGES_V2"),
+            ("REGISTRATION_VERIFIED", "ACCOUNT_V2"),
+            ("REGISTRATION_REJECTED", "ACCOUNT_V2"),
+            ("ARTICLE_STATUS_CHANGED", "ACCOUNT_V2"),
+            ("EARNING_CREDITED", "FINANCIAL_V2"),
+            ("PAYOUT_PAID", "FINANCIAL_V2"),
+            ("SOME_UNMAPPED_FUTURE_TYPE", "GENERAL_V2"),
         ];
         for (notification_type, expected_channel) in cases {
             assert_eq!(
@@ -412,19 +450,19 @@ mod m8_g13_channel_routing_tests {
     #[test]
     fn patient_channel_mapping_matches_dart_source() {
         let cases = [
-            ("CONSULTATION_REMINDER_15M", "CONSULTATION_REMINDERS"),
-            ("NEW_CHAT_MESSAGE", "MESSAGES"),
-            ("BOOKING_HOLD_CREATED", "APPOINTMENTS"),
-            ("BOOKING_HOLD_ONE_MINUTE", "APPOINTMENTS"),
-            ("BOOKING_HOLD_EXPIRED", "APPOINTMENTS"),
+            ("CONSULTATION_REMINDER_15M", "CONSULTATION_REMINDERS_V2"),
+            ("NEW_CHAT_MESSAGE", "MESSAGES_V2"),
+            ("BOOKING_HOLD_CREATED", "APPOINTMENTS_V2"),
+            ("BOOKING_HOLD_ONE_MINUTE", "APPOINTMENTS_V2"),
+            ("BOOKING_HOLD_EXPIRED", "APPOINTMENTS_V2"),
             // Doctor-only types must never resolve to a Doctor-only channel
             // ID when the recipient is a patient — a Doctor-targeted type
             // should never actually be sent to a patient, but if it somehow
             // were, it must still land on a channel the Patient app actually
             // created, not silently reference a non-existent one.
-            ("DAILY_CONSULTATION_SUMMARY", "GENERAL"),
-            ("EARNING_CREDITED", "GENERAL"),
-            ("SOME_UNMAPPED_FUTURE_TYPE", "GENERAL"),
+            ("DAILY_CONSULTATION_SUMMARY", "GENERAL_V2"),
+            ("EARNING_CREDITED", "GENERAL_V2"),
+            ("SOME_UNMAPPED_FUTURE_TYPE", "GENERAL_V2"),
         ];
         for (notification_type, expected_channel) in cases {
             assert_eq!(
@@ -443,11 +481,11 @@ mod m8_g13_channel_routing_tests {
     fn unknown_role_falls_back_to_general_channel_set() {
         assert_eq!(
             android_channel_id("CONSULTATION_REMINDER_15M", "PLATFORM_ADMIN"),
-            "CONSULTATION_REMINDERS"
+            "CONSULTATION_REMINDERS_V2"
         );
         assert_eq!(
             android_channel_id("SOME_UNMAPPED_TYPE", "PLATFORM_ADMIN"),
-            "GENERAL"
+            "GENERAL_V2"
         );
     }
 
@@ -465,7 +503,7 @@ mod m8_g13_channel_routing_tests {
         );
         assert_eq!(
             message["message"]["android"]["notification"]["channel_id"],
-            "CONSULTATION_REMINDERS"
+            "CONSULTATION_REMINDERS_V2"
         );
         assert_eq!(message["message"]["token"], "fake-push-token");
         assert_eq!(
@@ -480,6 +518,72 @@ mod m8_g13_channel_routing_tests {
         assert!(!data.contains_key("body"));
     }
 
+    /// Product owner, 2026-11-17: every push plays one of the two app tones —
+    /// the urgent tone for the 15-minute consultation reminder, the quick
+    /// tone for everything else — on Android (pre-8.0 phones read
+    /// `android.notification.sound`) and iOS (`aps.sound`).
+    #[test]
+    fn push_expiry_is_15_minutes_for_the_reminder_and_24_hours_otherwise() {
+        let ttl_of = |kind: &str, explicit: Option<i32>| {
+            let mut o = options(kind, "PATIENT");
+            o.ttl_seconds = explicit;
+            build_fcm_message("t", "Title", "Body", &o)["message"]["android"]["ttl"].clone()
+        };
+        assert_eq!(ttl_of("CONSULTATION_REMINDER_15M", None), "900s");
+        assert_eq!(ttl_of("NEW_CHAT_MESSAGE", None), "86400s");
+        assert_eq!(ttl_of("APPOINTMENT_RESCHEDULED", None), "86400s");
+        // A caller's own window-bound expiry (consultation ready, rejoin) wins.
+        assert_eq!(ttl_of("CONSULTATION_READY", Some(120)), "120s");
+        let o = options("NEW_CHAT_MESSAGE", "PATIENT");
+        let apns_expiry: i64 = build_fcm_message(
+            "t",
+            "Title",
+            "Body",
+            &PushOptions {
+                ttl_seconds: None,
+                ..o
+            },
+        )["message"]["apns"]["headers"]["apns-expiration"]
+            .as_str()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let ahead = apns_expiry - Utc::now().timestamp();
+        assert!(
+            (86_000..=86_400).contains(&ahead),
+            "APNs expiry follows: {ahead}"
+        );
+    }
+
+    #[test]
+    fn built_fcm_message_names_the_forced_sound_for_every_type() {
+        for (kind, role, sound) in [
+            (
+                "CONSULTATION_REMINDER_15M",
+                "DOCTOR",
+                "afya_reminder_urgent",
+            ),
+            (
+                "CONSULTATION_REMINDER_15M",
+                "PATIENT",
+                "afya_reminder_urgent",
+            ),
+            ("NEW_CHAT_MESSAGE", "PATIENT", "afya_notify_quick"),
+            ("DAILY_CONSULTATION_SUMMARY", "DOCTOR", "afya_notify_quick"),
+            ("SOME_BRAND_NEW_TYPE", "PATIENT", "afya_notify_quick"),
+        ] {
+            let message = build_fcm_message("t", "Title", "Body", &options(kind, role));
+            let android = &message["message"]["android"]["notification"];
+            assert_eq!(android["sound"], sound, "{kind}");
+            assert_eq!(android["notification_priority"], "PRIORITY_MAX", "{kind}");
+            assert_eq!(
+                message["message"]["apns"]["payload"]["aps"]["sound"],
+                format!("{sound}.wav"),
+                "{kind}"
+            );
+        }
+    }
+
     #[test]
     fn built_fcm_message_falls_back_to_general_for_unmapped_type_and_role() {
         let message = build_fcm_message(
@@ -490,7 +594,7 @@ mod m8_g13_channel_routing_tests {
         );
         assert_eq!(
             message["message"]["android"]["notification"]["channel_id"],
-            "GENERAL"
+            "GENERAL_V2"
         );
     }
 

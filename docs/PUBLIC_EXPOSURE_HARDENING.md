@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Public exposure and session hardening - 2026-10-08
 
 ## PUBLIC INTERNET EXPOSURE REQUIREMENTS

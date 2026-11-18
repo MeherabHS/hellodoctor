@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Security Audit Run-1 — Remediation Report (Agent J Independent Verification)
 
 **Date:** 2026-10-17

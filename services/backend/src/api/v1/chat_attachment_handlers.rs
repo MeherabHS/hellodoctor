@@ -273,7 +273,9 @@ async fn upload_authorized(
         attachment_size: Some(sanitized.len() as i64),
         attachment_hash: Some(hash),
         is_read: false,
-        sent_at: Utc::now(),
+        // Microsecond precision, as PostgreSQL stores it: the API must return the
+        // same sent_at clients later compare with read receipts.
+        sent_at: chrono::SubsecRound::trunc_subsecs(Utc::now(), 6),
     };
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))")
         .bind(format!("chat-send:{conversation_id}"))

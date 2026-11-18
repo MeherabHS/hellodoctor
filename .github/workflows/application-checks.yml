@@ -51,8 +51,8 @@ jobs:
         if: matrix.app == 'admin-web'
         run: docker exec '${{ job.services.redis.id }}' redis-cli -n 14 SET hd:test-fixture:owner "$TEST_REDIS_FIXTURE_ID"
       - run: npm ci
-      - name: Dependency security audit
-        run: npm audit --audit-level=moderate
+      - name: Dependency security audit (allowlist in .github/npm-audit-allowlist.json)
+        run: node ../../.github/scripts/npm_audit_gate.mjs
       - name: TypeScript
         run: npx --no-install tsc --noEmit
       - name: ESLint and existing source-safety checks

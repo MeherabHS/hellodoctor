@@ -36,7 +36,7 @@ class _StubRepository extends NotificationRepository {
       {this.items = const [], this.unread = 0, this.error, this.hang = false})
       : super(ApiClient(dio: Dio()));
   final List<NotificationDto> items;
-  final int unread;
+  int unread;
   final ApiException? error;
   final bool hang;
 
@@ -58,7 +58,11 @@ class _StubRepository extends NotificationRepository {
   // markRead()/markAllRead() confirmation resolves immediately instead of
   // attempting a genuine network call in a widget test.
   @override
-  Future<void> markRead(String id) async {}
+  Future<void> markRead(String id) async {
+    // A real server's count drops once the read is applied.
+    if (unread > 0) unread--;
+  }
+
   @override
   Future<NotificationDto> detail(String id) async =>
       items.firstWhere((n) => n.id == id);

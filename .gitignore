@@ -73,3 +73,10 @@ services/backend/scripts/.bench_env_base.env!
 
 # AfyaMkononi website build output (apps/afyamkononi-website/tools/build.py)
 /apps/afyamkononi-website/dist/
+
+# Performance-assurance database snapshots: rebuilt from the seed scripts; hash in the manifest.
+docs/assurance/evidence/**/*.dump
+
+# Stray Gradle state and SDK path from building Android at the repo root
+/.gradle/
+/local.properties

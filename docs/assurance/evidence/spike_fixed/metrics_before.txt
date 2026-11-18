@@ -1,0 +1,77 @@
+﻿# TYPE admission_accepted_total counter
+admission_accepted_total{class="health"} 3
+
+# TYPE http_requests_total counter
+http_requests_total{method="GET",path="/healthz",status="200"} 2
+
+# TYPE db_pool_size gauge
+db_pool_size{role="finance"} 1
+db_pool_size{role="api"} 1
+db_pool_size{role="payment"} 1
+db_pool_size{role="auth"} 1
+
+# TYPE db_pool_idle gauge
+db_pool_idle{role="auth"} 1
+db_pool_idle{role="payment"} 1
+db_pool_idle{role="finance"} 1
+db_pool_idle{role="api"} 1
+
+# TYPE admission_inflight gauge
+admission_inflight{class="health"} 1
+
+# TYPE admission_permit_hold_seconds summary
+admission_permit_hold_seconds{class="health",quantile="0"} 0.000977147
+admission_permit_hold_seconds{class="health",quantile="0.5"} 0.0009771210361253565
+admission_permit_hold_seconds{class="health",quantile="0.9"} 0.0009771210361253565
+admission_permit_hold_seconds{class="health",quantile="0.95"} 0.0009771210361253565
+admission_permit_hold_seconds{class="health",quantile="0.99"} 0.0009771210361253565
+admission_permit_hold_seconds{class="health",quantile="0.999"} 0.0009771210361253565
+admission_permit_hold_seconds{class="health",quantile="1"} 0.003587382
+admission_permit_hold_seconds_sum{class="health"} 0.004564529
+admission_permit_hold_seconds_count{class="health"} 2
+
+# TYPE http_request_duration_seconds summary
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0"} 0.001091522
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.5"} 0.0010916117253713092
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.9"} 0.0010916117253713092
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.95"} 0.0010916117253713092
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.99"} 0.0010916117253713092
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="0.999"} 0.0010916117253713092
+http_request_duration_seconds{method="GET",path="/healthz",status="200",quantile="1"} 0.003767292
+http_request_duration_seconds_sum{method="GET",path="/healthz",status="200"} 0.004858814
+http_request_duration_seconds_count{method="GET",path="/healthz",status="200"} 2
+
+# TYPE db_acquire_seconds summary
+db_acquire_seconds{quantile="0"} 0.000211811
+db_acquire_seconds{quantile="0.5"} 0.0002740773937988627
+db_acquire_seconds{quantile="0.9"} 0.00029964862131863956
+db_acquire_seconds{quantile="0.95"} 0.000421159038942355
+db_acquire_seconds{quantile="0.99"} 0.000421159038942355
+db_acquire_seconds{quantile="0.999"} 0.000421159038942355
+db_acquire_seconds{quantile="1"} 0.00449842
+db_acquire_seconds_sum 0.007454136
+db_acquire_seconds_count 12
+
+# TYPE admission_permit_hold_by_endpoint_seconds summary
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0"} 0.000977147
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.5"} 0.0009771210361253565
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.9"} 0.0009771210361253565
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.95"} 0.0009771210361253565
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.99"} 0.0009771210361253565
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="0.999"} 0.0009771210361253565
+admission_permit_hold_by_endpoint_seconds{class="health",endpoint="/healthz",quantile="1"} 0.003587382
+admission_permit_hold_by_endpoint_seconds_sum{class="health",endpoint="/healthz"} 0.004564529
+admission_permit_hold_by_endpoint_seconds_count{class="health",endpoint="/healthz"} 2
+
+# TYPE sqlx_pool_acquire_wait_seconds summary
+sqlx_pool_acquire_wait_seconds{quantile="0"} 0.000102581
+sqlx_pool_acquire_wait_seconds{quantile="0.5"} 0.0001096847697926641
+sqlx_pool_acquire_wait_seconds{quantile="0.9"} 0.00019399075910936543
+sqlx_pool_acquire_wait_seconds{quantile="0.95"} 0.0002138362477751576
+sqlx_pool_acquire_wait_seconds{quantile="0.99"} 0.0002138362477751576
+sqlx_pool_acquire_wait_seconds{quantile="0.999"} 0.0002138362477751576
+sqlx_pool_acquire_wait_seconds{quantile="1"} 0.000243406
+sqlx_pool_acquire_wait_seconds_sum 0.08848714499999999
+sqlx_pool_acquire_wait_seconds_count 783
+
+

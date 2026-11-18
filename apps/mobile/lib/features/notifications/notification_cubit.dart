@@ -89,6 +89,36 @@ class NotificationCubit extends Cubit<NotificationState> {
 
   bool _loadInFlight = false;
 
+  /// Bumped by every local read. A fetch that started before a read can carry
+  /// the server's count from before that read reached it, so its count is not
+  /// applied and the notices read here stay read in its list. (2026-11-17:
+  /// opening a notice refreshed the inbox and could put the badge back to 1.)
+  int _readGeneration = 0;
+  final Set<String> _readLocally = {};
+
+  List<NotificationDto> _withLocalReads(List<NotificationDto> items) {
+    if (_readLocally.isEmpty) return items;
+    final now = DateTime.now().toUtc();
+    return [
+      for (final n in items)
+        !n.isRead && _readLocally.contains(n.id) ? n.copyWith(readAt: now) : n
+    ];
+  }
+
+  /// Re-reads the unread count once a read is confirmed. This request starts
+  /// after the server applied the read, so its answer is current.
+  Future<void> _refreshUnreadCount() async {
+    try {
+      final generation = _readGeneration;
+      final count = await repo.unreadCount();
+      if (!isClosed && generation == _readGeneration) {
+        emit(state.copyWith(unreadCount: count));
+      }
+    } catch (_) {
+      // The next poll corrects it.
+    }
+  }
+
   Timer? _pollTimer;
   bool _pollingStarted = false;
 
@@ -136,6 +166,7 @@ class NotificationCubit extends Cubit<NotificationState> {
     _loadInFlight = true;
     final hadItems = state.items.isNotEmpty;
     emit(state.copyWith(loading: !hadItems, refreshing: hadItems, error: null));
+    final generation = _readGeneration;
     try {
       final results = await Future.wait([repo.list(), repo.unreadCount()]);
       if (isClosed) return;
@@ -144,9 +175,12 @@ class NotificationCubit extends Cubit<NotificationState> {
         loading: false,
         refreshing: false,
         error: null,
-        items: _olderLoaded ? _mergeItems(state.items, items) : items,
+        items: _withLocalReads(
+            _olderLoaded ? _mergeItems(state.items, items) : items),
         hasOlder: _olderLoaded ? state.hasOlder : items.length == 25,
-        unreadCount: results[1] as int,
+        unreadCount: generation == _readGeneration
+            ? results[1] as int
+            : state.unreadCount,
         lastUpdatedAt: _now().toUtc(),
       ));
       _processFetchedItems(items);
@@ -242,14 +276,17 @@ class NotificationCubit extends Cubit<NotificationState> {
   Future<void> _poll() async {
     if (_loadInFlight || isClosed) return;
     _loadInFlight = true;
+    final generation = _readGeneration;
     try {
       final results = await Future.wait([_delta(), repo.unreadCount()]);
       if (isClosed) return;
       final items = results[0] as List<NotificationDto>;
       emit(state.copyWith(
         error: null,
-        items: _mergeItems(state.items, items),
-        unreadCount: results[1] as int,
+        items: _withLocalReads(_mergeItems(state.items, items)),
+        unreadCount: generation == _readGeneration
+            ? results[1] as int
+            : state.unreadCount,
         lastUpdatedAt: DateTime.now().toUtc(),
       ));
       _processFetchedItems(items);
@@ -334,6 +371,8 @@ class NotificationCubit extends Cubit<NotificationState> {
     final previousUnread = state.unreadCount;
     final updated = [...state.items];
     updated[index] = updated[index].copyWith(readAt: DateTime.now().toUtc());
+    _readGeneration++;
+    _readLocally.add(id);
     emit(state.copyWith(
         items: updated,
         unreadCount: previousUnread > 0 ? previousUnread - 1 : 0,
@@ -341,13 +380,16 @@ class NotificationCubit extends Cubit<NotificationState> {
     try {
       await repo.markRead(id);
     } catch (e) {
+      _readLocally.remove(id);
       if (isClosed) return;
       emit(state.copyWith(
         items: previousItems,
         unreadCount: previousUnread,
         error: _message(e, 'This notification could not be marked as read.'),
       ));
+      return;
     }
+    await _refreshUnreadCount();
   }
 
   Future<void> markAllRead() async {
@@ -355,6 +397,8 @@ class NotificationCubit extends Cubit<NotificationState> {
     final previousItems = state.items;
     final previousUnread = state.unreadCount;
     final now = DateTime.now().toUtc();
+    _readGeneration++;
+    _readLocally.addAll(state.items.map((n) => n.id));
     emit(state.copyWith(
         busy: true,
         error: null,
@@ -366,6 +410,7 @@ class NotificationCubit extends Cubit<NotificationState> {
       await repo.markAllRead();
       if (isClosed) return;
       emit(state.copyWith(busy: false));
+      await _refreshUnreadCount();
     } catch (e) {
       if (isClosed) return;
       emit(state.copyWith(

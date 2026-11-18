@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/tokens.dart';
+import '../../l10n/app_localizations.dart';
 import '../../core/utils/time_format.dart';
 import 'doctor_models.dart';
 
@@ -8,9 +9,13 @@ class ClinicalMessageBubble extends StatelessWidget {
       {super.key,
       required this.message,
       required this.myUserId,
+      this.receipt,
       this.onViewAttachment});
   final MessageDto message;
   final String? myUserId;
+
+  /// Sent / Read ticks on the doctor's own messages (2026-11-17).
+  final MessageReceipt? receipt;
   final VoidCallback? onViewAttachment;
   @override
   Widget build(BuildContext context) {
@@ -61,11 +66,62 @@ class ClinicalMessageBubble extends StatelessWidget {
                       child: const Text('View image')),
                 ],
                 const SizedBox(height: 4),
-                Text(time,
-                    style: TextStyle(
-                        fontSize: 11,
-                        color: mine ? Colors.white70 : DoctorTokens.textSub)),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(time,
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: mine ? Colors.white70 : DoctorTokens.textSub)),
+                  if (mine && receipt != null) ...[
+                    const SizedBox(width: 4),
+                    ReceiptTick(receipt: receipt!),
+                  ],
+                ]),
               ])),
+    );
+  }
+}
+
+/// Sending (in flight), sent (stored by the server), read (the patient has
+/// read up to it).
+enum MessageReceipt { sending, sent, read }
+
+MessageReceipt receiptFor(String sentAt, DateTime? peerReadUpTo) {
+  final at = DateTime.tryParse(sentAt)?.toUtc();
+  return at != null && peerReadUpTo != null && !at.isAfter(peerReadUpTo)
+      ? MessageReceipt.read
+      : MessageReceipt.sent;
+}
+
+/// The delivery tick on the doctor's own message.
+class ReceiptTick extends StatelessWidget {
+  const ReceiptTick({super.key, required this.receipt});
+  final MessageReceipt receipt;
+
+  @override
+  Widget build(BuildContext context) {
+    // Falls back to English where no localizations are installed.
+    final l10n = Localizations.of<AppLocalizations>(context, AppLocalizations);
+    final (icon, color, label) = switch (receipt) {
+      MessageReceipt.sending => (
+          Icons.schedule_rounded,
+          Colors.white70,
+          l10n?.chatReceiptSending ?? 'Sending'
+        ),
+      MessageReceipt.sent => (
+          Icons.done_rounded,
+          Colors.white70,
+          l10n?.chatReceiptSent ?? 'Sent'
+        ),
+      MessageReceipt.read => (
+          Icons.done_all_rounded,
+          const Color(0xFFB9F6CA),
+          l10n?.chatReceiptRead ?? 'Read'
+        ),
+    };
+    return Semantics(
+      label: label,
+      child:
+          Icon(icon, size: 15, color: color, key: ValueKey('receipt-$receipt')),
     );
   }
 }

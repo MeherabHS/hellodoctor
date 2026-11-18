@@ -9,6 +9,56 @@ class AppLocalizationsSw extends AppLocalizations {
   AppLocalizationsSw([String locale = 'sw']) : super(locale);
 
   @override
+  String get batteryPromptTitle => 'Pokea vikumbusho kwa wakati';
+
+  @override
+  String get batteryPromptBody =>
+      'Simu yako inaweza kusimamisha programu hii chinichini ili kuokoa betri. Hilo linaweza kuchelewesha au kuzuia vikumbusho vya mashauriano na ujumbe. Ili uvipokee kwa wakati, ruhusu programu iendelee kufanya kazi chinichini.';
+
+  @override
+  String get batteryPromptLater => 'Si sasa';
+
+  @override
+  String get batteryPromptOpenSettings => 'Fungua mipangilio';
+
+  @override
+  String get batteryStepsSamsung =>
+      'Gusa Fungua mipangilio, kisha Battery, na uchague Unrestricted. Pia hakikisha programu hii haiko kwenye Sleeping apps (Settings > Battery > Background usage limits).';
+
+  @override
+  String get batteryStepsTranssion =>
+      'Gusa Fungua mipangilio, kisha Battery, na uruhusu programu ifanye kazi chinichini (zima battery optimisation). Kwenye Phone Master, ruhusu programu hii ijiwashe yenyewe (auto-start).';
+
+  @override
+  String get batteryStepsXiaomi =>
+      'Gusa Fungua mipangilio, kisha Battery saver, na uchague No restrictions. Kisha washa Autostart.';
+
+  @override
+  String get batteryStepsOppo =>
+      'Gusa Fungua mipangilio, kisha Battery, na uwashe Allow background activity. Pia ruhusu Auto launch.';
+
+  @override
+  String get batteryStepsVivo =>
+      'Gusa Fungua mipangilio, kisha Battery, na uruhusu matumizi makubwa ya betri chinichini. Pia ruhusu Auto-start.';
+
+  @override
+  String get batteryStepsHuawei =>
+      'Gusa Fungua mipangilio, kisha Battery, kisha App launch. Weka programu hii kwenye Manage manually na uwashe swichi zote tatu.';
+
+  @override
+  String get batteryStepsOther =>
+      'Gusa Fungua mipangilio, kisha Battery, na uchague Unrestricted (au Don\'t optimise).';
+
+  @override
+  String get chatReceiptSending => 'Inatumwa';
+
+  @override
+  String get chatReceiptSent => 'Imetumwa';
+
+  @override
+  String get chatReceiptRead => 'Imesomwa';
+
+  @override
   String get notificationsTitle => 'Arifa';
 
   @override

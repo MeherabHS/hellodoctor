@@ -1,3 +1,5 @@
+> **Historical record.** Dated evidence from before the 2026-11-17 re-baseline; its numbers and open/closed verdicts do not describe the current system. Current status: [docs/assurance](assurance/README.md).
+
 # Milestone 8 — Workstream 2: Sustained Reliability and Recovery
 
 Status: **IN PROGRESS.** This report covers (1) a confirmed application

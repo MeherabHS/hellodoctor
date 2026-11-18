@@ -60,7 +60,7 @@ not be invented or committed.
 
 ## Android
 
-Create a Firebase Android app for each package (`com.example.hellodoctor_mobile`
+Create a Firebase Android app for each package (`com.hellodoctor.doctor`
 and `com.hellodoctor.patient` — these are each app's real, already-checked-in
 `applicationId`, confirmed in `android/app/build.gradle.kts`). Download each
 project's `google-services.json` into its matching `android/app/` directory
@@ -139,3 +139,21 @@ foreground and opened-app callbacks only refresh the authenticated in-app
 inbox; they do not authorize deep links or change appointment, consultation or
 financial state. When native Firebase configuration is absent, the existing
 in-app notification polling continues and no fake device token is registered.
+
+### Delivery reliability (2026-11-18, product-owner decision)
+
+- **Push expiry.** A push that cannot reach an offline phone is kept by FCM/APNs
+  for 15 minutes for `CONSULTATION_REMINDER_15M` (a late "starts in 15
+  minutes" is useless) and 24 hours for every other type
+  (`default_push_ttl_seconds` in
+  `services/backend/src/services/notification_transport.rs`). Window-bound
+  pushes (`CONSULTATION_READY`, consultation rejoin) still pass their own
+  shorter expiry. Whatever expires is still in the in-app inbox.
+- **Battery optimisation.** Many Android phones (Tecno, Infinix, itel, Xiaomi,
+  Oppo, Vivo, Samsung "Sleeping apps") stop background apps and delay pushes.
+  Once per install, after sign-in, an Android user whose phone restricts the
+  app sees brand-specific steps and an **Open settings** button
+  (`lib/core/notifications/battery_optimization.dart` and
+  `BatteryOptimization.kt` in both apps). It only opens settings pages; the
+  Play-restricted `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission is not
+  used. Swahili copy should be reviewed by a native speaker.

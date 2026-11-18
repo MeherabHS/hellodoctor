@@ -14,6 +14,7 @@ import 'core/notifications/push_notification_service.dart';
 import 'core/network/connectivity_service.dart';
 import 'core/cache/doctor_cache_store.dart';
 import 'core/notifications/background_sync_worker.dart';
+import 'core/notifications/battery_optimization.dart';
 import 'core/notifications/local_notification_service.dart';
 import 'core/theme/tokens.dart';
 import 'core/validation/kenya_phone.dart';
@@ -892,6 +893,8 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
       await LocalNotificationService.init();
       await LocalNotificationService.requestPermission();
       await registerBackgroundSync();
+      // Once per install: how to stop this phone delaying reminders.
+      if (mounted) await BatteryOptimization.maybePrompt(context);
     } catch (_) {
       // Best-effort — never block the shell or surface an error for this.
     }
