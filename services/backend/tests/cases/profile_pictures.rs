@@ -736,3 +736,89 @@ async fn test_storage_unavailable_leaves_patient_photo_row_unchanged(pool: PgPoo
          dangling object-key reference"
     );
 }
+
+// ============================================================================
+// Counterpart photos (migration `20261222000014_counterpart_photos`): the
+// doctor of an appointment sees its patient's photo, the patient sees the
+// doctor's, and nobody else sees either.
+// ============================================================================
+#[sqlx::test(migrations = "./migrations")]
+async fn test_appointment_counterpart_photo_is_scoped_to_its_doctor_and_patient(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let (patient_id, patient_token) = new_patient(&pool).await;
+    let (apt_id, _slot) = insert_confirmed_appointment_for(
+        &pool,
+        uid(DOCTOR1_PROFILE_ID),
+        patient_id,
+        Utc::now() + chrono::Duration::hours(2),
+    )
+    .await;
+    let url = format!("/api/v1/appointments/{apt_id}/counterpart-photo");
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let other_doctor = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
+    let (_other_patient, other_patient_token) = new_patient(&pool).await;
+
+    // No photos yet: both sides get 404, not an empty body.
+    assert_eq!(
+        get(&app, &url, Some(&doctor)).await.status(),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        get(&app, &url, Some(&patient_token)).await.status(),
+        StatusCode::NOT_FOUND
+    );
+
+    let up = upload_patient_photo(
+        &app,
+        &patient_token,
+        "image/png",
+        &minimal_png_base64(),
+        None,
+    )
+    .await;
+    assert_eq!(up.status(), StatusCode::OK);
+    let up = upload_doctor_photo(&app, &doctor, "image/png", &minimal_png_base64()).await;
+    assert_eq!(up.status(), StatusCode::OK);
+
+    // The doctor of the appointment sees the patient's photo, privately.
+    let (status, headers, bytes) = response_parts(get(&app, &url, Some(&doctor)).await).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        header_str(&headers, axum::http::header::CACHE_CONTROL),
+        "private, no-store"
+    );
+    let own =
+        response_parts(get(&app, "/api/v1/patients/me/photo", Some(&patient_token)).await).await;
+    assert_eq!(
+        bytes, own.2,
+        "the doctor gets exactly the patient's saved photo"
+    );
+
+    // The patient sees the doctor's photo.
+    let (status, _, bytes) = response_parts(get(&app, &url, Some(&patient_token)).await).await;
+    assert_eq!(status, StatusCode::OK);
+    let doctor_own =
+        response_parts(get(&app, "/api/v1/doctor/profile/photo", Some(&doctor)).await).await;
+    assert_eq!(bytes, doctor_own.2);
+
+    // Another doctor, another patient and an Admin see nothing.
+    assert_eq!(
+        get(&app, &url, Some(&other_doctor)).await.status(),
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        get(&app, &url, Some(&other_patient_token)).await.status(),
+        StatusCode::NOT_FOUND
+    );
+    let admin = token_for_real_role(&pool, "ADMIN").await;
+    assert_eq!(
+        get(&app, &url, Some(&admin)).await.status(),
+        StatusCode::NOT_FOUND
+    );
+    // An unknown appointment is a 404 too.
+    let unknown = format!("/api/v1/appointments/{}/counterpart-photo", Uuid::new_v4());
+    assert_eq!(
+        get(&app, &unknown, Some(&doctor)).await.status(),
+        StatusCode::NOT_FOUND
+    );
+}

@@ -15,6 +15,7 @@ import '../features/patient/chat/chat_models.dart';
 import '../features/patient/chat/chat_repository.dart';
 import '../features/patient/chat/patient_chat_page.dart';
 import '../l10n/app_localizations.dart';
+import 'preview_avatar.dart';
 
 const _language =
     String.fromEnvironment('PREVIEW_LANGUAGE', defaultValue: 'en');
@@ -45,7 +46,8 @@ ChatMessageDto _msg(String id, String sender, String text, int minutesAgo) =>
 class _PreviewChatRepo extends ChatRepository {
   _PreviewChatRepo()
       : super(ApiClient(
-            dio: Dio(BaseOptions(baseUrl: 'http://preview.invalid/api/v1')),
+            dio: Dio(BaseOptions(baseUrl: 'http://preview.invalid/api/v1'))
+              ..httpClientAdapter = PreviewPhotoAdapter(),
             tokenStore: _NoTokens()));
   final _thread = [
     _msg(

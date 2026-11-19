@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_client.dart';
 import '../../core/cache/patient_cache_store.dart';
+import '../../core/widgets/person_photo.dart';
 import '../../core/validation/kenya_phone.dart';
 import '../notifications/notification_repository.dart';
 import 'auth_repository.dart';
@@ -114,6 +115,7 @@ class AuthCubit extends Cubit<AuthState> {
       authDiag(
           'auth.signedOutByExpiry', {'state': state.runtimeType.toString()});
       cache?.clear();
+      PersonPhotoCache.clear();
       if (!isClosed) emit(const SignedOut());
     };
   }
@@ -407,6 +409,7 @@ class AuthCubit extends Cubit<AuthState> {
     } finally {
       await api.clearSession();
       await cache?.clear();
+      PersonPhotoCache.clear();
       emit(SignedOut(notice: notice));
       _busy = false;
     }

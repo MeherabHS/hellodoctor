@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/widgets/afya_widgets.dart';
 import '../../../core/widgets/patient_widgets.dart';
+import '../../../core/widgets/person_photo.dart';
 import '../../../l10n/app_localizations.dart';
 import '../booking/booking_repository.dart';
 import '../directory/patient_directory_page.dart';
@@ -195,7 +196,11 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
           onTap: () => _openPeer(c),
           padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
           child: Row(children: [
-            AfyaInitialsAvatar(name: c.peerName, size: 46),
+            PersonPhoto(
+                api: widget.repo.api,
+                path: peerRequestCounterpartPhotoPath(c.requestId),
+                size: 46,
+                fallback: AfyaInitialsAvatar(name: c.peerName, size: 46)),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -351,10 +356,14 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
                             onTap: () => _open(a),
                             padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
                             child: Row(children: [
-                              AfyaInitialsAvatar(
-                                  name: a.doctorDisplayName
-                                      .replaceFirst(RegExp(r'^Dr\.?\s*'), ''),
-                                  size: 46),
+                              PersonPhoto(
+                                  api: widget.repo.api,
+                                  path: appointmentCounterpartPhotoPath(a.id),
+                                  size: 46,
+                                  fallback: AfyaInitialsAvatar(
+                                      name: a.doctorDisplayName.replaceFirst(
+                                          RegExp(r'^Dr\.?\s*'), ''),
+                                      size: 46)),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(

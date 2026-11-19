@@ -182,18 +182,20 @@ class DoctorTopBar extends StatelessWidget {
           InkWell(
               customBorder: const CircleBorder(),
               onTap: () => _push(c, const ProfilePage()),
-              child: Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(
-                      color: DoctorTokens.primary, shape: BoxShape.circle),
-                  child: Text(
-                      profile == null ? '' : personInitials(profile.name),
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white)))),
+              child: DoctorOwnPhoto(
+                  size: 34,
+                  fallback: Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                          color: DoctorTokens.primary, shape: BoxShape.circle),
+                      child: Text(
+                          profile == null ? '' : personInitials(profile.name),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white))))),
         ]));
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/theme/tokens.dart';
+import '../../core/widgets/person_photo.dart';
 
 /// Shared look of the Peer Navigator screens, measured from the Care-app
 /// peer references in `docs/design/peer-navigator/care-app/`.
@@ -97,10 +98,16 @@ void peerToast(BuildContext context, String text) =>
 
 /// Initials on a soft colour picked from the name (the reference rotates
 /// mint, purple, blue and peach).
+///
+/// With [api] and [photoPath], shows the person's saved photo instead once
+/// it loads (see [PersonPhoto]).
 class PeerAvatar extends StatelessWidget {
-  const PeerAvatar(this.name, {super.key, this.size = 52});
+  const PeerAvatar(this.name,
+      {super.key, this.size = 52, this.api, this.photoPath});
   final String name;
   final double size;
+  final ApiClient? api;
+  final String? photoPath;
   static const _palette = [
     (PeerTokens.mint, PeerTokens.green),
     (PeerTokens.purple, PeerTokens.purpleText),
@@ -111,7 +118,7 @@ class PeerAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final (bg, fg) = _palette[
         name.codeUnits.fold<int>(0, (a, b) => a + b) % _palette.length];
-    return Container(
+    final initials = Container(
         width: size,
         height: size,
         alignment: Alignment.center,
@@ -121,6 +128,10 @@ class PeerAvatar extends StatelessWidget {
                 color: fg,
                 fontWeight: FontWeight.w800,
                 fontSize: size * 0.36)));
+    final client = api;
+    if (client == null || photoPath == null) return initials;
+    return PersonPhoto(
+        api: client, path: photoPath, size: size, fallback: initials);
   }
 }
 

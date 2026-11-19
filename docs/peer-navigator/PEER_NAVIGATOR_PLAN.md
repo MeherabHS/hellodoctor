@@ -20,7 +20,7 @@ non-clinical: no prescriptions, no referrals, no clinical records, no earnings.
 | Chat | Same chat experience as doctor chat, but never closes: no 24-hour lock. "Mark Session Complete" changes the status only; the conversation stays open. |
 | Calls | Voice/video through Agora, reusing the doctor call screen and token minting, within the accepted slot. |
 | Patient's chat list | One list showing doctor consultation chats and peer chats together, each labelled. |
-| What the peer sees | Patient first name + initial (e.g. "Amina M."), age range, the topic they wrote. Never phone, email, address, records, prescriptions or doctor consultations. |
+| What the peer sees | Patient first name + initial (e.g. "Amina M."), age range, the topic they wrote, and the patient's saved profile photo if they set one (product owner, 2026-11-19). Never phone, email, address, records, prescriptions or doctor consultations. |
 | Not for peers | Rx, referrals/escalations, 20% earnings, KMPDC verification, grievances against clinical care. |
 | Payment | None (finance is deferred platform-wide). |
 
@@ -294,3 +294,15 @@ legal text before acceptance can be recorded like the doctor agreements.
     as text (tested).
 - Debug preview for the patient's doctor chat:
   `apps/mobile_patient/lib/dev/doctor_chat_preview_main.dart`.
+- **Profile photos (product owner, 2026-11-19).** Peers save a profile photo
+  from the Care app's Profile card (`POST/GET/DELETE /peer/profile/photo`,
+  migration `20261222000014_counterpart_photos`, same storage and
+  sanitising as patient and doctor photos); the Care Home header shows it.
+  The other person's photo in a session comes from
+  `GET /peer-requests/:id/counterpart-photo` (the peer gets the patient's
+  photo, the patient the peer's; anyone else, Admins included, gets 404),
+  shown on the request card, the chat list, the chat header and message
+  avatars in both apps. Consultations use the same shape:
+  `GET /appointments/:id/counterpart-photo` (the doctor gets the patient's
+  photo, the patient the doctor's). Photos are held in memory only and
+  cleared on sign-out; initials remain the fallback.

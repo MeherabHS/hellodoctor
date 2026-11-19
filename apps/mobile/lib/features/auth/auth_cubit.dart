@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_client.dart';
 import '../../core/cache/doctor_cache_store.dart';
+import '../../core/widgets/person_photo.dart';
 import '../notifications/notification_repository.dart';
 
 sealed class AuthState {
@@ -90,6 +91,7 @@ class AuthCubit extends Cubit<AuthState> {
     api.onSessionExpired = () {
       _challenge = null;
       cache?.clear();
+      PersonPhotoCache.clear();
       if (!isClosed) emit(const SignedOut());
     };
   }
@@ -409,6 +411,7 @@ class AuthCubit extends Cubit<AuthState> {
     } finally {
       await api.clearSession();
       await cache?.clear();
+      PersonPhotoCache.clear();
       _challenge = null;
       emit(SignedOut(notice: notice));
       _busy = false;

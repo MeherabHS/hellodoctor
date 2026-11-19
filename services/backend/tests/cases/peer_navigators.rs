@@ -1711,3 +1711,93 @@ async fn a_past_peer_session_reports_its_call_as_closed_on_every_list(pool: PgPo
         true
     );
 }
+
+fn tiny_png_base64() -> String {
+    let img = image::RgbImage::from_pixel(2, 2, image::Rgb([20, 160, 90]));
+    let mut buf = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::ImageRgb8(img)
+        .write_to(&mut buf, image::ImageFormat::Png)
+        .unwrap();
+    STANDARD.encode(buf.into_inner())
+}
+
+async fn photo_bytes(app: &axum::Router, url: &str, token: &str) -> (StatusCode, Vec<u8>) {
+    let res = get(app, url, Some(token)).await;
+    let status = res.status();
+    (
+        status,
+        res.into_body().collect().await.unwrap().to_bytes().to_vec(),
+    )
+}
+
+/// Migration `20261222000014_counterpart_photos`: a peer saves a photo, the
+/// peer of a request sees its patient's photo (and the patient the peer's),
+/// and nobody else sees either.
+#[sqlx::test(migrations = "./migrations")]
+async fn peer_photo_and_request_counterpart_photos(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let (peer, _peer_id, slots) =
+        approved_peer_with_slots(&app, &pool, PEER_EMAIL, "+254711220101", 1).await;
+    let (other_peer, _, _) =
+        approved_peer_with_slots(&app, &pool, "other.peer@example.test", "+254711220102", 0).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+
+    // Own peer photo: none, upload, read back, remove.
+    let own = "/api/v1/peer/profile/photo";
+    assert_eq!(photo_bytes(&app, own, &peer).await.0, StatusCode::NOT_FOUND);
+    let body = serde_json::json!({"mime_type": "image/png", "base64_content": tiny_png_base64()});
+    assert_eq!(
+        post(&app, own, Some(&peer), &body).await.status(),
+        StatusCode::OK
+    );
+    let (status, peer_photo) = photo_bytes(&app, own, &peer).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(image::load_from_memory(&peer_photo).is_ok());
+    assert_eq!(
+        post(&app, own, Some(&patient), &body).await.status(),
+        StatusCode::FORBIDDEN,
+        "only a peer has a peer photo"
+    );
+
+    // The patient saves a photo and requests the peer.
+    let up = post(&app, "/api/v1/patients/me/photo", Some(&patient), &body).await;
+    assert_eq!(up.status(), StatusCode::OK);
+    let (_, patient_photo) = photo_bytes(&app, "/api/v1/patients/me/photo", &patient).await;
+    let request = json_body(request_slot(&app, &patient, &slots[0]).await).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let url = format!("/api/v1/peer-requests/{request}/counterpart-photo");
+
+    // Pending already: the peer sees the patient's photo, the patient the peer's.
+    let (status, bytes) = photo_bytes(&app, &url, &peer).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(bytes, patient_photo);
+    let (status, bytes) = photo_bytes(&app, &url, &patient).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(bytes, peer_photo);
+
+    // Another peer, a doctor and an Admin see nothing.
+    assert_eq!(
+        photo_bytes(&app, &url, &other_peer).await.0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        photo_bytes(&app, &url, &doctor).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let admin = token_for_real_role(&pool, "ADMIN").await;
+    assert_eq!(
+        photo_bytes(&app, &url, &admin).await.0,
+        StatusCode::NOT_FOUND
+    );
+
+    // Removing the peer photo turns the patient's view back into a 404.
+    let removed = send(&app, "DELETE", own, Some(&peer), None, None).await;
+    assert_eq!(removed.status(), StatusCode::OK);
+    assert_eq!(
+        photo_bytes(&app, &url, &patient).await.0,
+        StatusCode::NOT_FOUND
+    );
+}

@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/widgets/person_photo.dart';
 import '../doctor/agora_page.dart';
 import 'peer_repository.dart';
 import 'peer_ui.dart';
@@ -181,14 +182,18 @@ class _PeerChatsTabState extends State<PeerChatsTab> {
                     for (final c in shown)
                       Padding(
                           padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-                          child: _ChatRow(chat: c, onTap: () => _open(c))),
+                          child: _ChatRow(
+                              chat: c,
+                              api: widget.repo.api,
+                              onTap: () => _open(c))),
                 ]);
           }));
 }
 
 class _ChatRow extends StatelessWidget {
-  const _ChatRow({required this.chat, required this.onTap});
+  const _ChatRow({required this.chat, required this.api, required this.onTap});
   final PeerChatSummary chat;
+  final ApiClient api;
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
@@ -201,7 +206,10 @@ class _ChatRow extends StatelessWidget {
         onTap: onTap,
         padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
         child: Row(children: [
-          PeerAvatar(chat.name, size: 56),
+          PeerAvatar(chat.name,
+              size: 56,
+              api: api,
+              photoPath: peerRequestCounterpartPhotoPath(chat.requestId)),
           const SizedBox(width: 16),
           Expanded(
               child: Column(
@@ -440,7 +448,11 @@ class _PeerChatPageState extends State<PeerChatPage> {
                     filled: true,
                     onTap: () => Navigator.of(context).maybePop()),
                 const SizedBox(width: 12),
-                PeerAvatar(widget.name, size: 56),
+                PeerAvatar(widget.name,
+                    size: 56,
+                    api: widget.repo.api,
+                    photoPath:
+                        peerRequestCounterpartPhotoPath(widget.requestId)),
                 const SizedBox(width: 12),
                 Expanded(
                     child: Column(
@@ -515,6 +527,10 @@ class _PeerChatPageState extends State<PeerChatPage> {
                                         message: m,
                                         mine: m.senderId == _me,
                                         name: widget.name,
+                                        api: widget.repo.api,
+                                        photoPath:
+                                            peerRequestCounterpartPhotoPath(
+                                                widget.requestId),
                                         onView: m.hasImage
                                             ? () => _viewImage(m)
                                             : null),
@@ -598,10 +614,14 @@ class _Bubble extends StatelessWidget {
       {required this.message,
       required this.mine,
       required this.name,
+      required this.api,
+      required this.photoPath,
       this.onView});
   final PeerChatMessage message;
   final bool mine;
   final String name;
+  final ApiClient api;
+  final String photoPath;
   final VoidCallback? onView;
   @override
   Widget build(BuildContext context) {
@@ -653,7 +673,8 @@ class _Bubble extends StatelessWidget {
                 children: [
                     Padding(
                         padding: const EdgeInsets.only(bottom: 8, right: 8),
-                        child: PeerAvatar(name, size: 38)),
+                        child: PeerAvatar(name,
+                            size: 38, api: api, photoPath: photoPath)),
                     Flexible(child: bubble),
                   ]));
   }

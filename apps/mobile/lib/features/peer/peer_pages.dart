@@ -7,6 +7,7 @@ import '../auth/auth_cubit.dart';
 import '../notifications/notification_repository.dart';
 import 'peer_chats.dart';
 import 'peer_notifications.dart';
+import 'peer_profile_photo.dart';
 import 'peer_repository.dart';
 import 'peer_requests.dart';
 import 'peer_schedule.dart';
@@ -365,14 +366,17 @@ class _PeerHomeTabState extends State<PeerHomeTab> {
                                         color: Colors.white, width: 1.5)))),
                     ])),
                 const SizedBox(width: 6),
-                CircleAvatar(
-                    radius: 23,
-                    backgroundColor: PeerTokens.green,
-                    child: Text(peerInitials(widget.profile.fullName),
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16))),
+                PeerOwnPhoto(
+                    repo: widget.repo,
+                    size: 46,
+                    fallback: CircleAvatar(
+                        radius: 23,
+                        backgroundColor: PeerTokens.green,
+                        child: Text(peerInitials(widget.profile.fullName),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16)))),
               ])),
           // Welcome hero with the three-friends illustration.
           Padding(
@@ -706,17 +710,20 @@ class _PeerProfileTabState extends State<PeerProfileTab> {
                 wave: true,
                 padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
                 child: Row(children: [
-                  Container(
-                      width: 72,
-                      height: 72,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                          color: Color(0xFFD6F1E1), shape: BoxShape.circle),
-                      child: Text(peerInitials(p.fullName),
-                          style: const TextStyle(
-                              fontSize: 27,
-                              fontWeight: FontWeight.w800,
-                              color: PeerTokens.green))),
+                  PeerProfilePhotoPicker(
+                      repo: widget.repo,
+                      size: 72,
+                      fallback: Container(
+                          width: 72,
+                          height: 72,
+                          alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                              color: Color(0xFFD6F1E1), shape: BoxShape.circle),
+                          child: Text(peerInitials(p.fullName),
+                              style: const TextStyle(
+                                  fontSize: 27,
+                                  fontWeight: FontWeight.w800,
+                                  color: PeerTokens.green)))),
                   const SizedBox(width: 16),
                   Expanded(
                       child: Column(

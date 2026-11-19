@@ -17,6 +17,7 @@ import '../features/patient/modules/patient_modules.dart';
 import '../features/patient/peer/peer_pages.dart';
 import '../features/patient/peer/peer_repository.dart';
 import '../l10n/app_localizations.dart';
+import 'preview_avatar.dart';
 
 const _screen = String.fromEnvironment('PREVIEW_SCREEN', defaultValue: '');
 const _language =
@@ -34,7 +35,8 @@ class _NoTokens implements TokenStore {
 }
 
 ApiClient _api() => ApiClient(
-    dio: Dio(BaseOptions(baseUrl: 'http://preview.invalid/api/v1')),
+    dio: Dio(BaseOptions(baseUrl: 'http://preview.invalid/api/v1'))
+      ..httpClientAdapter = PreviewPhotoAdapter(),
     tokenStore: _NoTokens());
 
 DateTime _at(int dayOffset, int hour, [int minute = 0]) {

@@ -17,6 +17,7 @@ import '../../core/theme/tokens.dart';
 import '../../core/time/kenya_time.dart';
 import '../../core/validation/kenya_phone.dart';
 import '../../core/widgets/doctor_widgets.dart';
+import '../../core/widgets/person_photo.dart';
 import '../auth/auth_cubit.dart';
 import 'profile_photo_avatar.dart';
 import '../notifications/notification_center_page.dart';
@@ -482,18 +483,22 @@ class _DoctorProfileBar extends StatelessWidget {
             color: Colors.white,
             border: Border(bottom: BorderSide(color: DoctorTokens.border))),
         child: Row(children: [
-          Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                  color: DoctorTokens.primaryLight,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: DoctorTokens.primary)),
-              alignment: Alignment.center,
-              child: Text(p == null ? '' : _initials(p.name),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: DoctorTokens.primaryDark))),
+          DoctorOwnPhoto(
+              size: 42,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: DoctorTokens.primary),
+              fallback: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                      color: DoctorTokens.primaryLight,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: DoctorTokens.primary)),
+                  alignment: Alignment.center,
+                  child: Text(p == null ? '' : _initials(p.name),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: DoctorTokens.primaryDark)))),
           const SizedBox(width: 10),
           Expanded(
               child: Column(
@@ -3200,18 +3205,27 @@ class _ConvCard extends StatelessWidget {
                           width: 42,
                           height: 42,
                           child: Stack(clipBehavior: Clip.none, children: [
-                            Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                    color: colors.$1,
-                                    borderRadius: BorderRadius.circular(13)),
-                                alignment: Alignment.center,
-                                child: Text(_personInitials(name),
-                                    style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w800,
-                                        color: colors.$2))),
+                            PersonPhoto(
+                                api: c.read<DoctorCubit>().repo.api,
+                                path: chat.appointmentId == null
+                                    ? null
+                                    : appointmentCounterpartPhotoPath(
+                                        chat.appointmentId!),
+                                size: 42,
+                                borderRadius: BorderRadius.circular(13),
+                                fallback: Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                        color: colors.$1,
+                                        borderRadius:
+                                            BorderRadius.circular(13)),
+                                    alignment: Alignment.center,
+                                    child: Text(_personInitials(name),
+                                        style: TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: colors.$2)))),
                             if (active)
                               Positioned(
                                   bottom: -2,
@@ -3882,19 +3896,28 @@ class _ChatTopBar extends StatelessWidget {
                   alignment: Alignment.center,
                   child: const Icon(Icons.arrow_back, size: 18))),
           const SizedBox(width: 8),
-          Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                  color: colors.$1,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: DoctorTokens.primary, width: 1.5)),
-              alignment: Alignment.center,
-              child: Text(_personInitials(name),
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
-                      color: colors.$2))),
+          PersonPhoto(
+              api: c.read<DoctorCubit>().repo.api,
+              path: chat.appointmentId == null
+                  ? null
+                  : appointmentCounterpartPhotoPath(chat.appointmentId!),
+              size: 36,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: DoctorTokens.primary, width: 1.5),
+              fallback: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                      color: colors.$1,
+                      borderRadius: BorderRadius.circular(12),
+                      border:
+                          Border.all(color: DoctorTokens.primary, width: 1.5)),
+                  alignment: Alignment.center,
+                  child: Text(_personInitials(name),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          color: colors.$2)))),
           const SizedBox(width: 10),
           Expanded(
               child: Column(

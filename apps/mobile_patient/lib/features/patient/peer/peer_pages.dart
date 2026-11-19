@@ -13,6 +13,7 @@ import '../../../core/utils/initials.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/widgets/afya_widgets.dart';
 import '../../../core/widgets/patient_widgets.dart';
+import '../../../core/widgets/person_photo.dart';
 import '../../../l10n/app_localizations.dart';
 import '../booking/booking_repository.dart';
 import '../booking/pre_consult_intake_modal.dart' show deletePickedSourceFile;
@@ -874,12 +875,24 @@ String _initial(String name) {
   return words.isEmpty ? '?' : words.first[0].toUpperCase();
 }
 
+/// The peer's initial, or their saved photo when [api] and [photoPath] are
+/// given and the peer has one.
 class _PeerLetterAvatar extends StatelessWidget {
-  const _PeerLetterAvatar({required this.name, required this.size});
+  const _PeerLetterAvatar(
+      {required this.name, required this.size, this.api, this.photoPath});
   final String name;
   final double size;
+  final ApiClient? api;
+  final String? photoPath;
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) {
+    final client = api;
+    if (client == null || photoPath == null) return _letter();
+    return PersonPhoto(
+        api: client, path: photoPath, size: size, fallback: _letter());
+  }
+
+  Widget _letter() => Container(
         width: size,
         height: size,
         alignment: Alignment.center,
@@ -1255,6 +1268,9 @@ class _PatientPeerChatPageState extends State<PatientPeerChatPage> {
                                     message: m,
                                     mine: m.senderId == widget.myUserId,
                                     peerName: widget.peerName,
+                                    api: widget.repo.api,
+                                    photoPath: peerRequestCounterpartPhotoPath(
+                                        widget.requestId),
                                     onView: m.hasImage
                                         ? () => _viewPhoto(m)
                                         : null),
@@ -1276,7 +1292,11 @@ class _PatientPeerChatPageState extends State<PatientPeerChatPage> {
               tooltip: MaterialLocalizations.of(context).backButtonTooltip,
               onPressed: () => Navigator.of(context).maybePop()),
           const SizedBox(width: 8),
-          _PeerLetterAvatar(name: widget.peerName, size: 42),
+          _PeerLetterAvatar(
+              name: widget.peerName,
+              size: 42,
+              api: widget.repo.api,
+              photoPath: peerRequestCounterpartPhotoPath(widget.requestId)),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -1460,10 +1480,14 @@ class _PeerBubble extends StatelessWidget {
       {required this.message,
       required this.mine,
       required this.peerName,
+      required this.api,
+      required this.photoPath,
       this.onView});
   final PeerChatMessageDto message;
   final bool mine;
   final String peerName;
+  final ApiClient api;
+  final String photoPath;
   final VoidCallback? onView;
   @override
   Widget build(BuildContext context) {
@@ -1547,7 +1571,11 @@ class _PeerBubble extends StatelessWidget {
             if (!mine) ...[
               Padding(
                   padding: const EdgeInsets.only(top: 6),
-                  child: _PeerLetterAvatar(name: peerName, size: 30)),
+                  child: _PeerLetterAvatar(
+                      name: peerName,
+                      size: 30,
+                      api: api,
+                      photoPath: photoPath)),
               const SizedBox(width: 8),
             ],
             Flexible(child: bubble),

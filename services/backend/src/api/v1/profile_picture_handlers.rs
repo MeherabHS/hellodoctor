@@ -173,6 +173,90 @@ pub async fn get_own_doctor_photo(
     Ok(photo_response(photo, true))
 }
 
+// ---- Peer Navigator (self) ----
+
+async fn own_peer_id(state: &AppState, ctx: &AuthContext) -> Result<uuid::Uuid, AppError> {
+    let mut tx = state.begin_authed(ctx).await?;
+    let profile = crate::repository::peer_repo::find_by_user_id(&mut *tx, ctx.user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Peer profile not found.".into()))?;
+    tx.commit().await?;
+    Ok(profile.id)
+}
+
+pub async fn upload_peer_photo(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    axum::Json(payload): axum::Json<UploadPhotoRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::PeerSelf)?;
+    rate_limit::check_upload_limit(&state.redis, &ctx.user_id.to_string()).await?;
+    let _upload_concurrency_guard =
+        rate_limit::acquire_upload_concurrency(&state.redis, &ctx.user_id.to_string(), 2).await?;
+    let peer_id = own_peer_id(&state, &ctx).await?;
+    let bytes = decode_base64_payload(&payload.base64_content)?;
+    ProfilePictureService::upload_peer_photo(&state, &ctx, peer_id, payload.mime_type, bytes)
+        .await?;
+    Ok(axum::Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({"updated": true}),
+    }))
+}
+
+pub async fn delete_peer_photo(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::PeerSelf)?;
+    let peer_id = own_peer_id(&state, &ctx).await?;
+    ProfilePictureService::remove_peer_photo(&state, &ctx, peer_id).await?;
+    Ok(axum::Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({"removed": true}),
+    }))
+}
+
+pub async fn get_own_peer_photo(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::PeerSelf)?;
+    let peer_id = own_peer_id(&state, &ctx).await?;
+    let photo = ProfilePictureService::get_own_peer_photo(&state, &ctx, peer_id).await?;
+    Ok(photo_response(photo, true))
+}
+
+// ---- The other person in a consultation or peer session ----
+
+/// `GET /appointments/:id/counterpart-photo` — the patient's photo for the
+/// appointment's doctor, the doctor's photo for its patient. 404 for anyone
+/// else or when no photo is set.
+pub async fn get_appointment_counterpart_photo(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(appointment_id): Path<uuid::Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let photo =
+        ProfilePictureService::get_appointment_counterpart_photo(&state, &ctx, appointment_id)
+            .await?;
+    Ok(photo_response(photo, true))
+}
+
+/// `GET /peer-requests/:id/counterpart-photo` — the patient's photo for the
+/// request's peer, the peer's photo for its patient. 404 for anyone else or
+/// when no photo is set.
+pub async fn get_peer_request_counterpart_photo(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(request_id): Path<uuid::Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    let photo =
+        ProfilePictureService::get_peer_request_counterpart_photo(&state, &ctx, request_id).await?;
+    Ok(photo_response(photo, true))
+}
+
 // ---- Doctor (directory, any authenticated viewer) ----
 
 pub async fn get_directory_doctor_photo(
