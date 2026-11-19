@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/network/api_client.dart';
+import '../../core/widgets/person_photo.dart';
 import 'peer_chats.dart';
 import 'peer_repository.dart';
 import 'peer_ui.dart';
@@ -268,6 +270,7 @@ class _PeerRequestsTabState extends State<PeerRequestsTab> {
                           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                           child: _RequestCard(
                               request: r,
+                              api: widget.repo.api,
                               busy: _busy != null,
                               onOpen: () => _open(r),
                               onAccept: () => _accept(r),
@@ -305,12 +308,14 @@ class _AgeChip extends StatelessWidget {
 class _RequestCard extends StatelessWidget {
   const _RequestCard(
       {required this.request,
+      required this.api,
       required this.busy,
       required this.onOpen,
       required this.onAccept,
       required this.onDecline,
       this.onChat});
   final PeerInboxItem request;
+  final ApiClient api;
   final bool busy;
   final VoidCallback onOpen, onAccept, onDecline;
   final VoidCallback? onChat;
@@ -341,7 +346,10 @@ class _RequestCard extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            PeerAvatar(r.patientName, size: 40),
+            PeerAvatar(r.patientName,
+                size: 40,
+                api: api,
+                photoPath: peerRequestCounterpartPhotoPath(r.id)),
             const SizedBox(width: 12),
             Expanded(
                 child: Wrap(

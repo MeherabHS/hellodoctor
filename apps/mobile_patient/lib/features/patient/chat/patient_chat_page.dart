@@ -10,7 +10,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/time_format.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/widgets/patient_widgets.dart';
+import '../../../core/widgets/person_photo.dart';
 import '../../../l10n/app_localizations.dart';
 import '../booking/pre_consult_intake_modal.dart' show deletePickedSourceFile;
 import '../grievance/grievance_modal.dart';
@@ -244,6 +246,7 @@ class _PatientChatPageState extends State<PatientChatPage> {
                 expiresAt: widget.conversation.expiresAt,
                 appointmentId: widget.conversation.appointmentId,
                 closed: locked,
+                api: widget.repo.api,
                 grievanceRepo: GrievanceRepository(widget.repo.api)),
             _ExpiryBar(
                 expiresAt: widget.conversation.expiresAt, closed: locked),
@@ -453,12 +456,14 @@ class _ChatTopBar extends StatelessWidget {
     required this.expiresAt,
     required this.appointmentId,
     required this.closed,
+    required this.api,
     required this.grievanceRepo,
   });
   final String name;
   final DateTime expiresAt;
   final String appointmentId;
   final bool closed;
+  final ApiClient api;
   final GrievanceRepository grievanceRepo;
 
   @override
@@ -487,17 +492,26 @@ class _ChatTopBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-              color: colors.$1,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: PatientTokens.primary, width: 1.5)),
-          alignment: Alignment.center,
-          child: Text(initials,
-              style: TextStyle(
-                  fontWeight: FontWeight.w800, fontSize: 13, color: colors.$2)),
+        PersonPhoto(
+          api: api,
+          path: appointmentCounterpartPhotoPath(appointmentId),
+          size: 36,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: PatientTokens.primary, width: 1.5),
+          fallback: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+                color: colors.$1,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: PatientTokens.primary, width: 1.5)),
+            alignment: Alignment.center,
+            child: Text(initials,
+                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: colors.$2)),
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(

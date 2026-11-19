@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,8 +11,22 @@ import 'package:hellodoctor_mobile_patient/features/patient/profile/family_profi
 import 'package:hellodoctor_mobile_patient/features/patient/profile/family_profiles_repository.dart';
 import 'package:hellodoctor_mobile_patient/l10n/app_localizations.dart';
 
+/// Answers every request with 404: the list's doctor-photo lookups find no
+/// photo, so the cards keep their initials and no request is left open.
+class _NoPhotos implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(RequestOptions options,
+          Stream<Uint8List>? requestStream, Future<void>? cancelFuture) async =>
+      ResponseBody.fromString('{"success":false}', 404, headers: {
+        Headers.contentTypeHeader: ['application/json']
+      });
+  @override
+  void close({bool force = false}) {}
+}
+
 class _FixedChatRepository extends ChatRepository {
-  _FixedChatRepository(this.fixed) : super(ApiClient(dio: Dio()));
+  _FixedChatRepository(this.fixed)
+      : super(ApiClient(dio: Dio()..httpClientAdapter = _NoPhotos()));
   final List<AppointmentSummaryDto> fixed;
   @override
   Future<List<AppointmentSummaryDto>> consultationPage(
@@ -49,6 +65,11 @@ void main() {
         home: PatientChatListPage(
             repo: repo, familyProfilesCubit: family, onBook: (_) {})));
     await tester.pumpAndSettle();
+    // Let the stubbed doctor-photo lookups finish (Dio runs each step on a
+    // zero-length timer).
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
     expect(find.textContaining('KES'), findsNothing,
         reason: 'a deferred (NOT_REQUIRED) consultation must never show a '
             'fee amount, even though the backend still stores a nominal '
@@ -71,6 +92,11 @@ void main() {
         home: PatientChatListPage(
             repo: repo, familyProfilesCubit: family, onBook: (_) {})));
     await tester.pumpAndSettle();
+    // Let the stubbed doctor-photo lookups finish (Dio runs each step on a
+    // zero-length timer).
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
     expect(find.textContaining('KES'), findsNothing);
     expect(find.textContaining('500'), findsNothing);
     await family.close();

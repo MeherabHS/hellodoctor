@@ -18,7 +18,7 @@
 use crate::auth_context::AuthContext;
 use crate::domain::ids::{DoctorProfileId, PatientProfileId};
 use crate::error::AppError;
-use crate::repository::{doctor_repo, patient_repo, AppState};
+use crate::repository::{doctor_repo, patient_repo, peer_repo, AppState};
 use crate::services::document_storage_service::DocumentStorageService;
 use crate::services::upload_security_service::UploadSecurityService;
 use chrono::Utc;
@@ -282,6 +282,164 @@ impl ProfilePictureService {
         ctx: &AuthContext,
         doctor_id: DoctorProfileId,
     ) -> Result<StoredProfilePicture, AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        let raw: Option<serde_json::Value> = sqlx::query_scalar("SELECT doctor_public_photo($1)")
+            .bind(doctor_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Self::photo_from_json(state, raw).await
+    }
+
+    pub async fn upload_peer_photo(
+        state: &AppState,
+        ctx: &AuthContext,
+        peer_id: Uuid,
+        mime_type: String,
+        bytes: Vec<u8>,
+    ) -> Result<(), AppError> {
+        validate_profile_photo_mime(&mime_type)?;
+        // PHASE A — no transaction held across this CPU-bound work.
+        let sanitized =
+            UploadSecurityService::sanitize_profile_picture_async(bytes, mime_type.clone()).await?;
+        let hash = format!("{:x}", Sha256::digest(&sanitized));
+        let object_key = format!("avatars/peer/{}/{}.bin", peer_id, Uuid::now_v7());
+
+        // PHASE B
+        let mut tx = state.begin_authed(ctx).await?;
+        lock_profile_picture(&mut *tx, peer_id).await?;
+        let existing = peer_repo::find_profile_picture(&mut *tx, peer_id).await?;
+
+        DocumentStorageService::put(state, &object_key, &sanitized).await?;
+        let rows = match peer_repo::update_profile_picture(
+            &mut *tx,
+            peer_id,
+            Some(&object_key),
+            Some(&state.config.storage_bucket),
+            Some(&hash),
+            Some(&mime_type),
+            Some(sanitized.len() as i32),
+            Utc::now(),
+        )
+        .await
+        {
+            Ok(rows) => rows,
+            Err(error) => {
+                DocumentStorageService::delete(state, &object_key).await;
+                return Err(error.into());
+            }
+        };
+        if rows != 1 {
+            DocumentStorageService::delete(state, &object_key).await;
+            return Err(AppError::NotFound("Peer profile not found.".into()));
+        }
+        if let Err(error) = tx.commit().await {
+            DocumentStorageService::delete(state, &object_key).await;
+            return Err(error.into());
+        }
+        if let Some(old_key) = existing.and_then(|m| m.object_key) {
+            if old_key != object_key {
+                DocumentStorageService::delete(state, &old_key).await;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn remove_peer_photo(
+        state: &AppState,
+        ctx: &AuthContext,
+        peer_id: Uuid,
+    ) -> Result<(), AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        lock_profile_picture(&mut *tx, peer_id).await?;
+        let existing = peer_repo::find_profile_picture(&mut *tx, peer_id).await?;
+        let rows = peer_repo::update_profile_picture(
+            &mut *tx,
+            peer_id,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Utc::now(),
+        )
+        .await?;
+        if rows != 1 {
+            return Err(AppError::NotFound("Peer profile not found.".into()));
+        }
+        tx.commit().await?;
+        if let Some(old_key) = existing.and_then(|m| m.object_key) {
+            DocumentStorageService::delete(state, &old_key).await;
+        }
+        Ok(())
+    }
+
+    pub async fn get_own_peer_photo(
+        state: &AppState,
+        ctx: &AuthContext,
+        peer_id: Uuid,
+    ) -> Result<StoredProfilePicture, AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        let meta = peer_repo::find_profile_picture(&mut *tx, peer_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Peer profile not found.".into()))?;
+        tx.commit().await?;
+        Self::photo_from_meta(state, meta.object_key, meta.content_hash, meta.mime_type).await
+    }
+
+    /// The other person's photo in one consultation (doctor ↔ patient), via
+    /// the `appointment_counterpart_photo` SECURITY DEFINER function, which
+    /// returns nothing unless the caller is that appointment's doctor or
+    /// patient. A missing photo and a foreign appointment both read as 404.
+    pub async fn get_appointment_counterpart_photo(
+        state: &AppState,
+        ctx: &AuthContext,
+        appointment_id: Uuid,
+    ) -> Result<StoredProfilePicture, AppError> {
+        Self::photo_from_definer(
+            state,
+            ctx,
+            "SELECT appointment_counterpart_photo($1)",
+            appointment_id,
+        )
+        .await
+    }
+
+    /// The other person's photo in one peer request or its chat
+    /// (peer ↔ patient), via `peer_request_counterpart_photo`.
+    pub async fn get_peer_request_counterpart_photo(
+        state: &AppState,
+        ctx: &AuthContext,
+        request_id: Uuid,
+    ) -> Result<StoredProfilePicture, AppError> {
+        Self::photo_from_definer(
+            state,
+            ctx,
+            "SELECT peer_request_counterpart_photo($1)",
+            request_id,
+        )
+        .await
+    }
+
+    async fn photo_from_definer(
+        state: &AppState,
+        ctx: &AuthContext,
+        sql: &'static str,
+        id: Uuid,
+    ) -> Result<StoredProfilePicture, AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        let raw: Option<Option<serde_json::Value>> = sqlx::query_scalar(sql)
+            .bind(id)
+            .fetch_optional(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Self::photo_from_json(state, raw.flatten()).await
+    }
+
+    async fn photo_from_json(
+        state: &AppState,
+        raw: Option<serde_json::Value>,
+    ) -> Result<StoredProfilePicture, AppError> {
         #[derive(serde::Deserialize)]
         struct Row {
             bucket: Option<String>,
@@ -289,12 +447,6 @@ impl ProfilePictureService {
             hash: Option<String>,
             mime: Option<String>,
         }
-        let mut tx = state.begin_authed(ctx).await?;
-        let raw: Option<serde_json::Value> = sqlx::query_scalar("SELECT doctor_public_photo($1)")
-            .bind(doctor_id)
-            .fetch_one(&mut *tx)
-            .await?;
-        tx.commit().await?;
         let row: Row = raw
             .map(serde_json::from_value)
             .transpose()

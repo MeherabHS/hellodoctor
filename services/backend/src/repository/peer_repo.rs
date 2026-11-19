@@ -110,6 +110,55 @@ pub async fn find_by_id<'e, E: PgExecutor<'e>>(
     .await
 }
 
+/// Same shape as the patient and doctor photo metadata
+/// (migration `20261222000014_counterpart_photos`).
+pub type ProfilePictureMeta = crate::repository::doctor_repo::ProfilePictureMeta;
+
+pub async fn find_profile_picture<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+) -> Result<Option<ProfilePictureMeta>, sqlx::Error> {
+    sqlx::query_as::<_, ProfilePictureMeta>(
+        "SELECT profile_picture_object_key AS object_key, profile_picture_bucket AS bucket, \
+         profile_picture_content_hash AS content_hash, profile_picture_mime_type AS mime_type, \
+         profile_picture_size_bytes AS size_bytes, profile_picture_updated_at AS updated_at \
+         FROM peer_profiles WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(executor)
+    .await
+}
+
+/// Overwrites every photo column (`None` everywhere removes the photo).
+/// Returns the number of rows updated.
+#[allow(clippy::too_many_arguments)]
+pub async fn update_profile_picture<'e, E: PgExecutor<'e>>(
+    executor: E,
+    id: Uuid,
+    object_key: Option<&str>,
+    bucket: Option<&str>,
+    content_hash: Option<&str>,
+    mime_type: Option<&str>,
+    size_bytes: Option<i32>,
+    updated_at: DateTime<Utc>,
+) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query(
+        "UPDATE peer_profiles SET profile_picture_object_key=$2, profile_picture_bucket=$3, \
+         profile_picture_content_hash=$4, profile_picture_mime_type=$5, \
+         profile_picture_size_bytes=$6, profile_picture_updated_at=$7 WHERE id=$1",
+    )
+    .bind(id)
+    .bind(object_key)
+    .bind(bucket)
+    .bind(content_hash)
+    .bind(mime_type)
+    .bind(size_bytes)
+    .bind(updated_at)
+    .execute(executor)
+    .await?;
+    Ok(result.rows_affected())
+}
+
 /// Partial update of the peer's own profile text; `None` keeps the value.
 pub async fn update_own<'e, E: PgExecutor<'e>>(
     executor: E,

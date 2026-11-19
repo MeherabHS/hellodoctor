@@ -32,6 +32,7 @@ import '../features/notifications/notification_repository.dart';
 import '../features/peer/peer_pages.dart';
 import '../features/peer/peer_repository.dart';
 import '../l10n/app_localizations.dart';
+import 'preview_avatar.dart';
 
 /// `--dart-define=PREVIEW_VERIFICATION=PENDING` (or `REJECTED`) shows the
 /// approval gate instead of the tabs.
@@ -110,7 +111,8 @@ Future<void> main() async {
                   theme: DoctorTokens.theme(),
                   builder: (_, child) => Banner(
                       message: 'PREVIEW DATA',
-                      location: BannerLocation.topEnd,
+                      // Top-left: the top-right corner holds the profile photo.
+                      location: BannerLocation.topStart,
                       color: const Color(0xFFB45309),
                       child: child ?? const SizedBox()),
                   home: _role == 'PEER'
@@ -394,6 +396,12 @@ class _FixtureAdapter implements HttpClientAdapter {
     final path = options.uri.path.replaceFirst('/api/v1', '');
     final query = options.uri.queryParameters;
     if (options.method == 'GET') {
+      final photo = _photo(path);
+      if (photo != null) {
+        return ResponseBody.fromBytes(photo, 200, headers: {
+          Headers.contentTypeHeader: ['image/png']
+        });
+      }
       final data = _read(path, query);
       if (data != null) return _json(200, {'success': true, 'data': data});
       return _json(404, _error('Not available in the design preview.'));
@@ -446,6 +454,18 @@ class _FixtureAdapter implements HttpClientAdapter {
       }
     }
     return _json(503, _error('Design preview: this action is not connected.'));
+  }
+
+  /// Sample profile photos (drawn silhouettes, see preview_avatar.dart):
+  /// the signed-in doctor or peer, and the other person in each chat.
+  Uint8List? _photo(String path) {
+    if (path == '/doctor/profile/photo') return previewAvatarPng(1);
+    if (path == '/peer/profile/photo') return previewAvatarPng(0);
+    final other =
+        RegExp(r'^/(appointments|peer-requests)/([^/]+)/counterpart-photo$')
+            .firstMatch(path);
+    if (other != null) return previewAvatarPng(other.group(2)!.hashCode + 2);
+    return null;
   }
 
   Object? _read(String path, Map<String, String> query) {

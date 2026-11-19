@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
@@ -197,5 +198,63 @@ class _ProfilePhotoAvatarState extends State<ProfilePhotoAvatar> {
         );
       },
     );
+  }
+}
+
+/// The signed-in doctor's saved photo for headers (Home, Queue), or
+/// [fallback] (their initials) when there is none. Shares [DoctorCubit]'s
+/// in-memory photo with the Profile screen, so a new photo shows here as
+/// soon as it is saved.
+class DoctorOwnPhoto extends StatefulWidget {
+  const DoctorOwnPhoto(
+      {super.key,
+      required this.size,
+      required this.fallback,
+      this.borderRadius,
+      this.border});
+  final double size;
+  final Widget fallback;
+  final BorderRadius? borderRadius;
+  final BoxBorder? border;
+
+  @override
+  State<DoctorOwnPhoto> createState() => _DoctorOwnPhotoState();
+}
+
+class _DoctorOwnPhotoState extends State<DoctorOwnPhoto> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final cubit = context.read<DoctorCubit>();
+      // One attempt per header; a doctor without a photo keeps the initials.
+      if (cubit.state.photoBytes == null &&
+          !cubit.state.photoLoading &&
+          !cubit.isClosed) {
+        cubit.loadPhoto();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = context
+        .select<DoctorCubit, Uint8List?>((cubit) => cubit.state.photoBytes);
+    if (bytes == null) return widget.fallback;
+    final radius = widget.borderRadius;
+    return Container(
+        key: const ValueKey('doctor-header-photo'),
+        width: widget.size,
+        height: widget.size,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+            shape: radius == null ? BoxShape.circle : BoxShape.rectangle,
+            borderRadius: radius,
+            border: widget.border),
+        child: Image.memory(bytes,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, __, ___) => widget.fallback));
   }
 }

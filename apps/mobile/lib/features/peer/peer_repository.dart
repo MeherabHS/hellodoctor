@@ -163,6 +163,14 @@ class PeerRepository {
         if (bio != null) 'bio': bio,
       }))));
 
+  /// Saves the peer's own profile photo (JPEG or PNG); the server
+  /// compresses it and stores it encrypted.
+  Future<void> uploadPhoto(Uint8List bytes, String mime) async =>
+      api.post('/peer/profile/photo',
+          data: {'mime_type': mime, 'base64_content': base64Encode(bytes)});
+
+  Future<void> removePhoto() async => api.delete('/peer/profile/photo');
+
   Future<List<PeerInboxItem>> requests({String? status}) async =>
       _list(_data(await api.get('/peer/requests',
               query: {if (status != null) 'status': status})))
