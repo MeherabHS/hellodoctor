@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -24,10 +26,17 @@ List<BlocProvider> _notificationProvider() => [
               NotificationCubit(NotificationRepository(ApiClient(dio: Dio()))))
     ];
 
+/// The header asks for the doctor's own photo; this doctor has none.
+class _NoPhotoRepository extends DoctorRepository {
+  _NoPhotoRepository() : super(ApiClient(dio: Dio()));
+  @override
+  Future<Uint8List?> fetchPhotoBytes() async => null;
+}
+
 Widget harness(Widget child, DoctorState state) =>
     MultiBlocProvider(providers: [
       BlocProvider<DoctorCubit>(create: (_) {
-        final cubit = DoctorCubit(DoctorRepository(ApiClient(dio: Dio())));
+        final cubit = DoctorCubit(_NoPhotoRepository());
         cubit.emit(state);
         return cubit;
       }),
@@ -80,6 +89,8 @@ class _StubScheduleRepository extends DoctorRepository {
       const WalletDto(gross: '0', net: '0', pending: '0');
   @override
   Future<Json> duty() async => {'is_on_duty': false};
+  @override
+  Future<Uint8List?> fetchPhotoBytes() async => null;
   @override
   Future<Json> updateSlotStatus(String id, String status) async {
     updateCalls.add('$id:$status');

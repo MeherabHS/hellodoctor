@@ -102,6 +102,14 @@ void main() {
             'is_locked': false,
             'expires_at': '2099-01-01T00:00:00Z'
           };
+        } else if (r.path.endsWith('/counterpart-photo')) {
+          // The chat header asks for the doctor's photo; this doctor has
+          // none, which the server reports as 404.
+          h.reject(DioException.badResponse(
+              statusCode: 404,
+              requestOptions: r,
+              response: Response(requestOptions: r, statusCode: 404)));
+          return;
         } else if (r.path == '/chat/shared/messages') {
           if (r.method == 'POST') {
             final message = {
