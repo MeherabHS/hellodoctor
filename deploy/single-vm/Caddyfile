@@ -13,13 +13,29 @@
     header_up -X-HelloDoctor-Auth-Assertion
 }
 
+# Strip the response header that reveals the origin reverse proxy software.
+(hide_proxy) {
+    header -Via
+}
+
+# The web apps (Next.js) set these themselves; the Rust API does not, so the
+# edge adds them to the API responses. `header` replaces rather than
+# duplicates, so applying it everywhere is safe.
+(api_security_headers) {
+    import hide_proxy
+    header Strict-Transport-Security "max-age=63072000; includeSubDomains"
+    header X-Content-Type-Options "nosniff"
+}
+
 {$API_HOST} {
+    import api_security_headers
     reverse_proxy backend:8080 {
         import forwarding
     }
 }
 
 {$ADMIN_HOST} {
+    import hide_proxy
     reverse_proxy admin-web:3000 {
         import forwarding
         header_up X-HelloDoctor-Proxy {$WEB_PROXY_SECRET}
@@ -27,6 +43,7 @@
 }
 
 {$DOCTOR_HOST} {
+    import hide_proxy
     reverse_proxy doctor-web:3000 {
         import forwarding
         header_up X-HelloDoctor-Proxy {$WEB_PROXY_SECRET}

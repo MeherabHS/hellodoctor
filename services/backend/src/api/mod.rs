@@ -1,3 +1,4 @@
+pub mod json;
 pub mod middleware;
 pub mod router;
 pub mod v1;
