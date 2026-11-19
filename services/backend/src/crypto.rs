@@ -425,16 +425,93 @@ pub fn create_access_token(
         .decode(private_key_der_b64)
         .map_err(|_| AppError::internal("Invalid JWT signing key configuration.".into()))?;
     let key = EncodingKey::from_ed_der(&der);
-    let header = Header::new(jsonwebtoken::Algorithm::EdDSA);
+    let mut header = Header::new(jsonwebtoken::Algorithm::EdDSA);
+    // `kid` names the signing key so verification can pick the right one
+    // while an old key is still accepted during a rotation.
+    header.kid = Some(key_id_for_private_key(&der)?);
 
     encode(&header, &claims, &key)
         .map_err(|e| AppError::internal(format!("JWT signing failed: {e}")))
+}
+
+/// Stable, public identifier of an Ed25519 verification key: the first 16
+/// hex characters of SHA-256 over the raw 32-byte public key. It reveals
+/// nothing beyond the public key itself.
+fn key_id_for_raw_public_key(raw: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(raw);
+    digest[..8].iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// The `kid` of a configured public key (base64 DER, 32 raw or 44 SPKI bytes).
+pub fn jwt_key_id(public_key_der_b64: &str) -> Result<String, AppError> {
+    let der = STANDARD
+        .decode(public_key_der_b64)
+        .map_err(|_| AppError::internal("Invalid JWT verification key configuration.".into()))?;
+    Ok(key_id_for_raw_public_key(raw_public_key(&der)?))
+}
+
+/// Derives the `kid` from a PKCS#8 Ed25519 private key. In both PKCS#8 v1
+/// (48 bytes) and v2 the 32-byte seed sits at bytes 16..48 behind an
+/// OCTET STRING header `04 20`.
+fn key_id_for_private_key(der: &[u8]) -> Result<String, AppError> {
+    if der.len() < 48 || der[14] != 0x04 || der[15] != 0x20 {
+        return Err(AppError::internal(
+            "JWT signing key is not a PKCS#8 Ed25519 key.".into(),
+        ));
+    }
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&der[16..48]);
+    let public = ed25519_dalek::SigningKey::from_bytes(&seed)
+        .verifying_key()
+        .to_bytes();
+    Ok(key_id_for_raw_public_key(&public))
 }
 
 /// Verifies signature, expiry, issuer and audience on an incoming bearer token.
 /// This is the function that makes authentication actually enforced at request time —
 /// previously tokens were issued but never checked on the way back in.
 pub fn verify_access_token(token: &str, public_key_der_b64: &str) -> Result<Claims, AppError> {
+    verify_access_token_with_keys(token, public_key_der_b64, &[])
+}
+
+/// Key rotation: tokens name their signing key in `kid`. A token is checked
+/// against the current key or one of `previous_public_keys_der_b64` (old keys
+/// kept for at most one access-token lifetime after a rotation), chosen by
+/// `kid`; an unknown `kid` is refused. A token without `kid` (issued before
+/// this change) is checked against the current key only.
+pub fn verify_access_token_with_keys(
+    token: &str,
+    public_key_der_b64: &str,
+    previous_public_keys_der_b64: &[String],
+) -> Result<Claims, AppError> {
+    let header = jsonwebtoken::decode_header(token)
+        .map_err(|e| AppError::Unauthorized(format!("Invalid or expired access token: {e}")))?;
+    let key_b64 = match header.kid.as_deref() {
+        None => public_key_der_b64,
+        Some(kid) => std::iter::once(public_key_der_b64)
+            .chain(previous_public_keys_der_b64.iter().map(String::as_str))
+            .find(|candidate| jwt_key_id(candidate).is_ok_and(|id| id == kid))
+            .ok_or_else(|| {
+                AppError::Unauthorized(
+                    "Invalid or expired access token: unknown signing key.".into(),
+                )
+            })?,
+    };
+    verify_with_single_key(token, key_b64)
+}
+
+fn raw_public_key(der: &[u8]) -> Result<&[u8], AppError> {
+    match der.len() {
+        32 => Ok(der),
+        44 => Ok(&der[12..]),
+        other => Err(AppError::internal(format!(
+            "JWT verification key has unexpected length {other} bytes (expected 32 raw or 44 SPKI-DER)."
+        ))),
+    }
+}
+
+fn verify_with_single_key(token: &str, public_key_der_b64: &str) -> Result<Claims, AppError> {
     let der = STANDARD
         .decode(public_key_der_b64)
         .map_err(|_| AppError::internal("Invalid JWT verification key configuration.".into()))?;
@@ -450,16 +527,7 @@ pub fn verify_access_token(token: &str, public_key_der_b64: &str) -> Result<Clai
     // though signing (which genuinely does PKCS8 parsing for the private key)
     // works fine — confirmed by an isolated sign/verify roundtrip during
     // implementation, not a hypothetical.
-    let raw_pubkey: &[u8] = match der.len() {
-        32 => &der,
-        44 => &der[12..],
-        other => {
-            return Err(AppError::internal(format!(
-                "JWT verification key has unexpected length {other} bytes (expected 32 raw or 44 SPKI-DER)."
-            )))
-        }
-    };
-    let key = DecodingKey::from_ed_der(raw_pubkey);
+    let key = DecodingKey::from_ed_der(raw_public_key(&der)?);
 
     let mut validation = Validation::new(Algorithm::EdDSA);
     validation.set_issuer(&[JWT_ISSUER]);
@@ -469,6 +537,93 @@ pub fn verify_access_token(token: &str, public_key_der_b64: &str) -> Result<Clai
     decode::<Claims>(token, &key, &validation)
         .map(|data| data.claims)
         .map_err(|e| AppError::Unauthorized(format!("Invalid or expired access token: {e}")))
+}
+
+#[cfg(test)]
+mod jwt_key_rotation_tests {
+    use super::*;
+
+    /// A fresh Ed25519 pair in the production shapes: PKCS#8 v1 private key
+    /// and 44-byte SPKI public key, both base64.
+    fn keypair(seed: u8) -> (String, String) {
+        let seed = [seed; 32];
+        let mut private = hex::decode("302e020100300506032b657004220420").unwrap();
+        private.extend_from_slice(&seed);
+        let mut public = hex::decode("302a300506032b6570032100").unwrap();
+        public.extend_from_slice(
+            &ed25519_dalek::SigningKey::from_bytes(&seed)
+                .verifying_key()
+                .to_bytes(),
+        );
+        (STANDARD.encode(private), STANDARD.encode(public))
+    }
+
+    fn token(private: &str) -> String {
+        let id = uuid::Uuid::new_v4();
+        create_access_token(id, "ADMIN", id, private).unwrap()
+    }
+
+    #[test]
+    fn tokens_name_their_signing_key() {
+        let (private, public) = keypair(1);
+        let header = jsonwebtoken::decode_header(&token(&private)).unwrap();
+        assert_eq!(header.kid.unwrap(), jwt_key_id(&public).unwrap());
+        assert_eq!(jwt_key_id(&public).unwrap().len(), 16);
+    }
+
+    #[test]
+    fn a_rotated_out_key_is_accepted_only_while_listed_as_previous() {
+        let (old_private, old_public) = keypair(1);
+        let (_, new_public) = keypair(2);
+        let old_token = token(&old_private);
+        assert!(verify_access_token_with_keys(
+            &old_token,
+            &new_public,
+            std::slice::from_ref(&old_public)
+        )
+        .is_ok());
+        assert!(matches!(
+            verify_access_token_with_keys(&old_token, &new_public, &[]),
+            Err(AppError::Unauthorized(_))
+        ));
+    }
+
+    #[test]
+    fn a_token_from_an_unknown_key_is_refused() {
+        let (stranger_private, _) = keypair(9);
+        let (_, public) = keypair(1);
+        assert!(matches!(
+            verify_access_token(&token(&stranger_private), &public),
+            Err(AppError::Unauthorized(_))
+        ));
+    }
+
+    #[test]
+    fn a_legacy_token_without_kid_is_checked_against_the_current_key_only() {
+        let (private, public) = keypair(1);
+        let (_, other_public) = keypair(2);
+        let now = chrono::Utc::now().timestamp() as usize;
+        let claims = Claims {
+            sub: "u".into(),
+            user_id: uuid::Uuid::new_v4().to_string(),
+            sid: uuid::Uuid::new_v4().to_string(),
+            role: "ADMIN".into(),
+            permissions: vec![],
+            iss: JWT_ISSUER.into(),
+            aud: JWT_AUDIENCE.into(),
+            exp: now + 60,
+            iat: now,
+        };
+        let key = EncodingKey::from_ed_der(&STANDARD.decode(&private).unwrap());
+        let legacy = encode(&Header::new(Algorithm::EdDSA), &claims, &key).unwrap();
+        assert!(verify_access_token(&legacy, &public).is_ok());
+        assert!(verify_access_token_with_keys(
+            &legacy,
+            &other_public,
+            std::slice::from_ref(&public)
+        )
+        .is_err());
+    }
 }
 
 #[cfg(test)]

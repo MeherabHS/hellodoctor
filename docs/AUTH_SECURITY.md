@@ -49,7 +49,10 @@ sequenceDiagram
 - **Algorithm:** Ed25519 (Asymmetric public/private key signing).
 - **Key Generation:** Generated via the `ed25519-dalek` crate.
 - **Key Storage:** Must be stored in KMS (Key Management Service) or secure environment variables.
-- **Key Rotation:** Multi-key `kid` rollover is a deployment/design requirement; the current signer/verifier uses the configured Ed25519 key pair. No automatic key rotation occurred in this pass.
+- **Key Rotation (implemented 2026-11-20):** every access token carries a `kid` header, the first 16 hex characters of SHA-256 over the raw Ed25519 public key. Verification picks the key by `kid` from the current key and `JWT_ED25519_PREVIOUS_PUBLIC_KEYS_B64`; an unknown `kid` is refused, and a token without `kid` (issued before this change) is checked against the current key only. Refresh tokens are opaque and stored hashed, so a rotation never signs anyone out. To rotate:
+  1. Generate a new pair (`openssl genpkey -algorithm ed25519`, export the PKCS#8 DER private key and SPKI DER public key, base64 both).
+  2. Set the new pair as `JWT_ED25519_PRIVATE_KEY_B64` / `JWT_ED25519_PUBLIC_KEY_B64`, put the old public key in `JWT_ED25519_PREVIOUS_PUBLIC_KEYS_B64`, restart the backend.
+  3. After 15 minutes (one access-token lifetime) remove the old key from `JWT_ED25519_PREVIOUS_PUBLIC_KEYS_B64` and restart. After a suspected key leak, skip the overlap: rotate without listing the old key, which signs every access token out at once (users stay signed in through their refresh tokens).
 - **Verification:** Validate Ed25519 signature, issuer, audience, expiry and matching subject/user ID, then require the active account/current role and an unrevoked, unexpired active `auth_sessions` leaf in the JWT `sid` family. Database unavailability returns 503. Validation is server enforced on every protected request.
 - **Lifespan:** 15 minutes.
 - **Payload Schema:**

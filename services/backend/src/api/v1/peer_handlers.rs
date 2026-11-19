@@ -724,6 +724,7 @@ pub async fn admin_decide(
     Json(body): Json<AdminPeerDecision>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManagePeerNavigators)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let (target, allowed_from, needs_note): (&str, &[&str], bool) = match action.as_str() {
         "approve" => ("APPROVED", &["PENDING", "REJECTED"], false),
         "reject" => ("REJECTED", &["PENDING"], true),

@@ -106,6 +106,7 @@ pub async fn adjudicate_refund(
     Json(payload): Json<AdjudicateRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::AdjudicateGrievance)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let audit_notes = crate::domain::validation::validate_admin_text_field(
         &payload.audit_notes,
         "Audit notes",
@@ -180,6 +181,7 @@ pub async fn transition_refund_request(
     Json(payload): Json<TransitionRefundRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::InitiateDisbursement)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let provider_reference = payload
         .provider_reference
         .map(|r| {
@@ -267,6 +269,7 @@ pub async fn decide_appeal(
     Json(payload): Json<DecideAppealRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::AdjudicateGrievance)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let overturn = match payload.decision.as_str() {
         "UPHOLD" => false,
         "OVERTURN" => true,

@@ -53,59 +53,32 @@ impl std::fmt::Debug for ConfirmRequest {
     }
 }
 
-/// Re-checks the signed-in Admin's password. After 5 wrong passwords in 15
-/// minutes further checks are refused (correct ones never count); every wrong password is audited (visible in the Activity Log).
-/// A wrong password answers 403, not 401, so the session itself stays valid.
-const REAUTH_MAX_FAILURES: u32 = 5;
-const REAUTH_WINDOW_SECS: u64 = 900;
-
 async fn confirm_password(
     state: &AppState,
     ctx: &AuthContext,
     password: &str,
 ) -> Result<(), AppError> {
-    if password.is_empty() || password.len() > 128 {
-        return Err(AppError::Forbidden(
-            "Enter your current password to continue.".into(),
-        ));
-    }
-    let failures_key = format!("ratelimit:admin-reauth-failures:{}", ctx.user_id);
-    crate::rate_limit::ensure_failures_below(&state.redis, &failures_key, REAUTH_MAX_FAILURES)
+    crate::services::admin_step_up::confirm_password(state, ctx, password, "ADMIN_INVITATION").await
+}
+
+/// `POST /admin/reauth` — confirms the Admin's password and unlocks the
+/// sensitive Admin actions for this sign-in session for ten minutes
+/// (`services::admin_step_up`).
+pub async fn reauth(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Json(payload): Json<ConfirmRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ViewAdminOverview)?;
+    crate::services::admin_step_up::confirm_and_grant(&state, &ctx, &payload.current_password)
         .await?;
-    let mut tx = state
-        .begin_authed_as(ctx, crate::repository::DbRole::AuthWorker)
-        .await?;
-    let user = crate::repository::user_repo::find_by_id(&mut *tx, ctx.user_id)
-        .await?
-        .ok_or_else(|| AppError::internal("Authenticated user record is missing.".into()))?;
-    tx.commit().await?;
-    let ok = match user.password_hash {
-        Some(hash) => crate::crypto::verify_password_async(password.to_string(), hash).await?,
-        None => {
-            crate::crypto::verify_password_dummy_async().await?;
-            false
-        }
-    };
-    if !ok {
-        crate::rate_limit::record_failure(&state.redis, &failures_key, REAUTH_WINDOW_SECS).await?;
-        crate::services::AuditService::log(
-            state,
-            ctx,
-            crate::services::AuditLogEntry::new(
-                Some(ctx.user_id),
-                ctx.role,
-                "ADMIN_REAUTH_FAILED",
-                "ADMIN_INVITATION",
-                None,
-                "DENIED",
-            ),
-        )
-        .await?;
-        return Err(AppError::Forbidden(
-            "Your current password is incorrect.".into(),
-        ));
-    }
-    Ok(())
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({
+            "confirmed": true,
+            "valid_for_seconds": crate::services::admin_step_up::STEP_UP_TTL_SECS,
+        }),
+    }))
 }
 
 #[derive(Debug, Deserialize)]
@@ -185,6 +158,8 @@ pub async fn revoke(
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManageAdminTeam)?;
+    // Revoking needs a fresh password too (product owner, 2026-11-20).
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     AdminInvitationService::revoke(&state, &ctx, id).await?;
     Ok(Json(ApiResponse {
         success: true,

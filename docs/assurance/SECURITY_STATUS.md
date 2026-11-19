@@ -20,16 +20,16 @@ their *open/closed* verdicts are superseded by the table below.
 | Currency separation | HIGH, open | **Fixed** | `transactions`, `disbursement_items` and related finance tables carry `currency CHAR(3) NOT NULL ... CHECK (currency = 'KES')` (finance migrations, Oct 2026). |
 | Payment `UNKNOWN` state / reconciliation | HIGH, open | **Partial** | `migrations/20261130000001_remediation_a_finance.up.sql` adds `provider_request_state` (`UNKNOWN` / `NOT_STARTED` / `STARTED`) so an in-doubt provider call is recorded durably. No reconciliation worker exists, because no real payment-provider adapter exists yet. |
 | Abandoned-payment expiry | MEDIUM, open | **Partial** | `appointment_repo::expire_abandoned_hold_for_slot` frees a stale unpaid hold when someone else tries to book that slot. No scheduled sweeper releases holds nobody contends for. |
-| Admin step-up re-authentication | HIGH, open | **Partial** | `src/api/v1/admin_team_handlers.rs:62-97`: Admin team invite/resend/revoke require password re-confirmation, with lockout after 5 failures per 15 min. Other sensitive Admin actions (finance, doctor verification) still rely on the normal session. |
+| Admin step-up re-authentication | HIGH, open | **Fixed (2026-11-20)** | `src/services/admin_step_up.rs`: doctor verify/reject/revoke and Admin-created doctors, peer decisions, grievance refunds and appeal decisions, refund-request transitions, disbursements and period finalisation, platform payment methods, account erasure, identity traces and revoking Admin invitations answer `REAUTH_REQUIRED` until the Admin re-enters their password (`POST /admin/reauth`). One confirmation unlocks that sign-in session for 10 minutes; wrong passwords are audited and locked out after 5 in 15 minutes. Admin Web asks for the password and retries. Test: `tests/cases/admin_step_up.rs`. |
 | Payment webhook amount / currency / merchant check | HIGH, open | **Open** | `src/api/v1/webhook_handlers.rs:21` (`PaymentWebhookPayload`) is HMAC-verified, provider-bound and idempotent, but does not compare amount, currency or merchant against the transaction. Must be closed in the real provider adapter before money moves. |
-| JWT key rotation (`kid`, overlap window) | MEDIUM, open | **Open** | No `kid` header handling; a single static Ed25519 key pair. |
+| JWT key rotation (`kid`, overlap window) | MEDIUM, open | **Fixed (2026-11-20)** | `src/crypto.rs`: tokens carry `kid`; verification accepts the current key and `JWT_ED25519_PREVIOUS_PUBLIC_KEYS_B64` by `kid`. Procedure in [AUTH_SECURITY.md](../AUTH_SECURITY.md) §2. Tests: `crypto::jwt_key_rotation_tests`. |
 | Machine-readable API route inventory | MEDIUM, open | **Open** | Router is explicit (`src/api/router.rs`) and every non-public handler calls `abac::authorize`, but no generated inventory or regression check guards new routes. |
 | Data-retention cleanup | MEDIUM, open | **Partial** | Expired-upload and intake-removal cleanup jobs (`notification_scheduler.rs:933,1016`) and the erasure journal exist; no general retention purge. |
 | Incident runbooks / alert routing | MEDIUM, open | **Partial** | [INCIDENT_RESPONSE_RUNBOOK.md](../INCIDENT_RESPONSE_RUNBOOK.md) exists; alert routing depends on the deployment environment. |
-| Malware scanning of uploads | Deferred | **Deferred (external)** | Structural PDF/image sanitisation exists; no ClamAV-class scanner. |
+| Malware scanning of uploads | Deferred | **Deferred (decided 2026-11-20)** | Structural PDF/image sanitisation and re-encoding exist; no antivirus scanner. A ClamAV integration was built and then dropped by product-owner decision on 2026-11-20. |
 | Production TLS, firewall, secrets manager | Deferred | **Deferred (deployment)** | Caddy config is in `deploy/single-vm/`; needs the real host. |
 
-**Count now:** 3 fixed, 5 partial, 3 open, 2 deferred to external dependencies. No item is rated
+**Count now (2026-11-20):** 5 fixed, 4 partial, 2 open, 2 deferred (antivirus by decision; production TLS, firewall and secrets to deployment). No item is rated
 critical.
 
 ## 2. Controls verified earlier and still in place

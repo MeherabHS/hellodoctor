@@ -55,6 +55,8 @@ mod admin_invitations;
 mod admin_query_g20_investigation;
 #[path = "cases/admin_quizzes.rs"]
 mod admin_quizzes;
+#[path = "cases/admin_step_up.rs"]
+mod admin_step_up;
 #[path = "cases/admission_capacity_bench.rs"]
 mod admission_capacity_bench;
 #[path = "cases/admission_control_fairness.rs"]
@@ -250,6 +252,10 @@ fn test_config() -> AppConfig {
         redis_url: test_redis_url(),
         jwt_ed25519_private_key_b64: TEST_JWT_PRIVATE_KEY_B64.into(),
         jwt_ed25519_public_key_b64: TEST_JWT_PUBLIC_KEY_B64.into(),
+        jwt_ed25519_previous_public_keys_b64: Vec::new(),
+        // Existing Admin tests predate the password step-up; the step-up
+        // tests turn it back on (tests/cases/admin_step_up.rs).
+        admin_step_up_required: false,
         totp_encryption_key_b64: totp_key_for_test(),
         agora_app_id: "73ddf1abee12ac89822eecb0e7df9e28".into(),
         agora_app_certificate: "12a7c64e686cb880ee5cb57ac9eed39d".into(),

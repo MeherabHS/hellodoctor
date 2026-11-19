@@ -65,6 +65,12 @@ pub enum AppError {
     #[error("Forbidden: {0}")]
     Forbidden(String),
 
+    /// A sensitive Admin action needs a fresh password check
+    /// (`services::admin_step_up`). 403 with code `REAUTH_REQUIRED`, so Admin
+    /// Web can ask for the password and retry; the session stays valid.
+    #[error("Re-authentication required")]
+    ReauthRequired,
+
     #[error("Rate limit exceeded: {0}")]
     RateLimitExceeded(String),
 
@@ -238,6 +244,11 @@ impl IntoResponse for AppError {
             AppError::Conflict(msg) => (StatusCode::CONFLICT, "RESOURCE_CONFLICT", msg.clone()),
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone()),
             AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone()),
+            AppError::ReauthRequired => (
+                StatusCode::FORBIDDEN,
+                "REAUTH_REQUIRED",
+                "Confirm your password to continue.".into(),
+            ),
             AppError::RateLimitExceeded(msg) => (
                 StatusCode::TOO_MANY_REQUESTS,
                 "RATE_LIMIT_EXCEEDED",
