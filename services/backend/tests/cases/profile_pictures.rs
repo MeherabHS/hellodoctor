@@ -746,7 +746,7 @@ async fn test_storage_unavailable_leaves_patient_photo_row_unchanged(pool: PgPoo
 async fn test_appointment_counterpart_photo_is_scoped_to_its_doctor_and_patient(pool: PgPool) {
     let (app, pool) = test_app(pool).await;
     let (patient_id, patient_token) = new_patient(&pool).await;
-    let (apt_id, _slot) = insert_confirmed_appointment_for(
+    let (_slot, apt_id) = insert_confirmed_appointment_for(
         &pool,
         uid(DOCTOR1_PROFILE_ID),
         patient_id,
