@@ -750,7 +750,8 @@ async fn test_appointment_counterpart_photo_is_scoped_to_its_doctor_and_patient(
         &pool,
         uid(DOCTOR1_PROFILE_ID),
         patient_id,
-        Utc::now() + chrono::Duration::hours(2),
+        // Far from the seeded Doctor 1 slots, which sit a few hours out.
+        Utc::now() + chrono::Duration::days(37),
     )
     .await;
     let url = format!("/api/v1/appointments/{apt_id}/counterpart-photo");
