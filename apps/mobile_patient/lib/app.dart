@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
+import 'core/cache/offline_documents.dart';
 import 'core/cache/patient_cache_store.dart';
 import 'core/l10n/locale_controller.dart';
 import 'core/network/api_client.dart';
@@ -119,6 +120,8 @@ class _AppState extends State<HelloDoctorPatientApp>
     try {
       secureStore = SecureTokenStore();
       cache = PatientCacheStore(secureStore!);
+      // Offline Health Records: encrypted document copies, wiped at sign-out.
+      OfflineDocuments.configure(secureStore!);
       connectivity = ConnectivityService();
       api = widget.apiClientFactory?.call(secureStore!) ??
           ApiClient(tokenStore: secureStore);

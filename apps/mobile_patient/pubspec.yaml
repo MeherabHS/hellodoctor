@@ -39,6 +39,10 @@ dependencies:
   agora_rtc_engine: ^6.6.3
   flutter_markdown_plus: ^1.0.12
   pdfx: ^2.11.0
+  # Offline Health Records: AES-GCM encryption of saved clinical documents
+  # (pure Dart) and the app's private support directory for the files.
+  cryptography: ^2.7.0
+  path_provider: ^2.1.5
 dev_dependencies:
   flutter_test:
     sdk: flutter

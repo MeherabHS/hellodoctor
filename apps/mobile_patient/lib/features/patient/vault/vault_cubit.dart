@@ -15,11 +15,15 @@ class VaultState {
     this.error,
     this.documents = const [],
     this.lastUpdatedAt,
+    this.savedIds = const {},
   });
   final bool loading, refreshing, offline;
   final String? error;
   final List<PatientDocumentDto> documents;
   final DateTime? lastUpdatedAt;
+
+  /// Documents saved (encrypted) on this phone, openable offline.
+  final Set<String> savedIds;
 
   VaultState copyWith({
     bool? loading,
@@ -28,6 +32,7 @@ class VaultState {
     Object? error = _unset,
     List<PatientDocumentDto>? documents,
     DateTime? lastUpdatedAt,
+    Set<String>? savedIds,
   }) =>
       VaultState(
         loading: loading ?? this.loading,
@@ -36,6 +41,7 @@ class VaultState {
         error: identical(error, _unset) ? this.error : error as String?,
         documents: documents ?? this.documents,
         lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
+        savedIds: savedIds ?? this.savedIds,
       );
 }
 
@@ -74,7 +80,9 @@ class VaultCubit extends Cubit<VaultState> {
     final cached = viewingSelf
         ? await repo.cachedDocuments()
         : const <PatientDocumentDto>[];
+    final saved = await repo.savedDocumentIds();
     if (isClosed) return;
+    emit(state.copyWith(savedIds: saved));
     if (cached.isNotEmpty) {
       emit(state.copyWith(
           loading: false,
@@ -101,6 +109,7 @@ class VaultCubit extends Cubit<VaultState> {
         documents: documents,
         lastUpdatedAt: DateTime.now().toUtc(),
       ));
+      unawaited(_saveForOffline(documents));
     } catch (e) {
       if (isClosed) return;
       emit(state.copyWith(
@@ -114,6 +123,13 @@ class VaultCubit extends Cubit<VaultState> {
     } finally {
       _refreshInFlight = false;
     }
+  }
+
+  /// Health Records offline: downloads what is not yet saved on this phone,
+  /// in the background, after the list has shown.
+  Future<void> _saveForOffline(List<PatientDocumentDto> documents) async {
+    final saved = await repo.saveForOffline(documents);
+    if (!isClosed) emit(state.copyWith(savedIds: saved));
   }
 
   @override
