@@ -30,8 +30,9 @@ class _NoTokens implements TokenStore {
 
 String _ago(Duration d) => DateTime.now().toUtc().subtract(d).toIso8601String();
 
-NotificationDto _notice(String id, String type, String title, String body,
-        Duration ago, {bool read = false}) =>
+NotificationDto _notice(
+        String id, String type, String title, String body, Duration ago,
+        {bool read = false}) =>
     NotificationDto.fromJson({
       'id': id,
       'user_id': 'me',
@@ -44,19 +45,28 @@ NotificationDto _notice(String id, String type, String title, String body,
     });
 
 final _notices = [
-  _notice('n1', 'CONSULTATION_REMINDER_15M', 'Consultation in 15 minutes',
+  _notice(
+      'n1',
+      'CONSULTATION_REMINDER_15M',
+      'Consultation in 15 minutes',
       'Your video consultation starts soon. Open the waiting room. (sample)',
       const Duration(minutes: 4)),
   _notice('n2', 'NEW_CHAT_MESSAGE', 'New message from your doctor',
       'Open the chat to read it. (sample)', const Duration(minutes: 38)),
-  _notice('n3', 'PRESCRIPTION_AVAILABLE', 'Prescription ready',
+  _notice(
+      'n3',
+      'PRESCRIPTION_AVAILABLE',
+      'Prescription ready',
       'Your doctor has sent a prescription to Health Records. (sample)',
       const Duration(hours: 3),
       read: true),
   _notice('n4', 'BOOKING_CONFIRMED', 'Booking confirmed',
       'Your chat consultation is booked. (sample)', const Duration(days: 1),
       read: true),
-  _notice('n5', 'PEER_REQUEST_ACCEPTED', 'Peer support accepted',
+  _notice(
+      'n5',
+      'PEER_REQUEST_ACCEPTED',
+      'Peer support accepted',
       'Your Peer Navigator accepted your request. (sample)',
       const Duration(days: 3),
       read: true),

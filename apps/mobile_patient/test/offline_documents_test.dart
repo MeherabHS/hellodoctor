@@ -45,8 +45,8 @@ void main() {
 
   test('the file on disk is encrypted, not the document', () async {
     await store.put(id, photo);
-    final raw = await File('${dir.path}${Platform.pathSeparator}$id.bin')
-        .readAsBytes();
+    final raw =
+        await File('${dir.path}${Platform.pathSeparator}$id.bin').readAsBytes();
     // No 64-byte run of the plaintext appears in the stored file.
     final plain = photo.bytes.sublist(100, 164);
     var found = false;
