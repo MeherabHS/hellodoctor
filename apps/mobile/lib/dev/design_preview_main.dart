@@ -24,7 +24,11 @@ import '../core/network/api_client.dart';
 import '../core/network/screen_refresh.dart';
 import '../core/theme/tokens.dart';
 import '../features/auth/auth_cubit.dart';
+import '../core/video/join_eligibility.dart';
+import '../features/doctor/agora_page.dart';
 import '../features/doctor/call_close_out_page.dart';
+import '../features/doctor/doctor_models.dart';
+import '../features/doctor/doctor_pages.dart' show ChatThreadPage;
 import '../features/doctor/doctor_cubit.dart';
 import '../features/doctor/doctor_repository.dart';
 import '../features/notifications/notification_cubit.dart';
@@ -32,6 +36,7 @@ import '../features/notifications/notification_repository.dart';
 import '../features/peer/peer_pages.dart';
 import '../features/peer/peer_repository.dart';
 import '../l10n/app_localizations.dart';
+import 'preview_agora_engine.dart';
 import 'preview_avatar.dart';
 
 /// `--dart-define=PREVIEW_VERIFICATION=PENDING` (or `REJECTED`) shows the
@@ -55,6 +60,9 @@ const _rxMode = String.fromEnvironment('PREVIEW_RX', defaultValue: 'REFUSE');
 /// the call screen hands over.
 const _screen = String.fromEnvironment('PREVIEW_SCREEN', defaultValue: '');
 // PREVIEW_SCREEN=SCHEDULE opens on the Consultation Schedule.
+// PREVIEW_SCREEN=CHAT_ACTIVE / CHAT_EXPIRED opens a chat consultation before
+// and after its booked time ends; PREVIEW_SCREEN=CALL opens a video call
+// (stand-in engine, placeholder video) with the in-call chat button.
 
 /// `--dart-define=PREVIEW_SLOTS=EMPTY` shows the schedule's empty state.
 const _slotsMode = String.fromEnvironment('PREVIEW_SLOTS', defaultValue: '');
@@ -121,7 +129,71 @@ Future<void> main() async {
                           ? const _CallEndedPreview()
                           : _screen == 'SCHEDULE'
                               ? const _SchedulePreview()
-                              : const DoctorShell())))));
+                              : _screen.startsWith('CHAT_') ||
+                                      _screen == 'CALL'
+                                  ? const _PushedPreview()
+                                  : const DoctorShell())))));
+}
+
+ChatDto _previewChat({required bool expired, String modality = 'CHAT'}) =>
+    ChatDto(
+        id: 'c2',
+        appointmentId: 'a2',
+        patientId: 'patient-a2',
+        patientName: 'Sample Patient Two',
+        modality: modality,
+        appointmentStatus: 'CONFIRMED',
+        lastMessageAt: _at(const Duration(minutes: -3)),
+        expiresAt: _at(expired
+            ? const Duration(minutes: -15)
+            : const Duration(minutes: 8)),
+        locked: false);
+
+/// The Doctor shell with a chat consultation or a call pushed on top.
+class _PushedPreview extends StatefulWidget {
+  const _PushedPreview();
+  @override
+  State<_PushedPreview> createState() => _PushedPreviewState();
+}
+
+class _PushedPreviewState extends State<_PushedPreview> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<DoctorCubit>().loadAll();
+      if (!mounted) return;
+      final Widget page = _screen == 'CALL'
+          ? AgoraPage(
+              appointmentId: 'a1',
+              engine: PreviewAgoraEngine(),
+              requestPermissions: () async => true,
+              loadJoin: () async => JoinEligibility(
+                  eligible: true,
+                  reason: 'OK',
+                  joinOpenAt: DateTime.now().toUtc(),
+                  joinCloseAt:
+                      DateTime.now().toUtc().add(const Duration(minutes: 20)),
+                  serverTime: DateTime.now().toUtc(),
+                  clockOffset: Duration.zero),
+              loadToken: () async => {
+                    'app_id': 'preview',
+                    'channel_name': 'preview',
+                    'token': 'preview',
+                    'uid': 1,
+                    'expires_in': 3600,
+                  },
+              loadChat: () async => ChatThreadPage(
+                  chat: _previewChat(expired: false, modality: 'VIDEO'),
+                  inCall: true))
+          : ChatThreadPage(
+              chat: _previewChat(expired: _screen == 'CHAT_EXPIRED'));
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const DoctorShell();
 }
 
 /// The Doctor shell switched to the Consultation Schedule.

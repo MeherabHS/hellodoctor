@@ -1131,7 +1131,17 @@ class _PatientPeerChatPageState extends State<PatientPeerChatPage> {
           appointmentId: widget.requestId,
           repo: widget.bookingRepo,
           loadToken: () => widget.repo.rtcToken(widget.requestId),
-          loadOpenAt: () => widget.repo.callOpensAt(widget.requestId))));
+          loadOpenAt: () => widget.repo.callOpensAt(widget.requestId),
+          // The same chat over the call, without its own call button.
+          loadChat: () async => PatientPeerChatPage(
+              repo: widget.repo,
+              bookingRepo: widget.bookingRepo,
+              chatId: widget.chatId,
+              requestId: widget.requestId,
+              peerName: widget.peerName,
+              requestStatus: widget.requestStatus,
+              callClosed: true,
+              myUserId: widget.myUserId))));
 
   void _details() {
     final l = AppLocalizations.of(context);

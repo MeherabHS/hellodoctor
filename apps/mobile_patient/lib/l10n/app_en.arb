@@ -223,9 +223,9 @@
   "@bookingVideoTitle": {
     "description": "Booking screen title for a video consultation."
   },
-  "bookingChatTitle": "Book 24h Chat",
+  "bookingChatTitle": "Book Chat Consultation",
   "@bookingChatTitle": {
-    "description": "Booking screen title for a 24h chat consultation."
+    "description": "Booking screen title for a chat consultation (open until its booked time ends)."
   },
   "bookingNoSlots": "This doctor has no bookable slots right now.",
   "@bookingNoSlots": {
@@ -247,7 +247,7 @@
   "@bookingFormatSubtitle": {
     "description": "Patient interface: bookingFormatSubtitle"
   },
-  "bookingChatRow": "24-Hour Dedicated Chat",
+  "bookingChatRow": "Dedicated Chat Consultation",
   "@bookingChatRow": {
     "description": "Patient interface: bookingChatRow"
   },
@@ -355,7 +355,7 @@
   "@bookingFeeVideo": {
     "description": "Fee summary row label for a video consultation."
   },
-  "bookingFeeChat": "24-Hour Clinical Chat Fee",
+  "bookingFeeChat": "Chat Consultation Fee",
   "@bookingFeeChat": {
     "description": "Fee summary row label for a chat consultation."
   },
@@ -653,7 +653,7 @@
   "@waitingRoomVideoTitle": {
     "description": "Waiting room screen title for a video consultation."
   },
-  "waitingRoomChatTitle": "24-Hour Clinical Chat",
+  "waitingRoomChatTitle": "Chat Consultation",
   "@waitingRoomChatTitle": {
     "description": "Waiting room screen title for a chat consultation."
   },
@@ -699,7 +699,7 @@
   "@waitingRoomVideoCallsYouDetail": {
     "description": "Waiting room video-modality readiness banner detail."
   },
-  "waitingRoomChatWindowDetail": "Your 24-hour chat window opens around your booked slot time.",
+  "waitingRoomChatWindowDetail": "You can chat with your doctor during your booked time. When it ends, the chat becomes read-only.",
   "@waitingRoomChatWindowDetail": {
     "description": "Waiting room chat-modality readiness banner detail."
   },
@@ -814,7 +814,7 @@
   "@homeServicePaidBadge": {
     "description": "Core service card badge."
   },
-  "homeServiceChatDesc": "Paid clinical text & e-Rx (24h)",
+  "homeServiceChatDesc": "Paid clinical text & e-Rx",
   "@homeServiceChatDesc": {
     "description": "Core service card description."
   },
@@ -900,7 +900,7 @@
   "@servicesChatWithDoctor": {
     "description": "Services list item title."
   },
-  "servicesChatWithDoctorDesc": "24h consultation chat",
+  "servicesChatWithDoctorDesc": "Chat consultation with a doctor",
   "@servicesChatWithDoctorDesc": {
     "description": "Services list item description."
   },
@@ -960,7 +960,7 @@
   "@chatNoMessages": {
     "description": "Chat screen empty state."
   },
-  "chatWindowClosed": "Consultation window closed (24h expired). Chat is no longer available.",
+  "chatWindowClosed": "This consultation has ended. The conversation is kept here for your records, but no new messages can be sent.",
   "@chatWindowClosed": {
     "description": "Chat screen locked/expired banner."
   },
@@ -997,7 +997,7 @@
       }
     }
   },
-  "chat24hSession": "24h Session",
+  "chat24hSession": "Chat Session",
   "@chat24hSession": {
     "description": "Chat screen session-type chip."
   },
@@ -1325,7 +1325,7 @@
   "@directoryAllDoctors": {
     "description": "Patient interface: directoryAllDoctors"
   },
-  "directoryChatTab": "24h Chat",
+  "directoryChatTab": "Chat",
   "@directoryChatTab": {
     "description": "Patient interface: directoryChatTab"
   },
@@ -1496,7 +1496,7 @@
   "@doctorVideoFee": {
     "description": "Patient interface: doctorVideoFee"
   },
-  "doctorChatFee": "24-Hour Clinical Chat Fee:",
+  "doctorChatFee": "Chat Consultation Fee:",
   "@doctorChatFee": {
     "description": "Patient interface: doctorChatFee"
   },
@@ -1530,7 +1530,7 @@
       }
     }
   },
-  "doctorChatBooking": "24h Chat (KES {fee})",
+  "doctorChatBooking": "Chat Consultation (KES {fee})",
   "@doctorChatBooking": {
     "description": "Patient interface: doctorChatBooking",
     "placeholders": {
@@ -1784,7 +1784,7 @@
   "filterAllVisits": "All consultation types",
   "consultChoose": "Choose consultation",
   "consultVideo": "Video consultation",
-  "consultChat": "24-hour chat",
+  "consultChat": "Chat consultation",
   "consultBookVideo": "Book video",
   "consultBookChat": "Book chat",
   "consultAction": "Consult",
@@ -2671,5 +2671,41 @@
       }
     }
   },
-  "remindersExactAlarmsAllow": "Allow alarms & reminders"
+  "remindersExactAlarmsAllow": "Allow alarms & reminders",
+  "callOpenChat": "Chat",
+  "@callOpenChat": {
+    "description": "In-call button that opens the consultation chat over the video call"
+  },
+  "vaultSavedOffline": "Saved on this phone",
+  "@vaultSavedOffline": {
+    "description": "Health Records: this document opens without internet"
+  },
+  "vaultNotSavedOffline": "This document isn't saved on this phone yet. Open Health Records once while online to save it.",
+  "@vaultNotSavedOffline": {
+    "description": "Health Records: tapped an unsaved document while offline"
+  },
+  "chatStatusActive": "Active",
+  "@chatStatusActive": {
+    "description": "Consultation chat status pill while messages can be sent"
+  },
+  "chatStatusExpired": "Expired",
+  "@chatStatusExpired": {
+    "description": "Consultation chat status pill once its time is over"
+  },
+  "chatActiveUntil": "You can message {doctor} until {time}.",
+  "@chatActiveUntil": {
+    "description": "Consultation chat banner body while active",
+    "placeholders": {
+      "doctor": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "chatTimeOver": "Consultation time is over.",
+  "@chatTimeOver": {
+    "description": "Consultation chat expiry bar once its time is over"
+  }
 }

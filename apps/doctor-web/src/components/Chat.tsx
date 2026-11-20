@@ -4,7 +4,7 @@ import { ClinicalAttachment } from './ClinicalAttachment';
 import { compressRxPhoto } from '../lib/rx-compression';
 import { useEffect, useRef, useState } from 'react';
 import { api, chatReceipts, errorText, post, useResource, runtimeGeneration } from '../lib/client';
-import { Appointment, Conversation, Message, Profile, chatLocked, messageSide, consultationContext, compareMessageInstants } from '../lib/contracts';
+import { Appointment, Conversation, Message, Profile, chatExpired, chatLocked, messageSide, consultationContext, compareMessageInstants } from '../lib/contracts';
 import { Avatar, Badge, PageHeader, State, demographics } from './Common';
 import { Icon } from './Icons';
 import { ClinicalAction, date, time } from './Queue';
@@ -60,7 +60,7 @@ export function Chat({ profile, appointments, selectedAppointment, focusAppointm
             <span className="am-grow" style={{minWidth:0}}>
               <span className="am-row between" style={{flexWrap:'nowrap'}}><strong className="am-strong" style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.patient_display_name}</strong><span className="am-faint" style={{flexShrink:0}}>{c.last_message_at?(dayKeyOf(c.last_message_at)===dayKeyOf(new Date(now).toISOString())?time(c.last_message_at):date(c.last_message_at)):''}</span></span>
               <span className="am-faint" style={{display:'block'}}>{context?`${context.appointment_number} · ${date(context.start_time)}`:c.modality==='VIDEO'?'Video consultation follow-up':'Chat consultation'}</span>
-              <span className="am-row" style={{marginTop:6,gap:6}}><Badge tone={locked?'slate':'green'} dot>{locked?'Read-only':'Active'}</Badge>{!c.last_message_at&&<span className="am-faint">No messages yet</span>}</span>
+              <span className="am-row" style={{marginTop:6,gap:6}}><Badge tone={locked?'slate':'green'} dot>{locked?(chatExpired(c,now)?'Expired':'Read-only'):'Active'}</Badge>{!c.last_message_at&&<span className="am-faint">No messages yet</span>}</span>
             </span>
           </button>;})}
           {hasMore&&<div className="am-row" style={{justifyContent:'center',padding:10}}><button className="am-btn ghost sm" disabled={moreBusy} onClick={()=>void loadMore()}>{moreBusy?'Loading…':'Load more'}</button></div>}
@@ -199,7 +199,7 @@ export function ChatThread({ chat, profile, appointment, onBack, action, gap, vi
     <header className="am-thread-head">
       <div className="am-row between" style={{flexWrap:'nowrap'}}>
         <div className="am-person" style={{minWidth:0}}>{!compact&&<button className="am-btn ghost sm" aria-label="All chats" onClick={onBack}><Icon name="arrowLeft" size={15}/></button>}<Avatar name={chat.patient_display_name}/><div style={{minWidth:0}}><strong>{chat.patient_display_name}</strong><span>{appointment?`${[demographics(appointment),appointment.appointment_number].filter(Boolean).join(' · ')}`:'Consultation conversation'}</span></div></div>
-        <Badge tone={locked?'slate':'green'} dot>{locked?'Read-only':minutesLeft>90?`Open until ${time(chat.expires_at)}`:`${minutesLeft} min left`}</Badge>
+        <Badge tone={locked?'slate':'green'} dot>{locked?(chatExpired(chat,tick)?'Expired':'Read-only'):minutesLeft>90?`Open until ${time(chat.expires_at)}`:`${minutesLeft} min left`}</Badge>
       </div>
       {!compact&&<div className="am-row" style={{marginTop:12,gap:8}}>
         <button className="am-btn ghost sm" disabled={!appointment} onClick={()=>clinical('history')}><Icon name="history" size={15}/>History</button>
@@ -217,7 +217,7 @@ export function ChatThread({ chat, profile, appointment, onBack, action, gap, vi
       </div>;})}
       {messages.data?.length===0&&<State compact icon="chat" empty="No messages yet" hint={locked?undefined:'Say hello to start the conversation.'}/>}
     </div>
-    {locked?<p className="am-callout" role="status" style={{margin:14}}><Icon name="lock"/>This consultation window has closed, so the conversation is read-only.</p>
+    {locked?<p className="am-callout" role="status" style={{margin:14}}><Icon name="lock"/>{chatExpired(chat,tick)?'The time for this consultation is over, so the conversation is read-only. The history stays here.':'This consultation window has closed, so the conversation is read-only.'}</p>
     :<form className="am-composer" onSubmit={e=>{e.preventDefault();void send();}}>
       <input ref={picker} type="file" accept="image/jpeg,image/png" hidden aria-label="Clinical image file" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void uploadImage(file);}}/>
       <button className="am-icon-btn" type="button" disabled={locked||uploading} aria-label="Attach clinical image" title="Attach image" onClick={()=>picker.current?.click()}><Icon name="paperclip"/></button>

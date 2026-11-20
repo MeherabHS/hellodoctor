@@ -71,6 +71,11 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
   late final ScreenRefresh _screenRefresh;
   int generation = 0;
   StreamSubscription<FamilyProfilesState>? profileSubscription;
+
+  /// The consultation chat can no longer be messaged.
+  bool chatWindowClosed(AppointmentSummaryDto a) =>
+      a.chatLocked == true ||
+      (a.chatExpiresAt?.isBefore(DateTime.now()) ?? false);
   bool isPast(AppointmentSummaryDto a) =>
       const [
         'COMPLETED',
@@ -391,8 +396,19 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
                                           crossAxisAlignment:
                                               WrapCrossAlignment.center,
                                           children: [
-                                            StatusChip(_statusLabel(l, a.status,
-                                                lapsed: a.lapsed)),
+                                            // A chat whose window has closed
+                                            // reads "Expired", whatever the
+                                            // appointment status says.
+                                            chatWindowClosed(a)
+                                                ? StatusChip(
+                                                    l.chatStatusExpired,
+                                                    color:
+                                                        const Color(0xFFF1F3F5),
+                                                    textColor:
+                                                        const Color(0xFF5B6B78))
+                                                : StatusChip(_statusLabel(
+                                                    l, a.status,
+                                                    lapsed: a.lapsed)),
                                             Text(l.messagesChatConsultation,
                                                 style: const TextStyle(
                                                     fontSize: 11.5,

@@ -28,6 +28,15 @@ import 'doctor_repository.dart';
 import 'agora_page.dart';
 import 'articles_page.dart';
 import '../../core/video/call_screen_guard.dart';
+import '../peer/peer_ui.dart'
+    show
+        PeerAvatar,
+        PeerCard,
+        PeerCircleButton,
+        PeerHeader,
+        PeerPillTabs,
+        PeerTokens,
+        peerListTime;
 
 /// Shared across every "join/rejoin a live video consultation" entry point
 /// in this file — see [CallScreenGuard]'s own doc comment for why one
@@ -3062,6 +3071,8 @@ class _ChatListState extends State<ChatListPage> {
     }).toList();
   }
 
+  bool searching = false;
+
   @override
   Widget build(BuildContext c) {
     final s = c.watch<DoctorCubit>().state;
@@ -3070,113 +3081,122 @@ class _ChatListState extends State<ChatListPage> {
     final activeCount = all.where((x) => !x.isClosed).length;
     final closedCount = all.length - activeCount;
     final cubit = c.read<DoctorCubit>();
-    // No AppBar here, so without this the custom DoctorPageHeader below
-    // renders straight under the status bar (confirmed on-device).
+    const filters = ['all', 'active', 'closed'];
+    // The Peer Navigator chat list's look (product owner, 2026-11-20).
+    // No AppBar here, so without SafeArea the header renders straight under
+    // the status bar (confirmed on-device).
     return SafeArea(
         bottom: false,
         child: Scaffold(
             backgroundColor: DoctorTokens.bg,
-            body: Column(children: [
-              DoctorPageHeader('Consultation Chats',
-                  'All patient message channels & triage threads',
-                  actions: _notificationBellActions(c)),
-              Expanded(
-                  child: s.loading && s.chats.isEmpty
-                      ? const Center(child: CircularProgressIndicator())
-                      : s.error != null && s.chats.isEmpty
-                          ? ErrorPanel(s.error!, onRetry: cubit.refreshChats)
-                          : RefreshIndicator(
-                              onRefresh: cubit.refreshChats,
-                              child: ListView(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(0, 10, 0, 18),
-                                  children: [
-                                    CacheStatusBar(
-                                        offline: s.offline,
-                                        refreshing: s.refreshing,
-                                        lastUpdated: s.lastUpdatedAt),
-                                    if (s.error != null)
-                                      InlineError(s.error!,
-                                          onRetry: cubit.refreshChats),
-                                    Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            18, 0, 18, 8),
-                                        child: TextField(
-                                            onChanged: (v) =>
-                                                setState(() => query = v),
-                                            style:
-                                                const TextStyle(fontSize: 13),
-                                            decoration: const InputDecoration(
-                                                hintText:
-                                                    'Search patient conversations…',
-                                                hintStyle:
-                                                    TextStyle(fontSize: 13),
-                                                prefixIcon: Icon(Icons.search,
-                                                    size: 18),
-                                                isDense: true,
-                                                contentPadding:
-                                                    EdgeInsets.symmetric(
-                                                        vertical: 10)))),
-                                    SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        padding: const EdgeInsets.only(
-                                            left: 18, right: 18, bottom: 10),
-                                        child: Row(children: [
-                                          _QueueFilter(
-                                              'All (${all.length})',
-                                              'all',
-                                              filter,
-                                              (v) =>
-                                                  setState(() => filter = v)),
-                                          _QueueFilter(
-                                              'Active ($activeCount)',
-                                              'active',
-                                              filter,
-                                              (v) =>
-                                                  setState(() => filter = v)),
-                                          _QueueFilter(
-                                              'Closed ($closedCount)',
-                                              'closed',
-                                              filter,
-                                              (v) =>
-                                                  setState(() => filter = v)),
-                                        ])),
-                                    if (chats.isEmpty)
-                                      const Padding(
-                                          padding: EdgeInsets.all(32),
-                                          child: Center(
-                                              child: Text(
-                                                  'No conversations found')))
-                                    else
-                                      Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 18),
-                                          child: Column(
-                                              children: chats
-                                                  .map((chat) => _ConvCard(
-                                                      chat: chat,
-                                                      onTap: () => Navigator.push(
-                                                          c,
-                                                          MaterialPageRoute(
-                                                              builder: (_) =>
-                                                                  ChatThreadPage(
-                                                                      chat:
-                                                                          chat)))))
-                                                  .toList())),
-                                    if (s.hasMoreChats)
-                                      TextButton(
-                                          onPressed: s.loadingMoreChats
-                                              ? null
-                                              : () => cubit.refreshChats(
-                                                  older: true),
-                                          child: Text(s.loadingMoreChats
-                                              ? 'Loading?'
-                                              : 'Load more conversations'))
-                                  ])))
-            ])));
+            body: s.loading && s.chats.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : s.error != null && s.chats.isEmpty
+                    ? ErrorPanel(s.error!, onRetry: cubit.refreshChats)
+                    : RefreshIndicator(
+                        onRefresh: cubit.refreshChats,
+                        child: ListView(
+                            padding: const EdgeInsets.only(bottom: 24),
+                            children: [
+                              PeerHeader(
+                                  title: 'Consultation Chats',
+                                  subtitle: 'Your patient conversations',
+                                  actions: [
+                                    PeerCircleButton(
+                                        key: const ValueKey(
+                                            'doctor-chats-search'),
+                                        icon: Icons.search_rounded,
+                                        tooltip: 'Search',
+                                        active: searching,
+                                        onTap: () => setState(() {
+                                              searching = !searching;
+                                              if (!searching) query = '';
+                                            })),
+                                    ..._notificationBellActions(c),
+                                  ]),
+                              CacheStatusBar(
+                                  offline: s.offline,
+                                  refreshing: s.refreshing,
+                                  lastUpdated: s.lastUpdatedAt),
+                              if (s.error != null)
+                                InlineError(s.error!,
+                                    onRetry: cubit.refreshChats),
+                              if (searching)
+                                Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                        18, 0, 18, 12),
+                                    child: TextField(
+                                        key: const ValueKey(
+                                            'doctor-chats-query'),
+                                        autofocus: true,
+                                        onChanged: (v) =>
+                                            setState(() => query = v),
+                                        decoration: InputDecoration(
+                                            hintText:
+                                                'Search patient conversations…',
+                                            prefixIcon: const Icon(
+                                                Icons.search_rounded),
+                                            filled: true,
+                                            fillColor: Colors.white,
+                                            border: OutlineInputBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(24),
+                                                borderSide: const BorderSide(
+                                                    color: PeerTokens.line))))),
+                              PeerPillTabs(
+                                  labels: const [
+                                    'All Chats',
+                                    'Active',
+                                    'Expired'
+                                  ],
+                                  selected: filters.indexOf(filter),
+                                  counts: {
+                                    0: all.length,
+                                    1: activeCount,
+                                    2: closedCount
+                                  },
+                                  onSelected: (i) =>
+                                      setState(() => filter = filters[i])),
+                              const SizedBox(height: 14),
+                              if (chats.isEmpty)
+                                Padding(
+                                    padding: const EdgeInsets.all(36),
+                                    child: Text(
+                                        query.trim().isNotEmpty
+                                            ? 'No conversations match your search.'
+                                            : filter == 'closed'
+                                                ? 'Conversations move here when their consultation time is over. The history stays readable.'
+                                                : 'No conversations found',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                            color: PeerTokens.grey)))
+                              else
+                                for (final chat in chats)
+                                  Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                          14, 0, 14, 10),
+                                      child: _ConvCard(
+                                          chat: chat,
+                                          onTap: () => Navigator.push(
+                                              c,
+                                              MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      ChatThreadPage(
+                                                          chat: chat))))),
+                              if (s.hasMoreChats)
+                                TextButton(
+                                    onPressed: s.loadingMoreChats
+                                        ? null
+                                        : () => cubit.refreshChats(older: true),
+                                    child: Text(s.loadingMoreChats
+                                        ? 'Loading…'
+                                        : 'Load more conversations'))
+                            ]))));
   }
 }
 
+/// One conversation in the Peer Navigator chat list's look: photo, name,
+/// what to do next, last activity and an Active / Expired pill.
 class _ConvCard extends StatelessWidget {
   const _ConvCard({required this.chat, required this.onTap});
   final ChatDto chat;
@@ -3185,108 +3205,67 @@ class _ConvCard extends StatelessWidget {
   Widget build(BuildContext c) {
     final active = !chat.isClosed;
     final name = chat.patientName ?? 'Patient';
-    final colors = _avatarColors(chat.patientId ?? chat.id);
-    return Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        child: Material(
-            color: DoctorTokens.surface,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: onTap,
-                child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: DoctorTokens.border)),
-                    child: Row(children: [
-                      SizedBox(
-                          width: 42,
-                          height: 42,
-                          child: Stack(clipBehavior: Clip.none, children: [
-                            PersonPhoto(
-                                api: c.read<DoctorCubit>().repo.api,
-                                path: chat.appointmentId == null
-                                    ? null
-                                    : appointmentCounterpartPhotoPath(
-                                        chat.appointmentId!),
-                                size: 42,
-                                borderRadius: BorderRadius.circular(13),
-                                fallback: Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                        color: colors.$1,
-                                        borderRadius:
-                                            BorderRadius.circular(13)),
-                                    alignment: Alignment.center,
-                                    child: Text(_personInitials(name),
-                                        style: TextStyle(
-                                            fontSize: 13.5,
-                                            fontWeight: FontWeight.w800,
-                                            color: colors.$2)))),
-                            if (active)
-                              Positioned(
-                                  bottom: -2,
-                                  right: -2,
-                                  child: Container(
-                                      width: 9,
-                                      height: 9,
-                                      decoration: BoxDecoration(
-                                          color: const Color(0xFF10B981),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                              color: DoctorTokens.surface,
-                                              width: 2))))
-                          ])),
-                      const SizedBox(width: 12),
-                      Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                            Row(children: [
-                              Expanded(
-                                  child: Text(name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w800))),
-                              Text(_shortTime(chat.lastMessageAt),
-                                  style: const TextStyle(
-                                      fontSize: 10.5,
-                                      color: DoctorTokens.textSub))
-                            ]),
-                            const SizedBox(height: 2),
-                            Row(children: [
-                              Expanded(
-                                  child: Text(
-                                      active
-                                          ? chat.actionLabel
-                                          : 'Consultation window closed',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontSize: 11.5,
-                                          color: DoctorTokens.textSub))),
-                              const SizedBox(width: 6),
-                              StatusChip(active ? 'Active' : 'Closed',
-                                  color: active
-                                      ? DoctorTokens.primaryLight
-                                      : DoctorTokens.surfaceSubtle,
-                                  textColor: active
-                                      ? DoctorTokens.primaryDark
-                                      : DoctorTokens.textSub)
-                            ])
-                          ]))
-                    ])))));
+    final last = DateTime.tryParse(chat.lastMessageAt ?? '')
+        ?.toUtc()
+        .add(const Duration(hours: 3));
+    final now = DateTime.now().toUtc().add(const Duration(hours: 3));
+    return PeerCard(
+        key: ValueKey('doctor-chat-${chat.id}'),
+        radius: 22,
+        onTap: onTap,
+        padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+        child: Row(children: [
+          PeerAvatar(name,
+              size: 56,
+              api: c.read<DoctorCubit>().repo.api,
+              photoPath: chat.appointmentId == null
+                  ? null
+                  : appointmentCounterpartPhotoPath(chat.appointmentId!)),
+          const SizedBox(width: 16),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: PeerTokens.navy)),
+                const SizedBox(height: 4),
+                Text(active ? chat.actionLabel : 'Consultation time is over',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 14.5, color: PeerTokens.grey)),
+              ])),
+          const SizedBox(width: 8),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(last == null ? '' : peerListTime(last, now: now),
+                style: const TextStyle(fontSize: 13, color: PeerTokens.grey)),
+            const SizedBox(height: 8),
+            Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                    color: active ? PeerTokens.mint : PeerTokens.field,
+                    borderRadius: BorderRadius.circular(14)),
+                child: Text(active ? 'Active' : 'Expired',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: active ? PeerTokens.green : PeerTokens.grey))),
+          ]),
+        ]));
   }
 }
 
 class ChatThreadPage extends StatefulWidget {
-  const ChatThreadPage({super.key, required this.chat});
+  const ChatThreadPage({super.key, required this.chat, this.inCall = false});
   final ChatDto chat;
+
+  /// Shown over a live call (in-call chat): no "Start Video Call" button.
+  final bool inCall;
   @override
   State<ChatThreadPage> createState() => _ChatThreadState();
 }
@@ -3353,9 +3332,14 @@ class _ChatThreadState extends State<ChatThreadPage> {
     }
   }
 
+  /// Rebuilds the moment the chat window closes, so a screen left open turns
+  /// read-only and shows "Expired" without being reopened.
+  Timer? _expiryTimer;
+
   @override
   void dispose() {
     _screenRefresh.dispose();
+    _expiryTimer?.cancel();
     pendingAttachment = null;
     input.dispose();
     super.dispose();
@@ -3406,6 +3390,13 @@ class _ChatThreadState extends State<ChatThreadPage> {
         enabled: () => !widget.chat.isClosed && !serverClosed,
         hasError: () => _refreshFailure != null,
         networkChanges: context.read<DoctorCubit>().connectivity?.changes);
+    final expiresAt = DateTime.tryParse(widget.chat.expiresAt ?? '');
+    final untilExpiry = expiresAt?.difference(DateTime.now().toUtc());
+    if (untilExpiry != null && !untilExpiry.isNegative) {
+      _expiryTimer = Timer(untilExpiry + const Duration(seconds: 1), () {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   @override
@@ -3716,7 +3707,11 @@ class _ChatThreadState extends State<ChatThreadPage> {
         backgroundColor: DoctorTokens.bg,
         body: SafeArea(
             child: Column(children: [
-          _ChatTopBar(name: name, chat: chat),
+          _ChatTopBar(
+              name: name,
+              chat: chat,
+              closed: chat.isClosed || serverClosed,
+              inCall: widget.inCall),
           if (chat.expiresAt != null || chat.isClosed)
             _ChatExpiryBar(chat: chat),
           Expanded(
@@ -3871,7 +3866,15 @@ class _ChatThreadState extends State<ChatThreadPage> {
 }
 
 class _ChatTopBar extends StatelessWidget {
-  const _ChatTopBar({required this.name, required this.chat});
+  const _ChatTopBar(
+      {required this.name,
+      required this.chat,
+      required this.closed,
+      this.inCall = false});
+
+  /// The chat can no longer be messaged (its time is over or it was closed).
+  final bool closed;
+  final bool inCall;
   final String name;
   final ChatDto chat;
   @override
@@ -3928,16 +3931,16 @@ class _ChatTopBar extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 13, fontWeight: FontWeight.w800)),
-                Text(
-                    chat.isClosed
-                        ? 'Consultation closed'
-                        : 'Consultation chat active',
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: chat.isClosed
-                            ? DoctorTokens.textSub
-                            : DoctorTokens.primary))
+                const SizedBox(height: 3),
+                StatusChip(closed ? 'Expired' : 'Active',
+                    key: ValueKey(
+                        closed ? 'chat-status-expired' : 'chat-status-active'),
+                    color: closed
+                        ? DoctorTokens.surfaceSubtle
+                        : DoctorTokens.primaryLight,
+                    textColor: closed
+                        ? DoctorTokens.textSub
+                        : DoctorTokens.primaryDark)
               ])),
           InkWell(
               onTap: chat.appointmentId == null
@@ -3958,7 +3961,7 @@ class _ChatTopBar extends StatelessWidget {
                   alignment: Alignment.center,
                   child: const Icon(Icons.history, size: 17))),
           const SizedBox(width: 6),
-          if (chat.modality == 'VIDEO' && !chat.isClosed)
+          if (chat.modality == 'VIDEO' && !closed && !inCall)
             _ChatIconBtn(
                 icon: Icons.videocam_outlined,
                 tooltip: 'Start Video Call',
@@ -4029,10 +4032,12 @@ class _ChatExpiryBar extends StatelessWidget {
     final expiresAt = DateTime.tryParse(chat.expiresAt ?? '');
     final remaining = expiresAt?.difference(DateTime.now().toUtc());
     final label = locked
-        ? 'Consultation window closed'
+        ? 'Consultation time is over.'
         : (remaining == null || remaining.isNegative)
-            ? '24h consultation chat active'
-            : '24h chat active (${remaining.inHours}h ${remaining.inMinutes % 60}m remaining)';
+            ? 'Consultation chat active'
+            : remaining.inHours > 0
+                ? 'Chat open (${remaining.inHours}h ${remaining.inMinutes % 60}m left)'
+                : 'Chat open (${remaining.inMinutes + 1} min left)';
     return Container(
         margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

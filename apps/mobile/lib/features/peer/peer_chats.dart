@@ -14,14 +14,16 @@ import 'peer_repository.dart';
 import 'peer_ui.dart';
 
 /// Voice/video for an accepted request, on the shared Agora screen with the
-/// peer join-window and token endpoints (no doctor close-out).
-void openPeerCall(
-        BuildContext context, PeerRepository repo, String requestId) =>
+/// peer join-window and token endpoints (no doctor close-out). [chat] is the
+/// session chat shown from the in-call chat button; null hides the button.
+void openPeerCall(BuildContext context, PeerRepository repo, String requestId,
+        {Widget Function()? chat}) =>
     Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => AgoraPage(
             appointmentId: requestId,
             loadJoin: () => repo.joinEligibility(requestId),
-            loadToken: () => repo.rtcToken(requestId))));
+            loadToken: () => repo.rtcToken(requestId),
+            loadChat: chat == null ? null : () async => chat())));
 
 // ---------------------------------------------------------------------------
 // Chats (references 05 and 05b)
@@ -550,7 +552,16 @@ class _PeerChatPageState extends State<PeerChatPage> {
                             textStyle: const TextStyle(
                                 fontSize: 17, fontWeight: FontWeight.w800)),
                         onPressed: () => openPeerCall(
-                            context, widget.repo, widget.requestId),
+                            context, widget.repo, widget.requestId,
+                            // The same chat over the call, without its own
+                            // call button.
+                            chat: () => PeerChatPage(
+                                repo: widget.repo,
+                                chatId: widget.chatId,
+                                requestId: widget.requestId,
+                                name: widget.name,
+                                status: widget.status,
+                                callClosed: true)),
                         icon: const Icon(Icons.call_rounded, size: 26),
                         label: const Text('Start Support Call')))),
           Padding(
