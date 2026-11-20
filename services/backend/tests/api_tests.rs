@@ -6865,7 +6865,7 @@ async fn test_normal_rejections_do_not_create_system_error_logs(pool: PgPool) {
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
     )
     .fetch_one(&pool)
     .await
@@ -6919,6 +6919,44 @@ async fn test_refused_requests_are_recorded_on_the_incident_log(pool: PgPool) {
         .find(|r| r.1.as_deref() == Some("GET /api/v1/appointments/:id/documents/:id"))
         .expect("the refused document link is recorded with ids stripped");
     assert_eq!(document.2, Some(status.as_u16() as i16));
+}
+
+/// Background jobs (scheduler, email dispatch, clean-ups) only ever logged
+/// their failures. Every ERROR/WARN the backend logs now also reaches the
+/// Admin incident log, grouped per log line (product owner, 2026-11-20).
+#[sqlx::test(migrations = "./migrations")]
+async fn test_logged_background_failures_reach_the_incident_log(pool: PgPool) {
+    let (_app, pool) = test_app(pool).await;
+    for _ in 0..2 {
+        tracing::error!(
+            target: "hellodoctor_backend::services::incident_probe",
+            job = "probe",
+            "background probe job failed"
+        );
+    }
+    tracing::warn!(
+        target: "hellodoctor_backend::services::incident_probe",
+        "background probe job deferred"
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let rows: Vec<(String, String, i32, Option<String>)> = sqlx::query_as(
+        "SELECT subsystem, error_message, occurrence_count, stack_trace FROM system_error_logs          WHERE component = 'hellodoctor_backend::services::incident_probe' ORDER BY subsystem",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let error = rows
+        .iter()
+        .find(|r| r.0 == "SERVER_LOG")
+        .expect("the ERROR line is recorded");
+    assert!(
+        error.1.contains("background probe job failed"),
+        "{}",
+        error.1
+    );
+    assert_eq!(error.2, 2, "the same log line groups into one incident");
+    assert!(error.3.as_deref().unwrap_or("").contains("api_tests.rs"));
+    assert!(rows.iter().any(|r| r.0 == "SERVER_LOG_WARNING"));
 }
 
 /// A genuine handler panic — not an `AppError`, a real unwind — must still
@@ -8053,7 +8091,7 @@ async fn test_client_incident_auth_and_server_controlled_fields(pool: PgPool) {
         );
     }
     let count: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+        "SELECT count(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
     )
     .fetch_one(&pool)
     .await
@@ -8113,7 +8151,7 @@ async fn test_client_incident_concurrent_reports_group_atomically(pool: PgPool) 
         json_body(b).await["data"]["incident_id"]
     );
     let count: i32 = sqlx::query_scalar(
-        "SELECT occurrence_count FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+        "SELECT occurrence_count FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
     )
     .fetch_one(&pool)
     .await
@@ -8146,7 +8184,7 @@ async fn test_client_incident_bounds_and_context_privacy(pool: PgPool) {
         StatusCode::ACCEPTED
     );
     let context: Value = sqlx::query_scalar(
-        "SELECT client_context FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+        "SELECT client_context FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
     )
     .fetch_one(&pool)
     .await
@@ -8184,7 +8222,7 @@ async fn test_client_incident_dedup_keeps_doctors_and_builds_separate(pool: PgPo
         StatusCode::ACCEPTED
     );
     let (count, total): (i64, i64) =
-        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'")
+        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')")
             .fetch_one(&pool)
             .await
             .unwrap();
@@ -8220,7 +8258,7 @@ async fn test_client_incident_rate_limit(pool: PgPool) {
         StatusCode::TOO_MANY_REQUESTS
     );
     let (count, total): (i64, i64) =
-        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'")
+        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')")
             .fetch_one(&pool)
             .await
             .unwrap();
@@ -8244,7 +8282,7 @@ async fn test_client_incident_storage_failure_does_not_recursively_report(pool: 
         StatusCode::SERVICE_UNAVAILABLE
     );
     let count: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+        "SELECT count(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
     )
     .fetch_one(&pool)
     .await
@@ -13301,7 +13339,7 @@ async fn test_admin_system_error_simulation_environment_abac_and_persistence(poo
         StatusCode::UNPROCESSABLE_ENTITY
     );
     let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
     )
     .fetch_one(&pool)
     .await
@@ -13363,7 +13401,7 @@ async fn test_admin_system_error_simulation_environment_abac_and_persistence(poo
         StatusCode::CREATED
     );
     let before: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
     )
     .fetch_one(&pool)
     .await
@@ -13383,7 +13421,7 @@ async fn test_admin_system_error_simulation_environment_abac_and_persistence(poo
         );
     }
     let after: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
     )
     .fetch_one(&pool)
     .await
