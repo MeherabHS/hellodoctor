@@ -105,6 +105,16 @@ pub struct AppConfig {
     pub redis_url: String,
     pub jwt_ed25519_private_key_b64: String,
     pub jwt_ed25519_public_key_b64: String,
+    /// Old verification keys still accepted after a JWT key rotation
+    /// (`JWT_ED25519_PREVIOUS_PUBLIC_KEYS_B64`, comma-separated). Keep an old
+    /// key for one access-token lifetime (15 minutes) after rotating, then
+    /// remove it. See docs/AUTH_SECURITY.md.
+    pub jwt_ed25519_previous_public_keys_b64: Vec<String>,
+    /// Sensitive Admin actions need a fresh password confirmation
+    /// (`services::admin_step_up`). Always `true` when loaded from the
+    /// environment — there is deliberately no variable to turn it off; only
+    /// test code that builds an `AppConfig` directly can.
+    pub admin_step_up_required: bool,
     pub totp_encryption_key_b64: String,
     pub agora_app_id: String,
     pub agora_app_certificate: String,
@@ -313,6 +323,10 @@ impl std::fmt::Debug for AppConfig {
             .field(
                 "jwt_ed25519_public_key_b64",
                 &self.jwt_ed25519_public_key_b64,
+            )
+            .field(
+                "jwt_ed25519_previous_public_keys_b64",
+                &self.jwt_ed25519_previous_public_keys_b64,
             )
             .field(
                 "totp_encryption_key_b64",
@@ -587,6 +601,14 @@ impl AppConfig {
             redis_url: require("REDIS_URL"),
             jwt_ed25519_private_key_b64: require("JWT_ED25519_PRIVATE_KEY_B64"),
             jwt_ed25519_public_key_b64: require("JWT_ED25519_PUBLIC_KEY_B64"),
+            jwt_ed25519_previous_public_keys_b64: env::var("JWT_ED25519_PREVIOUS_PUBLIC_KEYS_B64")
+                .unwrap_or_default()
+                .split(',')
+                .map(str::trim)
+                .filter(|k| !k.is_empty())
+                .map(str::to_string)
+                .collect(),
+            admin_step_up_required: true,
             totp_encryption_key_b64: require("TOTP_ENCRYPTION_KEY_B64"),
             agora_app_id: require("AGORA_APP_ID"),
             agora_app_certificate: require("AGORA_APP_CERTIFICATE"),
@@ -773,6 +795,7 @@ impl AppConfig {
     /// Called before any database/Redis connection; tests also exercise it directly.
     pub fn validate_public_exposure(&self) -> Result<(), &'static str> {
         validate_storage_configuration(self)?;
+        validate_previous_jwt_keys(self)?;
         if self.requires_https() && (self.port == 0 || self.app_db_port == 0) {
             return Err("PORT and APP_DB_PORT must be between 1 and 65535");
         }
@@ -1157,6 +1180,22 @@ fn valid_storage_name(value: &str, max_len: usize) -> bool {
         && !value.contains("--")
 }
 
+/// Old JWT verification keys must be real keys, and only a few are kept:
+/// each one is meant to live for one access-token lifetime after a rotation.
+fn validate_previous_jwt_keys(config: &AppConfig) -> Result<(), &'static str> {
+    if config.jwt_ed25519_previous_public_keys_b64.len() > 3 {
+        return Err("JWT_ED25519_PREVIOUS_PUBLIC_KEYS_B64 holds more than 3 keys; remove keys retired more than 15 minutes ago.");
+    }
+    if config
+        .jwt_ed25519_previous_public_keys_b64
+        .iter()
+        .any(|key| crate::crypto::jwt_key_id(key).is_err())
+    {
+        return Err("JWT_ED25519_PREVIOUS_PUBLIC_KEYS_B64 contains a key that is not a base64 Ed25519 public key.");
+    }
+    Ok(())
+}
+
 fn validate_storage_configuration(config: &AppConfig) -> Result<(), &'static str> {
     match config.storage_provider {
         StorageProvider::Disabled => {
@@ -1454,6 +1493,8 @@ pub(crate) mod remediation_e3_tests {
             redis_url: "redis://:SYNTH_REDIS_PW_666666@localhost:6379".into(),
             jwt_ed25519_private_key_b64: "SYNTH_JWT_PRIVATE_777777".into(),
             jwt_ed25519_public_key_b64: "PUBLIC_KEY_VISIBLE_888888".into(),
+            jwt_ed25519_previous_public_keys_b64: Vec::new(),
+            admin_step_up_required: true,
             totp_encryption_key_b64: "SYNTH_TOTP_KEY_999999".into(),
             agora_app_id: "agora-app-id-visible".into(),
             agora_app_certificate: "SYNTH_AGORA_CERT_AAAAAA".into(),

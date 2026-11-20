@@ -3,6 +3,7 @@
 //! the approved-peer list patients choose from, and Admin approval.
 
 use crate::abac::{self, Action};
+use crate::api::json::Json;
 use crate::auth_context::AuthContext;
 use crate::domain::ids::UserId;
 use crate::domain::models::{User, UserRole};
@@ -16,7 +17,6 @@ use axum::{
     extract::{ConnectInfo, OriginalUri, Path, Query, State},
     http::{HeaderMap, Method, StatusCode},
     response::IntoResponse,
-    Json,
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
@@ -724,6 +724,7 @@ pub async fn admin_decide(
     Json(body): Json<AdminPeerDecision>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManagePeerNavigators)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let (target, allowed_from, needs_note): (&str, &[&str], bool) = match action.as_str() {
         "approve" => ("APPROVED", &["PENDING", "REJECTED"], false),
         "reject" => ("REJECTED", &["PENDING"], true),

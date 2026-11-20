@@ -8,6 +8,7 @@ import { TopicsPage } from '@/components/blogs/CategoryManager';
 import { AdminTeamPage } from '@/components/team/AdminTeamPage';
 import { ActivityLogPage } from '@/components/team/ActivityLogPage';
 import { NotificationCenter } from '@/components/shell/NotificationCenter';
+import { StepUpDialog } from '@/components/shell/StepUpDialog';
 import { PatientsDirectory } from '@/components/people/PatientsDirectory';
 import { PatientRecord } from '@/components/people/PatientRecord';
 import { PeerDirectory } from '@/components/people/PeerDirectory';
@@ -788,6 +789,7 @@ function AdminPortalContent() {
         ))}
       </div>
 
+      <StepUpDialog />
       <AdminSidebar
         active={activeAdminPage}
         onNavigate={navigateAdmin}

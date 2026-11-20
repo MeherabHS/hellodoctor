@@ -1,3 +1,4 @@
+use crate::api::json::Json;
 use crate::auth_context::AuthContext;
 use crate::crypto;
 use crate::domain::ids::{DoctorProfileId, UserId};
@@ -13,7 +14,6 @@ use axum::{
     extract::{ConnectInfo, OriginalUri, State},
     http::{HeaderMap, Method},
     response::IntoResponse,
-    Json,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

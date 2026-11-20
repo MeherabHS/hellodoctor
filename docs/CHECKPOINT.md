@@ -1,5 +1,31 @@
 # HelloDoctor - Current Project Checkpoint
 
+**Checkpoint — 2026-11-20 (resume from here):** The product is feature-complete for its
+current scope and running in production on the ARM64 VM. Full status, milestone table and the
+ordered list of what remains: [PROGRESS.md](PROGRESS.md#current-status--2026-11-20).
+
+- **Code:** `main` at `0f4a32c` (PR #48, saved profile photos in headers, chats and peer
+  requests). CI green: backend suite against a fresh PostgreSQL, both Flutter apps, Doctor
+  Web and Admin Web. 132 reversible migrations; the newest is `20261222000014`.
+- **Images:** ARM64 backend, admin-web and doctor-web published to GHCR from `0f4a32c`
+  (run 44557139554). To be rolled out on the VM for the photo fix.
+- **APKs:** Patient and Care internal-test APKs built from `0f4a32c` (run 44558068186).
+- **Uncommitted on the workstation:** the Play Store AAB workflow
+  (`.github/workflows/play-release-aab.yml`), Android release-signing changes in both
+  `build.gradle.kts` files and their `.gitignore` entries.
+- **Next:** (1) roll out the `0f4a32c` images; (2) fix the Security Scan workflow (failing
+  to start since 2026-11-11); (3) external penetration test; (4) Google Play
+  internal-testing release from Circle Technology Ltd; (5) wider real-device pilot.
+- **Decisions in force since the October entries below:** payments deferred
+  (`FINANCIAL_MODULE_MODE=deferred`); no SMS; 600 KB per clinical image, 40 KB per profile
+  photo; Admins publish directly; Kenya only, English and Swahili.
+
+The entries below are a dated history, newest first; their "next step" and "still open"
+lines describe the state on their own dates.
+
+---
+
+
 **Milestone 8 six-service performance remediation — RLS root-cause found and fixed, full-system bottleneck now identified as host CPU, not yet acceptance-ready (2026-11-02):** Continuation of the six-service (backend/Postgres/Redis/Caddy/Admin-Web/Doctor-Web) benchmark work against the `hellodoctor-m8-final-local` Docker stack (a disposable, dedicated benchmark project — never the shared dev `hellodoctor-postgres`/`hellodoctor-redis` or any other running stack, all of which were deliberately left untouched throughout). Full detail, evidence, and raw data: `docs/MILESTONE_8_SIX_SERVICE_PERFORMANCE_REMEDIATION.md` (Phases 1-4). **No git add/commit/push was performed anywhere in this session; everything below is uncommitted working-tree state.**
 
 Root cause of the six-service active-web-load degradation (first flagged in an earlier session's contaminated 60-minute run) was isolated precisely: `GET /api/v1/doctor/chats` and `GET /api/v1/doctor/appointments` (used by both Doctor-Web and the Flutter Doctor app's `doctor_repository.dart` — same backend endpoints) were measured at 3,452ms/3,196ms under real RLS enforcement vs 148ms with RLS bypassed as superuser — a 23x slowdown from `appointments_access`/`chat_conversations_access`/`chat_messages_access`/`consultation_sessions_access`'s RLS policies resolving "is the caller the doctor who owns this row" via a correlated subquery into `doctor_profiles`, re-executed per scanned row (confirmed via `EXPLAIN (ANALYZE, BUFFERS)` against the real `hellodoctor_api` role, not a missing index — every join already used one).
