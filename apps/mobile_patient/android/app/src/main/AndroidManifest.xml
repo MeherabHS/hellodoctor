@@ -12,6 +12,9 @@
          a sensible point in the app, not on first launch (see
          local_notification_service.dart). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- One-tap "always run in background" dialog (2026-11-20). Play-restricted:
+         declared in Play Console, see docs/PLAY_BATTERY_EXEMPTION_DECLARATION.md. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Re-arms the patient's own scheduled reminders after a reboot. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Personal reminders ring like an alarm clock at the exact time

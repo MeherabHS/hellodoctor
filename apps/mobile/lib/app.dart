@@ -32,6 +32,8 @@ import 'features/notifications/notification_cubit.dart';
 import 'features/notifications/notification_repository.dart';
 import 'features/home/consultation_history_tab.dart';
 import 'features/home/home_pages.dart';
+import 'features/onboarding/account_onboarding_gate.dart';
+import 'features/onboarding/doctor_onboarding_page.dart';
 
 class HelloDoctorApp extends StatefulWidget {
   const HelloDoctorApp({super.key});
@@ -170,7 +172,9 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
                       home: home);
                   if (state is SignedIn && state.isPeer) {
                     // Peer Navigators get their own screens; no doctor data.
-                    return application(PeerApp(repo: PeerRepository(api!)));
+                    return application(PeerApp(
+                        repo: PeerRepository(api!),
+                        onboardingStore: secureStore));
                   }
                   if (state is SignedIn) {
                     // Scope both the Navigator and all routed subflows to this account.
@@ -190,7 +194,8 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
                         child: application(Builder(
                             builder: (context) => NotificationNavigationHost(
                                 cubit: context.read<NotificationCubit>(),
-                                child: const DoctorShell()))));
+                                child: DoctorShell(
+                                    onboardingStore: secureStore)))));
                   }
                   return application(state is SessionRestoring
                       ? const _SplashPage()
@@ -776,7 +781,11 @@ class VerificationGateView extends StatelessWidget {
 }
 
 class DoctorShell extends StatefulWidget {
-  const DoctorShell({super.key});
+  const DoctorShell({super.key, this.onboardingStore});
+
+  /// Where the per-doctor onboarding flag lives; without it (tests, design
+  /// previews) the shell shows no onboarding.
+  final TokenStore? onboardingStore;
 
   /// Lets a pushed page (e.g. Settings' Availability/Payout tiles) switch
   /// the shell back to one of its bottom-nav tabs instead of duplicating
@@ -899,10 +908,17 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
   Future<void> _initLocalNotificationDelivery() async {
     try {
       await LocalNotificationService.init();
-      await LocalNotificationService.requestPermission();
       await registerBackgroundSync();
-      // Once per install: how to stop this phone delaying reminders.
-      if (mounted) await BatteryOptimization.maybePrompt(context);
+      // Not on top of a first-login onboarding: wait until it is done.
+      if (widget.onboardingStore != null) {
+        await AccountOnboardingGate.whenHidden();
+      }
+      // Notification permission, then the battery exemption, each after a
+      // short explanation (2026-11-20); re-asked on a later launch.
+      if (mounted) {
+        await BatteryOptimization.ensureReady(context,
+            requestPermission: LocalNotificationService.requestPermission);
+      }
     } catch (_) {
       // Best-effort — never block the shell or surface an error for this.
     }
@@ -964,11 +980,21 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
           onBack: () => selectTab(0), onOpenAppointments: () => selectTab(1)),
       MorePage(onBack: () => selectTab(0)),
     ];
-    return Scaffold(
+    final shell = Scaffold(
         body: pages[tab],
         bottomNavigationBar: SafeArea(
             top: false,
             child: DoctorBottomNav(selected: tab, onSelected: selectTab)));
+    final store = widget.onboardingStore;
+    if (store == null) return shell;
+    // Once per approved doctor account on this phone (product-owner
+    // instruction, 2026-11-20).
+    final account = professional == null
+        ? null
+        : (professional.userId?.isNotEmpty ?? false)
+            ? professional.userId
+            : professional.license;
+    return DoctorOnboardingGate(store: store, account: account, child: shell);
   }
 }
 

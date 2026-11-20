@@ -70,6 +70,12 @@ const _slotsMode = String.fromEnvironment('PREVIEW_SLOTS', defaultValue: '');
 /// `--dart-define=PREVIEW_PEER=EMPTY` shows the Peer Navigator empty states.
 const _peerMode = String.fromEnvironment('PREVIEW_PEER', defaultValue: '');
 
+/// `--dart-define=PREVIEW_ONBOARDING=true` gives the shell an empty
+/// onboarding store, so the approved fixture doctor (or, with
+/// PREVIEW_ROLE=PEER, the approved fixture Peer Navigator) sees the
+/// onboarding exactly as on a first real sign-in.
+const _onboarding = bool.fromEnvironment('PREVIEW_ONBOARDING');
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kReleaseMode) {
@@ -124,15 +130,18 @@ Future<void> main() async {
                       color: const Color(0xFFB45309),
                       child: child ?? const SizedBox()),
                   home: _role == 'PEER'
-                      ? PeerApp(repo: PeerRepository(api))
+                      ? PeerApp(
+                          repo: PeerRepository(api),
+                          onboardingStore: _onboarding ? store : null)
                       : _screen == 'CALL_ENDED'
                           ? const _CallEndedPreview()
                           : _screen == 'SCHEDULE'
                               ? const _SchedulePreview()
-                              : _screen.startsWith('CHAT_') ||
-                                      _screen == 'CALL'
+                              : _screen.startsWith('CHAT_') || _screen == 'CALL'
                                   ? const _PushedPreview()
-                                  : const DoctorShell())))));
+                                  : DoctorShell(
+                                      onboardingStore:
+                                          _onboarding ? store : null))))));
 }
 
 ChatDto _previewChat({required bool expired, String modality = 'CHAT'}) =>
@@ -441,6 +450,58 @@ List<Map<String, dynamic>> _notifications() => [
         'created_at': _at(const Duration(minutes: -30)),
         'read_at': _at(const Duration(minutes: -10)),
       },
+      for (final (id, type, title, body, ago, read) in [
+        (
+          'n3',
+          'CONSULTATION_REMINDER_15M',
+          'Consultation in 15 minutes',
+          'Your next video consultation starts soon (fixture).',
+          12,
+          false
+        ),
+        (
+          'n4',
+          'BOOKING_RESCHEDULED',
+          'Appointment rescheduled',
+          'A patient moved their booking to a new time (fixture).',
+          95,
+          false
+        ),
+        (
+          'n5',
+          'CONSULTATION_COMPLETED',
+          'Consultation completed',
+          'The outcome was recorded (fixture).',
+          60 * 5,
+          true
+        ),
+        (
+          'n6',
+          'CANCELLED',
+          'Appointment cancelled',
+          'A patient cancelled a booking (fixture).',
+          60 * 26,
+          true
+        ),
+        (
+          'n7',
+          'ARTICLE_STATUS_CHANGED',
+          'Article published',
+          'Your health article is now live (fixture).',
+          60 * 50,
+          true
+        ),
+      ])
+        {
+          'id': id,
+          'user_id': 'preview-doctor-user',
+          'notification_type': type,
+          'title': title,
+          'body': body,
+          'delivery_status': 'DELIVERED',
+          'created_at': _at(Duration(minutes: -ago)),
+          if (read) 'read_at': _at(Duration(minutes: -ago + 1)),
+        },
     ];
 
 const _profile = {
@@ -590,7 +651,12 @@ class _FixtureAdapter implements HttpClientAdapter {
           ? <Object>[]
           : _notifications();
     }
-    if (path == '/notifications/unread-count') return {'unread_count': 1};
+    if (path == '/notifications/unread-count') {
+      return {
+        'unread_count':
+            _notifications().where((n) => n['read_at'] == null).length
+      };
+    }
     if (RegExp(r'^/chat/[^/]+/messages$').hasMatch(path)) {
       return query.containsKey('before') || query.containsKey('after')
           ? <Object>[]

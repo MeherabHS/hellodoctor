@@ -4,7 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/widgets/afya_auth_widgets.dart';
 import '../auth/auth_cubit.dart';
+import '../../core/network/api_client.dart';
+import '../../core/notifications/battery_optimization.dart';
+import '../../core/notifications/local_notification_service.dart';
 import '../notifications/notification_repository.dart';
+import '../onboarding/peer_onboarding_page.dart';
 import 'peer_chats.dart';
 import 'peer_notifications.dart';
 import 'peer_profile_photo.dart';
@@ -31,8 +35,16 @@ export 'peer_schedule.dart';
 /// Signed-in Peer Navigator: shows the approval state until an Admin
 /// approves the account, then the five tabs.
 class PeerApp extends StatefulWidget {
-  const PeerApp({super.key, required this.repo, this.notifications});
+  const PeerApp(
+      {super.key,
+      required this.repo,
+      this.notifications,
+      this.onboardingStore});
   final PeerRepository repo;
+
+  /// Where the per-account onboarding flag lives; without it (tests, design
+  /// previews) no onboarding is shown.
+  final TokenStore? onboardingStore;
 
   /// The own-inbox notifications (defaults to the shared repository).
   final NotificationRepository? notifications;
@@ -66,8 +78,17 @@ class _PeerAppState extends State<PeerApp> {
         if (!profile.approved) {
           return _ApprovalGate(profile: profile, onRefresh: _reload);
         }
-        return PeerShell(
+        final shell = PeerShell(
             repo: widget.repo, profile: profile, notifications: _notifications);
+        final store = widget.onboardingStore;
+        // Once per approved Peer Navigator account on this phone
+        // (product-owner instruction, 2026-11-20).
+        return store == null
+            ? shell
+            : PeerOnboardingGate(
+                store: store,
+                account: profile.id.isEmpty ? null : profile.id,
+                child: shell);
       });
 }
 
@@ -174,6 +195,21 @@ class PeerShell extends StatefulWidget {
 
 class _PeerShellState extends State<PeerShell> {
   int tab = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        // The Care app's max-importance channels, for peers too.
+        await LocalNotificationService.init();
+        if (mounted) {
+          await BatteryOptimization.ensureReady(context,
+              requestPermission: LocalNotificationService.requestPermission);
+        }
+      } catch (_) {/* best effort; the Home banner remains */}
+    });
+  }
 
   /// Bumped to make the Schedule tab open on "Create Slots" or "My Schedule".
   int scheduleMode = 0, scheduleVersion = 0;

@@ -48,15 +48,18 @@ pub struct PushOptions {
 /// [`notification_sound`].
 pub fn android_channel_id(notification_type: &str, recipient_role: &str) -> &'static str {
     match recipient_role {
-        "DOCTOR" => match notification_type {
-            "CONSULTATION_REMINDER_15M" => "CONSULTATION_REMINDERS_V2",
-            "DAILY_CONSULTATION_SUMMARY" => "DAILY_SCHEDULE_V2",
-            "NEW_CHAT_MESSAGE" => "MESSAGES_V2",
+        // The Care app (Doctors and Peer Navigators). 2026-11-20: every Care
+        // channel is max importance (product-owner instruction), and Android
+        // fixes importance once a channel exists, so they are new `_V3` ids.
+        "DOCTOR" | "PEER_NAVIGATOR" => match notification_type {
+            "CONSULTATION_REMINDER_15M" => "CONSULTATION_REMINDERS_V3",
+            "DAILY_CONSULTATION_SUMMARY" => "DAILY_SCHEDULE_V3",
+            "NEW_CHAT_MESSAGE" => "MESSAGES_V3",
             "REGISTRATION_VERIFIED" | "REGISTRATION_REJECTED" | "ARTICLE_STATUS_CHANGED" => {
-                "ACCOUNT_V2"
+                "ACCOUNT_V3"
             }
-            "EARNING_CREDITED" | "PAYOUT_PAID" => "FINANCIAL_V2",
-            _ => "GENERAL_V2",
+            "EARNING_CREDITED" | "PAYOUT_PAID" => "FINANCIAL_V3",
+            _ => "GENERAL_V3",
         },
         // Patient and any other/unrecognized role share the Patient app's
         // channel set — "GENERAL_V2" always exists there too, so an
@@ -423,22 +426,25 @@ mod m8_g13_channel_routing_tests {
     #[test]
     fn doctor_channel_mapping_matches_dart_source() {
         let cases = [
-            ("CONSULTATION_REMINDER_15M", "CONSULTATION_REMINDERS_V2"),
-            ("DAILY_CONSULTATION_SUMMARY", "DAILY_SCHEDULE_V2"),
-            ("NEW_CHAT_MESSAGE", "MESSAGES_V2"),
-            ("REGISTRATION_VERIFIED", "ACCOUNT_V2"),
-            ("REGISTRATION_REJECTED", "ACCOUNT_V2"),
-            ("ARTICLE_STATUS_CHANGED", "ACCOUNT_V2"),
-            ("EARNING_CREDITED", "FINANCIAL_V2"),
-            ("PAYOUT_PAID", "FINANCIAL_V2"),
-            ("SOME_UNMAPPED_FUTURE_TYPE", "GENERAL_V2"),
+            ("CONSULTATION_REMINDER_15M", "CONSULTATION_REMINDERS_V3"),
+            ("DAILY_CONSULTATION_SUMMARY", "DAILY_SCHEDULE_V3"),
+            ("NEW_CHAT_MESSAGE", "MESSAGES_V3"),
+            ("REGISTRATION_VERIFIED", "ACCOUNT_V3"),
+            ("REGISTRATION_REJECTED", "ACCOUNT_V3"),
+            ("ARTICLE_STATUS_CHANGED", "ACCOUNT_V3"),
+            ("EARNING_CREDITED", "FINANCIAL_V3"),
+            ("PAYOUT_PAID", "FINANCIAL_V3"),
+            ("SOME_UNMAPPED_FUTURE_TYPE", "GENERAL_V3"),
         ];
-        for (notification_type, expected_channel) in cases {
-            assert_eq!(
-                android_channel_id(notification_type, "DOCTOR"),
-                expected_channel,
-                "DOCTOR/{notification_type}"
-            );
+        // Doctors and Peer Navigators both use the Care app's channels.
+        for role in ["DOCTOR", "PEER_NAVIGATOR"] {
+            for (notification_type, expected_channel) in cases {
+                assert_eq!(
+                    android_channel_id(notification_type, role),
+                    expected_channel,
+                    "{role}/{notification_type}"
+                );
+            }
         }
     }
 
@@ -503,7 +509,7 @@ mod m8_g13_channel_routing_tests {
         );
         assert_eq!(
             message["message"]["android"]["notification"]["channel_id"],
-            "CONSULTATION_REMINDERS_V2"
+            "CONSULTATION_REMINDERS_V3"
         );
         assert_eq!(message["message"]["token"], "fake-push-token");
         assert_eq!(

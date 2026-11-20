@@ -7,6 +7,9 @@
          a sensible point in the app, not on first launch (see
          local_notification_service.dart). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- One-tap "always run in background" dialog (2026-11-20). Play-restricted:
+         declared in Play Console, see docs/PLAY_BATTERY_EXEMPTION_DECLARATION.md. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Lets a periodic WorkManager background-sync task survive a device
          reboot (Layer 2 of the notification architecture) — without this,
          all pending periodic work is silently dropped on restart until the
@@ -58,7 +61,7 @@
              `NotificationChannels.forType`. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="GENERAL_V2" />
+            android:value="GENERAL_V3" />
         <!-- Required by flutter_local_notifications for AlarmManager delivery
              while the Flutter process is backgrounded, and rescheduling after
              reboot or an in-place APK update. -->
