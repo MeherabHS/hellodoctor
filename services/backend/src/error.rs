@@ -196,6 +196,18 @@ pub struct ErrorBody {
     pub details: Option<Vec<ErrorDetail>>,
 }
 
+/// Attached to every error response so the incident-reporting middleware
+/// (`api::middleware::incident_reporting`) can record it on the Admin
+/// incident log with its stable code and message. `already_reported` marks
+/// responses whose failure this module (or the panic handler) has already
+/// reported in full, so they are not recorded twice.
+#[derive(Debug, Clone)]
+pub struct ErrorResponseInfo {
+    pub code: &'static str,
+    pub message: String,
+    pub already_reported: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ErrorResponse {
     pub success: bool,
@@ -366,7 +378,20 @@ impl IntoResponse for AppError {
             },
         };
 
+        let already_reported = matches!(
+            self,
+            AppError::Internal(_)
+                | AppError::Database(_)
+                | AppError::ServiceUnavailable(_)
+                | AppError::RateLimitServiceUnavailable(_)
+        );
+        let info = ErrorResponseInfo {
+            code,
+            message: body.error.message.clone(),
+            already_reported,
+        };
         let mut response = (status, Json(body)).into_response();
+        response.extensions_mut().insert(info);
         if status == StatusCode::TOO_MANY_REQUESTS || status == StatusCode::SERVICE_UNAVAILABLE {
             response.headers_mut().insert(
                 axum::http::header::RETRY_AFTER,

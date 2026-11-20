@@ -6864,14 +6864,61 @@ async fn test_normal_rejections_do_not_create_system_error_logs(pool: PgPool) {
     assert_eq!(res2.status(), StatusCode::CONFLICT);
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(
         count, 0,
-        "none of 401/403/404/409 should ever create a system_error_logs row"
+        "none of 401/403/404/409 is a server failure (refused requests are          recorded separately under CLIENT_REQUEST)"
     );
+}
+
+/// Product owner, 2026-11-20: every error incident reaches the Admin incident
+/// log. Refused requests (4xx) are recorded under CLIENT_REQUEST, grouped by
+/// method + normalized route + code, with ids stripped from the route.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_refused_requests_are_recorded_on_the_incident_log(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    // 401 from auth, twice: one incident with two occurrences.
+    for _ in 0..2 {
+        assert_eq!(
+            get(&app, "/api/v1/doctor/chats", None).await.status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    // 404 from a handler, with ids in the path.
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let missing = format!(
+        "/api/v1/appointments/{}/documents/{}",
+        Uuid::new_v4(),
+        Uuid::new_v4()
+    );
+    let status = get(&app, &missing, Some(&patient)).await.status();
+    assert!(status.is_client_error(), "{status}");
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    type IncidentRow = (String, Option<String>, Option<i16>, i32, Option<String>);
+    let rows: Vec<IncidentRow> = sqlx::query_as(
+        "SELECT severity::text, endpoint, http_status, occurrence_count, error_code          FROM system_error_logs WHERE subsystem = 'CLIENT_REQUEST' ORDER BY endpoint",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let unauthorized = rows
+        .iter()
+        .find(|r| r.1.as_deref() == Some("GET /api/v1/doctor/chats"))
+        .expect("the 401 is recorded");
+    assert_eq!(unauthorized.0, "WARNING");
+    assert_eq!(unauthorized.2, Some(401));
+    assert_eq!(unauthorized.3, 2, "repeats group into one incident");
+    let document = rows
+        .iter()
+        .find(|r| r.1.as_deref() == Some("GET /api/v1/appointments/:id/documents/:id"))
+        .expect("the refused document link is recorded with ids stripped");
+    assert_eq!(document.2, Some(status.as_u16() as i16));
 }
 
 /// A genuine handler panic — not an `AppError`, a real unwind — must still
@@ -8005,10 +8052,12 @@ async fn test_client_incident_auth_and_server_controlled_fields(pool: PgPool) {
             StatusCode::UNPROCESSABLE_ENTITY
         );
     }
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(count, 0);
     assert_eq!(
         post_idem(
@@ -8063,10 +8112,12 @@ async fn test_client_incident_concurrent_reports_group_atomically(pool: PgPool) 
         json_body(a).await["data"]["incident_id"],
         json_body(b).await["data"]["incident_id"]
     );
-    let count: i32 = sqlx::query_scalar("SELECT occurrence_count FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i32 = sqlx::query_scalar(
+        "SELECT occurrence_count FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(count, 2);
 }
 
@@ -8094,10 +8145,12 @@ async fn test_client_incident_bounds_and_context_privacy(pool: PgPool) {
             .status(),
         StatusCode::ACCEPTED
     );
-    let context: Value = sqlx::query_scalar("SELECT client_context FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let context: Value = sqlx::query_scalar(
+        "SELECT client_context FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(context["screen"], "Application");
     assert_eq!(context["operation"], "unhandled_async");
     assert_eq!(context["error_type"], "Exception");
@@ -8131,7 +8184,7 @@ async fn test_client_incident_dedup_keeps_doctors_and_builds_separate(pool: PgPo
         StatusCode::ACCEPTED
     );
     let (count, total): (i64, i64) =
-        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs")
+        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'")
             .fetch_one(&pool)
             .await
             .unwrap();
@@ -8167,7 +8220,7 @@ async fn test_client_incident_rate_limit(pool: PgPool) {
         StatusCode::TOO_MANY_REQUESTS
     );
     let (count, total): (i64, i64) =
-        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs")
+        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'")
             .fetch_one(&pool)
             .await
             .unwrap();
@@ -8190,10 +8243,12 @@ async fn test_client_incident_storage_failure_does_not_recursively_report(pool: 
         .status(),
         StatusCode::SERVICE_UNAVAILABLE
     );
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(count, 0);
     assert_eq!(
         get(&app, "/api/v1/doctor/profile", Some(&doctor))
@@ -13245,10 +13300,12 @@ async fn test_admin_system_error_simulation_environment_abac_and_persistence(poo
         post(&app, uri, Some(&platform), &unknown).await.status(),
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(
         count, 0,
         "denied/invalid simulations must not persist incidents"
@@ -13305,10 +13362,12 @@ async fn test_admin_system_error_simulation_environment_abac_and_persistence(poo
         .status(),
         StatusCode::CREATED
     );
-    let before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let before: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     let mut config = (*state.config).clone();
     config.environment = "production".into();
     config.dev_simulation_enabled = false;
@@ -13323,10 +13382,12 @@ async fn test_admin_system_error_simulation_environment_abac_and_persistence(poo
             StatusCode::FORBIDDEN
         );
     }
-    let after: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let after: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem <> 'CLIENT_REQUEST'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(
         after, before,
         "production simulation must have no persistence side effect"

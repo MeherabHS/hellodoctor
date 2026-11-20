@@ -147,11 +147,21 @@ pub fn handle_panic(payload: Box<dyn Any + Send + 'static>) -> Response {
         event = event.with_stack_trace(loc);
     }
     system_error::report(event);
-    error_envelope(
+    let mut response = error_envelope(
         StatusCode::INTERNAL_SERVER_ERROR,
         "INTERNAL_SERVER_ERROR",
         "An unexpected error occurred.".to_string(),
-    )
+    );
+    // Reported above in full; the incident-reporting layer must not add a
+    // second, less detailed row.
+    response
+        .extensions_mut()
+        .insert(crate::error::ErrorResponseInfo {
+            code: "INTERNAL_SERVER_ERROR",
+            message: "An unexpected error occurred.".into(),
+            already_reported: true,
+        });
+    response
 }
 
 pub fn create_router(state: AppState) -> Router {
@@ -228,6 +238,11 @@ pub fn create_router_with_metrics(state: AppState, metrics_handle: PrometheusHan
         // task-local context is active — `handle_panic` calling
         // `request_id()` resolves the real per-request id, not a fallback.
         .layer(CatchPanicLayer::custom(handle_panic))
+        // Every error response (4xx and 5xx not already reported) reaches the
+        // Admin incident log. Inside `request_context` so the request id is
+        // known; outside everything else so auth, rate-limit, admission,
+        // unknown-route and body-limit refusals are all seen.
+        .layer(from_fn(crate::api::middleware::incident_reporting::middleware))
         .layer(from_fn(crate::api::middleware::request_context::middleware))
         .layer(from_fn(default_no_store))
         .layer(
