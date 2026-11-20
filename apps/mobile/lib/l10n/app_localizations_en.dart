@@ -208,4 +208,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsEndsAt => 'Ends at';
+
+  @override
+  String get notificationsToday => 'Today';
+
+  @override
+  String get notificationsYesterday => 'Yesterday';
+
+  @override
+  String get notificationsEarlier => 'Earlier';
+
+  @override
+  String get notificationsFilterAll => 'All';
+
+  @override
+  String get notificationsFilterAppointments => 'Visits';
+
+  @override
+  String get notificationsFilterMessages => 'Messages';
+
+  @override
+  String get notificationsFilterSystem => 'System';
+
+  @override
+  String get notificationsJustNow => 'Just now';
+
+  @override
+  String notificationsMinutesAgo(int count) {
+    return '$count min ago';
+  }
+
+  @override
+  String notificationsHoursAgo(int count) {
+    return '$count h ago';
+  }
 }

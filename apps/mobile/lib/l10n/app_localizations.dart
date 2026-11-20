@@ -457,6 +457,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ends at'**
   String get settingsEndsAt;
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get notificationsToday;
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get notificationsYesterday;
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'Earlier'**
+  String get notificationsEarlier;
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get notificationsFilterAll;
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'Visits'**
+  String get notificationsFilterAppointments;
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'Messages'**
+  String get notificationsFilterMessages;
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get notificationsFilterSystem;
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'Just now'**
+  String get notificationsJustNow;
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min ago'**
+  String notificationsMinutesAgo(int count);
+
+  /// Notification inbox (Peer Navigator design)
+  ///
+  /// In en, this message translates to:
+  /// **'{count} h ago'**
+  String notificationsHoursAgo(int count);
 }
 
 class _AppLocalizationsDelegate

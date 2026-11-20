@@ -73,5 +73,15 @@
   "settingsQuietHours": "Saa za utulivu",
   "settingsQuietHoursHelp": "Subirisha arifa zisizo za dharura katika kipindi hiki. Vikumbusho vya ushauri na arifa za muda maalumu havitacheleweshwa.",
   "settingsStartsAt": "Huanza saa",
-  "settingsEndsAt": "Huisha saa"
+  "settingsEndsAt": "Huisha saa",
+  "notificationsToday": "Leo",
+  "notificationsYesterday": "Jana",
+  "notificationsEarlier": "Awali",
+  "notificationsFilterAll": "Zote",
+  "notificationsFilterAppointments": "Miadi",
+  "notificationsFilterMessages": "Ujumbe",
+  "notificationsFilterSystem": "Mfumo",
+  "notificationsJustNow": "Sasa hivi",
+  "notificationsMinutesAgo": "Dakika {count} zilizopita",
+  "notificationsHoursAgo": "Saa {count} zilizopita"
 }

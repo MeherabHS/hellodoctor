@@ -2707,5 +2707,31 @@
   "chatTimeOver": "Consultation time is over.",
   "@chatTimeOver": {
     "description": "Consultation chat expiry bar once its time is over"
+  },
+  "notificationsEarlier": "Earlier",
+  "@notificationsEarlier": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsJustNow": "Just now",
+  "@notificationsJustNow": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsMinutesAgo": "{count} min ago",
+  "@notificationsMinutesAgo": {
+    "description": "Notification inbox (Peer Navigator design)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsHoursAgo": "{count} h ago",
+  "@notificationsHoursAgo": {
+    "description": "Notification inbox (Peer Navigator design)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
   }
 }

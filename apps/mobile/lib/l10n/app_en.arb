@@ -73,5 +73,55 @@
   "settingsQuietHours": "Quiet hours",
   "settingsQuietHoursHelp": "Hold non-urgent notifications during this window. Consultation reminders and time-sensitive alerts are never delayed.",
   "settingsStartsAt": "Starts at",
-  "settingsEndsAt": "Ends at"
+  "settingsEndsAt": "Ends at",
+  "notificationsToday": "Today",
+  "@notificationsToday": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsYesterday": "Yesterday",
+  "@notificationsYesterday": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsEarlier": "Earlier",
+  "@notificationsEarlier": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsFilterAll": "All",
+  "@notificationsFilterAll": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsFilterAppointments": "Visits",
+  "@notificationsFilterAppointments": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsFilterMessages": "Messages",
+  "@notificationsFilterMessages": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsFilterSystem": "System",
+  "@notificationsFilterSystem": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsJustNow": "Just now",
+  "@notificationsJustNow": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsMinutesAgo": "{count} min ago",
+  "@notificationsMinutesAgo": {
+    "description": "Notification inbox (Peer Navigator design)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsHoursAgo": "{count} h ago",
+  "@notificationsHoursAgo": {
+    "description": "Notification inbox (Peer Navigator design)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

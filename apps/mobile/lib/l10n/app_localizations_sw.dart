@@ -209,4 +209,38 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get settingsEndsAt => 'Huisha saa';
+
+  @override
+  String get notificationsToday => 'Leo';
+
+  @override
+  String get notificationsYesterday => 'Jana';
+
+  @override
+  String get notificationsEarlier => 'Awali';
+
+  @override
+  String get notificationsFilterAll => 'Zote';
+
+  @override
+  String get notificationsFilterAppointments => 'Miadi';
+
+  @override
+  String get notificationsFilterMessages => 'Ujumbe';
+
+  @override
+  String get notificationsFilterSystem => 'Mfumo';
+
+  @override
+  String get notificationsJustNow => 'Sasa hivi';
+
+  @override
+  String notificationsMinutesAgo(int count) {
+    return 'Dakika $count zilizopita';
+  }
+
+  @override
+  String notificationsHoursAgo(int count) {
+    return 'Saa $count zilizopita';
+  }
 }

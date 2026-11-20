@@ -1035,5 +1035,9 @@
   "chatStatusActive": "Inaendelea",
   "chatStatusExpired": "Muda umeisha",
   "chatActiveUntil": "Unaweza kumtumia {doctor} ujumbe hadi {time}.",
-  "chatTimeOver": "Muda wa ushauri umekwisha."
+  "chatTimeOver": "Muda wa ushauri umekwisha.",
+  "notificationsEarlier": "Awali",
+  "notificationsJustNow": "Sasa hivi",
+  "notificationsMinutesAgo": "Dakika {count} zilizopita",
+  "notificationsHoursAgo": "Saa {count} zilizopita"
 }

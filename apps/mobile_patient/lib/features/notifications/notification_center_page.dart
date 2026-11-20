@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/l10n/kenya_time.dart';
 import '../../core/theme/tokens.dart';
-import '../../core/widgets/afya_widgets.dart';
 import '../../core/widgets/patient_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import 'notification_cubit.dart';
@@ -65,6 +64,31 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
     super.dispose();
   }
 
+  /// "Just now", "5 min ago", "3 h ago", else the EAT date and time.
+  String _ago(BuildContext context, DateTime utc) {
+    final l10n = AppLocalizations.of(context);
+    final minutes = DateTime.now().toUtc().difference(utc).inMinutes;
+    if (minutes < 1) return l10n.notificationsJustNow;
+    if (minutes < 60) return l10n.notificationsMinutesAgo(minutes);
+    if (minutes < 12 * 60) return l10n.notificationsHoursAgo(minutes ~/ 60);
+    return _mediumDateTime(context, utc);
+  }
+
+  /// Today / Yesterday / Earlier, in Kenya time.
+  String _group(BuildContext context, DateTime utc) {
+    final l10n = AppLocalizations.of(context);
+    final day = kenyaTime(utc);
+    final today = kenyaTime(DateTime.now().toUtc());
+    final diff = DateTime(today.year, today.month, today.day)
+        .difference(DateTime(day.year, day.month, day.day))
+        .inDays;
+    return diff <= 0
+        ? l10n.peerToday
+        : diff == 1
+            ? l10n.peerYesterday
+            : l10n.notificationsEarlier;
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
@@ -74,8 +98,14 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
           final l10n = AppLocalizations.of(context);
           final items = [...s.items]
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          final groups = <String, List<NotificationDto>>{};
+          for (final n in items) {
+            groups.putIfAbsent(_group(context, n.createdAt), () => []).add(n);
+          }
+          // The Peer Navigator notifications design (product owner,
+          // 2026-11-20).
           return Scaffold(
-            backgroundColor: PatientTokens.bg,
+            backgroundColor: Colors.white,
             body: SafeArea(
               bottom: false,
               child: Column(children: [
@@ -83,20 +113,32 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
                   title: l10n.notificationsTitle,
                   subtitle: l10n.notificationsSubtitle,
                   onRefresh: widget.cubit.refresh,
-                  action: s.unreadCount > 0
-                      ? TextButton(
-                          onPressed: s.busy ? null : widget.cubit.markAllRead,
-                          child: s.busy
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2))
-                              : Text(l10n.notificationsMarkAllRead,
-                                  style: const TextStyle(fontSize: 12)),
-                        )
-                      : null,
                 ),
+                if (s.unreadCount > 0)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 4),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        key: const ValueKey('notifications-mark-all-read'),
+                        style: TextButton.styleFrom(
+                            foregroundColor: PatientTokens.primaryDark,
+                            backgroundColor: PatientTokens.mintCard,
+                            shape: const StadiumBorder()),
+                        onPressed: s.busy ? null : widget.cubit.markAllRead,
+                        child: s.busy
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : Text(l10n.notificationsMarkAllRead,
+                                style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ),
                 CacheStatusBar(
                     offline: false,
                     refreshing: s.refreshing,
@@ -121,6 +163,23 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
                                           InlineError(
                                               l10n.notificationsRefreshError,
                                               onRetry: widget.cubit.refresh),
+                                        for (final g in groups.entries) ...[
+                                          _GroupHeader(
+                                              label: g.key,
+                                              count: g.value.length),
+                                          for (final n in g.value)
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.fromLTRB(
+                                                      14, 0, 14, 12),
+                                              child: _NotificationTile(
+                                                  key: ValueKey(n.id),
+                                                  notification: n,
+                                                  time: _ago(
+                                                      context, n.createdAt),
+                                                  onTap: () => _handleTap(n)),
+                                            ),
+                                        ],
                                         if (s.hasOlder)
                                           TextButton(
                                               onPressed: s.loadingOlder
@@ -131,10 +190,6 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
                                                       .notificationsLoadingOlder
                                                   : l10n
                                                       .notificationsLoadOlder)),
-                                        ...items.map((n) => _NotificationTile(
-                                            key: ValueKey(n.id),
-                                            notification: n,
-                                            onTap: () => _handleTap(n))),
                                       ],
                                     ),
                             ),
@@ -148,122 +203,216 @@ class _NotificationCenterPageState extends State<NotificationCenterPage> {
   }
 }
 
+/// "Today  3" — the group label with its count in a green badge.
+class _GroupHeader extends StatelessWidget {
+  const _GroupHeader({required this.label, required this.count});
+  final String label;
+  final int count;
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+        child: Row(children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: PatientTokens.textSub)),
+          const SizedBox(width: 10),
+          Container(
+            constraints: const BoxConstraints(minWidth: 26),
+            height: 26,
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+                color: PatientTokens.primaryDark,
+                borderRadius: BorderRadius.circular(13)),
+            child: Text('$count',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w800)),
+          ),
+        ]),
+      );
+}
+
+/// One notification in the Peer Navigator design: coloured icon tile, title,
+/// body, when, unread dot and chevron.
 class _NotificationTile extends StatelessWidget {
   const _NotificationTile(
-      {super.key, required this.notification, required this.onTap});
+      {super.key,
+      required this.notification,
+      required this.time,
+      required this.onTap});
   final NotificationDto notification;
+  final String time;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final n = notification;
     final unread = !n.isRead;
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(18, 0, 18, 10),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: unread
-              ? PatientTokens.primaryLight.withValues(alpha: .35)
-              : PatientTokens.surface,
-          border: Border.all(color: PatientTokens.border),
-          borderRadius: BorderRadius.circular(PatientTokens.cardRadius),
-        ),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 6, right: 8),
-            child: unread
-                ? Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                        color: PatientTokens.primary, shape: BoxShape.circle))
-                : const SizedBox(width: 8, height: 8),
-          ),
-          Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(n.title,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: unread ? FontWeight.w800 : FontWeight.w600,
-                      color: PatientTokens.text)),
-              const SizedBox(height: 4),
-              Text(n.body,
-                  style: const TextStyle(
-                      fontSize: 12, color: PatientTokens.textSub, height: 1.4)),
-              const SizedBox(height: 6),
-              Text(_mediumDateTime(context, n.createdAt),
-                  style: const TextStyle(
-                      fontSize: 10, color: PatientTokens.textSub)),
+    final t = n.type;
+    final (IconData icon, Color bg, Color fg) = t == 'NEW_CHAT_MESSAGE'
+        ? (
+            Icons.chat_bubble_outline_rounded,
+            const Color(0xFFF0E7FD),
+            const Color(0xFF7B3FD1)
+          )
+        : t.contains('REMINDER')
+            ? (
+                Icons.alarm_rounded,
+                const Color(0xFFFFF5E5),
+                const Color(0xFFD98A00)
+              )
+            : t.contains('CANCEL') || t.contains('EXPIRED')
+                ? (
+                    Icons.event_busy_outlined,
+                    const Color(0xFFFFF5E5),
+                    const Color(0xFFD98A00)
+                  )
+                : t == 'PRESCRIPTION_AVAILABLE'
+                    ? (
+                        Icons.medication_outlined,
+                        PatientTokens.mintCard,
+                        PatientTokens.primaryDark
+                      )
+                    : t.startsWith('BOOKING_') ||
+                            t.startsWith('CONSULTATION_') ||
+                            t.startsWith('PEER_')
+                        ? (
+                            Icons.event_available_outlined,
+                            const Color(0xFFE6F1FD),
+                            const Color(0xFF1D5FB8)
+                          )
+                        : (
+                            Icons.notifications_none_rounded,
+                            PatientTokens.mintCard,
+                            PatientTokens.primaryDark
+                          );
+    return Material(
+      color: unread ? const Color(0xFFF1FAF5) : Colors.white,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFFE3E7EC))),
+      child: InkWell(
+        onTap: onTap,
+        customBorder:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 10, 16),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                    color: bg, borderRadius: BorderRadius.circular(16)),
+                child: Icon(icon, color: fg, size: 28)),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(n.title,
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight:
+                                unread ? FontWeight.w800 : FontWeight.w700,
+                            color: PatientTokens.navy)),
+                    const SizedBox(height: 3),
+                    Text(n.body,
+                        style: const TextStyle(
+                            fontSize: 13.5,
+                            height: 1.35,
+                            color: PatientTokens.ink)),
+                    const SizedBox(height: 4),
+                    Text(time,
+                        style: const TextStyle(
+                            fontSize: 12.5, color: PatientTokens.textSub)),
+                  ]),
+            ),
+            Column(children: [
+              SizedBox(
+                  height: 14,
+                  child: unread
+                      ? Container(
+                          key: ValueKey('notification-unread-${n.id}'),
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                              color: PatientTokens.primaryDark,
+                              shape: BoxShape.circle))
+                      : null),
+              const SizedBox(height: 8),
+              const Icon(Icons.chevron_right_rounded,
+                  color: PatientTokens.navy),
             ]),
-          ),
-        ]),
+          ]),
+        ),
       ),
     );
   }
 }
 
-/// Header of the product owner's notifications design: the brand mark over a
-/// soft mint wash, then a back arrow, the title block and a refresh action.
+/// The Peer Navigator header: circle back button, title block, then the
+/// mark-all-read pill and a circle refresh button.
 class _NotificationsHeader extends StatelessWidget {
   const _NotificationsHeader(
-      {required this.title,
-      required this.subtitle,
-      required this.onRefresh,
-      this.action});
+      {required this.title, required this.subtitle, required this.onRefresh});
   final String title, subtitle;
   final VoidCallback onRefresh;
-  final Widget? action;
+
+  Widget _circle(BuildContext context,
+          {required IconData icon,
+          required String tooltip,
+          required VoidCallback onTap}) =>
+      Tooltip(
+        message: tooltip,
+        child: Material(
+          color: Colors.white,
+          shape: const CircleBorder(
+              side: BorderSide(color: Color(0xFFDCE3E8), width: 1.2)),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+                width: 46,
+                height: 46,
+                child: Icon(icon, color: PatientTokens.navy, size: 23)),
+          ),
+        ),
+      );
+
   @override
-  Widget build(BuildContext context) => Container(
-        decoration: const BoxDecoration(
-            gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFFE4F5EC), Colors.white],
-                stops: [0, .55]),
-            border: Border(bottom: BorderSide(color: PatientTokens.border))),
-        padding: const EdgeInsets.fromLTRB(4, 8, 8, 12),
-        child: Column(children: [
-          const AfyaBrandLockup(markSize: 32, color: PatientTokens.primaryDark),
-          const SizedBox(height: 10),
-          Row(children: [
-            if (Navigator.of(context).canPop())
-              IconButton(
-                  onPressed: () => Navigator.maybePop(context),
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  icon: const Icon(Icons.arrow_back_rounded,
-                      color: PatientTokens.primaryDark))
-            else
-              const SizedBox(width: 16),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                        style: const TextStyle(
-                            fontSize: 24,
-                            height: 1.15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -.3,
-                            color: PatientTokens.text)),
-                    const SizedBox(height: 2),
-                    Text(subtitle,
-                        style: const TextStyle(
-                            fontSize: 13.5, color: PatientTokens.textSub)),
-                  ]),
-            ),
-            if (action != null) action!,
-            IconButton(
-                onPressed: onRefresh,
-                tooltip: MaterialLocalizations.of(context)
-                    .refreshIndicatorSemanticLabel,
-                icon: const Icon(Icons.refresh_rounded,
-                    size: 26, color: PatientTokens.primaryDark)),
-          ]),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+        child: Row(children: [
+          if (Navigator.of(context).canPop()) ...[
+            _circle(context,
+                icon: Icons.arrow_back_rounded,
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onTap: () => Navigator.maybePop(context)),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 24,
+                      height: 1.15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -.3,
+                      color: PatientTokens.navy)),
+              const SizedBox(height: 2),
+              Text(subtitle,
+                  style: const TextStyle(
+                      fontSize: 13.5, color: PatientTokens.textSub)),
+            ]),
+          ),
+          _circle(context,
+              icon: Icons.refresh_rounded,
+              tooltip: MaterialLocalizations.of(context)
+                  .refreshIndicatorSemanticLabel,
+              onTap: onRefresh),
         ]),
       );
 }
