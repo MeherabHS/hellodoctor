@@ -123,5 +123,241 @@
         "type": "int"
       }
     }
+  },
+  "doctorOnboardingSkip": "Skip",
+  "@doctorOnboardingSkip": {
+    "description": "Leaves the doctor onboarding"
+  },
+  "doctorOnboardingBack": "Back",
+  "@doctorOnboardingBack": {
+    "description": "Doctor onboarding: previous slide"
+  },
+  "doctorOnboardingNext": "Next",
+  "@doctorOnboardingNext": {
+    "description": "Doctor onboarding: next slide"
+  },
+  "doctorOnboardingGetStarted": "Get Started",
+  "@doctorOnboardingGetStarted": {
+    "description": "Doctor onboarding: slide 1 button"
+  },
+  "doctorOnboardingFinish": "Go to Dashboard",
+  "@doctorOnboardingFinish": {
+    "description": "Doctor onboarding: last button; the doctor is already signed in"
+  },
+  "doctorOnboardingCounter": "{current} of {total}",
+  "@doctorOnboardingCounter": {
+    "description": "Page dots label for screen readers",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "doctorOnboarding1Title": "Welcome, Doctor!",
+  "@doctorOnboarding1Title": {
+    "description": "Slide 1 title; the waving hand follows it"
+  },
+  "doctorOnboarding1Body": "Join AfyaMkononi to provide\nquality, confidential and\nyouth-friendly care.",
+  "@doctorOnboarding1Body": {
+    "description": "Slide 1 body; line breaks as on the board"
+  },
+  "doctorOnboarding2Title": "Provide Care Online",
+  "@doctorOnboarding2Title": {
+    "description": "Slide 2 title"
+  },
+  "doctorOnboarding2Body": "Consult patients through\nsecure video or chat, give\nadvice, and support\nfollow-up care.",
+  "@doctorOnboarding2Body": {
+    "description": "Slide 2 body"
+  },
+  "doctorOnboarding3Title": "Manage Appointments",
+  "@doctorOnboarding3Title": {
+    "description": "Slide 3 title"
+  },
+  "doctorOnboarding3Body": "View and manage your\nconsultation schedule easily,\nwith timely notifications\nand reminders.",
+  "@doctorOnboarding3Body": {
+    "description": "Slide 3 body"
+  },
+  "doctorOnboarding4Title": "You’re All Set!",
+  "@doctorOnboarding4Title": {
+    "description": "Slide 4 title"
+  },
+  "doctorOnboarding4Body": "Start providing trusted,\nconfidential and\nadolescent-friendly care\non AfyaMkononi.",
+  "@doctorOnboarding4Body": {
+    "description": "Slide 4 body (signed-in wording)"
+  },
+  "brandTagline": "Prevent · Test · Treat · Stay Healthy",
+  "@brandTagline": {
+    "description": "AfyaMkononi tagline; parts separated by ·"
+  },
+  "peerOnboardingSkip": "Skip",
+  "@peerOnboardingSkip": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboardingNext": "Next",
+  "@peerOnboardingNext": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboardingBack": "Back",
+  "@peerOnboardingBack": {
+    "description": "Peer onboarding: previous slide (screen-reader label of the back arrow)"
+  },
+  "peerOnboardingGetStarted": "Get Started",
+  "@peerOnboardingGetStarted": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboardingFinish": "Go to My Dashboard",
+  "@peerOnboardingFinish": {
+    "description": "Peer onboarding last button; opens the peer Home"
+  },
+  "peerOnboardingCounter": "{current} of {total}",
+  "@peerOnboardingCounter": {
+    "description": "Page dots label for screen readers",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "peerOnboarding1Bubble": "Hi there! 👋\nWelcome to\nAfyaMkononi!",
+  "@peerOnboarding1Bubble": {
+    "description": "Slide 1 speech bubble"
+  },
+  "peerOnboarding1Title": "Welcome, Peer Navigator",
+  "@peerOnboarding1Title": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding1Body": "You are a trusted peer for young people in your community. Share accurate information, offer support and help them reach care in a safe and friendly way.",
+  "@peerOnboarding1Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding1Tile1": "Support\nYour Peers",
+  "@peerOnboarding1Tile1": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding1Tile2": "Share\nTrusted Info",
+  "@peerOnboarding1Tile2": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding1Tile3": "Encourage\nCare",
+  "@peerOnboarding1Tile3": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding2Bubble": "You’re not alone.\nLet’s talk. I’m here\nto listen and support! 💚",
+  "@peerOnboarding2Bubble": {
+    "description": "Slide 2 speech bubble"
+  },
+  "peerOnboarding2Title": "Be a Supportive Peer",
+  "@peerOnboarding2Title": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding2Body": "Chat with young people, offer encouragement and share positive experiences in a safe and respectful space.",
+  "@peerOnboarding2Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding3Bubble": "Here’s what you can\ndo on your peer\ndashboard!",
+  "@peerOnboarding3Bubble": {
+    "description": "Slide 3 speech bubble"
+  },
+  "peerOnboarding3Title": "Your Peer Dashboard",
+  "@peerOnboarding3Title": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding3Body": "Everything you need to support others, in one place.",
+  "@peerOnboarding3Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding3Row1Title": "Support Requests",
+  "@peerOnboarding3Row1Title": {
+    "description": "Matches the Requests tab"
+  },
+  "peerOnboarding3Row1Body": "Accept or decline requests for your support.",
+  "@peerOnboarding3Row1Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding3Row2Title": "Chats",
+  "@peerOnboarding3Row2Title": {
+    "description": "Matches the Chats tab"
+  },
+  "peerOnboarding3Row2Body": "Continue conversations with the people you support.",
+  "@peerOnboarding3Row2Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding3Row3Title": "Schedule & Availability",
+  "@peerOnboarding3Row3Title": {
+    "description": "Matches the Schedule tab"
+  },
+  "peerOnboarding3Row3Body": "Set when you are available and create support slots.",
+  "@peerOnboarding3Row3Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding4Bubble": "You’re ready! 👋\nThank you for walking\nwith young people on\ntheir health journey.",
+  "@peerOnboarding4Bubble": {
+    "description": "Slide 4 speech bubble"
+  },
+  "peerOnboarding4Row1Title": "Be kind",
+  "@peerOnboarding4Row1Title": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding4Row1Body": "Make every chat a safe and friendly space.",
+  "@peerOnboarding4Row1Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding4Row2Title": "Be respectful",
+  "@peerOnboarding4Row2Title": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding4Row2Body": "Respect each person’s choices and experiences.",
+  "@peerOnboarding4Row2Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding4Row3Title": "Stay confidential",
+  "@peerOnboarding4Row3Title": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding4Row3Body": "Keep what people share private and protected.",
+  "@peerOnboarding4Row3Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding4Title": "Ready to begin?",
+  "@peerOnboarding4Title": {
+    "description": "Peer Navigator onboarding"
+  },
+  "peerOnboarding4Body": "Set your availability so young people can request your support.",
+  "@peerOnboarding4Body": {
+    "description": "Peer Navigator onboarding"
+  },
+  "batteryPromptAllow": "Allow",
+  "@batteryPromptAllow": {
+    "description": "Opens Android's 'always run in background' dialog"
+  },
+  "deliveryNotificationsOffTitle": "Notifications are off",
+  "@deliveryNotificationsOffTitle": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryNotificationsOffBody": "Turn them on so you don't miss consultation reminders and messages.",
+  "@deliveryNotificationsOffBody": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryChannelsOffBody": "Some notification types are switched off, so you may miss reminders or messages.",
+  "@deliveryChannelsOffBody": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryBatteryTitle": "Reminders may be delayed",
+  "@deliveryBatteryTitle": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryBatteryBody": "Battery saving can stop this app in the background. Allow it to run so reminders arrive on time.",
+  "@deliveryBatteryBody": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryFix": "Turn on",
+  "@deliveryFix": {
+    "description": "Notification and battery readiness"
   }
 }

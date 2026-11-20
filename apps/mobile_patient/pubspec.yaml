@@ -58,6 +58,7 @@ flutter:
     - assets/auth/
     - assets/education/
     - assets/facilities/
+    - assets/onboarding/
   fonts:
     - family: Plus Jakarta Sans
       fonts:

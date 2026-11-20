@@ -62,9 +62,28 @@ class SecureTokenStore implements TokenStore {
       storage.write(key: key, value: value);
   @override
   Future<void> delete(String key) => storage.delete(key: key);
+
+  /// Ends the session. Per-account onboarding flags (keys starting with
+  /// [keptOnSignOutPrefix]) belong to the phone, not the session, and are
+  /// kept so signing out does not show onboarding again.
   @override
-  Future<void> clear() => storage.deleteAll();
+  Future<void> clear() async {
+    Map<String, String> keep = const {};
+    try {
+      keep = Map.fromEntries((await storage.readAll())
+          .entries
+          .where((e) => e.key.startsWith(keptOnSignOutPrefix)));
+    } catch (_) {/* cleared with the rest; onboarding shows once more */}
+    await storage.deleteAll();
+    for (final e in keep.entries) {
+      await storage.write(key: e.key, value: e.value);
+    }
+  }
 }
+
+/// Keys with this prefix survive [SecureTokenStore.clear]: the per-account
+/// Doctor and Peer Navigator onboarding "seen" flags.
+const keptOnSignOutPrefix = 'onboarding_seen_v1:';
 
 class ApiException implements Exception {
   const ApiException(this.status, this.message, {this.requestId, this.code});

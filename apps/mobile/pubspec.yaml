@@ -41,6 +41,7 @@ flutter:
     - assets/auth/
     - assets/peer/
     - assets/history/
+    - assets/onboarding/
     - assets/doctor/
     - assets/doctor/
   fonts:

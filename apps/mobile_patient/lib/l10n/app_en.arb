@@ -2733,5 +2733,89 @@
         "type": "int"
       }
     }
+  },
+  "onboardingSkip": "Skip",
+  "@onboardingSkip": {
+    "description": "Patient onboarding (reference boards, 2026-11-20)"
+  },
+  "onboarding1Title": "Welcome to\nAfyaMkononi!",
+  "@onboarding1Title": {
+    "description": "Slide 1 title; the waving hand is drawn after it"
+  },
+  "onboarding1Body": "Your private and friendly\nhealth companion for\nHIV care, prevention and\noverall well-being.",
+  "@onboarding1Body": {
+    "description": "Slide 1 body; line breaks as in the reference"
+  },
+  "onboarding2Title": "Learn & Stay Safe",
+  "@onboarding2Title": {
+    "description": "Slide 2 title"
+  },
+  "onboarding2Body": "Get trusted information on\nHIV, prevention, testing,\ntreatment and sexual health\n— made for youth like you.",
+  "@onboarding2Body": {
+    "description": "Slide 2 body"
+  },
+  "onboarding3Title": "Get Confidential Support",
+  "@onboarding3Title": {
+    "description": "Slide 3 title"
+  },
+  "onboarding3Body": "Chat privately with trained\ncounsellors, peer supporters\nand care providers for\nguidance, questions\nor concerns.",
+  "@onboarding3Body": {
+    "description": "Slide 3 body"
+  },
+  "onboarding4Title": "Access Care, Anytime",
+  "@onboarding4Title": {
+    "description": "Slide 4 title"
+  },
+  "onboarding4Body": "Book video consultations\nwith a doctor, get reminders\nand keep your health records\nin one secure place.",
+  "@onboarding4Body": {
+    "description": "Slide 4 body"
+  },
+  "onboardingNext": "Next",
+  "@onboardingNext": {
+    "description": "Onboarding button on slides 1-3"
+  },
+  "onboardingGetStarted": "Get Started",
+  "@onboardingGetStarted": {
+    "description": "Onboarding button on the last slide"
+  },
+  "onboardingCounter": "{current} of {total}",
+  "@onboardingCounter": {
+    "description": "Onboarding progress",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "batteryPromptAllow": "Allow",
+  "@batteryPromptAllow": {
+    "description": "Opens Android's 'always run in background' dialog"
+  },
+  "deliveryNotificationsOffTitle": "Notifications are off",
+  "@deliveryNotificationsOffTitle": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryNotificationsOffBody": "Turn them on so you don't miss consultation reminders and messages.",
+  "@deliveryNotificationsOffBody": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryChannelsOffBody": "Some notification types are switched off, so you may miss reminders or messages.",
+  "@deliveryChannelsOffBody": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryBatteryTitle": "Reminders may be delayed",
+  "@deliveryBatteryTitle": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryBatteryBody": "Battery saving can stop this app in the background. Allow it to run so reminders arrive on time.",
+  "@deliveryBatteryBody": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryFix": "Turn on",
+  "@deliveryFix": {
+    "description": "Notification and battery readiness"
   }
 }

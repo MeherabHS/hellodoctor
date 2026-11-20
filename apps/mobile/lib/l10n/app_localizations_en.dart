@@ -242,4 +242,193 @@ class AppLocalizationsEn extends AppLocalizations {
   String notificationsHoursAgo(int count) {
     return '$count h ago';
   }
+
+  @override
+  String get doctorOnboardingSkip => 'Skip';
+
+  @override
+  String get doctorOnboardingBack => 'Back';
+
+  @override
+  String get doctorOnboardingNext => 'Next';
+
+  @override
+  String get doctorOnboardingGetStarted => 'Get Started';
+
+  @override
+  String get doctorOnboardingFinish => 'Go to Dashboard';
+
+  @override
+  String doctorOnboardingCounter(int current, int total) {
+    return '$current of $total';
+  }
+
+  @override
+  String get doctorOnboarding1Title => 'Welcome, Doctor!';
+
+  @override
+  String get doctorOnboarding1Body =>
+      'Join AfyaMkononi to provide\nquality, confidential and\nyouth-friendly care.';
+
+  @override
+  String get doctorOnboarding2Title => 'Provide Care Online';
+
+  @override
+  String get doctorOnboarding2Body =>
+      'Consult patients through\nsecure video or chat, give\nadvice, and support\nfollow-up care.';
+
+  @override
+  String get doctorOnboarding3Title => 'Manage Appointments';
+
+  @override
+  String get doctorOnboarding3Body =>
+      'View and manage your\nconsultation schedule easily,\nwith timely notifications\nand reminders.';
+
+  @override
+  String get doctorOnboarding4Title => 'You’re All Set!';
+
+  @override
+  String get doctorOnboarding4Body =>
+      'Start providing trusted,\nconfidential and\nadolescent-friendly care\non AfyaMkononi.';
+
+  @override
+  String get brandTagline => 'Prevent · Test · Treat · Stay Healthy';
+
+  @override
+  String get peerOnboardingSkip => 'Skip';
+
+  @override
+  String get peerOnboardingNext => 'Next';
+
+  @override
+  String get peerOnboardingBack => 'Back';
+
+  @override
+  String get peerOnboardingGetStarted => 'Get Started';
+
+  @override
+  String get peerOnboardingFinish => 'Go to My Dashboard';
+
+  @override
+  String peerOnboardingCounter(int current, int total) {
+    return '$current of $total';
+  }
+
+  @override
+  String get peerOnboarding1Bubble => 'Hi there! 👋\nWelcome to\nAfyaMkononi!';
+
+  @override
+  String get peerOnboarding1Title => 'Welcome, Peer Navigator';
+
+  @override
+  String get peerOnboarding1Body =>
+      'You are a trusted peer for young people in your community. Share accurate information, offer support and help them reach care in a safe and friendly way.';
+
+  @override
+  String get peerOnboarding1Tile1 => 'Support\nYour Peers';
+
+  @override
+  String get peerOnboarding1Tile2 => 'Share\nTrusted Info';
+
+  @override
+  String get peerOnboarding1Tile3 => 'Encourage\nCare';
+
+  @override
+  String get peerOnboarding2Bubble =>
+      'You’re not alone.\nLet’s talk. I’m here\nto listen and support! 💚';
+
+  @override
+  String get peerOnboarding2Title => 'Be a Supportive Peer';
+
+  @override
+  String get peerOnboarding2Body =>
+      'Chat with young people, offer encouragement and share positive experiences in a safe and respectful space.';
+
+  @override
+  String get peerOnboarding3Bubble =>
+      'Here’s what you can\ndo on your peer\ndashboard!';
+
+  @override
+  String get peerOnboarding3Title => 'Your Peer Dashboard';
+
+  @override
+  String get peerOnboarding3Body =>
+      'Everything you need to support others, in one place.';
+
+  @override
+  String get peerOnboarding3Row1Title => 'Support Requests';
+
+  @override
+  String get peerOnboarding3Row1Body =>
+      'Accept or decline requests for your support.';
+
+  @override
+  String get peerOnboarding3Row2Title => 'Chats';
+
+  @override
+  String get peerOnboarding3Row2Body =>
+      'Continue conversations with the people you support.';
+
+  @override
+  String get peerOnboarding3Row3Title => 'Schedule & Availability';
+
+  @override
+  String get peerOnboarding3Row3Body =>
+      'Set when you are available and create support slots.';
+
+  @override
+  String get peerOnboarding4Bubble =>
+      'You’re ready! 👋\nThank you for walking\nwith young people on\ntheir health journey.';
+
+  @override
+  String get peerOnboarding4Row1Title => 'Be kind';
+
+  @override
+  String get peerOnboarding4Row1Body =>
+      'Make every chat a safe and friendly space.';
+
+  @override
+  String get peerOnboarding4Row2Title => 'Be respectful';
+
+  @override
+  String get peerOnboarding4Row2Body =>
+      'Respect each person’s choices and experiences.';
+
+  @override
+  String get peerOnboarding4Row3Title => 'Stay confidential';
+
+  @override
+  String get peerOnboarding4Row3Body =>
+      'Keep what people share private and protected.';
+
+  @override
+  String get peerOnboarding4Title => 'Ready to begin?';
+
+  @override
+  String get peerOnboarding4Body =>
+      'Set your availability so young people can request your support.';
+
+  @override
+  String get batteryPromptAllow => 'Allow';
+
+  @override
+  String get deliveryNotificationsOffTitle => 'Notifications are off';
+
+  @override
+  String get deliveryNotificationsOffBody =>
+      'Turn them on so you don\'t miss consultation reminders and messages.';
+
+  @override
+  String get deliveryChannelsOffBody =>
+      'Some notification types are switched off, so you may miss reminders or messages.';
+
+  @override
+  String get deliveryBatteryTitle => 'Reminders may be delayed';
+
+  @override
+  String get deliveryBatteryBody =>
+      'Battery saving can stop this app in the background. Allow it to run so reminders arrive on time.';
+
+  @override
+  String get deliveryFix => 'Turn on';
 }

@@ -517,6 +517,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} h ago'**
   String notificationsHoursAgo(int count);
+
+  /// Leaves the doctor onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get doctorOnboardingSkip;
+
+  /// Doctor onboarding: previous slide
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get doctorOnboardingBack;
+
+  /// Doctor onboarding: next slide
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get doctorOnboardingNext;
+
+  /// Doctor onboarding: slide 1 button
+  ///
+  /// In en, this message translates to:
+  /// **'Get Started'**
+  String get doctorOnboardingGetStarted;
+
+  /// Doctor onboarding: last button; the doctor is already signed in
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Dashboard'**
+  String get doctorOnboardingFinish;
+
+  /// Page dots label for screen readers
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String doctorOnboardingCounter(int current, int total);
+
+  /// Slide 1 title; the waving hand follows it
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome, Doctor!'**
+  String get doctorOnboarding1Title;
+
+  /// Slide 1 body; line breaks as on the board
+  ///
+  /// In en, this message translates to:
+  /// **'Join AfyaMkononi to provide\nquality, confidential and\nyouth-friendly care.'**
+  String get doctorOnboarding1Body;
+
+  /// Slide 2 title
+  ///
+  /// In en, this message translates to:
+  /// **'Provide Care Online'**
+  String get doctorOnboarding2Title;
+
+  /// Slide 2 body
+  ///
+  /// In en, this message translates to:
+  /// **'Consult patients through\nsecure video or chat, give\nadvice, and support\nfollow-up care.'**
+  String get doctorOnboarding2Body;
+
+  /// Slide 3 title
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Appointments'**
+  String get doctorOnboarding3Title;
+
+  /// Slide 3 body
+  ///
+  /// In en, this message translates to:
+  /// **'View and manage your\nconsultation schedule easily,\nwith timely notifications\nand reminders.'**
+  String get doctorOnboarding3Body;
+
+  /// Slide 4 title
+  ///
+  /// In en, this message translates to:
+  /// **'You’re All Set!'**
+  String get doctorOnboarding4Title;
+
+  /// Slide 4 body (signed-in wording)
+  ///
+  /// In en, this message translates to:
+  /// **'Start providing trusted,\nconfidential and\nadolescent-friendly care\non AfyaMkononi.'**
+  String get doctorOnboarding4Body;
+
+  /// AfyaMkononi tagline; parts separated by ·
+  ///
+  /// In en, this message translates to:
+  /// **'Prevent · Test · Treat · Stay Healthy'**
+  String get brandTagline;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get peerOnboardingSkip;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get peerOnboardingNext;
+
+  /// Peer onboarding: previous slide (screen-reader label of the back arrow)
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get peerOnboardingBack;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Get Started'**
+  String get peerOnboardingGetStarted;
+
+  /// Peer onboarding last button; opens the peer Home
+  ///
+  /// In en, this message translates to:
+  /// **'Go to My Dashboard'**
+  String get peerOnboardingFinish;
+
+  /// Page dots label for screen readers
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String peerOnboardingCounter(int current, int total);
+
+  /// Slide 1 speech bubble
+  ///
+  /// In en, this message translates to:
+  /// **'Hi there! 👋\nWelcome to\nAfyaMkononi!'**
+  String get peerOnboarding1Bubble;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome, Peer Navigator'**
+  String get peerOnboarding1Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'You are a trusted peer for young people in your community. Share accurate information, offer support and help them reach care in a safe and friendly way.'**
+  String get peerOnboarding1Body;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Support\nYour Peers'**
+  String get peerOnboarding1Tile1;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Share\nTrusted Info'**
+  String get peerOnboarding1Tile2;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Encourage\nCare'**
+  String get peerOnboarding1Tile3;
+
+  /// Slide 2 speech bubble
+  ///
+  /// In en, this message translates to:
+  /// **'You’re not alone.\nLet’s talk. I’m here\nto listen and support! 💚'**
+  String get peerOnboarding2Bubble;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Be a Supportive Peer'**
+  String get peerOnboarding2Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Chat with young people, offer encouragement and share positive experiences in a safe and respectful space.'**
+  String get peerOnboarding2Body;
+
+  /// Slide 3 speech bubble
+  ///
+  /// In en, this message translates to:
+  /// **'Here’s what you can\ndo on your peer\ndashboard!'**
+  String get peerOnboarding3Bubble;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Your Peer Dashboard'**
+  String get peerOnboarding3Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Everything you need to support others, in one place.'**
+  String get peerOnboarding3Body;
+
+  /// Matches the Requests tab
+  ///
+  /// In en, this message translates to:
+  /// **'Support Requests'**
+  String get peerOnboarding3Row1Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Accept or decline requests for your support.'**
+  String get peerOnboarding3Row1Body;
+
+  /// Matches the Chats tab
+  ///
+  /// In en, this message translates to:
+  /// **'Chats'**
+  String get peerOnboarding3Row2Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Continue conversations with the people you support.'**
+  String get peerOnboarding3Row2Body;
+
+  /// Matches the Schedule tab
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule & Availability'**
+  String get peerOnboarding3Row3Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Set when you are available and create support slots.'**
+  String get peerOnboarding3Row3Body;
+
+  /// Slide 4 speech bubble
+  ///
+  /// In en, this message translates to:
+  /// **'You’re ready! 👋\nThank you for walking\nwith young people on\ntheir health journey.'**
+  String get peerOnboarding4Bubble;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Be kind'**
+  String get peerOnboarding4Row1Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Make every chat a safe and friendly space.'**
+  String get peerOnboarding4Row1Body;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Be respectful'**
+  String get peerOnboarding4Row2Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Respect each person’s choices and experiences.'**
+  String get peerOnboarding4Row2Body;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Stay confidential'**
+  String get peerOnboarding4Row3Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Keep what people share private and protected.'**
+  String get peerOnboarding4Row3Body;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to begin?'**
+  String get peerOnboarding4Title;
+
+  /// Peer Navigator onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Set your availability so young people can request your support.'**
+  String get peerOnboarding4Body;
+
+  /// Opens Android's 'always run in background' dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get batteryPromptAllow;
+
+  /// Notification and battery readiness
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications are off'**
+  String get deliveryNotificationsOffTitle;
+
+  /// Notification and battery readiness
+  ///
+  /// In en, this message translates to:
+  /// **'Turn them on so you don\'t miss consultation reminders and messages.'**
+  String get deliveryNotificationsOffBody;
+
+  /// Notification and battery readiness
+  ///
+  /// In en, this message translates to:
+  /// **'Some notification types are switched off, so you may miss reminders or messages.'**
+  String get deliveryChannelsOffBody;
+
+  /// Notification and battery readiness
+  ///
+  /// In en, this message translates to:
+  /// **'Reminders may be delayed'**
+  String get deliveryBatteryTitle;
+
+  /// Notification and battery readiness
+  ///
+  /// In en, this message translates to:
+  /// **'Battery saving can stop this app in the background. Allow it to run so reminders arrive on time.'**
+  String get deliveryBatteryBody;
+
+  /// Notification and battery readiness
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on'**
+  String get deliveryFix;
 }
 
 class _AppLocalizationsDelegate

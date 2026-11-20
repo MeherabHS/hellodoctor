@@ -56,6 +56,11 @@ const sessionSecureStorage = FlutterSecureStorage(
   aOptions: AndroidOptions(sharedPreferencesName: sessionSecureStorageFile),
 );
 
+/// Device flag: the patient has finished or skipped onboarding on this
+/// phone. It belongs to the install, not the session, so [SecureTokenStore]
+/// keeps it when sign-out clears the session.
+const onboardingSeenKey = 'onboarding_seen_v1';
+
 class SecureTokenStore implements TokenStore {
   SecureTokenStore([FlutterSecureStorage? storage])
       : storage = storage ?? sessionSecureStorage;
@@ -68,7 +73,16 @@ class SecureTokenStore implements TokenStore {
   @override
   Future<void> delete(String key) => storage.delete(key: key);
   @override
-  Future<void> clear() => storage.deleteAll();
+  Future<void> clear() async {
+    String? onboarding;
+    try {
+      onboarding = await storage.read(key: onboardingSeenKey);
+    } catch (_) {/* cleared with the rest; onboarding shows once more */}
+    await storage.deleteAll();
+    if (onboarding != null) {
+      await storage.write(key: onboardingSeenKey, value: onboarding);
+    }
+  }
 }
 
 class ApiException implements Exception {
