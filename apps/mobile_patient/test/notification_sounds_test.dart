@@ -32,7 +32,13 @@ void main() {
         .map((c) => c.arguments as Map)
         .toList();
     expect(channels, hasLength(NotificationChannels.all.length));
-    for (final c in channels) {
+    // Admin announcements: their own max-importance V3 channel (2026-11-21).
+    final announcements =
+        channels.singleWhere((c) => c['id'] == 'ANNOUNCEMENTS_V3');
+    expect(announcements['importance'], 5);
+    expect(
+        NotificationChannels.forType('ADMIN_CAMPAIGN').id, 'ANNOUNCEMENTS_V3');
+    for (final c in channels.where((c) => c != announcements)) {
       expect('${c['id']}', endsWith('_V2'));
       expect(c['playSound'], true);
       expect(c['importance'], greaterThanOrEqualTo(4),

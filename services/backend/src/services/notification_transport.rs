@@ -47,6 +47,11 @@ pub struct PushOptions {
 /// fixes a channel's sound once created, so new ids were needed); see
 /// [`notification_sound`].
 pub fn android_channel_id(notification_type: &str, recipient_role: &str) -> &'static str {
+    // Admin-published announcements: one max-importance channel in both apps,
+    // whatever the recipient's role (product owner, 2026-11-21).
+    if notification_type == "ADMIN_CAMPAIGN" {
+        return "ANNOUNCEMENTS_V3";
+    }
     match recipient_role {
         // The Care app (Doctors and Peer Navigators). 2026-11-20: every Care
         // channel is max importance (product-owner instruction), and Android
@@ -483,6 +488,32 @@ mod m8_g13_channel_routing_tests {
     /// (`GENERAL`, present in both apps) rather than panicking or producing
     /// an empty string — defensive, since `recipient_role` ultimately comes
     /// from a database read, not a closed Rust enum.
+    /// Admin-published announcements always use the max-importance
+    /// ANNOUNCEMENTS_V3 channel, in both apps, at the highest FCM priority.
+    #[test]
+    fn admin_campaigns_use_the_announcements_channel_for_every_role() {
+        for role in ["PATIENT", "DOCTOR", "PEER_NAVIGATOR", "PLATFORM_ADMIN"] {
+            assert_eq!(
+                android_channel_id("ADMIN_CAMPAIGN", role),
+                "ANNOUNCEMENTS_V3",
+                "{role}"
+            );
+        }
+        let message = build_fcm_message(
+            "fake-push-token",
+            "Announcement",
+            "A message from AfyaMkononi.",
+            &options("ADMIN_CAMPAIGN", "PATIENT"),
+        );
+        let android = &message["message"]["android"];
+        assert_eq!(android["notification"]["channel_id"], "ANNOUNCEMENTS_V3");
+        assert_eq!(android["priority"], "high");
+        assert_eq!(
+            android["notification"]["notification_priority"],
+            "PRIORITY_MAX"
+        );
+    }
+
     #[test]
     fn unknown_role_falls_back_to_general_channel_set() {
         assert_eq!(

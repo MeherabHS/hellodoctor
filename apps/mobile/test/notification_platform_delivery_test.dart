@@ -29,7 +29,9 @@ void main() {
         .where((c) => c.method == 'createNotificationChannel')
         .map((c) => c.arguments as Map)
         .toList();
-    expect(channels, hasLength(6));
+    expect(channels, hasLength(7));
+    expect(
+        NotificationChannels.forType('ADMIN_CAMPAIGN').id, 'ANNOUNCEMENTS_V3');
     final reminders =
         channels.singleWhere((c) => c['id'] == 'CONSULTATION_REMINDERS_V3');
     // Forced sounds (2026-11-17): the urgent tone for reminders, the quick
