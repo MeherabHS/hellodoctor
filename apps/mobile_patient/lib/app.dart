@@ -12,6 +12,7 @@ import 'features/onboarding/onboarding_page.dart';
 import 'core/cache/patient_cache_store.dart';
 import 'core/l10n/locale_controller.dart';
 import 'core/network/api_client.dart';
+import 'core/network/chat_live.dart';
 import 'core/network/screen_refresh.dart';
 import 'core/network/client_error_reporter.dart';
 import 'core/notifications/push_notification_service.dart';
@@ -137,6 +138,13 @@ class _AppState extends State<HelloDoctorPatientApp>
           : Future<void>.error(StateError('signed out')));
       _authSubscription = auth!.stream.listen((state) {
         _incidentRetryTimer?.cancel();
+        // Live chat nudges run only while signed in.
+        if (state is SignedIn) {
+          ChatLive.current ??= ChatLive(api!)..start();
+        } else if (state is! SessionRestoring) {
+          unawaited(ChatLive.current?.stop());
+          ChatLive.current = null;
+        }
         if (state is SignedIn) {
           // A language picked while signed out reaches the account.
           locale?.flushPendingSync();

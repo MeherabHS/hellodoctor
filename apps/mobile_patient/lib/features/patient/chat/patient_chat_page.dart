@@ -1,3 +1,4 @@
+import '../../../core/network/chat_live.dart';
 import '../../../core/network/screen_refresh.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'clinical_image_viewer.dart';
@@ -60,6 +61,7 @@ class _PatientChatPageState extends State<PatientChatPage> {
   /// Rebuilds the moment the chat window closes, so a screen left open turns
   /// read-only and shows "Expired" without being reopened.
   Timer? _expiryTimer;
+  late final LiveChatHook _live;
 
   @override
   void initState() {
@@ -83,13 +85,20 @@ class _PatientChatPageState extends State<PatientChatPage> {
         setState(() {});
       }
     });
+    // A live nudge for this conversation fetches it at once.
+    _live = LiveChatHook(
+        wants: (nudge) => nudge.concerns(widget.conversation.id),
+        onNudge: () =>
+            unawaited(_screenRefresh.run().catchError((Object _) {})),
+        onConnectionChange: () => _screenRefresh.reschedule());
     _screenRefresh = ScreenRefresh(() async {
       await _cubit.poll();
       if (mounted) setState(() {});
     },
         interval: const Duration(seconds: 10),
-        // 3 s while the conversation is active, easing to 30 s when quiet.
-        intervalFor: () => _cubit.pollInterval(DateTime.now()),
+        // 3 s while the conversation is active, easing to 30 s when quiet;
+        // 30 s throughout while live nudges arrive.
+        intervalFor: () => _live.pollEvery(_cubit.pollInterval(DateTime.now())),
         networkChanges: widget.repo.connectivity?.changes,
         enabled: () =>
             !widget.conversation.isExpired && !_cubit.state.serverLocked);
@@ -152,6 +161,7 @@ class _PatientChatPageState extends State<PatientChatPage> {
 
   @override
   void dispose() {
+    _live.dispose();
     _screenRefresh.dispose();
     _expiryTimer?.cancel();
     _stateSubscription?.cancel();

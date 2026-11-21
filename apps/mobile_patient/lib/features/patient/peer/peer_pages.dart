@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/l10n/kenya_time.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/chat_live.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/initials.dart';
 import '../../../core/utils/time_format.dart';
@@ -969,17 +970,26 @@ class _PatientPeerChatPageState extends State<PatientPeerChatPage> {
   Object? _error;
   bool _sending = false;
   Timer? _poll;
+  late final LiveChatHook _live;
 
   @override
   void initState() {
     super.initState();
     _load();
-    _poll =
-        Timer.periodic(const Duration(seconds: 10), (_) => _load(quiet: true));
+    // Every 10 s, or every 30 s while live nudges arrive (a nudge for this
+    // chat fetches it at once).
+    _poll = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (_live.live && timer.tick % 3 != 0) return;
+      _load(quiet: true);
+    });
+    _live = LiveChatHook(
+        wants: (nudge) => nudge.concerns(widget.chatId),
+        onNudge: () => _load(quiet: true));
   }
 
   @override
   void dispose() {
+    _live.dispose();
     _poll?.cancel();
     _text.dispose();
     _scroll.dispose();

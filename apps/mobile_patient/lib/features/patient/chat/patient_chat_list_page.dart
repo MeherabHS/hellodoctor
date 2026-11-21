@@ -1,3 +1,4 @@
+import '../../../core/network/chat_live.dart';
 import '../../../core/network/screen_refresh.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -69,6 +70,7 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
   int pageDepth = 1;
   String? error;
   late final ScreenRefresh _screenRefresh;
+  late final LiveChatHook _live;
   int generation = 0;
   StreamSubscription<FamilyProfilesState>? profileSubscription;
 
@@ -96,6 +98,11 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
         networkChanges: widget.repo.connectivity?.changes,
         hasError: () => error != null,
         enabled: () => !past);
+    // New messages update the list (unread state, order) at once.
+    _live = LiveChatHook(
+        wants: (nudge) => nudge.isResync || nudge.kind == 'CHAT',
+        onNudge: () =>
+            unawaited(_screenRefresh.run().catchError((Object _) {})));
     String? profileId = widget.familyProfilesCubit.state.activeProfileId;
     profileSubscription = widget.familyProfilesCubit.stream.listen((s) {
       if (s.activeProfileId != profileId) {
@@ -117,6 +124,7 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
   @override
   void dispose() {
     generation++;
+    _live.dispose();
     _screenRefresh.dispose();
     profileSubscription?.cancel();
     super.dispose();

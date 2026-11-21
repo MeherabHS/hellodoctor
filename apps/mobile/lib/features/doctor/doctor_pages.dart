@@ -12,6 +12,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../core/network/api_client.dart';
+import '../../core/network/chat_live.dart';
 import '../../core/network/screen_refresh.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/time/kenya_time.dart';
@@ -3028,6 +3029,7 @@ class ChatListPage extends StatefulWidget {
 
 class _ChatListState extends State<ChatListPage> {
   late final ScreenRefresh _refresh;
+  late final LiveChatHook _live;
   @override
   void initState() {
     super.initState();
@@ -3035,6 +3037,10 @@ class _ChatListState extends State<ChatListPage> {
         interval: const Duration(seconds: 30),
         enabled: () => filter != 'closed',
         networkChanges: context.read<DoctorCubit>().connectivity?.changes);
+    // New messages update the list at once.
+    _live = LiveChatHook(
+        wants: (nudge) => nudge.isResync || nudge.kind == 'CHAT',
+        onNudge: () => unawaited(_refresh.run().catchError((Object _) {})));
     unawaited(context.read<DoctorCubit>().refreshChats());
   }
 
@@ -3046,6 +3052,7 @@ class _ChatListState extends State<ChatListPage> {
 
   @override
   void dispose() {
+    _live.dispose();
     _refresh.dispose();
     super.dispose();
   }
@@ -3273,6 +3280,7 @@ class ChatThreadPage extends StatefulWidget {
 class _ChatThreadState extends State<ChatThreadPage> {
   final input = TextEditingController();
   late final ScreenRefresh _screenRefresh;
+  late final LiveChatHook _live;
   bool _polling = false;
   DateTime? _refreshFailure;
   bool hasOlder = true, loadingOlder = false;
@@ -3338,6 +3346,7 @@ class _ChatThreadState extends State<ChatThreadPage> {
 
   @override
   void dispose() {
+    _live.dispose();
     _screenRefresh.dispose();
     _expiryTimer?.cancel();
     pendingAttachment = null;
@@ -3354,6 +3363,12 @@ class _ChatThreadState extends State<ChatThreadPage> {
     load();
     unawaited(ack('CHAT_OPENED'));
     unawaited(ack('CONSULTATION_OPENED'));
+    // A live nudge for this conversation fetches it at once.
+    _live = LiveChatHook(
+        wants: (nudge) => nudge.concerns(widget.chat.id),
+        onNudge: () =>
+            unawaited(_screenRefresh.run().catchError((Object _) {})),
+        onConnectionChange: () => _screenRefresh.reschedule());
     _screenRefresh = ScreenRefresh(() async {
       if (_polling || !mounted) return;
       _polling = true;
@@ -3386,7 +3401,8 @@ class _ChatThreadState extends State<ChatThreadPage> {
       }
     },
         interval: const Duration(seconds: 10),
-        intervalFor: () => _pollInterval(DateTime.now()),
+        // 30 s throughout while live nudges arrive.
+        intervalFor: () => _live.pollEvery(_pollInterval(DateTime.now())),
         enabled: () => !widget.chat.isClosed && !serverClosed,
         hasError: () => _refreshFailure != null,
         networkChanges: context.read<DoctorCubit>().connectivity?.changes);

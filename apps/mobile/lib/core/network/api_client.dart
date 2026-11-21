@@ -432,6 +432,32 @@ class ApiClient {
   final TokenStore _storage;
   Uri resolveServerUrl(String value) =>
       Uri.parse(_dio.options.baseUrl).resolve(value);
+
+  /// The live chat socket's address and handshake headers: the same client
+  /// type, bearer token and device proof as any authenticated request, so
+  /// the upgrade passes the normal auth middleware. Null when signed out.
+  Future<({Uri uri, Map<String, String> headers})?> liveSocket() async {
+    final token = await read('access_token');
+    if (token == null) return null;
+    final base = Uri.parse(_dio.options.baseUrl);
+    final path =
+        '${base.path.endsWith('/') ? base.path.substring(0, base.path.length - 1) : base.path}/chat/live';
+    final uri = base.replace(
+        scheme: base.scheme == 'https' ? 'wss' : 'ws', path: path, query: null);
+    final headers = <String, String>{
+      'Authorization': 'Bearer $token',
+      'X-Client-Type': 'DOCTOR_FLUTTER',
+      'X-Client-Build':
+          const String.fromEnvironment('APP_BUILD', defaultValue: 'unreported'),
+    };
+    if (_proofSigner.enabled) {
+      headers['X-Device-Proof-Required'] = '1';
+      final proof = await _proofSigner.sign('GET', path, token);
+      if (proof != null) headers['X-Device-Proof'] = proof;
+    }
+    return (uri: uri, headers: headers);
+  }
+
   Future<void>? _refresh;
   int _sessionGeneration = 0;
   Future<void> _storageWrites = Future<void>.value();

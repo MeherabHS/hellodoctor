@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/network/api_client.dart';
+import 'core/network/chat_live.dart';
 import 'core/network/screen_refresh.dart';
 import 'core/network/client_error_reporter.dart';
 import 'core/notifications/push_notification_service.dart';
@@ -125,6 +126,13 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
       auth = AuthCubit(api!, cache: cache);
       _authSubscription = auth!.stream.listen((state) {
         _incidentRetryTimer?.cancel();
+        // Live chat nudges run only while signed in.
+        if (state is SignedIn) {
+          ChatLive.current ??= ChatLive(api!)..start();
+        } else if (state is! SessionRestoring) {
+          unawaited(ChatLive.current?.stop());
+          ChatLive.current = null;
+        }
         if (state is SignedIn) {
           unawaited(ClientErrorReporter.current?.flushStartup());
           _incidentRetryTimer =
