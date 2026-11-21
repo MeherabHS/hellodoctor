@@ -581,8 +581,8 @@ async fn test_deferred_chat_booking_activates_conversation_and_both_parties_exch
     let (apt_id, slot_id) = book_deferred(&app, &patient, "CHAT").await;
     assert_eq!(conversation_count(&pool, apt_id).await, 1);
 
-    // A CHAT consultation can be messaged until its booked slot ends
-    // (product owner, 2026-11-20; AppointmentService::chat_window_end).
+    // A CHAT consultation can be messaged for 24 hours after its booked slot
+    // ends (product owner, 2026-11-21; AppointmentService::chat_window_end).
     let (expires_at, slot_end): (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
         sqlx::query_as(
             "SELECT c.expires_at, s.end_time FROM chat_conversations c, doctor_schedule_slots s \
@@ -593,7 +593,7 @@ async fn test_deferred_chat_booking_activates_conversation_and_both_parties_exch
         .fetch_one(&pool)
         .await
         .unwrap();
-    assert_eq!(expires_at, slot_end);
+    assert!(expires_at >= slot_end + chrono::Duration::hours(24) - chrono::Duration::seconds(5));
 
     let conv = conversation_id_for(&app, &patient, apt_id).await;
     assert_eq!(conversation_id_for(&app, &doctor, apt_id).await, conv);

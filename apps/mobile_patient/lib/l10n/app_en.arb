@@ -225,7 +225,7 @@
   },
   "bookingChatTitle": "Book Chat Consultation",
   "@bookingChatTitle": {
-    "description": "Booking screen title for a chat consultation (open until its booked time ends)."
+    "description": "Booking screen title for a chat consultation (open until 24 hours after its booked time)."
   },
   "bookingNoSlots": "This doctor has no bookable slots right now.",
   "@bookingNoSlots": {
@@ -255,11 +255,11 @@
   "@bookingIncludedFree": {
     "description": "Patient interface: bookingIncludedFree"
   },
-  "bookingChatIncludedLabel": "24-Hour Chat Included:",
+  "bookingChatIncludedLabel": "Chat Included:",
   "@bookingChatIncludedLabel": {
     "description": "Patient interface: bookingChatIncludedLabel"
   },
-  "bookingChatIncludedBody": "Your video consultation automatically includes 24 hours of direct specialist chat for pre-visit history and post-visit follow-up.",
+  "bookingChatIncludedBody": "Your video consultation includes a chat with your doctor until 1 hour after the consultation ends.",
   "@bookingChatIncludedBody": {
     "description": "Patient interface: bookingChatIncludedBody"
   },
@@ -699,7 +699,7 @@
   "@waitingRoomVideoCallsYouDetail": {
     "description": "Waiting room video-modality readiness banner detail."
   },
-  "waitingRoomChatWindowDetail": "You can chat with your doctor during your booked time. When it ends, the chat becomes read-only.",
+  "waitingRoomChatWindowDetail": "You can chat with your doctor until 24 hours after your booked time. After that, the chat becomes read-only.",
   "@waitingRoomChatWindowDetail": {
     "description": "Waiting room chat-modality readiness banner detail."
   },
@@ -711,9 +711,9 @@
   "@waitingRoomOpenChat": {
     "description": "Waiting room open-chat button for chat modality."
   },
-  "waitingRoomOpen24hChat": "Open 24h Chat",
+  "waitingRoomOpen24hChat": "Open Chat",
   "@waitingRoomOpen24hChat": {
-    "description": "Waiting room secondary 24h-chat entry for video modality."
+    "description": "Waiting room secondary chat entry for video modality (chat closes 1 hour after the consultation is completed)."
   },
   "waitingRoomTestCameraMic": "Test Camera & Microphone",
   "@waitingRoomTestCameraMic": {

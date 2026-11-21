@@ -5455,6 +5455,48 @@ async fn test_admin_create_doctor_issues_temporary_password(pool: PgPool) {
     assert_eq!(login.status(), StatusCode::OK);
 }
 
+/// Product owner, 2026-11-21: a video consultation's chat closes 1 hour after
+/// the booked slot ends, and once completed, 1 hour after completion.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_video_chat_closes_one_hour_after_completion(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let (apt_id, _) = book_and_confirm(&app, &patient).await;
+    let modality: String =
+        sqlx::query_scalar("SELECT modality::text FROM appointments WHERE id=$1")
+            .bind(apt_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(modality, "VIDEO");
+    let (expires, slot_end): (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
+        sqlx::query_as("SELECT c.expires_at, s.end_time FROM chat_conversations c JOIN appointments a ON a.id=c.appointment_id JOIN doctor_schedule_slots s ON s.id=a.slot_id WHERE a.id=$1")
+            .bind(apt_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(expires, slot_end + chrono::Duration::hours(1));
+
+    sqlx::query("UPDATE doctor_schedule_slots SET start_time=NOW()+INTERVAL '5 minutes',end_time=NOW()+INTERVAL '15 minutes' WHERE id=(SELECT slot_id FROM appointments WHERE id=$1)")
+        .bind(apt_id).execute(&pool).await.unwrap();
+    let res = post(
+        &app,
+        &format!("/api/v1/consultations/{apt_id}/complete-no-rx"),
+        Some(&doctor),
+        &serde_json::json!({ "reason": "Follow-up advice given; no prescription needed" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let (expires, completed): (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
+        sqlx::query_as("SELECT c.expires_at, a.completed_at FROM chat_conversations c JOIN appointments a ON a.id=c.appointment_id WHERE a.id=$1")
+            .bind(apt_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(expires, completed + chrono::Duration::hours(1));
+}
+
 #[sqlx::test(migrations = "./migrations")]
 async fn test_complete_consultation_without_prescription(pool: PgPool) {
     let (app, pool) = test_app(pool).await;

@@ -779,12 +779,13 @@ impl AppointmentService {
     /// Does nothing for an appointment that is not confirmed or later.
     ///
     /// The conversation's messaging window ([`chat_window_end`]):
-    /// - a chat consultation can be messaged only until its booked slot ends
-    ///   (product owner, 2026-11-20); afterwards the history stays readable
-    ///   to both parties but nobody can send;
-    /// - a video consultation keeps a follow-up chat until 24 hours after its
-    ///   slot ends, or after activation if that is later, so one booked ahead
-    ///   of time cannot reach its slot with an already expired chat.
+    /// (product owner, 2026-11-21) afterwards the history stays readable to
+    /// both parties but nobody can send:
+    /// - a chat consultation can be messaged for 24 hours after its booked
+    ///   slot ends (or after activation, if that is later);
+    /// - a video consultation's chat closes 1 hour after its booked slot
+    ///   ends, and once the Doctor completes it, 1 hour after completion
+    ///   (`finish_video_chat_window`, called from completion).
     pub async fn ensure_consultation_activated(
         state: &AppState,
         appointment_id: Uuid,
@@ -963,9 +964,13 @@ pub fn chat_window_end(
     slot_end: chrono::DateTime<Utc>,
     now: chrono::DateTime<Utc>,
 ) -> chrono::DateTime<Utc> {
+    // Activated late (repair path): counted from activation instead, so the
+    // window is never already over when it is created.
+    let from = std::cmp::max(now, slot_end);
     match modality {
-        Modality::Chat => slot_end,
-        Modality::Video => std::cmp::max(now, slot_end) + chrono::Duration::hours(24),
+        Modality::Chat => from + chrono::Duration::hours(24),
+        // Moved to 1 hour after completion by `finish_video_chat_window`.
+        Modality::Video => from + chrono::Duration::hours(1),
     }
 }
 
@@ -975,30 +980,33 @@ mod chat_window_tests {
     use chrono::TimeZone;
 
     #[test]
-    fn a_chat_consultation_closes_when_its_slot_ends() {
+    fn a_chat_consultation_stays_open_24_hours_after_its_slot() {
         let slot_end = Utc.with_ymd_and_hms(2026, 11, 20, 10, 10, 0).unwrap();
         let booked_earlier = slot_end - chrono::Duration::days(2);
         assert_eq!(
             chat_window_end(Modality::Chat, slot_end, booked_earlier),
-            slot_end
+            slot_end + chrono::Duration::hours(24)
         );
-        // Activated late (repair path): still the slot end, so it is already closed.
-        let late = slot_end + chrono::Duration::hours(1);
-        assert_eq!(chat_window_end(Modality::Chat, slot_end, late), slot_end);
+        // Activated late (repair path): 24 hours from activation.
+        let late = slot_end + chrono::Duration::hours(3);
+        assert_eq!(
+            chat_window_end(Modality::Chat, slot_end, late),
+            late + chrono::Duration::hours(24)
+        );
     }
 
     #[test]
-    fn a_video_consultation_keeps_a_24_hour_follow_up_chat() {
+    fn a_video_consultation_chat_closes_1_hour_after_its_slot() {
         let slot_end = Utc.with_ymd_and_hms(2026, 11, 20, 10, 10, 0).unwrap();
         let before = slot_end - chrono::Duration::days(2);
         assert_eq!(
             chat_window_end(Modality::Video, slot_end, before),
-            slot_end + chrono::Duration::hours(24)
+            slot_end + chrono::Duration::hours(1)
         );
         let late = slot_end + chrono::Duration::hours(3);
         assert_eq!(
             chat_window_end(Modality::Video, slot_end, late),
-            late + chrono::Duration::hours(24)
+            late + chrono::Duration::hours(1)
         );
     }
 }

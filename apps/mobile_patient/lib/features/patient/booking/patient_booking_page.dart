@@ -579,7 +579,7 @@ class _FormatBanner extends StatelessWidget {
   }
 }
 
-/// Prototype `view-4` "24-Hour Chat Included" callout.
+/// Prototype `view-4` chat-included callout (video: chat until 1 hour after completion).
 class _ChatIncludedCallout extends StatelessWidget {
   const _ChatIncludedCallout();
   @override

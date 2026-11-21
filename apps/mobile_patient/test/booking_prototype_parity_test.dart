@@ -123,7 +123,7 @@ void main() {
     expect(find.text('Select Date'), findsOneWidget);
     expect(find.text('Available Slots'), findsOneWidget);
     expect(find.text('Times shown in EAT (UTC+3)'), findsOneWidget);
-    expect(find.textContaining('24-Hour Chat Included:'), findsOneWidget);
+    expect(find.textContaining('Chat Included:'), findsOneWidget);
     expect(find.textContaining('Doctor calls you'), findsNothing);
     expectNoPaymentUi();
     await tester.tap(find.text('10:00 AM').first);
