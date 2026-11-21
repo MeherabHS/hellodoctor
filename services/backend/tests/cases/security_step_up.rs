@@ -68,7 +68,7 @@ async fn sensitive_admin_actions_require_a_recent_password_reentry(pool: PgPool)
     )
     .await;
     assert_eq!(res.status(), StatusCode::OK);
-    assert_eq!(json_body(res).await["data"]["valid_for_seconds"], 300);
+    assert_eq!(json_body(res).await["data"]["valid_for_seconds"], 120);
     let res = post(&app, &approve, Some(&token), &empty).await;
     assert_ne!(
         res.status(),

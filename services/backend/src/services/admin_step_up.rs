@@ -21,7 +21,7 @@ use serde::Deserialize;
 use std::time::Duration;
 
 /// How long one password confirmation covers sensitive actions.
-pub const STEP_UP_TTL_SECS: u64 = 5 * 60;
+pub const STEP_UP_TTL_SECS: u64 = 2 * 60;
 const REAUTH_MAX_FAILURES: u32 = 5;
 const REAUTH_WINDOW_SECS: u64 = 900;
 
