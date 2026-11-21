@@ -112,6 +112,7 @@ pub async fn review(
     Json(body): Json<ReviewRequest>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     authorize_review(&ctx)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     if !["IN_REVIEW", "COMPLETED", "DECLINED"].contains(&body.status.as_str())
         || body.response.trim().is_empty()
         || body.response.chars().count() > 4000

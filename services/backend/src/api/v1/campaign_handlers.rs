@@ -285,6 +285,7 @@ pub async fn approve(
     Json(payload): Json<CampaignTransition>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     abac::authorize(&ctx, Action::ManageCampaigns)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let mut tx = state.begin_authed(&ctx).await?;
     // Approval is bound to `content_version`, not `version` — it must still
     // read as "approved" after later lifecycle transitions (schedule/pause/
@@ -320,6 +321,7 @@ pub async fn schedule(
     Json(payload): Json<ScheduleCampaign>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     abac::authorize(&ctx, Action::ManageCampaigns)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     if payload.scheduled_for < Utc::now() - Duration::minutes(1) {
         return Err(AppError::Validation(
             "Schedule time must not be meaningfully in the past.".into(),
@@ -376,6 +378,7 @@ pub async fn resume(
     Json(payload): Json<CampaignTransition>,
 ) -> Result<Json<serde_json::Value>, AppError> {
     abac::authorize(&ctx, Action::ManageCampaigns)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let mut tx = state.begin_authed(&ctx).await?;
     let current = campaign_repo::find(&mut *tx, id)
         .await?

@@ -91,6 +91,11 @@ pub enum AppError {
         message: String,
     },
 
+    /// A sensitive Admin action needs a recent password re-entry
+    /// (`services::admin_step_up`); Admin Web prompts and retries.
+    #[error("Step-up required: {0}")]
+    StepUpRequired(String),
+
     #[error("Capacity limit reached: {0}")]
     CapacityLimitReached(String),
 
@@ -273,6 +278,9 @@ impl IntoResponse for AppError {
                     _ => StatusCode::CONFLICT,
                 };
                 (status, *reason, message.clone())
+            }
+            AppError::StepUpRequired(msg) => {
+                (StatusCode::FORBIDDEN, "STEP_UP_REQUIRED", msg.clone())
             }
             AppError::PaymentRequired(msg) => (
                 StatusCode::PAYMENT_REQUIRED,

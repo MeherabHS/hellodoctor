@@ -178,6 +178,7 @@ pub async fn finalize_financial_period(
     Json(payload): Json<FinalizePeriodRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::InitiateDisbursement)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     if !(1..=12).contains(&payload.month) || !(2000..=2200).contains(&payload.year) {
         return Err(AppError::Validation("Invalid financial period.".into()));
     }
@@ -339,6 +340,7 @@ pub async fn revoke_doctor_professional_registration(
     Json(payload): Json<RevokeDoctorRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManageProfessionalVerification)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let id = DoctorProfileId::from(id);
     let reason = crate::domain::validation::validate_admin_text_field(
         &payload.reason,
@@ -777,6 +779,7 @@ pub async fn initiate_disbursement(
     Json(payload): Json<InitiateDisbursementRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::InitiateDisbursement)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     // Audit write now happens inside the service, in the same FinanceWorker
     // transaction as the batch/item rows (Pass 2 fix, docs/CHECKPOINT.md §10)
     // — not a separate call here.
@@ -804,6 +807,7 @@ pub async fn approve_disbursement_item(
     Path(item_id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::InitiateDisbursement)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let mut tx = state.begin_authed_as(&ctx, DbRole::FinanceWorker).await?;
     let batch_id: Uuid = sqlx::query_scalar("SELECT b.id FROM disbursement_batches b JOIN disbursement_items i ON i.batch_id=b.id WHERE i.id=$1 FOR UPDATE OF b")
         .bind(item_id).fetch_optional(&mut *tx).await?
@@ -860,6 +864,7 @@ pub async fn confirm_disbursement_item_paid(
     Json(payload): Json<ConfirmDisbursementPaidRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::InitiateDisbursement)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let gateway_reference = payload.gateway_reference.trim();
     if gateway_reference.is_empty() {
         return Err(AppError::Validation(
@@ -1431,6 +1436,7 @@ pub async fn execute_patient_data_rights(
     Path(id): Path<Uuid>,
     Json(body): Json<DataRightsExecutionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let reason = validated_data_rights_reason(&body.reason)?;
     let outcome = crate::services::data_rights_service::execute_patient_erasure(
         &state,
@@ -1460,6 +1466,7 @@ pub async fn execute_doctor_data_rights(
     Path(id): Path<Uuid>,
     Json(body): Json<DataRightsExecutionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let reason = validated_data_rights_reason(&body.reason)?;
     let outcome = crate::services::data_rights_service::execute_doctor_erasure(
         &state,
@@ -1503,6 +1510,7 @@ pub async fn verify_doctor_professional_registration(
     Path(id): Path<Uuid>,
     Json(payload): Json<ProfessionalReviewRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     review_doctor_professional_registration(
         state,
         ctx,
@@ -1538,6 +1546,7 @@ async fn review_doctor_professional_registration(
     status: ProfessionalVerificationStatus,
 ) -> Result<Json<ApiResponse<serde_json::Value>>, AppError> {
     abac::authorize(&ctx, Action::ManageProfessionalVerification)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let note = payload
         .note
         .map(|n| crate::domain::validation::validate_admin_text_field(&n, "Review note", 1000))
@@ -2506,6 +2515,7 @@ pub async fn set_primary_platform_payment_method(
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManagePlatformPaymentMethod)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let mut tx = state.begin_authed(&ctx).await?;
     let method = payment_methods_repo::find_platform_payment_method(&mut *tx, id)
         .await?

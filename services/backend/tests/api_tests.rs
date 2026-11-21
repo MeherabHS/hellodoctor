@@ -103,6 +103,10 @@ mod push_notification_delivery;
 mod qna_audit;
 #[path = "cases/remediation_a.rs"]
 mod remediation_a;
+#[path = "cases/security_retention.rs"]
+mod security_retention;
+#[path = "cases/security_step_up.rs"]
+mod security_step_up;
 
 #[path = "cases/remediation_d.rs"]
 mod remediation_d;
@@ -250,6 +254,7 @@ fn test_config() -> AppConfig {
         redis_url: test_redis_url(),
         jwt_ed25519_private_key_b64: TEST_JWT_PRIVATE_KEY_B64.into(),
         jwt_ed25519_public_key_b64: TEST_JWT_PUBLIC_KEY_B64.into(),
+        jwt_previous_public_keys_b64: Vec::new(),
         totp_encryption_key_b64: totp_key_for_test(),
         agora_app_id: "73ddf1abee12ac89822eecb0e7df9e28".into(),
         agora_app_certificate: "12a7c64e686cb880ee5cb57ac9eed39d".into(),
@@ -537,6 +542,29 @@ async fn build_role_pools(pool: &PgPool) -> RolePools {
     }
 }
 
+/// Admin step-up (2026-11-21): seeded Admin fixture sessions count as having
+/// re-entered their password, so tests of sensitive Admin actions exercise the
+/// action itself. `security_step_up` tests the guard on unmarked sessions.
+async fn mark_fixture_admin_step_up(pool: &PgPool, redis: &deadpool_redis::Pool) {
+    let sessions: Vec<(Uuid, Uuid)> = sqlx::query_as(
+        "SELECT s.user_id, s.token_family_id FROM auth_sessions s JOIN users u ON u.id = s.user_id          WHERE u.role = 'ADMIN' AND s.refresh_token_hash LIKE 'fixture-session-%'",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    let mut conn = redis.get().await.expect("test redis");
+    for (user, family) in sessions {
+        deadpool_redis::redis::cmd("SET")
+            .arg(format!("admin-step-up:{user}:{family}"))
+            .arg(1)
+            .arg("EX")
+            .arg(3600)
+            .query_async::<()>(&mut conn)
+            .await
+            .unwrap();
+    }
+}
+
 async fn test_app(pool: PgPool) -> (axum::Router, PgPool) {
     test_app_with_config(pool, test_config()).await
 }
@@ -568,6 +596,7 @@ async fn test_app_with_storage_fixture(
 
     // Reset real counters only after checking explicit fixture ownership.
     reset_owned_redis(&redis).await;
+    mark_fixture_admin_step_up(&pool, &redis).await;
 
     // Real System Error Service wiring for every test, not just a dedicated
     // few — matches production (`main.rs` calls this once at startup) and
@@ -673,6 +702,7 @@ async fn test_app_and_state_with_config(
         .create_pool(Some(deadpool_redis::Runtime::Tokio1))
         .expect("redis pool (is `docker compose up -d` running?)");
     reset_owned_redis(&redis).await;
+    mark_fixture_admin_step_up(&pool, &redis).await;
     hellodoctor_backend::system_error::init(roles.system.clone());
     let mut state = AppState::new(
         roles.api,
@@ -1809,6 +1839,21 @@ async fn token_for_real_role(pool: &PgPool, role: &str) -> String {
         .bind(id).bind(format!("+2547{:08}", rand::thread_rng().gen_range(0..100_000_000)))
         .bind(role).execute(pool).await.unwrap();
     fixture_session(pool, id).await;
+    if role == "ADMIN" {
+        // Like the seeded Admin: counts as having re-entered the password.
+        let redis = deadpool_redis::Config::from_url(&test_config().redis_url)
+            .create_pool(Some(deadpool_redis::Runtime::Tokio1))
+            .expect("test redis");
+        let mut conn = redis.get().await.expect("test redis");
+        deadpool_redis::redis::cmd("SET")
+            .arg(format!("admin-step-up:{id}:{id}"))
+            .arg(1)
+            .arg("EX")
+            .arg(3600)
+            .query_async::<()>(&mut conn)
+            .await
+            .unwrap();
+    }
     make_token(id, role)
 }
 

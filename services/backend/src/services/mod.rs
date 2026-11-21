@@ -1,5 +1,6 @@
 pub mod admin_bootstrap_service;
 pub mod admin_invitation_service;
+pub mod admin_step_up;
 pub mod agora_token_service;
 pub mod appointment_service;
 pub mod article_media_service;
@@ -25,6 +26,7 @@ pub mod payment_provider_verification;
 pub mod peer_call_service;
 pub mod prescription_service;
 pub mod profile_picture_service;
+pub mod security_retention;
 pub mod upload_security_service;
 
 pub use agora_token_service::AgoraTokenService;

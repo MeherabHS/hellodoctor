@@ -765,6 +765,8 @@ fn protected_routes() -> Router<AppState> {
         .route("/admin/audit/views", axum::routing::post(activity_handlers::record_view))
         // Admin Team: invite other Admins by email.
         .route("/admin/team", get(admin_team_handlers::team))
+        // Step-up re-authentication for sensitive Admin actions.
+        .route("/admin/step-up", axum::routing::post(crate::services::admin_step_up::step_up))
         .route("/admin/team/invitations", axum::routing::post(admin_team_handlers::invite))
         .route("/admin/team/invitations/:id/resend", axum::routing::post(admin_team_handlers::resend))
         .route("/admin/team/invitations/:id/revoke", axum::routing::post(admin_team_handlers::revoke))

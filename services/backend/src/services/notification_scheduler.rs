@@ -100,6 +100,10 @@ pub fn start(state: AppState) {
             if let Err(error) = run_intake_removal_cleanup(&state).await {
                 tracing::error!(error = ?error, "removed intake-upload cleanup failed");
             }
+            // Approved security-data retention (expired codes, ended sessions).
+            if let Err(error) = crate::services::security_retention::run_if_due(&state).await {
+                tracing::error!(error = ?error, "security retention purge failed");
+            }
             if let Err(error) = run_consultation_presence_sweep(&state).await {
                 tracing::error!(error = ?error, "consultation presence grace sweep failed");
             }
