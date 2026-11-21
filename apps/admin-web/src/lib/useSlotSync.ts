@@ -1,3 +1,4 @@
+import { tr } from './i18n/core.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AdminSlot, getAdminSlots } from './api';
 import { startScheduleSync } from './polling';
@@ -29,7 +30,7 @@ export function useSlotSync(onUpdate: (rows: AdminSlot[]) => void, enabled=true)
     } catch {
       if (job === epoch.current) {
         hasError.current = true;
-        setSync(previous => ({ ...previous, loading: false, error: 'Schedule refresh failed. Displayed slots may be out of date.' }));
+        setSync(previous => ({ ...previous, loading: false, error: tr('lib.scheduleRefreshFailed') }));
       }
     }
   }, []);

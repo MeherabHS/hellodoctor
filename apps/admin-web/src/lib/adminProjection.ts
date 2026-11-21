@@ -1,3 +1,4 @@
+import { tr } from './i18n/core.ts';
 import type { DoctorHistoryItem, PatientRecordItem, GrievanceItem } from '@/data/adminStore';
 
 // Dependency-free leaf module (see finance-projection.ts's own precedent):
@@ -26,8 +27,8 @@ export function backendDocToStoreItem(doc: any, idx: number): DoctorHistoryItem 
     professionalVerificationStatus: doc.professional_verification_status,
     registrationNumber: doc.license_number,
     phone: doc.verified_phone,
-    residence: doc.residential_address || 'Not provided',
-    email: doc.email || 'Not provided',
+    residence: doc.residential_address || tr('lib.notProvided'),
+    email: doc.email || tr('lib.notProvided'),
     avatar: initials,
     bgColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
     meta: `${doc.primary_specialty} • ${doc.current_hospital} • KMPDC registration`,
@@ -63,13 +64,13 @@ export function backendDocToStoreItem(doc: any, idx: number): DoctorHistoryItem 
       fee: enc.payment_policy === 'NOT_REQUIRED'
         ? 'Deferred'
         : `KES  ${enc.consultation_fee || enc.fee || 0}`,
-      diagnosis: enc.clinical_outcome || 'Consultation',
-      rx: enc.clinical_outcome === 'COMPLETED_WITH_RX' ? 'Rx Synced' : 'No Rx',
+      diagnosis: enc.clinical_outcome || tr('lib.consultation'),
+      rx: enc.clinical_outcome === 'COMPLETED_WITH_RX' ? tr('lib.rxSynced') : tr('lib.noRx'),
     })),
     disbursements: (doc.disbursements || []).map((d: any) => ({
       date: d.created_at ? new Date(d.created_at).toLocaleDateString() : 'Recent',
       amount: `KES  ${Number(d.net_amount || 0).toLocaleString()}`,
-      method: `${d.provider_code || 'Provider not connected'} ${d.masked_destination_snapshot || ''}`,
+      method: `${d.provider_code || tr('lib.providerNotConnected')} ${d.masked_destination_snapshot || ''}`,
       txId: d.id ? d.id.slice(0, 10) : 'N/A',
       commission: `KES  ${Number(d.platform_fee || 0).toLocaleString()} (20%)`,
       status: d.status || 'Pending',
@@ -103,8 +104,8 @@ export function backendPatientToStoreItem(pt: any, idx: number): PatientRecordIt
     avatar: initials,
     bgColor: AVATAR_COLORS[(idx + 2) % AVATAR_COLORS.length],
     meta: `${pt.date_of_birth || '30'} • ${pt.gender || 'F'} • ${pt.emergency_contact_phone || 'Kenya'}`,
-    cohort: pt.blood_group ? `Blood ${pt.blood_group}` : 'General Patient',
-    labs: `${(pt.vault_records || []).length} Documents in Vault`,
+    cohort: pt.blood_group ? `Blood ${pt.blood_group}` : tr('lib.generalPatient'),
+    labs: tr('lib.documentsInVault', { count: (pt.vault_records || []).length }),
     vaultRecords: (pt.vault_records || []).map((v: any) => ({
       id: v.id,
       appointmentId: v.appointment_id,
@@ -134,12 +135,12 @@ export function backendPatientToStoreItem(pt: any, idx: number): PatientRecordIt
     })),
     encounters: encounters.map((enc: any) => ({
       date: enc.created_at ? new Date(enc.created_at).toLocaleDateString() : 'Recent',
-      doctor: enc.doctor_name || 'Attending Physician',
+      doctor: enc.doctor_name || tr('lib.attendingPhysician'),
       spec: 'Telemedicine',
       mode: enc.modality === 'VIDEO' ? '📹 Video Visit' : '💬 24h Chat',
       badgeCls: enc.modality === 'VIDEO' ? 'badge-green' : 'badge-blue',
-      diag: enc.clinical_outcome || enc.status || 'General Consult',
-      rx: enc.clinical_outcome === 'COMPLETED_WITH_RX' ? 'Rx Synced' : 'No Rx',
+      diag: enc.clinical_outcome || enc.status || tr('lib.generalConsult'),
+      rx: enc.clinical_outcome === 'COMPLETED_WITH_RX' ? tr('lib.rxSynced') : tr('lib.noRx'),
     })),
   };
 }
@@ -149,50 +150,50 @@ export function backendGrievanceToStoreItem(g: any): GrievanceItem {
     id: g.grievance_number || g.id,
     backendId: g.id,
     timestamp: g.created_at || '',
-    timeFormatted: g.created_at ? new Date(g.created_at).toLocaleTimeString() : 'Not supplied',
-    relativeTime: g.created_at ? new Date(g.created_at).toLocaleDateString() : 'Not supplied',
+    timeFormatted: g.created_at ? new Date(g.created_at).toLocaleTimeString() : tr('lib.notSupplied'),
+    relativeTime: g.created_at ? new Date(g.created_at).toLocaleDateString() : tr('lib.notSupplied'),
     patient: {
       id: g.patient_id,
-      name: g.patient_name || 'Not supplied',
-      phone: 'Not provided',
-      ageGender: 'Demographics not supplied',
+      name: g.patient_name || tr('lib.notSupplied'),
+      phone: tr('lib.notProvided'),
+      ageGender: tr('lib.demographicsNotSupplied'),
     },
     doctor: {
-      id: g.doctor_id || 'Not supplied',
-      name: g.doctor_name || 'Not supplied',
-      registrationNumber: g.doctor_license || 'Not provided',
-      specialty: g.doctor_specialty || 'Not supplied',
-      hospital: g.doctor_hospital || 'Not supplied',
+      id: g.doctor_id || tr('lib.notSupplied'),
+      name: g.doctor_name || tr('lib.notSupplied'),
+      registrationNumber: g.doctor_license || tr('lib.notProvided'),
+      specialty: g.doctor_specialty || tr('lib.notSupplied'),
+      hospital: g.doctor_hospital || tr('lib.notSupplied'),
       // See the identical note in backendDocToStoreItem — a deferred
       // appointment's nominal consultation_fee was never actually charged.
       fee: g.appointment_payment_policy === 'NOT_REQUIRED'
         ? 'Deferred'
-        : g.consultation_fee == null ? 'Not supplied' : `KES ${g.consultation_fee}`,
+        : g.consultation_fee == null ? tr('lib.notSupplied') : `KES ${g.consultation_fee}`,
     },
     consultationId: g.consultation_id,
-    consultationType: g.modality === 'CHAT' ? 'Chat consultation' : g.modality === 'VIDEO' ? 'Video consultation' : 'Consultation',
+    consultationType: g.modality === 'CHAT' ? tr('lib.chatConsultation') : g.modality === 'VIDEO' ? tr('lib.videoConsultation') : tr('lib.consultation'),
     target: g.target_type || 'DOCTOR',
-    category: g.category || 'Not supplied',
+    category: g.category || tr('lib.notSupplied'),
     severity: ['CRITICAL', 'HIGH', 'MEDIUM'].includes(g.severity) ? g.severity : 'UNASSESSED',
     claimSummary: g.claim_summary,
     patientStatement: g.claim_summary,
     boardRemedy:
       g.status === 'REFUND_APPROVED'
-        ? 'Refund approved — provider execution pending'
+        ? tr('lib.refundApprovedPending')
         : g.status === 'REFUNDED'
-        ? 'Refund confirmed'
+        ? tr('lib.refundConfirmed')
         : g.status === 'WARNED'
-        ? 'Internal Platform Compliance Warning Logged'
+        ? tr('lib.warningLogged')
         : g.status === 'DISMISSED'
-        ? 'Claim Reviewed and Dismissed'
+        ? tr('lib.claimDismissed')
         : g.status === 'UNDER_INVESTIGATION'
-        ? 'Under Active Investigation'
-        : 'Under Governance Review',
+        ? tr('lib.underInvestigation')
+        : tr('lib.underGovernanceReview'),
     telemetryEvidence: {
-      callDuration: 'Media not implemented',
-      connectionStatus: 'No provider evidence',
-      rxIssued: 'See prescription records in investigation timeline',
-      paymentStatus: g.payment_status || 'See investigation timeline',
+      callDuration: tr('lib.mediaNotImplemented'),
+      connectionStatus: tr('lib.noProviderEvidence'),
+      rxIssued: tr('lib.seeRxRecords'),
+      paymentStatus: g.payment_status || tr('lib.seeTimeline'),
       webrtcDiagnostics: {
         iceConnectionState: g.telemetry?.connection_state || 'Unmeasured',
         audioQuality: 'Unmeasured',

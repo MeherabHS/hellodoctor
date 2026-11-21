@@ -1,4 +1,5 @@
 'use client';
+import { tr, type MessageKey } from '@/lib/i18n';
 import {useEffect,useRef,useState,type ComponentType} from 'react';
 import {Archive,CalendarClock,CheckCircle2,FileEdit,Pencil,Plus,type LucideIcon} from 'lucide-react';
 import type {AdminArticle,ArticleCategory,ArticleStatus} from '../../lib/blogContent';
@@ -13,8 +14,8 @@ import './blogs.css';
 const PAGE=20;
 type StatusTab=''|ArticleStatus;
 const TABS:{id:StatusTab;label:string}[]=[
-  {id:'',label:'All'},{id:'DRAFT',label:'Draft'},
-  {id:'SCHEDULED',label:'Scheduled'},{id:'PUBLISHED',label:'Published'},{id:'ARCHIVED',label:'Archived'},
+  {id:'',get label(){return tr('ui.all')}},{id:'DRAFT',get label(){return tr('ui.draft')}},
+  {id:'SCHEDULED',get label(){return tr('ui.scheduled')}},{id:'PUBLISHED',get label(){return tr('ui.published')}},{id:'ARCHIVED',get label(){return tr('ui.archived')}},
 ];
 
 export type EditorProps={initial:AdminArticle|null;categories:ArticleCategory[];onSaved:()=>void;onClose:(message?:string)=>void};
@@ -59,41 +60,41 @@ export function ContentManager({kind,title,subtitle,noun,icon,Editor,showTopic}:
   const Icon=icon;const plural=noun==="quiz"?"quizzes":`${noun}s`;
   return <div className="afya-stack">
     <PageHead title={title} subtitle={subtitle}
-      actions={<button type="button" className="afya-btn-primary" onClick={()=>requestNavigation(()=>{setNotice('');setEditor(null);})}><Plus size={16} aria-hidden/>New {noun}</button>}/>
+      actions={<button type="button" className="afya-btn-primary" onClick={()=>requestNavigation(()=>{setNotice('');setEditor(null);})}><Plus size={16} aria-hidden/>{tr(`tpl.${kind}.new` as MessageKey)}</button>}/>
     {notice&&<p role="status" className="afya-notice info" style={{margin:0}}>{notice}</p>}
     <div className="afya-stat-grid">
-      <StatTile icon={Icon} tone="green" value={counts['']??'—'} label={`All ${plural}`}/>
-      <StatTile icon={CheckCircle2} tone="green" value={counts.PUBLISHED??'—'} label="Published"/>
-      <StatTile icon={FileEdit} tone="amber" value={counts.DRAFT??'—'} label="Drafts"/>
-      <StatTile icon={CalendarClock} tone="blue" value={counts.SCHEDULED??'—'} label="Scheduled"/>
-      <StatTile icon={Archive} tone="neutral" value={counts.ARCHIVED??'—'} label="Archived"/>
+      <StatTile icon={Icon} tone="green" value={counts['']??'—'} label={tr(`tpl.${kind}.all` as MessageKey)}/>
+      <StatTile icon={CheckCircle2} tone="green" value={counts.PUBLISHED??'—'} label={tr('ui.published')}/>
+      <StatTile icon={FileEdit} tone="amber" value={counts.DRAFT??'—'} label={tr('ui.drafts')}/>
+      <StatTile icon={CalendarClock} tone="blue" value={counts.SCHEDULED??'—'} label={tr('ui.scheduled')}/>
+      <StatTile icon={Archive} tone="neutral" value={counts.ARCHIVED??'—'} label={tr('ui.archived')}/>
     </div>
     <section className="admin-card">
       <Tabs label={`${title} status`} value={status} onChange={v=>{setStatus(v);setOffset(0);}} items={TABS.map(t=>({...t,count:counts[t.id]}))}/>
       <div className="afya-filter-bar">
-        <SearchField label={`Search ${plural}`} placeholder={`Search ${plural} by title…`} value={search} onChange={v=>{setSearch(v);setOffset(0);}}/>
-        {showTopic&&<select className="afya-select" aria-label="Topic" value={category} onChange={e=>{setCategory(e.target.value);setOffset(0);}}>
-          <option value="">All topics</option>
+        <SearchField label={tr(`tpl.${kind}.search` as MessageKey)} placeholder={tr(`tpl.${kind}.searchByTitle` as MessageKey)} value={search} onChange={v=>{setSearch(v);setOffset(0);}}/>
+        {showTopic&&<select className="afya-select" aria-label={tr('ui.topic2')} value={category} onChange={e=>{setCategory(e.target.value);setOffset(0);}}>
+          <option value="">{tr('ui.allTopics')}</option>
           {topicCategories.map(c=><option key={c.id} value={c.id}>{c.topic_key?topicLabel(c.topic_key):c.name_en}</option>)}
         </select>}
       </div>
-      {error&&<div className="afya-login-error" role="alert" style={{marginBottom:12}}>{error} <button type="button" className="afya-btn-secondary" onClick={()=>setRevision(v=>v+1)}>Retry</button></div>}
+      {error&&<div className="afya-login-error" role="alert" style={{marginBottom:12}}>{error} <button type="button" className="afya-btn-secondary" onClick={()=>setRevision(v=>v+1)}>{tr('ui.retry')}</button></div>}
       <div className="afya-table-wrap">
         <table className="admin-table">
-          <thead><tr><th>{noun[0].toUpperCase()+noun.slice(1)}</th>{showTopic&&<th>Topic</th>}<th>Status</th><th>Updated</th><th style={{textAlign:'right'}}>Actions</th></tr></thead>
-          <tbody>{loading&&!rows.length?<tr><td colSpan={showTopic?5:4}><EmptyState title="Loading…"/></td></tr>:rows.map(a=>{
+          <thead><tr><th>{tr(`tpl.${kind}.column` as MessageKey)}</th>{showTopic&&<th>{tr('ui.topic2')}</th>}<th>{tr('ui.status')}</th><th>{tr('ui.updated')}</th><th style={{textAlign:'right'}}>{tr('ui.actions')}</th></tr></thead>
+          <tbody>{loading&&!rows.length?<tr><td colSpan={showTopic?5:4}><EmptyState title={tr('ui.loading')}/></td></tr>:rows.map(a=>{
             const c=categoryOf(a);const chip=STATUS_CHIP[a.status];
             return <tr key={a.id} className="admin-clickable-row" onClick={()=>requestNavigation(()=>open(a.id))}>
               <td><div style={{display:'flex',alignItems:'center',gap:12}}><CoverThumb article={a} icon={Icon}/><div style={{minWidth:0}}>
                 <div style={{fontWeight:700,color:'var(--afya-ink)'}}>{a.title_en}</div>
-                <div className="afya-stat-note" style={{maxWidth:420,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{kind==='article'?(a.title_sw?'English · Kiswahili':'English'):a.body_en}</div></div></div></td>
+                <div className="afya-stat-note" style={{maxWidth:420,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{kind==='article'?(a.title_sw?tr('ui2.englishKiswahili'):tr('ui2.english')):a.body_en}</div></div></div></td>
               {showTopic&&<td>{c?<Chip tone="topic">{c.topic_key?topicLabel(c.topic_key):c.name_en}</Chip>:'—'}</td>}
               <td><Chip tone={chip.tone}>{chip.label}</Chip></td>
               <td style={{whiteSpace:'nowrap'}}>{eatDate(a.updated_at)}</td>
-              <td style={{textAlign:'right'}}><button type="button" className="afya-icon-btn" aria-label={`Edit ${a.title_en}`} onClick={e=>{e.stopPropagation();requestNavigation(()=>open(a.id));}}><Pencil size={16}/></button></td>
+              <td style={{textAlign:'right'}}><button type="button" className="afya-icon-btn" aria-label={tr('tpl.editNamed', { name: a.title_en })} onClick={e=>{e.stopPropagation();requestNavigation(()=>open(a.id));}}><Pencil size={16}/></button></td>
             </tr>;})}</tbody>
         </table>
-        {!loading&&!rows.length&&<EmptyState title={`No ${plural} here yet`}>Press New {noun} to add one.</EmptyState>}
+        {!loading&&!rows.length&&<EmptyState title={tr(`tpl.${kind}.none` as MessageKey)}>{tr(`tpl.${kind}.pressNew` as MessageKey)}</EmptyState>}
       </div>
       <Pagination offset={offset} pageSize={PAGE} total={total} busy={loading} onChange={setOffset}/>
     </section>

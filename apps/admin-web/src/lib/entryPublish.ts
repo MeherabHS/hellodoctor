@@ -1,3 +1,4 @@
+import { tr } from './i18n/core.ts';
 import type {AdminArticle,ArticleContent} from './blogContent';
 import {saveArticle,transitionArticle,uploadCover} from './blogApi';
 import {stepsBeforePublish} from './publishFlow';
@@ -16,7 +17,7 @@ export async function persistEntry(id:string,article:AdminArticle|null,content:A
 }
 
 export class CoverError extends Error{
-  constructor(readonly saved:AdminArticle,readonly cause:unknown){super('Cover upload failed.');}
+  constructor(readonly saved:AdminArticle,readonly cause:unknown){super(tr('lib.coverUploadFailed'));}
 }
 
 /** Publishes now, running the backend's remaining internal review steps

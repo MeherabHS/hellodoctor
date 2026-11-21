@@ -1,4 +1,6 @@
 'use client';
+import { tr } from '@/lib/i18n';
+import { apiErrorMessage } from '@/lib/i18n/apiErrors';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Campaign,
@@ -34,14 +36,14 @@ import { isUnpublished, stepsBeforePublish } from '@/lib/publishFlow';
 const NAIROBI_OFFSET = '+03:00';
 
 const STATUS_LABEL: Record<CampaignStatus, string> = {
-  DRAFT: 'Draft',
-  PENDING_REVIEW: 'Draft',
-  APPROVED: 'Draft',
-  SCHEDULED: 'Scheduled',
-  SENDING: 'Sending',
-  PAUSED: 'Paused',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
+  get DRAFT(){return tr('ui2.draft')},
+  get PENDING_REVIEW(){return tr('ui2.draft')},
+  get APPROVED(){return tr('ui2.draft')},
+  get SCHEDULED(){return tr('ui2.scheduled')},
+  get SENDING(){return tr('ui2.sending2')},
+  get PAUSED(){return tr('ui2.paused')},
+  get COMPLETED(){return tr('ui2.completed')},
+  get CANCELLED(){return tr('ui2.cancelled')},
 };
 const STATUS_TONE: Record<CampaignStatus, ChipTone> = {
   DRAFT: 'warn',
@@ -53,14 +55,14 @@ const STATUS_TONE: Record<CampaignStatus, ChipTone> = {
   COMPLETED: 'success',
   CANCELLED: 'danger',
 };
-const AUDIENCE_LABEL: Record<CampaignAudience, string> = { PATIENTS: 'Patients', DOCTORS: 'Doctors', BOTH: 'Patients and doctors' };
+const AUDIENCE_LABEL: Record<CampaignAudience, string> = { get PATIENTS(){return tr('ui2.patients')}, get DOCTORS(){return tr('ui2.doctors')}, get BOTH(){return tr('ui2.patientsAndDoctors')} };
 
 function emptyContent(): CampaignContent {
   return { title_en: '', title_sw: '', body_en: '', body_sw: '', audience: 'PATIENTS' };
 }
 
 function errorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : 'Something went wrong. Please retry.';
+  return apiErrorMessage(e, tr('ui.somethingWentWrongPleaseRetry'));
 }
 
 
@@ -301,7 +303,7 @@ export function CampaignManager() {
         ? new Date(`${scheduleLocal}:00${NAIROBI_OFFSET}`).toISOString()
         : null;
     if (!scheduledForUtc) {
-      setActionError('Choose a date and time, or use Send Immediately.');
+      setActionError(tr('ui2.chooseADateAndTimeOr'));
       return;
     }
     setBusy(true);
@@ -320,7 +322,7 @@ export function CampaignManager() {
 
   async function doCancel() {
     if (!selected) return;
-    if (!window.confirm('Cancel this campaign? Any not-yet-sent notifications will be removed. This cannot be undone.')) {
+    if (!window.confirm(tr('ui.cancelThisCampaignAnyNotYet'))) {
       return;
     }
     await runTransition(cancelCampaign);
@@ -344,40 +346,40 @@ export function CampaignManager() {
   if (!selectedId) {
     return (
       <div className="afya-stack">
-        <PageHead title="Campaigns" subtitle="Create and manage push notification campaigns for patients and doctors."
-          actions={<button type="button" className="afya-btn-primary" onClick={startNewCampaign}><Plus size={16} aria-hidden />New Campaign</button>} />
+        <PageHead title={tr('ui.campaigns')} subtitle={tr('ui4.createAndManagePushNotificationCampaigns')}
+          actions={<button type="button" className="afya-btn-primary" onClick={startNewCampaign}><Plus size={16} aria-hidden />{tr('ui.newCampaign')}</button>} />
         <section className="admin-card">
           <div className="afya-filter-bar">
-            <SearchField label="Search campaigns" placeholder="Search campaigns by title or message…" value={search} onChange={setSearch} />
-            <select className="afya-select" aria-label="Audience" value={audienceFilter} onChange={(e) => setAudienceFilter(e.target.value as CampaignAudience | 'ALL')}>
-              <option value="ALL">All audiences</option><option value="PATIENTS">Patients</option><option value="DOCTORS">Doctors</option><option value="BOTH">Patients and doctors</option>
+            <SearchField label={tr('ui.searchCampaigns')} placeholder={tr('ui.searchCampaignsByTitleOrMessage')} value={search} onChange={setSearch} />
+            <select className="afya-select" aria-label={tr('ui.audience')} value={audienceFilter} onChange={(e) => setAudienceFilter(e.target.value as CampaignAudience | 'ALL')}>
+              <option value="ALL">{tr('ui.allAudiences')}</option><option value="PATIENTS">{tr('ui.patients')}</option><option value="DOCTORS">{tr('ui.doctors')}</option><option value="BOTH">{tr('ui.patientsAndDoctors')}</option>
             </select>
-            <select className="afya-select" aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as CampaignStatus | 'ALL')}>
-              <option value="ALL">All statuses</option>
+            <select className="afya-select" aria-label={tr('ui.status')} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as CampaignStatus | 'ALL')}>
+              <option value="ALL">{tr('ui.allStatuses')}</option>
               {(Object.keys(STATUS_LABEL) as CampaignStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
             </select>
           </div>
-          {listError && <div className="afya-login-error" role="alert" style={{ marginBottom: 12 }}>{listError} <button type="button" className="afya-btn-secondary" onClick={() => void loadList()}>Retry</button></div>}
+          {listError && <div className="afya-login-error" role="alert" style={{ marginBottom: 12 }}>{listError} <button type="button" className="afya-btn-secondary" onClick={() => void loadList()}>{tr('ui.retry')}</button></div>}
           <div className="afya-table-wrap">
             <table className="admin-table">
-              <thead><tr><th>Campaign title</th><th>Channel</th><th>Audience</th><th>Schedule</th><th>Status</th><th>Updated</th><th style={{ textAlign: 'right' }}>Actions</th></tr></thead>
+              <thead><tr><th>{tr('ui.campaignTitle')}</th><th>{tr('ui.channel')}</th><th>{tr('ui.audience')}</th><th>{tr('ui.schedule')}</th><th>{tr('ui.status')}</th><th>{tr('ui.updated')}</th><th style={{ textAlign: 'right' }}>{tr('ui.actions')}</th></tr></thead>
               <tbody>
                 {visibleCampaigns.map((c) => (
                   <tr key={c.id} className="admin-clickable-row" onClick={() => void openCampaign(c.id)}>
                     <td><div style={{ display: 'flex', alignItems: 'center', gap: 12 }}><span className="afya-stat-icon afya-tone-green" style={{ width: 40, height: 40, borderRadius: 10 }} aria-hidden><Megaphone size={18} /></span>
                       <div><div style={{ fontWeight: 700 }}>{c.title_en}</div><div className="afya-stat-note" style={{ maxWidth: 360, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.body_en}</div></div></div></td>
-                    <td><Chip tone="info">Push</Chip></td>
+                    <td><Chip tone="info">{tr('ui.push')}</Chip></td>
                     <td>{AUDIENCE_LABEL[c.audience]}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>{c.scheduled_for ? new Date(c.scheduled_for).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi', dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
                     <td><Chip tone={STATUS_TONE[c.status]}>{STATUS_LABEL[c.status]}</Chip></td>
                     <td style={{ whiteSpace: 'nowrap' }}>{eatDate(c.updated_at)}</td>
-                    <td style={{ textAlign: 'right' }}><button type="button" className="afya-icon-btn" aria-label={`Open ${c.title_en}`} onClick={(e) => { e.stopPropagation(); void openCampaign(c.id); }}><Pencil size={16} /></button></td>
+                    <td style={{ textAlign: 'right' }}><button type="button" className="afya-icon-btn" aria-label={tr('tpl.openNamed', { name: c.title_en })} onClick={(e) => { e.stopPropagation(); void openCampaign(c.id); }}><Pencil size={16} /></button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {listLoading && !campaigns.length && <EmptyState title="Loading campaigns…" />}
-            {!listLoading && !listError && !visibleCampaigns.length && <EmptyState title={campaigns.length ? 'No campaigns match these filters' : 'No campaigns yet'}>{campaigns.length ? 'Try another search, audience or status.' : 'Create one to send a push notification to patients or doctors.'}</EmptyState>}
+            {listLoading && !campaigns.length && <EmptyState title={tr('ui.loadingCampaigns')} />}
+            {!listLoading && !listError && !visibleCampaigns.length && <EmptyState title={campaigns.length ? tr('ui2.noCampaignsMatchTheseFilters') : tr('ui2.noCampaignsYet')}>{campaigns.length ? tr('ui2.tryAnotherSearchAudienceOrStatus') : tr('ui2.createOneToSendAPush')}</EmptyState>}
           </div>
         </section>
       </div>
@@ -388,18 +390,18 @@ export function CampaignManager() {
     <div className="afya-stack">
       <div className="afya-page-head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button type="button" className="afya-icon-btn" aria-label="Back to campaigns" onClick={closeEditor}><ArrowLeft size={20} /></button>
+          <button type="button" className="afya-icon-btn" aria-label={tr('ui.backToCampaigns')} onClick={closeEditor}><ArrowLeft size={20} /></button>
           <div>
-            <h2>{selectedId === 'new' ? 'Create Campaign' : 'Edit Campaign'}</h2>
+            <h2>{selectedId === 'new' ? tr('ui2.createCampaign') : tr('ui2.editCampaign')}</h2>
             <p style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              {selected ? <Chip tone={STATUS_TONE[selected.status]}>{STATUS_LABEL[selected.status]}</Chip> : <Chip tone="neutral">Not saved yet</Chip>}
-              {selected && `Created ${eatDate(selected.created_at)}`}
-              {selected?.scheduled_for && ` · Scheduled for ${new Date(selected.scheduled_for).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' })} EAT`}
+              {selected ? <Chip tone={STATUS_TONE[selected.status]}>{STATUS_LABEL[selected.status]}</Chip> : <Chip tone="neutral">{tr('ui.notSavedYet')}</Chip>}
+              {selected && tr('tpl.createdOn', { date: eatDate(selected.created_at) })}
+              {selected?.scheduled_for && tr('tpl.scheduledFor', { date: new Date(selected.scheduled_for).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' }) })}
             </p>
           </div>
         </div>
       </div>
-      {detailLoading && <p role="status" className="afya-stat-note">Loading campaign…</p>}
+      {detailLoading && <p role="status" className="afya-stat-note">{tr('ui.loadingCampaign')}</p>}
       {detailError && <div className="afya-login-error" role="alert">{detailError}</div>}
       {actionError && <div className="afya-login-error" role="alert">{actionError}</div>}
       {!detailLoading && (
@@ -407,23 +409,23 @@ export function CampaignManager() {
           <div className="afya-stack">
             <section className="admin-card">
               <fieldset disabled={!canEditContent || busy} className="afya-form" style={{ border: 0, padding: 0, margin: 0 }}>
-                <div className="afya-lang-switch" role="group" aria-label="Campaign language">
-                  <button type="button" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>English (EN)</button>
-                  <button type="button" aria-pressed={lang === 'sw'} onClick={() => setLang('sw')}>Kiswahili (SW)</button>
+                <div className="afya-lang-switch" role="group" aria-label={tr('ui.campaignLanguage')}>
+                  <button type="button" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>{tr('ui.englishEn')}</button>
+                  <button type="button" aria-pressed={lang === 'sw'} onClick={() => setLang('sw')}>{tr('ui.kiswahiliSw')}</button>
                 </div>
-                <label htmlFor="cmp-title">Campaign title ({lang === 'en' ? 'English' : 'Kiswahili'}) *</label>
+                <label htmlFor="cmp-title">{tr('mix.campaignTitleLang', { lang: lang === 'en' ? tr('ui2.english') : tr('ui2.kiswahili') })}</label>
                 <input id="cmp-title" value={content[titleKey]} maxLength={CAMPAIGN_TITLE_MAX} onChange={(e) => updateField(titleKey, e.target.value)} />
                 <span className="afya-stat-note" style={{ textAlign: 'right' }}>{content[titleKey].length} / {CAMPAIGN_TITLE_MAX}</span>
-                <label htmlFor="cmp-body">Message ({lang === 'en' ? 'English' : 'Kiswahili'}) *</label>
+                <label htmlFor="cmp-body">{tr('mix.messageLang', { lang: lang === 'en' ? tr('ui2.english') : tr('ui2.kiswahili') })}</label>
                 <textarea id="cmp-body" rows={4} value={content[bodyKey]} maxLength={CAMPAIGN_BODY_MAX} onChange={(e) => updateField(bodyKey, e.target.value)} />
                 <span className="afya-stat-note" style={{ textAlign: 'right' }}>{content[bodyKey].length} / {CAMPAIGN_BODY_MAX}</span>
-                <label htmlFor="cmp-audience">Audience *</label>
+                <label htmlFor="cmp-audience">{tr('ui.audience2')}</label>
                 <select id="cmp-audience" value={content.audience} onChange={(e) => updateField('audience', e.target.value as CampaignAudience)}>
-                  <option value="PATIENTS">Patients</option><option value="DOCTORS">Doctors</option><option value="BOTH">Patients and doctors</option>
+                  <option value="PATIENTS">{tr('ui.patients')}</option><option value="DOCTORS">{tr('ui.doctors')}</option><option value="BOTH">{tr('ui.patientsAndDoctors')}</option>
                 </select>
-                <span className="afya-stat-note">{audiencePreviewLoading ? 'Counting eligible recipients…' : audiencePreview !== null ? `${audiencePreview} eligible recipient${audiencePreview === 1 ? '' : 's'} (no personal data shown)` : ''}</span>
-                <span className="afya-field-label">Delivery channel</span>
-                <span className="afya-check"><input type="checkbox" checked readOnly disabled />In-app push notification</span>
+                <span className="afya-stat-note">{audiencePreviewLoading ? tr('tpl.countingRecipients') : audiencePreview !== null ? tr(audiencePreview === 1 ? 'tpl.recipientsOne' : 'tpl.recipientsMany', { count: audiencePreview }) : ''}</span>
+                <span className="afya-field-label">{tr('ui.deliveryChannel')}</span>
+                <span className="afya-check"><input type="checkbox" checked readOnly disabled />{tr('ui.inAppPushNotification')}</span>
               </fieldset>
               {touched && validationErrors.length > 0 && (
                 <ul role="alert" className="afya-stat-note" style={{ color: 'var(--afya-danger-fg)', margin: '12px 0 0', paddingLeft: 18 }}>
@@ -433,33 +435,33 @@ export function CampaignManager() {
             </section>
 
             {selected && (isUnpublished(selected.status) || selected.status === 'SCHEDULED') && (
-              <Card title="Schedule" subtitle="Africa/Nairobi time (UTC+3).">
+              <Card title={tr('ui.schedule')} subtitle={tr('ui4.africaNairobiTimeUtc3')}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input className="afya-input" style={{ width: 230 }} type="datetime-local" aria-label="Send at" value={scheduleLocal} onChange={(e) => setScheduleLocal(e.target.value)} />
-                  <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void doSchedule(false)}>{selected.status === 'SCHEDULED' ? 'Reschedule' : 'Schedule for later'}</button>
-                  {selected.status === 'SCHEDULED' && <button type="button" className="afya-btn-primary" disabled={busy} onClick={() => void doSchedule(true)}><Send size={15} aria-hidden />Send now</button>}
+                  <input className="afya-input" style={{ width: 230 }} type="datetime-local" aria-label={tr('ui.sendAt')} value={scheduleLocal} onChange={(e) => setScheduleLocal(e.target.value)} />
+                  <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void doSchedule(false)}>{selected.status === 'SCHEDULED' ? tr('ui2.reschedule') : tr('ui2.scheduleForLater')}</button>
+                  {selected.status === 'SCHEDULED' && <button type="button" className="afya-btn-primary" disabled={busy} onClick={() => void doSchedule(true)}><Send size={15} aria-hidden />{tr('ui.sendNow')}</button>}
                 </div>
               </Card>
             )}
 
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              {canEditContent && <button type="button" className="afya-btn-outline-green" disabled={busy} onClick={() => void saveDraft()}>{selectedId === 'new' ? 'Save Draft' : 'Save changes'}</button>}
-              {selected && isUnpublished(selected.status) && <button type="button" className="afya-btn-primary" disabled={busy} onClick={() => void publishCampaignNow()}><Send size={15} aria-hidden />Publish now</button>}
-              {selected && selected.status === 'PAUSED' && <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void runTransition(resumeCampaign)}>Resume</button>}
-              {selected && ['SCHEDULED', 'SENDING'].includes(selected.status) && <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void runTransition(pauseCampaign)}>Pause</button>}
-              {selected && !['COMPLETED', 'CANCELLED'].includes(selected.status) && <button type="button" className="afya-btn-danger" disabled={busy} onClick={() => void doCancel()}>Cancel campaign</button>}
+              {canEditContent && <button type="button" className="afya-btn-outline-green" disabled={busy} onClick={() => void saveDraft()}>{selectedId === 'new' ? tr('ui2.saveDraft') : tr('ui2.saveChanges')}</button>}
+              {selected && isUnpublished(selected.status) && <button type="button" className="afya-btn-primary" disabled={busy} onClick={() => void publishCampaignNow()}><Send size={15} aria-hidden />{tr('ui.publishNow')}</button>}
+              {selected && selected.status === 'PAUSED' && <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void runTransition(resumeCampaign)}>{tr('ui.resume')}</button>}
+              {selected && ['SCHEDULED', 'SENDING'].includes(selected.status) && <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => void runTransition(pauseCampaign)}>{tr('ui.pause')}</button>}
+              {selected && !['COMPLETED', 'CANCELLED'].includes(selected.status) && <button type="button" className="afya-btn-danger" disabled={busy} onClick={() => void doCancel()}>{tr('ui.cancelCampaign')}</button>}
             </div>
 
             {selected && (
-              <Card title="Audit history" actions={<button type="button" className="afya-btn-secondary" onClick={() => void loadAudit(selected.id)}>{auditOpen ? 'Refresh' : 'Show'}</button>}>
-                {!auditOpen ? <p className="afya-stat-note" style={{ margin: 0 }}>Every change to this campaign is recorded.</p> : (
+              <Card title={tr('ui.auditHistory')} actions={<button type="button" className="afya-btn-secondary" onClick={() => void loadAudit(selected.id)}>{auditOpen ? tr('ui2.refresh') : tr('ui2.show')}</button>}>
+                {!auditOpen ? <p className="afya-stat-note" style={{ margin: 0 }}>{tr('ui.everyChangeToThisCampaignIs')}</p> : (
                   <>
                     {auditError && <div className="afya-login-error" role="alert">{auditError}</div>}
-                    {!auditError && auditLogs === null && <p role="status" className="afya-stat-note">Loading audit history…</p>}
-                    {auditLogs !== null && filteredAuditLogs.length === 0 && <p className="afya-stat-note">No audit events recorded for this campaign.</p>}
+                    {!auditError && auditLogs === null && <p role="status" className="afya-stat-note">{tr('ui.loadingAuditHistory')}</p>}
+                    {auditLogs !== null && filteredAuditLogs.length === 0 && <p className="afya-stat-note">{tr('ui.noAuditEventsRecordedForThis')}</p>}
                     {filteredAuditLogs.length > 0 && (
                       <div className="afya-table-wrap"><table className="admin-table">
-                        <thead><tr><th>Action</th><th>Actor</th><th>Result</th><th>When</th></tr></thead>
+                        <thead><tr><th>{tr('ui.action')}</th><th>{tr('ui.actor')}</th><th>{tr('ui.result')}</th><th>{tr('ui.when')}</th></tr></thead>
                         <tbody>{filteredAuditLogs.map((l) => <tr key={l.id}><td>{l.action}</td><td>{l.actor_role}</td><td>{l.result}</td><td>{new Date(l.created_at).toLocaleString('en-KE', { timeZone: 'Africa/Nairobi' })}</td></tr>)}</tbody>
                       </table></div>
                     )}
@@ -471,22 +473,22 @@ export function CampaignManager() {
 
           <div className="afya-stack">
             {selected && selected.status !== 'DRAFT' && (
-              <Card title="Delivery monitoring" actions={<button type="button" className="afya-btn-secondary" disabled={statsLoading} onClick={() => void loadStats(selected.id)}>{statsLoading ? 'Refreshing…' : 'Refresh'}</button>}>
+              <Card title={tr('ui.deliveryMonitoring')} actions={<button type="button" className="afya-btn-secondary" disabled={statsLoading} onClick={() => void loadStats(selected.id)}>{statsLoading ? tr('ui2.refreshing') : tr('ui2.refresh')}</button>}>
                 {statsError && <div className="afya-login-error" role="alert">{statsError}</div>}
                 {stats && (
                   <div className="afya-mini-stats">
-                    <div><span>{stats.audience_count}</span>Eligible audience</div>
-                    <div><span>{stats.queued}</span>Queued</div>
-                    <div><span style={{ color: 'var(--afya-success-fg)' }}>{stats.sent_to_provider}</span>Sent to FCM</div>
-                    <div><span style={{ color: 'var(--afya-warn-fg)' }}>{stats.deferred_by_preference_or_quiet_hours}</span>Deferred (quiet hours)</div>
-                    <div><span style={{ color: 'var(--afya-warn-fg)' }}>{stats.retry_pending}</span>Retry pending</div>
-                    <div><span style={{ color: 'var(--afya-danger-fg)' }}>{stats.permanently_failed}</span>Failed</div>
+                    <div><span>{stats.audience_count}</span>{tr('ui.eligibleAudience')}</div>
+                    <div><span>{stats.queued}</span>{tr('ui.queued')}</div>
+                    <div><span style={{ color: 'var(--afya-success-fg)' }}>{stats.sent_to_provider}</span>{tr('ui.sentToFcm')}</div>
+                    <div><span style={{ color: 'var(--afya-warn-fg)' }}>{stats.deferred_by_preference_or_quiet_hours}</span>{tr('ui.deferredQuietHours')}</div>
+                    <div><span style={{ color: 'var(--afya-warn-fg)' }}>{stats.retry_pending}</span>{tr('ui.retryPending')}</div>
+                    <div><span style={{ color: 'var(--afya-danger-fg)' }}>{stats.permanently_failed}</span>{tr('ui.failed')}</div>
                   </div>
                 )}
-                <p className="afya-stat-note" style={{ margin: '10px 0 0' }}>&ldquo;Sent to FCM&rdquo; means Google accepted the message. It is not a device-delivery or read receipt.</p>
+                <p className="afya-stat-note" style={{ margin: '10px 0 0' }}>{tr('ui.sentToFcmMeansGoogleAccepted')}</p>
               </Card>
             )}
-            <Card title="Live notification preview">
+            <Card title={tr('ui.liveNotificationPreview')}>
               <CampaignNotificationPreview titleEn={content.title_en} bodyEn={content.body_en} titleSw={content.title_sw} bodySw={content.body_sw} />
             </Card>
           </div>

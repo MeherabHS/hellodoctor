@@ -1,4 +1,5 @@
 'use client';
+import { tr } from '@/lib/i18n';
 import {useRef,useState} from 'react';
 import {ArrowLeft,Bold,Heading2,Italic,Link2,List,ListOrdered,Quote} from 'lucide-react';
 import type {AdminArticle,ArticleContent,ArticleCategory} from '../../lib/blogContent';
@@ -16,13 +17,13 @@ import {PublishCard} from './PublishCard';
 /** Markdown formatting applied to the current selection of a textarea. */
 type Format={label:string;icon:typeof Bold;wrap?:[string,string];prefix?:string;placeholder:string};
 const FORMATS:Format[]=[
-  {label:'Bold',icon:Bold,wrap:['**','**'],placeholder:'bold text'},
-  {label:'Italic',icon:Italic,wrap:['*','*'],placeholder:'italic text'},
-  {label:'Heading',icon:Heading2,prefix:'## ',placeholder:'Heading'},
-  {label:'Bulleted list',icon:List,prefix:'- ',placeholder:'List item'},
-  {label:'Numbered list',icon:ListOrdered,prefix:'1. ',placeholder:'List item'},
-  {label:'Quote',icon:Quote,prefix:'> ',placeholder:'Quote'},
-  {label:'Link',icon:Link2,wrap:['[','](https://)'],placeholder:'link text'},
+  {get label(){return tr('ui.bold')},icon:Bold,wrap:['**','**'],get placeholder(){return tr('ui.boldText')}},
+  {get label(){return tr('ui.italic')},icon:Italic,wrap:['*','*'],get placeholder(){return tr('ui.italicText')}},
+  {get label(){return tr('ui.heading')},icon:Heading2,prefix:'## ',get placeholder(){return tr('ui.heading')}},
+  {get label(){return tr('ui.bulletedList')},icon:List,prefix:'- ',get placeholder(){return tr('ui.listItem')}},
+  {get label(){return tr('ui.numberedList')},icon:ListOrdered,prefix:'1. ',get placeholder(){return tr('ui.listItem')}},
+  {get label(){return tr('ui.quote')},icon:Quote,prefix:'> ',get placeholder(){return tr('ui.quote')}},
+  {get label(){return tr('ui.link')},icon:Link2,wrap:['[','](https://)'],get placeholder(){return tr('ui.linkText')}},
 ];
 function applyFormat(area:HTMLTextAreaElement,format:Format):{value:string;cursor:[number,number]}{
   const {value,selectionStart:s,selectionEnd:e}=area;const selected=value.slice(s,e)||format.placeholder;
@@ -70,15 +71,15 @@ export function ArticleEditor({initial,categories:initialCategories,onSaved,onCl
     setBusy(true);setError('');setNotice('');
     try{await work();}
     catch(e){
-      if(e instanceof CoverError){settle(e.saved);setError(`Text saved, but the image was not: ${blogErrorMessage(e.cause)}`);}
+      if(e instanceof CoverError){settle(e.saved);setError(tr('tpl.textSavedImageNot', { error: blogErrorMessage(e.cause) }));}
       else setError(`${failure}${blogErrorMessage(e)}`);
     }finally{setBusy(false);onSaved();}
   }
-  const save=()=>run(async()=>{await persist();setNotice('Draft saved. Patients cannot see it until you publish.');});
+  const save=()=>run(async()=>{await persist();setNotice(tr('ui.draftSavedPatientsCannotSeeIt'));});
   // Publish returns to the list: nothing is left unsaved, so no prompt.
-  const publish=()=>run(async()=>{const saved=await persist();if(isUnpublished(saved.status))await publishEntry(saved);onClose(`Published “${saved.title_en}”.`);},'Not published: ');
-  const schedule=(when:string)=>run(async()=>{const at=nairobiSchedule(when);const saved=await persist();await publishEntry(saved,'schedule',at);onClose(`Scheduled “${saved.title_en}”.`);});
-  const action=(name:'unpublish'|'archive')=>run(async()=>{if(!article)return;settle(await transitionArticle(article.id,article.version,name));setNotice(name==='unpublish'?'Unpublished. It is a draft again.':'Archived.');});
+  const publish=()=>run(async()=>{const saved=await persist();if(isUnpublished(saved.status))await publishEntry(saved);onClose(tr('tpl.published', { title: saved.title_en }));},tr('tpl.notPublished'));
+  const schedule=(when:string)=>run(async()=>{const at=nairobiSchedule(when);const saved=await persist();await publishEntry(saved,'schedule',at);onClose(tr('tpl.scheduled', { title: saved.title_en }));});
+  const action=(name:'unpublish'|'archive')=>run(async()=>{if(!article)return;settle(await transitionArticle(article.id,article.version,name));setNotice(name==='unpublish'?tr('ui2.unpublishedItIsADraftAgain'):tr('ui2.archived'));});
   async function reload(){setBusy(true);try{settle(await getArticle(id));setCover(null);setError('');}catch(e){setError(blogErrorMessage(e));}finally{setBusy(false);}}
   function format(f:Format){
     const area=bodyRef.current;if(!area)return;const next=applyFormat(area,f);change(`body_${language}`,next.value);
@@ -90,42 +91,42 @@ export function ArticleEditor({initial,categories:initialCategories,onSaved,onCl
   return <div className="afya-stack">
     <div className="afya-page-head">
       <div style={{display:'flex',alignItems:'center',gap:12}}>
-        <button type="button" className="afya-icon-btn" aria-label="Back to articles" onClick={()=>requestNavigation(()=>onClose())}><ArrowLeft size={20}/></button>
-        <div><h2>{article?'Edit article':'New article'}</h2><p>{dirty?'Unsaved changes':article?'All changes saved':'Not saved yet'}</p></div>
+        <button type="button" className="afya-icon-btn" aria-label={tr('ui.backToArticles')} onClick={()=>requestNavigation(()=>onClose())}><ArrowLeft size={20}/></button>
+        <div><h2>{article?tr('ui2.editArticle'):tr('ui2.newArticle')}</h2><p>{dirty?tr('ui2.unsavedChanges'):article?tr('ui2.allChangesSaved'):tr('ui2.notSavedYet')}</p></div>
       </div>
     </div>
-    {error&&<div role="alert" className="afya-login-error">{error} {article&&<button type="button" className="afya-btn-secondary" onClick={reload}>Reload saved article</button>}</div>}
+    {error&&<div role="alert" className="afya-login-error">{error} {article&&<button type="button" className="afya-btn-secondary" onClick={reload}>{tr('ui.reloadSavedArticle')}</button>}</div>}
     {notice&&<p role="status" className="afya-notice info" style={{margin:0}}>{notice}</p>}
 
     <div className="afya-two-col">
       <section className="admin-card" style={{padding:0}}>
-        <div className="afya-tabs" role="tablist" aria-label="Editor view" style={{padding:'6px 22px 0',marginBottom:0}}>
-          <button type="button" role="tab" aria-selected={view==='write'} className={`afya-tab ${view==='write'?'active':''}`} onClick={()=>setView('write')}>Write</button>
-          <button type="button" role="tab" aria-selected={view==='preview'} className={`afya-tab ${view==='preview'?'active':''}`} onClick={()=>setView('preview')}>Patient preview</button>
+        <div className="afya-tabs" role="tablist" aria-label={tr('ui.editorView')} style={{padding:'6px 22px 0',marginBottom:0}}>
+          <button type="button" role="tab" aria-selected={view==='write'} className={`afya-tab ${view==='write'?'active':''}`} onClick={()=>setView('write')}>{tr('ui.write')}</button>
+          <button type="button" role="tab" aria-selected={view==='preview'} className={`afya-tab ${view==='preview'?'active':''}`} onClick={()=>setView('preview')}>{tr('ui.patientPreview')}</button>
         </div>
         {view==='write'?<fieldset disabled={busy||archived} className="afya-form" style={{border:0,margin:0,padding:'18px 22px 22px'}}>
-          <label htmlFor="art-topic">Topic *</label>
+          <label htmlFor="art-topic">{tr('ui.topic')}</label>
           <select id="art-topic" className="afya-select" value={choice.topic} onChange={e=>{setChoice({topic:e.target.value as TopicChoice['topic'],other:choice.other});setNotice('');}}>
-            <option value="">Choose a topic</option>
+            <option value="">{tr('ui.chooseATopic')}</option>
             {topicOptions.map(t=><option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
-          {choice.topic===OTHER&&<><label htmlFor="art-topic-other">Topic name *</label>
-            <input id="art-topic-other" value={choice.other} maxLength={80} placeholder="e.g. Mental health" onChange={e=>setChoice({topic:OTHER,other:e.target.value})}/></>}
+          {choice.topic===OTHER&&<><label htmlFor="art-topic-other">{tr('ui.topicName')}</label>
+            <input id="art-topic-other" value={choice.other} maxLength={80} placeholder={tr('ui.eGMentalHealth')} onChange={e=>setChoice({topic:OTHER,other:e.target.value})}/></>}
 
           <CoverPicker savedSrc={savedCover} file={cover} onFile={setCover} onError={setError}/>
 
-          <div className="afya-lang-switch" role="group" aria-label="Editor language">
-            <button type="button" aria-pressed={language==='en'} onClick={()=>setLanguage('en')}>English</button>
-            <button type="button" aria-pressed={language==='sw'} onClick={()=>setLanguage('sw')}>Kiswahili (optional)</button>
+          <div className="afya-lang-switch" role="group" aria-label={tr('ui.editorLanguage')}>
+            <button type="button" aria-pressed={language==='en'} onClick={()=>setLanguage('en')}>{tr('ui.english')}</button>
+            <button type="button" aria-pressed={language==='sw'} onClick={()=>setLanguage('sw')}>{tr('ui.kiswahiliOptional')}</button>
           </div>
-          <label htmlFor="art-title">Title{language==='en'?' *':''}</label>
+          <label htmlFor="art-title">{tr('mix.title')}{language==='en'?' *':''}</label>
           <input id="art-title" value={content[`title_${language}`]} maxLength={160} onChange={e=>change(`title_${language}`,e.target.value)}/>
-          <label htmlFor="art-body">Article{language==='en'?' *':''}</label>
+          <label htmlFor="art-body">{tr('mix.article')}{language==='en'?' *':''}</label>
           <div className="afya-md-editor">
-            <div className="afya-md-toolbar" role="toolbar" aria-label="Formatting">{FORMATS.map(f=>{const Icon=f.icon;return <button key={f.label} type="button" className="afya-icon-btn" title={f.label} aria-label={f.label} onClick={()=>format(f)}><Icon size={16}/></button>;})}</div>
+            <div className="afya-md-toolbar" role="toolbar" aria-label={tr('ui.formatting')}>{FORMATS.map(f=>{const Icon=f.icon;return <button key={f.label} type="button" className="afya-icon-btn" title={f.label} aria-label={f.label} onClick={()=>format(f)}><Icon size={16}/></button>;})}</div>
             <textarea id="art-body" ref={bodyRef} className="afya-md-body" value={content[`body_${language}`]} maxLength={30000} onChange={e=>change(`body_${language}`,e.target.value)} placeholder={'## Heading\n\nWrite the article…'} rows={16}/>
           </div>
-          <p className="afya-stat-note">{language==='sw'?'Leave Kiswahili empty and patients see the English text.':'Headings, bold, italic, lists, quotes and links.'}</p>
+          <p className="afya-stat-note">{language==='sw'?tr('ui2.leaveKiswahiliEmptyAndPatientsSee'):tr('ui2.headingsBoldItalicListsQuotesAnd')}</p>
         </fieldset>:<div style={{padding:'8px 22px 22px'}}><ArticlePreview content={content} category={previewCategory} language={previewLanguage} setLanguage={setPreviewLanguage} article={article} localCover={''} quiz={null}/></div>}
       </section>
 

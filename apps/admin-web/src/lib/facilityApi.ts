@@ -1,3 +1,4 @@
+import { tr } from './i18n/core.ts';
 import {clearSoftReads,request} from './api';
 import {adminFetch} from './adminQueue.mjs';
 import {MAX_ADMIN_IMAGE_UPLOAD} from './imageLimits';
@@ -16,11 +17,11 @@ export const facilityImageUrl=(id:string,imageVersion:string|null)=>`/api/facili
 async function binary(id:string,method:'POST'|'DELETE',version:number,file?:File):Promise<AdminFacility>{
   const res=await adminFetch(`/api/facility-media/${encodeURIComponent(id)}?version=${version}`,{method,credentials:'include',headers:file?{'Content-Type':file.type}:{},body:file});clearSoftReads();
   const data=await res.json().catch(()=>({}));
-  if(!res.ok||!data.success)throw new Error(data.error?.message||data.error||'Photo update failed.');
+  if(!res.ok||!data.success)throw new Error(data.error?.message||data.error||tr('lib.photoUpdateFailed'));
   return data.data;
 }
 export async function uploadFacilityImage(id:string,version:number,file:File):Promise<AdminFacility>{
-  if(!['image/jpeg','image/png'].includes(file.type)||file.size>MAX_ADMIN_IMAGE_UPLOAD)throw new Error('Choose a JPEG or PNG up to 25 MB.');
+  if(!['image/jpeg','image/png'].includes(file.type)||file.size>MAX_ADMIN_IMAGE_UPLOAD)throw new Error(tr('lib.chooseJpegPng'));
   return binary(id,'POST',version,file);
 }
 export const removeFacilityImage=(id:string,version:number)=>binary(id,'DELETE',version);

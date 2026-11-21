@@ -1,5 +1,7 @@
 'use client';
 
+import { tr, LanguageSwitch, useT } from '@/lib/i18n';
+import { authErrorMessage } from '@/lib/i18n/apiErrors';
 import { clearAdminRuntime } from '@/lib/api';
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -10,6 +12,7 @@ import { BotChallenge } from '@/components/BotChallenge';
 // same single-factor-OTP MFA shape; there is no authenticator-app factor.
 // Tokens stay in the BFF.
 export default function AdminLoginPage() {
+  useT(); // re-render this screen when the language changes
   const router = useRouter();
   const [step, setStep] = useState<'credentials' | 'code'>('credentials');
   const [email, setEmail] = useState('');
@@ -35,7 +38,7 @@ export default function AdminLoginPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setError(json.error || 'Invalid credentials.');
+        setError(authErrorMessage(res.status, json.error, tr('ui2.invalidCredentials')));
         setSubmitting(false);
         return;
       }
@@ -45,7 +48,7 @@ export default function AdminLoginPage() {
       setStep('code');
       setSubmitting(false);
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tr('ui.couldNotReachTheServerPlease'));
       setSubmitting(false);
     } finally {
       setChallengeToken(null);
@@ -66,7 +69,7 @@ export default function AdminLoginPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        setError(json.error || 'Invalid or expired verification code.');
+        setError(authErrorMessage(res.status, json.error, tr('ui2.invalidOrExpiredVerificationCode')));
         setSubmitting(false);
         return;
       }
@@ -74,7 +77,7 @@ export default function AdminLoginPage() {
       router.push('/');
       router.refresh();
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(tr('ui.couldNotReachTheServerPlease'));
       setSubmitting(false);
     }
   }
@@ -95,30 +98,31 @@ export default function AdminLoginPage() {
           <img src="/brand/afya_logo_white.png" alt="" />
           <div>
             <div className="afya-login-brand-name">AfyaMkononi</div>
-            <div className="afya-login-brand-sub">Health for You</div>
+            <div className="afya-login-brand-sub">{tr('ui.healthForYou')}</div>
           </div>
         </div>
         <div>
-          <h2>Admin console</h2>
-          <p>Content, people and care records, operations and campaigns for the AfyaMkononi platform.</p>
+          <h2>{tr('ui.adminConsole')}</h2>
+          <p>{tr('ui.contentPeopleAndCareRecordsOperations')}</p>
         </div>
-        <p className="afya-login-brand-foot">Kenya deployment · English and Kiswahili</p>
+        <p className="afya-login-brand-foot">{tr('ui.kenyaDeploymentEnglishAndKiswahili')}</p>
       </section>
 
       <main className="afya-login-main">
+        <LanguageSwitch className="afya-login-lang" />
         <div className="afya-login-card">
           <div className="afya-login-head">
             {/* eslint-disable-next-line @next/next/no-img-element -- static same-origin asset */}
             <img src="/brand/afya_logo.png" alt="AfyaMkononi" className="afya-login-mobile-logo" />
-            <h1>{step === 'credentials' ? 'Sign in to Admin' : 'Check your email'}</h1>
-            <p>{step === 'credentials' ? 'Use your administrator email and password.' : <>We emailed a verification code to <strong>{email}</strong>.</>}</p>
+            <h1>{step === 'credentials' ? tr('ui2.signInToAdmin') : tr('ui2.checkYourEmail')}</h1>
+            <p>{step === 'credentials' ? tr('ui2.useYourAdministratorEmailAndPassword') : <>{tr('ui.weEmailedAVerificationCodeTo')} <strong>{email}</strong>.</>}</p>
           </div>
 
           {step === 'credentials' ? (
             <form onSubmit={handleCredentialsSubmit} className="afya-login-form">
               {error && <div className="afya-login-error" role="alert">{error}</div>}
 
-              <label htmlFor="email">Admin email</label>
+              <label htmlFor="email">{tr('ui.adminEmail')}</label>
               <input
                 id="email"
                 type="email"
@@ -129,7 +133,7 @@ export default function AdminLoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
               />
 
-              <label htmlFor="password">Password</label>
+              <label htmlFor="password">{tr('ui.password')}</label>
               <input
                 id="password"
                 type="password"
@@ -139,10 +143,10 @@ export default function AdminLoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
 
-              <a href="/forgot-password" className="afya-login-forgot">Forgot password?</a>
+              <a href="/forgot-password" className="afya-login-forgot">{tr('ui.forgotPassword2')}</a>
               <BotChallenge action="admin_login" reset={challengeReset} onToken={setChallengeToken} />
               <button type="submit" className="afya-btn-primary afya-login-submit" disabled={submitting || challengeToken === null}>
-                {submitting ? 'Checking…' : 'Continue'}
+                {submitting ? tr('ui2.checking') : tr('ui2.continue')}
               </button>
             </form>
           ) : (
@@ -154,7 +158,7 @@ export default function AdminLoginPage() {
                 </p>
               )}
 
-              <label htmlFor="otp">Verification code</label>
+              <label htmlFor="otp">{tr('ui.verificationCode')}</label>
               <input
                 id="otp"
                 type="text"
@@ -166,20 +170,20 @@ export default function AdminLoginPage() {
                 autoFocus
                 value={otpCode}
                 onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="6-digit code"
+                placeholder={tr('ui.n6DigitCode')}
                 className="afya-login-otp"
               />
 
               <button type="submit" className="afya-btn-primary afya-login-submit" disabled={submitting}>
-                {submitting ? 'Verifying…' : 'Sign in'}
+                {submitting ? tr('ui2.verifying') : tr('ui2.signIn')}
               </button>
               <button type="button" className="afya-login-back" onClick={backToCredentials} disabled={submitting}>
-                ← Use a different account
+                {tr('ui.useADifferentAccount')}
               </button>
             </form>
           )}
 
-          <p className="afya-login-note">Access is restricted to verified platform administrators. All sign-ins are audited.</p>
+          <p className="afya-login-note">{tr('ui.accessIsRestrictedToVerifiedPlatform')}</p>
         </div>
       </main>
     </div>

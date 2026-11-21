@@ -1,4 +1,5 @@
 'use client';
+import { tr } from '@/lib/i18n';
 import Script from 'next/script';
 import { useEffect, useRef, useState } from 'react';
 
@@ -58,6 +59,6 @@ export function BotChallenge({ action, reset, onToken }: {
     {config?.required && config.siteKey && <Script id="turnstile" src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
       onReady={() => setLoaded(true)} onError={() => { onToken(null); setFailed(true); }} />}
     <div ref={container} />
-    {(failed || (config?.required && !config.siteKey)) && <p role="status">We couldn&apos;t complete verification. <button type="button" onClick={() => window.location.reload()}>Try again</button></p>}
+    {(failed || (config?.required && !config.siteKey)) && <p role="status">{tr('ui.weCouldnTCompleteVerification')} <button type="button" onClick={() => window.location.reload()}>{tr('ui.tryAgain')}</button></p>}
   </div>;
 }

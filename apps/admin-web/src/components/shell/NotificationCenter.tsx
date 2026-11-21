@@ -1,4 +1,5 @@
 'use client';
+import { tr } from '@/lib/i18n';
 import {useCallback, useEffect, useRef, useState} from 'react';
 import {Bell, X} from 'lucide-react';
 import {request} from '../../lib/api';
@@ -61,7 +62,7 @@ export function NotificationCenter({pendingApplications, onOpen}: {pendingApplic
   const pop = useCallback((fresh: AdminNotice[]) => {
     const shown = fresh.slice(0, MAX_POPUPS).map(n => ({id: n.id, view: describeNotice(n)}));
     if (fresh.length > MAX_POPUPS) {
-      shown.push({id: `more-${fresh[0].id}`, view: {title: `${fresh.length - MAX_POPUPS} more notifications`, body: 'Open the bell to see them all.', page: 'activity', tone: 'info'}});
+      shown.push({id: `more-${fresh[0].id}`, view: {title: `${fresh.length - MAX_POPUPS} more notifications`, body: tr('ui.openTheBellToSeeThem'), page: 'activity', tone: 'info'}});
     }
     setPopups(p => [...shown, ...p].slice(0, MAX_POPUPS + 1));
     for (const s of shown) setTimeout(() => dismiss(s.id), POPUP_MS);
@@ -125,23 +126,23 @@ export function NotificationCenter({pendingApplications, onOpen}: {pendingApplic
 
   return (
     <div className="afya-notify" ref={panel}>
-      <button type="button" className="admin-top-icon-btn" title="Notifications" aria-haspopup="true" aria-expanded={open}
-        aria-label={badge > 0 ? `Notifications: ${badge} new` : 'Notifications'} onClick={toggle}>
+      <button type="button" className="admin-top-icon-btn" title={tr('ui.notifications')} aria-haspopup="true" aria-expanded={open}
+        aria-label={badge > 0 ? tr('tpl.notificationsNew', { count: badge }) : tr('ui2.notifications')} onClick={toggle}>
         <Bell size={18} aria-hidden />
         {badge > 0 && <span className="afya-notify-count" aria-hidden>{badge > 99 ? '99+' : badge}</span>}
       </button>
 
       {open && (
-        <div className="afya-notify-panel" role="dialog" aria-label="Notifications">
-          <div className="afya-notify-head"><strong>Notifications</strong><span>Last 24 hours · live</span></div>
+        <div className="afya-notify-panel" role="dialog" aria-label={tr('ui.notifications')}>
+          <div className="afya-notify-head"><strong>{tr('ui.notifications')}</strong><span>{tr('ui.last24HoursLive')}</span></div>
           {pendingApplications > 0 && (
             <button type="button" className="afya-notify-item tone-warning" onClick={() => go('verification')}>
               <span className="afya-notify-dot" aria-hidden />
-              <span><strong>{pendingApplications} doctor application{pendingApplications === 1 ? '' : 's'} waiting</strong><small>Review KMPDC registrations</small></span>
+              <span><strong>{tr(pendingApplications === 1 ? 'mix.applicationsWaitingOne' : 'mix.applicationsWaitingMany', { count: pendingApplications })}</strong><small>{tr('ui.reviewKmpdcRegistrations')}</small></span>
             </button>
           )}
           <div className="afya-notify-list">
-            {items.length === 0 && pendingApplications === 0 && <p className="afya-notify-empty">Nothing new. You will see a pop-up here when something happens.</p>}
+            {items.length === 0 && pendingApplications === 0 && <p className="afya-notify-empty">{tr('ui.nothingNewYouWillSeeA')}</p>}
             {items.map(n => {
               const v = describeNotice(n);
               return (
@@ -152,7 +153,7 @@ export function NotificationCenter({pendingApplications, onOpen}: {pendingApplic
               );
             })}
           </div>
-          <button type="button" className="afya-notify-foot" onClick={() => go('activity')}>Open the Activity Log</button>
+          <button type="button" className="afya-notify-foot" onClick={() => go('activity')}>{tr('ui.openTheActivityLog')}</button>
         </div>
       )}
 
@@ -161,8 +162,8 @@ export function NotificationCenter({pendingApplications, onOpen}: {pendingApplic
           <div key={p.id} className={`afya-notify-popup tone-${p.view.tone}`} role="status">
             <span className="afya-notify-dot" aria-hidden />
             <div><strong>{p.view.title}</strong><span>{p.view.body}</span></div>
-            <button type="button" className="afya-notify-view" onClick={() => go(p.view.page, p.id)}>View</button>
-            <button type="button" className="afya-notify-close" aria-label="Dismiss" onClick={() => dismiss(p.id)}><X size={14} aria-hidden /></button>
+            <button type="button" className="afya-notify-view" onClick={() => go(p.view.page, p.id)}>{tr('ui.view')}</button>
+            <button type="button" className="afya-notify-close" aria-label={tr('ui.dismiss')} onClick={() => dismiss(p.id)}><X size={14} aria-hidden /></button>
           </div>
         ))}
       </div>
