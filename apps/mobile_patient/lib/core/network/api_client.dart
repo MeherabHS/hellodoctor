@@ -56,9 +56,10 @@ const sessionSecureStorage = FlutterSecureStorage(
   aOptions: AndroidOptions(sharedPreferencesName: sessionSecureStorageFile),
 );
 
-/// Device flag: the patient has finished or skipped onboarding on this
-/// phone. It belongs to the install, not the session, so [SecureTokenStore]
-/// keeps it when sign-out clears the session.
+/// "Onboarding seen" flags: `onboarding_seen_v1:<account>` per patient
+/// account on this phone (plain key when the token has no subject). They
+/// belong to the install, not the session, so [SecureTokenStore] keeps them
+/// when sign-out clears the session.
 const onboardingSeenKey = 'onboarding_seen_v1';
 
 class SecureTokenStore implements TokenStore {
@@ -74,13 +75,18 @@ class SecureTokenStore implements TokenStore {
   Future<void> delete(String key) => storage.delete(key: key);
   @override
   Future<void> clear() async {
-    String? onboarding;
+    var kept = const <String, String>{};
     try {
-      onboarding = await storage.read(key: onboardingSeenKey);
+      kept = {
+        for (final e in (await storage.readAll()).entries)
+          if (e.key == onboardingSeenKey ||
+              e.key.startsWith('$onboardingSeenKey:'))
+            e.key: e.value
+      };
     } catch (_) {/* cleared with the rest; onboarding shows once more */}
     await storage.deleteAll();
-    if (onboarding != null) {
-      await storage.write(key: onboardingSeenKey, value: onboarding);
+    for (final e in kept.entries) {
+      await storage.write(key: e.key, value: e.value);
     }
   }
 }

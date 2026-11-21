@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,20 +90,20 @@ void main() {
       (tester) async {
     final store = _Store();
     await tester.pumpWidget(_app(OnboardingGate(
-        store: store, child: const Text('sign-in', key: ValueKey('sign-in')))));
+        store: store, child: const Text('home', key: ValueKey('home')))));
     await tester.pumpAndSettle();
     expect(find.byType(OnboardingPage), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('onboarding-skip')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('sign-in')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home')), findsOneWidget);
     expect(store.values[onboardingSeenKey], '1');
 
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(_app(OnboardingGate(
-        store: store, child: const Text('sign-in', key: ValueKey('sign-in')))));
+        store: store, child: const Text('home', key: ValueKey('home')))));
     await tester.pumpAndSettle();
     expect(find.byType(OnboardingPage), findsNothing);
-    expect(find.byKey(const ValueKey('sign-in')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home')), findsOneWidget);
   });
 
   testWidgets('fits phones of other shapes without overflow', (tester) async {
@@ -128,6 +130,46 @@ void main() {
     }
   });
 
+  String jwt(String sub) => 'h.${base64Url.encode(utf8.encode(jsonEncode({
+            'sub': sub
+          }))).replaceAll('=', '')}.s';
+
+  testWidgets('onboarding shows once per signed-in account on this phone',
+      (tester) async {
+    final store = _Store({'access_token': jwt('patient-a')});
+    Widget gate() => _app(OnboardingGate(
+        key: UniqueKey(),
+        store: store,
+        child: const Text('home', key: ValueKey('home'))));
+    await tester.pumpWidget(gate());
+    await tester.pumpAndSettle();
+    expect(find.byType(OnboardingPage), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('onboarding-skip')));
+    await tester.pumpAndSettle();
+    expect(store.values['$onboardingSeenKey:patient-a'], '1');
+
+    await tester.pumpWidget(gate());
+    await tester.pumpAndSettle();
+    expect(find.byType(OnboardingPage), findsNothing);
+
+    // A new account (e.g. just registered) on the same phone sees it.
+    store.values['access_token'] = jwt('patient-b');
+    await tester.pumpWidget(gate());
+    await tester.pumpAndSettle();
+    expect(find.byType(OnboardingPage), findsOneWidget);
+  });
+
+  test('signing out keeps the onboarding flag of every account', () async {
+    FlutterSecureStorage.setMockInitialValues({
+      '$onboardingSeenKey:patient-a': '1',
+      'access_token': 'a',
+    });
+    final store = SecureTokenStore(const FlutterSecureStorage());
+    await store.clear();
+    expect(await store.read('access_token'), isNull);
+    expect(await store.read('$onboardingSeenKey:patient-a'), '1');
+  });
+
   test('signing out clears the session but not the onboarding flag', () async {
     FlutterSecureStorage.setMockInitialValues({
       onboardingSeenKey: '1',
@@ -145,12 +187,12 @@ void main() {
     expect(await store.read(onboardingSeenKey), isNull);
   });
 
-  testWidgets('a storage error never blocks sign-in', (tester) async {
+  testWidgets('a storage error never blocks the app', (tester) async {
     final store = _Store()..failReads = true;
     await tester.pumpWidget(_app(OnboardingGate(
-        store: store, child: const Text('sign-in', key: ValueKey('sign-in')))));
+        store: store, child: const Text('home', key: ValueKey('home')))));
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('sign-in')), findsOneWidget);
+    expect(find.byKey(const ValueKey('home')), findsOneWidget);
   });
 
   testWidgets('Swahili copy is used when the app is in Swahili',

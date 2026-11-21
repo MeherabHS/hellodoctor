@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,12 +9,34 @@ import '../../core/widgets/afya_widgets.dart';
 import '../../core/widgets/onboarding_language_switch.dart';
 import '../../l10n/app_localizations.dart';
 
-// The device flag lives with the store that preserves it across sign-out.
+// The flag's prefix lives with the store that keeps it across sign-out.
 export '../../core/network/api_client.dart' show onboardingSeenKey;
 
-/// Shows [OnboardingPage] the first time the app is opened on this phone,
-/// then [child] (the sign-in screen). A storage error never blocks sign-in:
-/// it is treated as "already seen".
+/// The "seen" flag for the signed-in account: one per patient account on
+/// this phone, read from the access token's subject. A token without one
+/// falls back to the phone-wide flag.
+String onboardingSeenKeyFor(String? accessToken) {
+  final parts = accessToken?.split('.') ?? const <String>[];
+  if (parts.length == 3) {
+    try {
+      final payload = jsonDecode(
+          utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      if (payload is Map) {
+        for (final key in const ['sub', 'patient_id', 'user_id']) {
+          final id = payload[key]?.toString() ?? '';
+          if (id.isNotEmpty) return '$onboardingSeenKey:$id';
+        }
+      }
+    } catch (_) {/* opaque token: phone-wide flag */}
+  }
+  return onboardingSeenKey;
+}
+
+/// Shows [OnboardingPage] right after sign-in (or after creating an
+/// account), once per patient account on this phone, then [child] (the
+/// signed-in app). Product owner, 2026-11-21: onboarding follows sign-in in
+/// both apps. A storage error never blocks the app: it is treated as
+/// "already seen".
 class OnboardingGate extends StatefulWidget {
   const OnboardingGate({super.key, required this.store, required this.child});
   final TokenStore store;
@@ -24,13 +47,22 @@ class OnboardingGate extends StatefulWidget {
 
 class _OnboardingGateState extends State<OnboardingGate> {
   bool? _seen;
+  String _key = onboardingSeenKey;
 
   @override
   void initState() {
     super.initState();
-    widget.store
-        .read(onboardingSeenKey)
-        .then((value) => _set(value != null), onError: (_) => _set(true));
+    _check();
+  }
+
+  Future<void> _check() async {
+    try {
+      _key = onboardingSeenKeyFor(await widget.store.read('access_token'));
+      final value = await widget.store.read(_key);
+      _set(value != null);
+    } catch (_) {
+      _set(true);
+    }
   }
 
   void _set(bool seen) {
@@ -40,7 +72,7 @@ class _OnboardingGateState extends State<OnboardingGate> {
   Future<void> _finish() async {
     _set(true);
     try {
-      await widget.store.write(onboardingSeenKey, '1');
+      await widget.store.write(_key, '1');
     } catch (_) {/* shown again next launch at worst */}
   }
 

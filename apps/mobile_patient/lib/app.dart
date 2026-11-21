@@ -131,14 +131,14 @@ class _AppState extends State<HelloDoctorPatientApp>
       ClientErrorReporter.current!.loadBuildMetadata();
       auth = AuthCubit(api!, cache: cache);
       locale = LocaleController(secureStore!)..load();
-      // Signed out (onboarding), the choice stays pending until sign-in.
+      // Signed out, a choice stays pending until sign-in.
       locale!.bindBackendSync((languageCode) => auth?.state is SignedIn
           ? NotificationRepository(api!).syncLanguage(languageCode)
           : Future<void>.error(StateError('signed out')));
       _authSubscription = auth!.stream.listen((state) {
         _incidentRetryTimer?.cancel();
         if (state is SignedIn) {
-          // A language picked before sign-in (onboarding) reaches the account.
+          // A language picked while signed out reaches the account.
           locale?.flushPendingSync();
           unawaited(ClientErrorReporter.current?.flushStartup());
           _incidentRetryTimer =
@@ -187,17 +187,20 @@ class _AppState extends State<HelloDoctorPatientApp>
                   home: home,
                 );
             if (state is SignedIn) {
-              return application(_SignedInRoot(
-                api: api!,
-                cache: cache!,
-                connectivity: connectivity!,
+              // Right after sign-in or account creation: onboarding, once
+              // per account on this phone (product owner, 2026-11-21).
+              return application(OnboardingGate(
+                store: secureStore!,
+                child: _SignedInRoot(
+                  api: api!,
+                  cache: cache!,
+                  connectivity: connectivity!,
+                ),
               ));
             }
             return application(state is SessionRestoring
                 ? const _SplashPage()
-                // First launch on this phone: onboarding, then sign-in.
-                : OnboardingGate(
-                    store: secureStore!, child: AuthEntryPage(auth: auth!)));
+                : AuthEntryPage(auth: auth!));
           }),
         ),
       ),
