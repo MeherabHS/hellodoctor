@@ -60,12 +60,30 @@ jobs:
         # Verified 2026-11-11; re-check if sqlx's `sqlite` feature is ever
         # enabled, or once a sqlx-sqlite release ships that itself requires a
         # patched `libsqlite3-sys`.
-        run: cargo audit --deny warnings --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0459
+        #
+        # RUSTSEC-2026-0543 (chrono unmaintained) and RUSTSEC-2026-0542
+        # (humantime unmaintained) are ignored by product-owner decision
+        # (2026-11-22). They are informational "unmaintained" notices, not
+        # vulnerabilities: no known flaw and nothing to upgrade to. chrono is
+        # used directly by the backend and by sqlx-core/sqlx-postgres and
+        # object_store; humantime arrives only via object_store. Neither can
+        # be removed without replacing sqlx and the storage library. Re-check
+        # when sqlx or object_store move off them, or if either notice is
+        # upgraded to a vulnerability.
+        run: cargo audit --deny warnings --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0459 --ignore RUSTSEC-2026-0543 --ignore RUSTSEC-2026-0542
 
   flutter-dependency-audit:
     name: Flutter dependency vulnerability scan (OSV-Scanner)
+    # The reusable OSV workflow's job declares `actions: read`, `contents:
+    # read` and `security-events: write`. A caller that grants less makes
+    # GitHub refuse to start the WHOLE Security Scan run (startup_failure,
+    # seen on every run on 2026-11-21), silently disabling cargo-audit and
+    # secret scanning too. security-events: write stays unused while
+    # upload-sarif is false.
     permissions:
+      actions: read
       contents: read
+      security-events: write
     # Scans the two committed Flutter pubspec.lock files (apps/mobile — the
     # Doctor app — and apps/mobile_patient — the Patient app) against the OSV
     # database. OSV-Scanner natively parses pubspec.lock for the Pub
