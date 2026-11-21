@@ -6,6 +6,7 @@ import 'package:hellodoctor_mobile/core/theme/tokens.dart';
 import 'package:hellodoctor_mobile/features/onboarding/account_onboarding_gate.dart';
 import 'package:hellodoctor_mobile/features/onboarding/peer_onboarding_page.dart';
 import 'package:hellodoctor_mobile/l10n/app_localizations.dart';
+import 'package:hellodoctor_mobile/core/l10n/doctor_locale.dart';
 
 class _Store implements TokenStore {
   final values = <String, String>{};
@@ -140,5 +141,37 @@ void main() {
     expect(await store.read('access_token'), isNull);
     expect(await store.read(onboardingSeenKey('peer', 'peer-1')), '1');
     expect(await store.read(onboardingSeenKey('doctor', 'doc-1')), '1');
+  });
+
+  testWidgets('EN | SW beside Skip switches onboarding and saves the choice',
+      (tester) async {
+    final store = _Store();
+    final locale = DoctorLocaleController(store);
+    final saved = <String>[];
+    locale.bindServerSync((code) async => saved.add(code));
+    await tester.pumpWidget(DoctorLocaleScope(
+      controller: locale,
+      child: ListenableBuilder(
+        listenable: locale,
+        builder: (_, __) =>
+            _app(PeerOnboardingPage(onDone: () {}), locale: locale.locale),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Skip'), findsOneWidget);
+    expect(find.text('SW'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('onboarding-language-sw')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ruka'), findsOneWidget);
+    expect(find.textContaining('Karibu, Mwelekezi Rika'), findsOneWidget);
+    expect(store.values['doctor_locale_v1'], 'sw');
+    await locale.serverSync;
+    expect(saved, ['sw']);
+
+    // Tapping the language already shown changes nothing.
+    await tester.tap(find.byKey(const ValueKey('onboarding-language-sw')));
+    await tester.pumpAndSettle();
+    expect(saved, ['sw']);
   });
 }

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/widgets/afya_auth_widgets.dart';
+import '../../core/widgets/onboarding_language_switch.dart';
 import '../../l10n/app_localizations.dart';
 import 'account_onboarding_gate.dart';
 
@@ -308,6 +309,21 @@ class _SlideView extends StatelessWidget {
                       child: _Brand(tagline: l.brandTagline),
                     ),
                   ],
+                  // EN | SW beside Skip (product owner, 2026-11-21).
+                  Positioned(
+                    left: 311 - 8 - 92,
+                    top: _skipRect.top + 4,
+                    width: 92,
+                    height: _skipRect.height - 8,
+                    child: ExcludeFocus(
+                      excluding: !active,
+                      child: const OnboardingLanguageSwitch(
+                          fill: _secondary,
+                          active: _green,
+                          text: _secondaryText,
+                          fontSize: 15),
+                    ),
+                  ),
                   Positioned(
                     left: 311,
                     top: _skipRect.top,

@@ -119,6 +119,9 @@ class _AppState extends State<HelloDoctorApp> with WidgetsBindingObserver {
           authenticated: () => auth?.state is SignedIn);
       ClientErrorReporter.current!.loadBuildMetadata();
       locale ??= DoctorLocaleController(secureStore!)..load();
+      // An onboarding language choice is saved to the account at once.
+      locale!.bindServerSync(
+          (code) => NotificationRepository(api!).syncLanguage(code));
       auth = AuthCubit(api!, cache: cache);
       _authSubscription = auth!.stream.listen((state) {
         _incidentRetryTimer?.cancel();
@@ -940,6 +943,8 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
       await _pushService!.initialize();
       if (mounted) {
         final controller = DoctorLocaleScope.maybeOf(context);
+        // Let a language just chosen on onboarding reach the server first.
+        await controller?.serverSync;
         final revision = controller?.revision;
         final preferences = await cubit.repo.getPreferences();
         if (mounted) {

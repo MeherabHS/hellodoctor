@@ -138,5 +138,8 @@
   "deliveryChannelsOffBody": "Baadhi ya aina za arifa zimezimwa, hivyo unaweza kukosa vikumbusho au ujumbe.",
   "deliveryBatteryTitle": "Vikumbusho vinaweza kuchelewa",
   "deliveryBatteryBody": "Uokoaji wa betri unaweza kusimamisha programu hii ikiwa nyuma. Iruhusu iendelee ili vikumbusho vifike kwa wakati.",
-  "deliveryFix": "Washa"
+  "deliveryFix": "Washa",
+  "onboardingLanguage": "Lugha",
+  "onboardingLanguageEnglish": "Kiingereza",
+  "onboardingLanguageSwahili": "Kiswahili"
 }

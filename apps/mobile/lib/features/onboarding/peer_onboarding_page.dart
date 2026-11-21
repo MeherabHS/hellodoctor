@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/widgets/afya_auth_widgets.dart';
+import '../../core/widgets/onboarding_language_switch.dart';
 import '../../l10n/app_localizations.dart';
 import '../peer/peer_ui.dart';
 import 'account_onboarding_gate.dart';
@@ -216,6 +217,17 @@ class _Header extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
+        // EN | SW beside Skip (product owner, 2026-11-21).
+        const SizedBox(
+          width: 86,
+          height: 36,
+          child: OnboardingLanguageSwitch(
+              fill: PeerTokens.mint,
+              active: PeerTokens.green,
+              text: PeerTokens.green,
+              fontSize: 14),
+        ),
+        const SizedBox(width: 6),
         Material(
           color: PeerTokens.mint,
           shape: const StadiumBorder(),

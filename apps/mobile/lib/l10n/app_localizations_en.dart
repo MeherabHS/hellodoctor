@@ -431,4 +431,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deliveryFix => 'Turn on';
+
+  @override
+  String get onboardingLanguage => 'Language';
+
+  @override
+  String get onboardingLanguageEnglish => 'English';
+
+  @override
+  String get onboardingLanguageSwahili => 'Kiswahili';
 }

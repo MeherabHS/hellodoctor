@@ -431,4 +431,13 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get deliveryFix => 'Washa';
+
+  @override
+  String get onboardingLanguage => 'Lugha';
+
+  @override
+  String get onboardingLanguageEnglish => 'Kiingereza';
+
+  @override
+  String get onboardingLanguageSwahili => 'Kiswahili';
 }

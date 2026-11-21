@@ -359,5 +359,11 @@
   "deliveryFix": "Turn on",
   "@deliveryFix": {
     "description": "Notification and battery readiness"
-  }
+  },
+  "onboardingLanguage": "Language",
+  "@onboardingLanguage": {"description": "Label of the EN | SW switch beside Skip on onboarding."},
+  "onboardingLanguageEnglish": "English",
+  "@onboardingLanguageEnglish": {"description": "Spoken name of the EN side of the onboarding language switch."},
+  "onboardingLanguageSwahili": "Kiswahili",
+  "@onboardingLanguageSwahili": {"description": "Spoken name of the SW side of the onboarding language switch."}
 }

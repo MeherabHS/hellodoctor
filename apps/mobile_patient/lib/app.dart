@@ -131,11 +131,15 @@ class _AppState extends State<HelloDoctorPatientApp>
       ClientErrorReporter.current!.loadBuildMetadata();
       auth = AuthCubit(api!, cache: cache);
       locale = LocaleController(secureStore!)..load();
-      locale!.bindBackendSync((languageCode) =>
-          NotificationRepository(api!).syncLanguage(languageCode));
+      // Signed out (onboarding), the choice stays pending until sign-in.
+      locale!.bindBackendSync((languageCode) => auth?.state is SignedIn
+          ? NotificationRepository(api!).syncLanguage(languageCode)
+          : Future<void>.error(StateError('signed out')));
       _authSubscription = auth!.stream.listen((state) {
         _incidentRetryTimer?.cancel();
         if (state is SignedIn) {
+          // A language picked before sign-in (onboarding) reaches the account.
+          locale?.flushPendingSync();
           unawaited(ClientErrorReporter.current?.flushStartup());
           _incidentRetryTimer =
               Timer.periodic(const Duration(seconds: 30), (_) {

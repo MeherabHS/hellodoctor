@@ -38,6 +38,28 @@ class DoctorLocaleController extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> Function(String code)? _serverSync;
+
+  /// The save started by the last [chooseLanguage]; screens that load the
+  /// server's language wait for it so they never undo a fresh choice.
+  Future<void> serverSync = Future<void>.value();
+
+  void bindServerSync(Future<void> Function(String code) sync) {
+    _serverSync = sync;
+  }
+
+  /// A language picked by the user (onboarding switch): applied at once,
+  /// kept on this phone and saved to the account (best effort) so the
+  /// signed-in shell, which reads the account's language, keeps it.
+  Future<void> chooseLanguage(String code) async {
+    if (_disposed || locale.languageCode == code) return;
+    await setLanguage(code);
+    final sync = _serverSync;
+    if (sync != null) {
+      serverSync = sync(locale.languageCode).catchError((_) {});
+    }
+  }
+
   @override
   void dispose() {
     _disposed = true;

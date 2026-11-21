@@ -57,9 +57,28 @@ class LocaleController extends ChangeNotifier {
     _locale = Locale(languageCode);
     notifyListeners();
     await _store.write(_storageKey, languageCode);
+    _sync(languageCode);
+  }
+
+  /// A choice the server has not taken yet (made before sign-in, e.g. on
+  /// onboarding, or while offline); [flushPendingSync] retries it.
+  String? _pendingSync;
+
+  void _sync(String languageCode) {
     final sync = _backendSync;
-    if (sync != null) {
-      unawaited(sync(languageCode).catchError((_) {}));
+    if (sync == null) {
+      _pendingSync = languageCode;
+      return;
     }
+    _pendingSync = languageCode;
+    unawaited(sync(languageCode).then((_) {
+      if (_pendingSync == languageCode) _pendingSync = null;
+    }).catchError((_) {}));
+  }
+
+  /// Called after sign-in: saves a language chosen while signed out.
+  void flushPendingSync() {
+    final pending = _pendingSync;
+    if (pending != null && pending == _locale.languageCode) _sync(pending);
   }
 }

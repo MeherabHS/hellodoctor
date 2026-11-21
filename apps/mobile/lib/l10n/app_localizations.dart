@@ -847,6 +847,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Turn on'**
   String get deliveryFix;
+
+  /// Label of the EN | SW switch beside Skip on onboarding.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get onboardingLanguage;
+
+  /// Spoken name of the EN side of the onboarding language switch.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get onboardingLanguageEnglish;
+
+  /// Spoken name of the SW side of the onboarding language switch.
+  ///
+  /// In en, this message translates to:
+  /// **'Kiswahili'**
+  String get onboardingLanguageSwahili;
 }
 
 class _AppLocalizationsDelegate

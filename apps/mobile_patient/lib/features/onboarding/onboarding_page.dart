@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/widgets/afya_widgets.dart';
+import '../../core/widgets/onboarding_language_switch.dart';
 import '../../l10n/app_localizations.dart';
 
 // The device flag lives with the store that preserves it across sign-out.
@@ -298,6 +299,19 @@ class _OnboardingPageState extends State<OnboardingPage> {
               label: l.onboardingCounter(_index + 1, _slides.length),
               child: _Dots(index: _index, scale: s),
             ),
+          ),
+          // EN | SW beside Skip (product owner, 2026-11-21); slimmer than
+          // Skip and level with its top so it clears slide 1's wordmark.
+          Positioned(
+            right: skipRight + skipW + 8 * s,
+            top: skipTop,
+            width: 80 * s,
+            height: 28 * s,
+            child: OnboardingLanguageSwitch(
+                fill: slide.skipFill,
+                active: slide.button,
+                text: _skipText,
+                fontSize: 13.5 * s),
           ),
           Positioned(
             right: skipRight,
