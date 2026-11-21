@@ -60,7 +60,17 @@ jobs:
         # Verified 2026-11-11; re-check if sqlx's `sqlite` feature is ever
         # enabled, or once a sqlx-sqlite release ships that itself requires a
         # patched `libsqlite3-sys`.
-        run: cargo audit --deny warnings --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0459
+        #
+        # RUSTSEC-2026-0543 (chrono unmaintained) and RUSTSEC-2026-0542
+        # (humantime unmaintained) are ignored by product-owner decision
+        # (2026-11-22). They are informational "unmaintained" notices, not
+        # vulnerabilities: no known flaw and nothing to upgrade to. chrono is
+        # used directly by the backend and by sqlx-core/sqlx-postgres and
+        # object_store; humantime arrives only via object_store. Neither can
+        # be removed without replacing sqlx and the storage library. Re-check
+        # when sqlx or object_store move off them, or if either notice is
+        # upgraded to a vulnerability.
+        run: cargo audit --deny warnings --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2026-0459 --ignore RUSTSEC-2026-0543 --ignore RUSTSEC-2026-0542
 
   flutter-dependency-audit:
     name: Flutter dependency vulnerability scan (OSV-Scanner)
