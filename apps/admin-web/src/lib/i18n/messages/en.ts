@@ -1520,8 +1520,10 @@ export const en = {
     newCount: "{count} new",
   },
   stepUp: {
+    unlocked: "Sensitive actions unlocked · {time}",
+    unlockedHint: "Your password confirmation is valid for this long.",
     title: "Confirm it is you",
-    body: "This action needs your password again. One confirmation covers sensitive actions for 5 minutes.",
+    body: "This action needs your password again. One confirmation covers sensitive actions for 2 minutes.",
     password: "Your password",
     confirm: "Confirm",
     cancel: "Cancel",

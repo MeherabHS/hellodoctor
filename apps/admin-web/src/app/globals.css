@@ -806,3 +806,7 @@ button, input, select, textarea { font-family: inherit; }
 .afya-lang-switch button:focus-visible { outline: 2px solid var(--afya-green); outline-offset: 2px; }
 .afya-login-main { position: relative; }
 .afya-login-lang { position: absolute; top: 20px; right: 20px; }
+
+/* Step-up countdown: time left on the last password confirmation. */
+.afya-step-up-timer { position: fixed; right: 20px; bottom: 20px; z-index: 9000; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--afya-green); color: #fff; font-size: 13px; font-weight: 700; box-shadow: 0 6px 18px rgba(10, 138, 74, 0.28); font-variant-numeric: tabular-nums; }
+.afya-step-up-dot { width: 8px; height: 8px; border-radius: 999px; background: #fff; opacity: 0.85; }

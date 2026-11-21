@@ -38,3 +38,25 @@ test('prompts, retries after a wrong password, shares one prompt and can be canc
     delete (globalThis as {window?: unknown}).window;
   }
 });
+
+test('a confirmation starts the 2-minute countdown; a new server request clears it', async () => {
+  const {markStepUpExpired, subscribeStepUpExpiry} = await import('../src/lib/stepUp.ts');
+  (globalThis as {window?: unknown}).window = {};
+  const unsubscribe = subscribeStepUp(() => {});
+  let expiry: number | null = null;
+  const stop = subscribeStepUpExpiry((value) => { expiry = value; });
+  try {
+    const before = Date.now();
+    const done = ensureStepUp(async () => 120);
+    await new Promise((r) => setTimeout(r, 0));
+    answerStepUp('right');
+    assert.equal(await done, true);
+    assert.ok(expiry !== null && expiry >= before + 119_000 && expiry <= Date.now() + 120_000);
+    markStepUpExpired();
+    assert.equal(expiry, null);
+  } finally {
+    stop();
+    unsubscribe();
+    delete (globalThis as {window?: unknown}).window;
+  }
+});

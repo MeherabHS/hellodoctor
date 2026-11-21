@@ -1519,8 +1519,10 @@ export const sw: Messages = {
     newCount: "{count} mapya",
   },
   stepUp: {
+    unlocked: "Vitendo nyeti vimefunguliwa · {time}",
+    unlockedHint: "Uthibitisho wa nenosiri lako ni halali kwa muda huu.",
     title: "Thibitisha ni wewe",
-    body: "Kitendo hiki kinahitaji nenosiri lako tena. Uthibitisho mmoja unahusu vitendo nyeti kwa dakika 5.",
+    body: "Kitendo hiki kinahitaji nenosiri lako tena. Uthibitisho mmoja unahusu vitendo nyeti kwa dakika 2.",
     password: "Nenosiri lako",
     confirm: "Thibitisha",
     cancel: "Ghairi",

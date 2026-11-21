@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ConsoleGuard } from '@/components/ConsoleGuard';
-import { StepUpDialog } from '@/components/StepUpDialog';
+import { StepUpDialog, StepUpTimer } from '@/components/StepUpDialog';
 import { cookies } from 'next/headers';
 import { I18nProvider } from '@/lib/i18n';
 import { tr } from '@/lib/i18n/core';
@@ -34,6 +34,7 @@ export default async function RootLayout({
         <I18nProvider initialLocale={locale}>
           <ErrorBoundary>{children}</ErrorBoundary>
           <StepUpDialog />
+          <StepUpTimer />
         </I18nProvider>
       </body>
     </html>

@@ -1,4 +1,4 @@
-import { ensureStepUp } from './stepUp.ts';
+import { ensureStepUp, markStepUpExpired } from './stepUp.ts';
 import { tr } from './i18n/core.ts';
 import { apiErrorMessage } from './i18n/apiErrors.ts';
 import { createSoftReads } from './inflight.mjs';
@@ -343,6 +343,7 @@ async function performRequest<T>(path: string, options?: RequestInit, stepUpRetr
     const errorBody = await res.text();
     // Sensitive Admin action: ask for the password once, then retry.
     if (res.status === 403 && !stepUpRetry && errorCode(errorBody) === 'STEP_UP_REQUIRED') {
+      markStepUpExpired();
       if (await ensureStepUp(submitStepUp)) return performRequest<T>(path, options, true);
       throw new Error(`API Error [403]: ${errorBody}`);
     }
@@ -363,12 +364,13 @@ function errorCode(body: string): string | undefined {
 }
 
 /** Posts the re-entered password; a wrong one throws the message to show. */
-async function submitStepUp(password: string): Promise<void> {
+async function submitStepUp(password: string): Promise<number | void> {
   try {
-    await performRequest('/admin/step-up', {
+    const data = await performRequest<{ valid_for_seconds?: number }>('/admin/step-up', {
       method: 'POST',
       body: JSON.stringify({ current_password: password }),
     }, true);
+    return typeof data?.valid_for_seconds === 'number' ? data.valid_for_seconds : undefined;
   } catch (error) {
     throw new Error(apiErrorMessage(error, tr('stepUp.cancelled')));
   }
