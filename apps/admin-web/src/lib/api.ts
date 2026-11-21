@@ -1,3 +1,6 @@
+import { ensureStepUp } from './stepUp.ts';
+import { tr } from './i18n/core.ts';
+import { apiErrorMessage } from './i18n/apiErrors.ts';
 import { createSoftReads } from './inflight.mjs';
 import { adminFetch } from './adminQueue.mjs';
 // API client connecting HelloDoctor Admin Portal to the Axum Rust Backend.
@@ -308,7 +311,7 @@ export function request<T>(path:string,options?:RequestInit):Promise<T>{
  inflightReads.clear();
  return performRequest<T>(path,options).finally(()=>inflightReads.clear());
 }
-async function performRequest<T>(path: string, options?: RequestInit): Promise<T> {
+async function performRequest<T>(path: string, options?: RequestInit, stepUpRetry = false): Promise<T> {
   const generation=runtimeGeneration;
   const url = `${API_BASE}${path}`;
   // Admin routes share the backend's two-request admission lane: queue them
@@ -338,11 +341,37 @@ async function performRequest<T>(path: string, options?: RequestInit): Promise<T
 
   if (!res.ok) {
     const errorBody = await res.text();
+    // Sensitive Admin action: ask for the password once, then retry.
+    if (res.status === 403 && !stepUpRetry && errorCode(errorBody) === 'STEP_UP_REQUIRED') {
+      if (await ensureStepUp(submitStepUp)) return performRequest<T>(path, options, true);
+      throw new Error(`API Error [403]: ${errorBody}`);
+    }
     throw new Error(`API Error [${res.status}]: ${errorBody}`);
   }
 
   const json: ApiResponse<T> = await res.json();
   return json.data;
+}
+
+function errorCode(body: string): string | undefined {
+  try {
+    const code = JSON.parse(body)?.error?.code;
+    return typeof code === 'string' ? code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Posts the re-entered password; a wrong one throws the message to show. */
+async function submitStepUp(password: string): Promise<void> {
+  try {
+    await performRequest('/admin/step-up', {
+      method: 'POST',
+      body: JSON.stringify({ current_password: password }),
+    }, true);
+  } catch (error) {
+    throw new Error(apiErrorMessage(error, tr('stepUp.cancelled')));
+  }
 }
 
 // Admin API Methods

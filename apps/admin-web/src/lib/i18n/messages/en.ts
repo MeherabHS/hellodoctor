@@ -1519,4 +1519,13 @@ export const en = {
     ofRegistered: "of {count} registered",
     newCount: "{count} new",
   },
+  stepUp: {
+    title: "Confirm it is you",
+    body: "This action needs your password again. One confirmation covers sensitive actions for 5 minutes.",
+    password: "Your password",
+    confirm: "Confirm",
+    cancel: "Cancel",
+    checking: "Checking…",
+    cancelled: "Action not done: password not confirmed.",
+  },
 };

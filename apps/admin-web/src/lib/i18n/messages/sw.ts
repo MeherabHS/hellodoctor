@@ -1518,4 +1518,13 @@ export const sw: Messages = {
     ofRegistered: "kati ya {count} waliosajiliwa",
     newCount: "{count} mapya",
   },
+  stepUp: {
+    title: "Thibitisha ni wewe",
+    body: "Kitendo hiki kinahitaji nenosiri lako tena. Uthibitisho mmoja unahusu vitendo nyeti kwa dakika 5.",
+    password: "Nenosiri lako",
+    confirm: "Thibitisha",
+    cancel: "Ghairi",
+    checking: "Inakagua…",
+    cancelled: "Kitendo hakikufanyika: nenosiri halikuthibitishwa.",
+  },
 };
