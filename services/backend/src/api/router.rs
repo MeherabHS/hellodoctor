@@ -574,6 +574,8 @@ fn protected_routes() -> Router<AppState> {
         .route("/peer-requests", get(crate::api::v1::peer_handlers::list_my_requests).post(crate::api::v1::peer_handlers::create_request))
         .route("/peer-requests/:id/cancel", axum::routing::post(crate::api::v1::peer_handlers::cancel_request))
         .route("/peer/requests", get(crate::api::v1::peer_handlers::list_inbox))
+        // Live nudges for new chat messages; content stays on the HTTP routes.
+        .route("/chat/live", get(crate::services::chat_live::live))
         .route("/peer-chats", get(crate::api::v1::peer_chat_handlers::list))
         .route("/peer-requests/:id/call", get(crate::api::v1::peer_chat_handlers::call_state))
         .route("/peer-requests/:id/rtc-token", axum::routing::post(crate::api::v1::peer_chat_handlers::call_token))

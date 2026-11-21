@@ -20506,3 +20506,154 @@ async fn test_data_rights_unknown_patient_is_not_found(pool: PgPool) {
     .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
 }
+
+/// Live chat nudge (2026-11-21): a committed chat message NOTIFYs `chat_live`
+/// for the recipient only, with identifiers and no message text.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_chat_message_emits_contentless_live_nudge_for_recipient(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+    let (conv_id, doctor_user): (Uuid, Uuid) = sqlx::query_as(
+        "SELECT c.id, d.user_id FROM chat_conversations c \
+         JOIN appointments a ON a.id = c.appointment_id \
+         JOIN doctor_profiles d ON d.id = a.doctor_id WHERE c.appointment_id = $1",
+    )
+    .bind(apt_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let mut listener = sqlx::postgres::PgListener::connect_with(&pool)
+        .await
+        .unwrap();
+    listener
+        .listen(hellodoctor_backend::services::chat_live::CHANNEL)
+        .await
+        .unwrap();
+
+    let res = post(
+        &app,
+        &format!("/api/v1/chat/{conv_id}/messages"),
+        Some(&patient_token),
+        &serde_json::json!({ "content": "secret symptom text" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let notification = tokio::time::timeout(std::time::Duration::from_secs(5), listener.recv())
+        .await
+        .expect("a chat_live NOTIFY after the message commits")
+        .unwrap();
+    assert!(!notification.payload().contains("secret"));
+    let signal =
+        hellodoctor_backend::services::chat_live::parse_payload(notification.payload()).unwrap();
+    assert_eq!(
+        signal,
+        hellodoctor_backend::services::chat_live::Signal::Chat {
+            user_id: doctor_user,
+            conversation_id: conv_id,
+            kind: "CHAT".into(),
+        }
+    );
+}
+
+/// The live socket sits behind the normal auth middleware.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_chat_live_socket_requires_authentication(pool: PgPool) {
+    let (app, _pool) = test_app(pool).await;
+    let anonymous = get(&app, "/api/v1/chat/live", None).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    // Authenticated but not a WebSocket handshake: past auth, refused by the upgrade.
+    let token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let plain = get(&app, "/api/v1/chat/live", Some(&token)).await;
+    assert!(
+        plain.status().is_client_error() && plain.status() != StatusCode::UNAUTHORIZED,
+        "got {}",
+        plain.status()
+    );
+}
+
+/// End to end over a real socket: the recipient's live connection receives
+/// a nudge naming the conversation (no text) when the other party writes.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_chat_live_socket_delivers_nudge_end_to_end(pool: PgPool) {
+    use futures_util::StreamExt;
+    use hellodoctor_backend::services::chat_live::{parse_payload, ChatLiveHub, CHANNEL};
+    use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message};
+
+    let (app, pool) = test_app(pool).await;
+    let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+    let (conv_id, doctor_user): (Uuid, Uuid) = sqlx::query_as(
+        "SELECT c.id, d.user_id FROM chat_conversations c \
+         JOIN appointments a ON a.id = c.appointment_id \
+         JOIN doctor_profiles d ON d.id = a.doctor_id WHERE c.appointment_id = $1",
+    )
+    .bind(apt_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // What `chat_live::start` does in the real server, on the test database.
+    let mut listener = sqlx::postgres::PgListener::connect_with(&pool)
+        .await
+        .unwrap();
+    listener.listen(CHANNEL).await.unwrap();
+    tokio::spawn(async move {
+        while let Ok(n) = listener.recv().await {
+            if let Some(signal) = parse_payload(n.payload()) {
+                ChatLiveHub::global().publish(signal);
+            }
+        }
+    });
+
+    let server = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = server.local_addr().unwrap();
+    let router = app.clone();
+    tokio::spawn(async move {
+        axum::serve(
+            server,
+            router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let doctor_token = make_token(doctor_user, "DOCTOR");
+    let mut request = format!("ws://{addr}/api/v1/chat/live")
+        .into_client_request()
+        .unwrap();
+    request.headers_mut().insert(
+        "Authorization",
+        format!("Bearer {doctor_token}").parse().unwrap(),
+    );
+    let (mut socket, _) = tokio_tungstenite::connect_async(request)
+        .await
+        .expect("authenticated upgrade");
+    let ready = socket.next().await.unwrap().unwrap();
+    assert_eq!(ready, Message::Text(r#"{"type":"ready"}"#.into()));
+
+    let res = post(
+        &app,
+        &format!("/api/v1/chat/{conv_id}/messages"),
+        Some(&patient_token),
+        &serde_json::json!({ "content": "secret symptom text" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let frame = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match socket.next().await.unwrap().unwrap() {
+                Message::Text(text) => return text,
+                _ => continue,
+            }
+        }
+    })
+    .await
+    .expect("nudge on the doctor's socket");
+    assert!(frame.contains(&conv_id.to_string()), "{frame}");
+    assert!(frame.contains(r#""type":"chat""#), "{frame}");
+    assert!(!frame.contains("secret"), "{frame}");
+}
