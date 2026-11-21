@@ -179,7 +179,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Visit type'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('24-hour chat').last);
+      await tester.tap(find.text('Chat consultation').last);
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await tester.ensureVisible(find.text('View profile'));

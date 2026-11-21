@@ -1,4 +1,6 @@
 'use client';
+import { tr, LanguageSwitch, useT } from '@/lib/i18n';
+import { apiErrorMessage } from '@/lib/i18n/apiErrors';
 import { dataRightsNotice } from '../lib/dataRightsOutcome';
 
 import { GrievanceInvestigation } from '@/components/GrievanceInvestigation';
@@ -86,6 +88,7 @@ interface ToastNotice {
 export default function AdminPortalPage(){return <NavigationGuard><AdminPortalContent/></NavigationGuard>;}
 
 function AdminPortalContent() {
+  useT(); // re-render this screen when the language changes
   // Navigation State
   const [activeAdminPage, setActiveAdminPage] = useState<AdminPageId>('command');
   const {requestNavigation}=useAdminNavigation();
@@ -108,17 +111,17 @@ function AdminPortalContent() {
   const [recoveryResolutionBusy, setRecoveryResolutionBusy] = useState<string | null>(null);
 
   async function handleRecoveryResolution(sessionId: string) {
-    const reason = window.prompt('Required resolution reason (at least 8 characters):')?.trim();
+    const reason = window.prompt(tr('ui.requiredResolutionReasonAtLeast8'))?.trim();
     if (!reason || reason.length < 8) return;
-    const pendingFinance = window.confirm('Choose OK to record PENDING_FINANCE_ACTION. Cancel records RESOLVED_NO_SETTLEMENT. No payment is changed by this action.');
+    const pendingFinance = window.confirm(tr('ui.chooseOkToRecordPendingFinance'));
     setRecoveryResolutionBusy(sessionId);
     try {
       await resolveConsultationRecovery(sessionId, pendingFinance ? 'PENDING_FINANCE_ACTION' : 'RESOLVED_NO_SETTLEMENT', reason);
-      showToast('Recovery Recorded', 'The audited decision was saved; appointment and payment state were unchanged.', '✓', 'success');
+      showToast(tr('ui.recoveryRecorded'), tr('ui.theAuditedDecisionWasSavedAppointment'), '✓', 'success');
       const refreshed = await getCommandTelemetry();
       setCommandTelemetry(refreshed);
     } catch (error) {
-      showToast('Recovery Not Recorded', error instanceof Error ? error.message : 'The session may already have a decision.', '⚠️', 'warning');
+      showToast(tr('ui.recoveryNotRecorded'), apiErrorMessage(error, tr('ui.theSessionMayAlreadyHaveA')), '⚠️', 'warning');
     } finally {
       setRecoveryResolutionBusy(null);
     }
@@ -151,14 +154,14 @@ function AdminPortalContent() {
   async function handleSavePlatformPaymentMethod() {
     if (paymentMethodsBusy) return;
     if (!newLabel.trim() || !newMaskedDisplay.trim()) {
-      showToast('Missing Fields', 'Label and display text are both required.', 'ℹ️', 'info');
+      showToast(tr('ui.missingFields'), tr('ui.labelAndDisplayTextAreBoth'), 'ℹ️', 'info');
       return;
     }
     let credentials: Record<string, string>;
     try {
       credentials = JSON.parse(newCredentialsJson);
     } catch {
-      showToast('Invalid Credentials JSON', 'Fix the JSON syntax before saving.', '⚠️', 'warning');
+      showToast(tr('ui.invalidCredentialsJson'), tr('ui.fixTheJsonSyntaxBeforeSaving'), '⚠️', 'warning');
       return;
     }
     setPaymentMethodsBusy(true);
@@ -169,13 +172,13 @@ function AdminPortalContent() {
         masked_display: newMaskedDisplay.trim(),
         credentials,
       });
-      showToast('Payment Method Saved', `${newLabel} is now configured. This is the body — plug in the real driver when ready.`, '💳', 'success');
+      showToast(tr('ui.paymentMethodSaved'), `${newLabel} is now configured. This is the body — plug in the real driver when ready.`, '💳', 'success');
       setAddPaymentMethodModalOpen(false);
       setNewLabel('');
       setNewMaskedDisplay('');
       refreshPlatformPaymentMethods();
     } catch (e) {
-      showToast('Save Failed', 'The backend did not save this payment method.', '⚠️', 'warning');
+      showToast(tr('ui.saveFailed'), tr('ui.theBackendDidNotSaveThis'), '⚠️', 'warning');
       console.warn('Platform payment method save notice:', e);
     } finally {
       setPaymentMethodsBusy(false);
@@ -187,10 +190,10 @@ function AdminPortalContent() {
     setPaymentMethodsBusy(true);
     try {
       await setPrimaryPlatformPaymentMethod(id);
-      showToast('Primary Updated', 'This method is now primary for its provider type.', '✓', 'info');
+      showToast(tr('ui.primaryUpdated'), tr('ui.thisMethodIsNowPrimaryFor'), '✓', 'info');
       refreshPlatformPaymentMethods();
     } catch {
-      showToast('Update Failed', 'The backend did not change the primary method.', '⚠️', 'warning');
+      showToast(tr('ui.updateFailed'), tr('ui.theBackendDidNotChangeThe'), '⚠️', 'warning');
     } finally {
       setPaymentMethodsBusy(false);
     }
@@ -201,10 +204,10 @@ function AdminPortalContent() {
     setPaymentMethodsBusy(true);
     try {
       await deactivatePlatformPaymentMethod(id);
-      showToast('Payment Method Removed', 'It no longer appears in the active list.', '✓', 'info');
+      showToast(tr('ui.paymentMethodRemoved'), tr('ui.itNoLongerAppearsInThe'), '✓', 'info');
       refreshPlatformPaymentMethods();
     } catch {
-      showToast('Removal Failed', 'The backend did not remove this payment method.', '⚠️', 'warning');
+      showToast(tr('ui.removalFailed'), tr('ui.theBackendDidNotRemoveThis'), '⚠️', 'warning');
     } finally {
       setPaymentMethodsBusy(false);
     }
@@ -291,26 +294,26 @@ function AdminPortalContent() {
 
   // Page Header Titles & Breadcrumbs
   const PAGE_METADATA: Record<AdminPageId, { title: string; breadcrumb: string }> = {
-    command: { title: 'Operations & Live Command Center', breadcrumb: 'Live consultations, specialist availability and the emergency helpline' },
-    patients: { title: 'Patients Directory', breadcrumb: 'People & Care · Find patients and review their care history' },
-    verification: { title: 'Doctor Verification', breadcrumb: 'People & Care · Review KMPDC professional registrations' },
-    peers: { title: 'Peer Navigators', breadcrumb: 'People & Care · Approve Peer Navigators from the Care app' },
-    peerDirectory: { title: 'Peer Directory', breadcrumb: 'People & Care · Peer Navigators and the patients they support' },
-    slots: { title: 'Slot Matrix & Locks', breadcrumb: 'Operations & Safety · Doctor schedule slots, blocks and payment locks' },
+    command: { title: tr('ui.operationsLiveCommandCenter'), breadcrumb: tr('ui.liveConsultationsSpecialistAvailabilityA') },
+    patients: { title: tr('ui.patientsDirectory'), breadcrumb: tr('ui.peopleCareFindPatientsAndReview') },
+    verification: { title: tr('ui.doctorVerification'), breadcrumb: tr('ui.peopleCareReviewKmpdcProfessionalRegistr') },
+    peers: { title: tr('ui.peerNavigators'), breadcrumb: tr('ui.peopleCareApprovePeerNavigatorsFrom') },
+    peerDirectory: { title: tr('ui.peerDirectory'), breadcrumb: tr('ui.peopleCarePeerNavigatorsAndThe') },
+    slots: { title: tr('ui.slotMatrixLocks'), breadcrumb: tr('ui.operationsSafetyDoctorScheduleSlotsBlock') },
     logs: { title: 'App Errors & Incidents', breadcrumb: 'Operations & Safety · Track, triage and resolve platform incidents' },
-    grievances: { title: 'Consultation Grievances', breadcrumb: 'Operations & Safety · Complaints, adjudication and appeals' },
-    compliance: { title: 'Rx & Q&A Audit', breadcrumb: 'Operations & Safety · Prescription and doctor answer review' },
-    blogs: { title: 'Articles', breadcrumb: 'Content · Health articles by topic' },
-    videos: { title: 'Videos', breadcrumb: 'Content · YouTube videos for the Patient app' },
-    quizzes: { title: 'Quizzes', breadcrumb: 'Content · Standalone quizzes for the Patient app' },
-    topics: { title: 'Topics & Categories', breadcrumb: 'Content · Link article categories to Patient app topics' },
-    team: { title: 'Admins & Invitations', breadcrumb: 'Admin Team · Invite and manage Admins' },
-    activity: { title: 'Activity Log', breadcrumb: 'Admin Team · Who did what, and when, live' },
-    facilities: { title: 'Facilities', breadcrumb: 'Content · Health facilities, services and opening hours' },
-    campaigns: { title: 'Campaigns', breadcrumb: 'Push notification campaigns for patients and doctors' },
-    finance: { title: 'All Payments & Escrow', breadcrumb: 'Finance · Payments, escrow and the 20% platform charge' },
-    doctors: { title: 'Settlements & Payouts', breadcrumb: 'Finance · Physician earnings, 20% platform charge and payouts' },
-    settings: { title: 'Payment Settings', breadcrumb: 'Finance · Collection methods and settlement configuration' },
+    grievances: { title: tr('ui.consultationGrievances'), breadcrumb: tr('ui.operationsSafetyComplaintsAdjudicationAn') },
+    compliance: { title: tr('ui.rxQAAudit'), breadcrumb: tr('ui.operationsSafetyPrescriptionAndDoctorAns') },
+    blogs: { title: tr('ui.articles'), breadcrumb: tr('ui.contentHealthArticlesByTopic') },
+    videos: { title: tr('ui.videos'), breadcrumb: tr('ui.contentYoutubeVideosForThePatient') },
+    quizzes: { title: tr('ui.quizzes'), breadcrumb: tr('ui.contentStandaloneQuizzesForThePatient') },
+    topics: { title: tr('ui.topicsCategories'), breadcrumb: tr('ui.contentLinkArticleCategoriesToPatient') },
+    team: { title: tr('ui.adminsInvitations'), breadcrumb: tr('ui.adminTeamInviteAndManageAdmins') },
+    activity: { title: tr('ui.activityLog'), breadcrumb: tr('ui.adminTeamWhoDidWhatAnd') },
+    facilities: { title: tr('ui.facilities'), breadcrumb: tr('ui.contentHealthFacilitiesServicesAndOpenin') },
+    campaigns: { title: tr('ui.campaigns'), breadcrumb: tr('ui.pushNotificationCampaignsForPatientsAnd') },
+    finance: { title: tr('ui.allPaymentsEscrow'), breadcrumb: tr('ui.financePaymentsEscrowAndThe20') },
+    doctors: { title: tr('ui.settlementsPayouts'), breadcrumb: tr('ui.financePhysicianEarnings20PlatformCharge') },
+    settings: { title: tr('ui.paymentSettings'), breadcrumb: tr('ui.financeCollectionMethodsAndSettlementCon') },
   };
 
   // Real client-side export: errorLogs is already the full currently-loaded
@@ -320,7 +323,7 @@ function AdminPortalContent() {
   // that previously claimed a file was produced without ever creating one.
   function handleExportLedgerCsv() {
     if (transactions.length === 0) {
-      showToast('Nothing to Export', 'There are no transactions currently loaded to export.', 'ℹ️', 'info');
+      showToast(tr('ui.nothingToExport'), tr('ui.thereAreNoTransactionsCurrentlyLoaded'), 'ℹ️', 'info');
       return;
     }
     const escapeCsv = (value: unknown) => {
@@ -353,12 +356,12 @@ function AdminPortalContent() {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
-    showToast('Ledger CSV Exported', `${transactions.length} transactions exported as CSV file.`, '📄', 'success');
+    showToast(tr('ui.ledgerCsvExported'), `${transactions.length} transactions exported as CSV file.`, '📄', 'success');
   }
 
   function handleExportLogs() {
     if (errorLogs.length === 0) {
-      showToast('Nothing to Export', 'There are no incidents currently loaded to export.', 'ℹ️', 'info');
+      showToast(tr('ui.nothingToExport'), 'There are no incidents currently loaded to export.', 'ℹ️', 'info');
       return;
     }
     const blob = new Blob([JSON.stringify(errorLogs, null, 2)], { type: 'application/json' });
@@ -384,17 +387,17 @@ function AdminPortalContent() {
       const batch = await initiateDisbursement(start, end);
       if (batch.total_doctors > 0) {
         showToast(
-          `Disbursement Batch Prepared: ${money(batch.total_net_disbursed)}`,
-          `${batch.total_doctors} Doctor${batch.total_doctors === 1 ? '' : 's'} routed for Finance approval. No money moved.`,
+          tr('tpl.batchPrepared', { amount: money(batch.total_net_disbursed) }),
+          tr(batch.total_doctors === 1 ? 'tpl.batchRoutedOne' : 'tpl.batchRoutedMany', { count: batch.total_doctors }),
           '🧾',
           'info'
         );
       } else {
-        showToast('No Eligible Unassigned Statements', 'Review payout setup and existing allocations for the selected month. No money moved.', 'ℹ️', 'info');
+        showToast(tr('ui.noEligibleUnassignedStatements'), tr('ui.reviewPayoutSetupAndExistingAllocations'), 'ℹ️', 'info');
       }
       await refreshBackend();
     } catch (e) {
-      showToast('Batch Not Prepared', 'The month must be finalized and destinations eligible. The backend did not prepare a batch.', '⚠️', 'warning');
+      showToast(tr('ui.batchNotPrepared'), tr('ui.theMonthMustBeFinalizedAnd'), '⚠️', 'warning');
       console.warn('Disbursement API notice:', e);
     } finally { setFinanceBusy(false); }
   }
@@ -404,10 +407,10 @@ function AdminPortalContent() {
     setFinanceBusy(true);
     try {
       await finalizeFinancialPeriod(financeMonth);
-      showToast('Accounting Month Finalized', `${financeMonth} statement amounts are frozen. This does not approve or pay any payout.`, '🧾', 'info');
+      showToast(tr('ui.accountingMonthFinalized'), tr('tpl.monthFrozen', { month: financeMonth }), '🧾', 'info');
       await refreshBackend();
     } catch {
-      showToast('Month Not Finalized', 'Check whether the month is already finalized or in the future. The backend did not close it.', '⚠️', 'warning');
+      showToast(tr('ui.monthNotFinalized'), tr('ui.checkWhetherTheMonthIsAlready'), '⚠️', 'warning');
     } finally { setFinanceBusy(false); }
   }
 
@@ -427,10 +430,10 @@ function AdminPortalContent() {
           },
         };
       });
-      showToast('Disbursement Approved', 'Finance approval recorded. No provider payment has been confirmed.', '✓', 'info');
+      showToast(tr('ui.disbursementApproved'), tr('ui.financeApprovalRecordedNoProviderPayment'), '✓', 'info');
       await refreshBackend();
     } catch (e) {
-      showToast('Approval Failed', 'The backend did not approve this disbursement item.', '⚠️', 'warning');
+      showToast(tr('ui.approvalFailed'), tr('ui.theBackendDidNotApproveThis'), '⚠️', 'warning');
       console.warn('Disbursement approval API notice:', e);
     } finally { setFinanceBusy(false); }
   }
@@ -440,7 +443,7 @@ function AdminPortalContent() {
     if (verificationBusy) return;
     const candidate = verificationQueue.find((d) => d.id === selectedVerificationId);
     if (!candidate) {
-      showToast('No Application Selected', 'Select a doctor from the vetting queue first.', 'ℹ️', 'info');
+      showToast(tr('ui.noApplicationSelected'), tr('ui.selectADoctorFromTheVetting'), 'ℹ️', 'info');
       return;
     }
 
@@ -452,16 +455,16 @@ function AdminPortalContent() {
           showToast(`${candidate.full_name} Approved ✓`, `${candidate.license_number} credentialed by the backend.`, '✓', 'success');
           await refreshBackend();
         } catch (e) {
-          showToast('Approval Failed', 'The backend did not verify this Doctor.', '⚠️', 'warning');
+          showToast(tr('ui.approvalFailed'), tr('ui.theBackendDidNotVerifyThis'), '⚠️', 'warning');
           console.warn('Professional registration verify API notice:', e);
         }
       } else {
         try {
           await rejectDoctorProfessionalRegistration(candidate.id, 'Application declined by admin');
-          showToast('Application Declined', `${candidate.full_name}'s application was rejected.`, '✕', 'warning');
+          showToast(tr('ui.applicationDeclined'), `${candidate.full_name}'s application was rejected.`, '✕', 'warning');
           await refreshBackend();
         } catch (e) {
-          showToast('Rejection Failed', 'The backend did not reject this application.', '⚠️', 'warning');
+          showToast(tr('ui.rejectionFailed'), tr('ui.theBackendDidNotRejectThis'), '⚠️', 'warning');
           console.warn('Professional registration reject API notice:', e);
         }
       }
@@ -480,7 +483,7 @@ function AdminPortalContent() {
       setAdminSlots(rows => rows.map(slot => slot.id === result.slot_id ? { ...slot, status: result.status } : slot));
       await slotSync.refresh();
     } catch (e) {
-      showToast('Slot Update Failed', 'The backend did not toggle this slot.', '⚠️', 'warning');
+      showToast(tr('ui.slotUpdateFailed'), tr('ui.theBackendDidNotToggleThis'), '⚠️', 'warning');
       console.warn('Slot toggle API notice:', e);
     } finally {
       setSlotBusy(null);
@@ -502,10 +505,10 @@ function AdminPortalContent() {
       }
       setAdjudicationNotes('');
       await refreshBackend();
-      showToast(action === 'REFUND' ? 'Refund approved' : 'Decision recorded',
-        action === 'REFUND' ? 'Provider execution is pending. No money has been returned.' : 'The backend confirmed the decision.', '?', 'success');
+      showToast(action === 'REFUND' ? tr('ui2.refundApproved') : tr('ui2.decisionRecorded'),
+        action === 'REFUND' ? tr('ui2.providerExecutionIsPendingNoMoney') : tr('ui2.theBackendConfirmedTheDecision'), '?', 'success');
     } catch (error) {
-      showToast('Decision not confirmed', error instanceof Error ? error.message : 'Retry after checking the server state.', '!', 'warning');
+      showToast(tr('ui.decisionNotConfirmed'), apiErrorMessage(error, tr('ui.retryAfterCheckingTheServerState')), '!', 'warning');
     } finally {
       setFinanceBusy(false);
     }
@@ -533,9 +536,9 @@ function AdminPortalContent() {
     try {
       const dossier = await getPatientDossier(patientId);
       downloadJson(`hellodoctor-patient-${patientId.slice(0, 8)}-export`, dossier);
-      showToast('Patient Data Exported 📥', 'Full record downloaded as JSON.', '📥', 'success');
+      showToast(tr('ui.patientDataExported'), tr('ui.fullRecordDownloadedAsJson'), '📥', 'success');
     } catch (error) {
-      showToast('Export Failed', error instanceof Error ? error.message : 'The backend did not return this record.', '⚠️', 'warning');
+      showToast(tr('ui.exportFailed'), apiErrorMessage(error, tr('ui.theBackendDidNotReturnThis')), '⚠️', 'warning');
     } finally {
       setDataRightsBusy(null);
     }
@@ -547,9 +550,9 @@ function AdminPortalContent() {
     try {
       const dossier = await getDoctorDossier(doctorId);
       downloadJson(`hellodoctor-doctor-${doctorId.slice(0, 8)}-export`, dossier);
-      showToast('Doctor Data Exported 📥', 'Full record downloaded as JSON.', '📥', 'success');
+      showToast(tr('ui.doctorDataExported'), tr('ui.fullRecordDownloadedAsJson'), '📥', 'success');
     } catch (error) {
-      showToast('Export Failed', error instanceof Error ? error.message : 'The backend did not return this record.', '⚠️', 'warning');
+      showToast(tr('ui.exportFailed'), apiErrorMessage(error, tr('ui.theBackendDidNotReturnThis')), '⚠️', 'warning');
     } finally {
       setDataRightsBusy(null);
     }
@@ -558,15 +561,15 @@ function AdminPortalContent() {
   async function handleErasePatientData(patientId: string, displayName: string) {
     if (dataRightsBusy) return;
     const reason = window.prompt(
-      `Erase/anonymize ${displayName}'s data (Data Protection Act 2019 §40). This cannot be undone.\n\nIf this account has consultation history, the profile is anonymized and the clinical/financial trail is kept; otherwise it is permanently deleted.\n\nEnter the justification for this request (8–300 characters):`
+      tr('tpl.erasePatientPrompt', { name: displayName })
     );
     if (!reason || !reason.trim()) return;
     const trimmed = reason.trim();
     if (trimmed.length < 8 || trimmed.length > 300) {
-      showToast('Invalid Reason', 'Justification must be 8–300 characters.', '⚠️', 'warning');
+      showToast(tr('ui.invalidReason'), tr('ui.justificationMustBe8300Characters'), '⚠️', 'warning');
       return;
     }
-    if (!window.confirm(`Confirm: permanently erase or anonymize ${displayName}'s data? This cannot be undone.`)) return;
+    if (!window.confirm(tr('tpl.eraseConfirm', { name: displayName }))) return;
     setDataRightsBusy(patientId);
     try {
       const result = await executePatientDataRights(patientId, trimmed);
@@ -576,7 +579,7 @@ function AdminPortalContent() {
       const notice = dataRightsNotice(result, 'Patient', refreshed);
       showToast(notice.title, notice.message, notice.icon, notice.level);
     } catch (error) {
-      showToast('Request Failed', error instanceof Error ? error.message : 'The backend rejected this request.', '⚠️', 'warning');
+      showToast(tr('ui.requestFailed'), apiErrorMessage(error, tr('ui.theBackendRejectedThisRequest')), '⚠️', 'warning');
     } finally {
       setDataRightsBusy(null);
     }
@@ -585,15 +588,15 @@ function AdminPortalContent() {
   async function handleEraseDoctorData(doctorId: string, displayName: string) {
     if (dataRightsBusy) return;
     const reason = window.prompt(
-      `Erase/anonymize ${displayName}'s data (Data Protection Act 2019 §40). This cannot be undone.\n\nKMPDC professional/regulatory record (license, qualifications) is kept either way; personal/contact fields are scrubbed.\n\nEnter the justification for this request (8–300 characters):`
+      tr('tpl.eraseDoctorPrompt', { name: displayName })
     );
     if (!reason || !reason.trim()) return;
     const trimmed = reason.trim();
     if (trimmed.length < 8 || trimmed.length > 300) {
-      showToast('Invalid Reason', 'Justification must be 8–300 characters.', '⚠️', 'warning');
+      showToast(tr('ui.invalidReason'), tr('ui.justificationMustBe8300Characters'), '⚠️', 'warning');
       return;
     }
-    if (!window.confirm(`Confirm: permanently erase or anonymize ${displayName}'s data? This cannot be undone.`)) return;
+    if (!window.confirm(tr('tpl.eraseConfirm', { name: displayName }))) return;
     setDataRightsBusy(doctorId);
     try {
       const result = await executeDoctorDataRights(doctorId, trimmed);
@@ -603,7 +606,7 @@ function AdminPortalContent() {
       const notice = dataRightsNotice(result, 'Doctor', refreshed);
       showToast(notice.title, notice.message, notice.icon, notice.level);
     } catch (error) {
-      showToast('Request Failed', error instanceof Error ? error.message : 'The backend rejected this request.', '⚠️', 'warning');
+      showToast(tr('ui.requestFailed'), apiErrorMessage(error, tr('ui.theBackendRejectedThisRequest')), '⚠️', 'warning');
     } finally {
       setDataRightsBusy(null);
     }
@@ -619,11 +622,11 @@ function AdminPortalContent() {
     if (refundBusy) return;
     let providerReference: string | undefined;
     if (status === 'REFUNDED') {
-      const entered = window.prompt('Provider reference for this refund (required, max 300 characters):');
+      const entered = window.prompt(tr('ui.providerReferenceForThisRefundRequired'));
       if (!entered || !entered.trim()) return;
       const trimmed = entered.trim();
       if (trimmed.length > 300) {
-        showToast('Reference Too Long', 'Provider reference must be 300 characters or fewer.', '⚠️', 'warning');
+        showToast(tr('ui.referenceTooLong'), tr('ui.providerReferenceMustBe300Characters'), '⚠️', 'warning');
         return;
       }
       providerReference = trimmed;
@@ -632,9 +635,9 @@ function AdminPortalContent() {
     try {
       await transitionRefundRequest(requestId, status, providerReference);
       await refreshBackend();
-      showToast('Refund Request Updated', `Status set to ${status.replace(/_/g, ' ')}.`, '✓', 'success');
+      showToast(tr('ui.refundRequestUpdated'), tr('tpl.statusSet', { status: status.replace(/_/g, ' ') }), '✓', 'success');
     } catch (error) {
-      showToast('Update Failed', error instanceof Error ? error.message : 'The backend rejected this transition.', '⚠️', 'warning');
+      showToast(tr('ui.updateFailed'), apiErrorMessage(error, tr('ui.theBackendRejectedThisTransition')), '⚠️', 'warning');
     } finally {
       setRefundBusy(null);
     }
@@ -652,7 +655,7 @@ function AdminPortalContent() {
       await refreshBackend();
       showToast('Incident Acknowledged', 'Marked as under investigation.', '🔍', 'info');
     } catch (e) {
-      showToast('Update Failed', e instanceof Error ? e.message : 'The backend did not accept this change.', '⚠️', 'warning');
+      showToast(tr('ui.updateFailed'), e instanceof Error ? e.message : 'The backend did not accept this change.', '⚠️', 'warning');
     } finally {
       setLogActionBusy(null);
     }
@@ -666,7 +669,7 @@ function AdminPortalContent() {
       await refreshBackend();
       showToast('Incident Resolved', 'Telemetry exception marked resolved.', '✓', 'success');
     } catch (e) {
-      showToast('Update Failed', e instanceof Error ? e.message : 'The backend did not accept this change.', '⚠️', 'warning');
+      showToast(tr('ui.updateFailed'), e instanceof Error ? e.message : 'The backend did not accept this change.', '⚠️', 'warning');
     } finally {
       setLogActionBusy(null);
     }
@@ -795,25 +798,25 @@ function AdminPortalContent() {
         onNavigate={navigateAdmin}
         badges={{
           verification: verificationQueue.length > 0 ? { label: String(verificationQueue.length), tone: 'blue' } : undefined,
-          logs: unresolvedLogsCount > 0 ? { label: `${unresolvedLogsCount} new`, tone: 'red' } : undefined,
+          logs: unresolvedLogsCount > 0 ? { label: tr('ui4.newCount', { count: unresolvedLogsCount }), tone: 'red' } : undefined,
           grievances: pendingGrievancesCount > 0 ? { label: `${pendingGrievancesCount} open`, tone: 'red' } : undefined,
           ...(!paymentRequired ? {
-            finance: { label: 'Deferred', tone: 'muted', title: 'FINANCIAL_MODULE_MODE=deferred — read-only' },
-            doctors: { label: 'Deferred', tone: 'muted', title: 'FINANCIAL_MODULE_MODE=deferred — read-only' },
-            settings: { label: 'Deferred', tone: 'muted', title: 'FINANCIAL_MODULE_MODE=deferred — read-only' },
+            finance: { label: tr('ui.deferred'), tone: 'muted', title: tr('ui.financialModuleModeDeferredReadOnly') },
+            doctors: { label: tr('ui.deferred'), tone: 'muted', title: tr('ui.financialModuleModeDeferredReadOnly') },
+            settings: { label: tr('ui.deferred'), tone: 'muted', title: tr('ui.financialModuleModeDeferredReadOnly') },
           } : doctorsAwaitingCount > 0 ? { doctors: { label: `${doctorsAwaitingCount} pending`, tone: 'amber' } } : {}),
         }}
         groupBadges={{
           people: verificationQueue.length > 0 ? { label: String(verificationQueue.length), tone: 'blue' } : undefined,
           operations: unresolvedLogsCount + pendingGrievancesCount > 0 ? { label: String(unresolvedLogsCount + pendingGrievancesCount), tone: 'red' } : undefined,
-          finance: !paymentRequired ? { label: 'Deferred', tone: 'muted' } : undefined,
+          finance: !paymentRequired ? { label: tr('ui.deferred'), tone: 'muted' } : undefined,
         }}
       />
 
       {/* Main Wrapper (Topbar + Content Area) */}
       <div className="admin-main-wrapper">
         <header className="admin-topbar">
-          <nav className="admin-topbar-left admin-trail" aria-label="Breadcrumb">
+          <nav className="admin-topbar-left admin-trail" aria-label={tr('ui.breadcrumb')}>
             {pageTrail(activeAdminPage).slice(0, -1).map(part => (
               <span key={part} className="admin-trail-part">{part}<ChevronRight size={14} aria-hidden /></span>
             ))}
@@ -828,9 +831,9 @@ function AdminPortalContent() {
               <input
                 type="text"
                 id="adminGlobalSearchInput"
-                aria-label="Search doctors, patients, incidents and payments"
+                aria-label={tr('ui.searchDoctorsPatientsIncidentsAndPayment')}
                 maxLength={150}
-                placeholder="Search doctors, patients, incidents…"
+                placeholder={tr('ui.searchDoctorsPatientsIncidents')}
                 onChange={(e) => {
                   const val = e.target.value;
                   setDoctorSearchQuery(val);
@@ -841,27 +844,29 @@ function AdminPortalContent() {
               />
             </div>
 
+            <LanguageSwitch />
+
             <NotificationCenter pendingApplications={verificationQueue.length} onOpen={(page) => navigateAdmin(page)} />
 
             <div className="admin-user-pill">
               <div className="admin-avatar">AD</div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="admin-user-name">Admin account</span>
-                <span className="admin-user-role">Administrator</span>
+                <span className="admin-user-name">{tr('ui.adminAccount')}</span>
+                <span className="admin-user-role">{tr('ui.administrator')}</span>
               </div>
             </div>
 
             <button
               type="button"
               className="admin-top-icon-btn"
-              title="Sign out"
-              aria-label="Sign out"
+              title={tr('ui.signOut')}
+              aria-label={tr('ui.signOut')}
               onClick={() => requestNavigation(async () => {
                 try {
                   clearAdminRuntime();
                   const result = await fetch('/api/logout', { method: 'POST' });
-                  if (!result.ok) window.alert('Signed out locally. Server revocation could not be confirmed.');
-                } catch { window.alert('Unable to reach the server. Server sign-out could not be confirmed.'); }
+                  if (!result.ok) window.alert(tr('ui.signedOutLocallyServerRevocationCould'));
+                } catch { window.alert(tr('ui.unableToReachTheServerServer')); }
                 // A full document navigation discards the authenticated runtime.
                 window.location.assign(new URL('/login', window.location.origin).href);
               })}
@@ -880,8 +885,8 @@ function AdminPortalContent() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className="afya-page-head" style={{ flex: 1 }}>
                   <div>
-                    <h2>Settlements &amp; Payouts</h2>
-                    <p>Physician earnings, the 20% platform charge and monthly payouts.</p>
+                    <h2>{tr('ui.settlementsPayouts2')}</h2>
+                    <p>{tr('ui.physicianEarningsThe20PlatformCharge')}</p>
                   </div>
                 </div>
 
@@ -893,17 +898,17 @@ function AdminPortalContent() {
                     style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#1E293B', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '9px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginRight: '8px' }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                    <span>Master Payment Ledger →</span>
+                    <span>{tr('ui.masterPaymentLedger')}</span>
                   </button>
-                  <label style={{ fontSize: '12px', marginRight: '8px' }}>Statement month <input aria-label="Statement month" type="month" value={financeMonth} max={new Date().toISOString().slice(0, 7)} onChange={(e) => {
+                  <label style={{ fontSize: '12px', marginRight: '8px' }}>{tr('ui.statementMonth')} <input aria-label={tr('ui.statementMonth')} type="month" value={financeMonth} max={new Date().toISOString().slice(0, 7)} onChange={(e) => {
                     if (!e.target.value || financeBusy) return;
                     setFinanceMonth(e.target.value);
                     setDoctorStore((previous) => Object.fromEntries(Object.entries(previous).map(([key, doc]) => [key, { ...doc, payoutRouting: undefined }])));
                   }} /></label>
-                  <button className="admin-btn-sec" disabled={financeBusy} onClick={handleFinalizePeriod}>Finalize Month</button>
+                  <button className="admin-btn-sec" disabled={financeBusy} onClick={handleFinalizePeriod}>{tr('ui.finalizeMonth')}</button>
                   <button className="admin-batch-payout-btn" disabled={financeBusy} onClick={handleExecuteBatchPayout}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    <span>Prepare Batch</span>
+                    <span>{tr('ui.prepareBatch')}</span>
                   </button>
                 </div>
                 )}
@@ -915,18 +920,18 @@ function AdminPortalContent() {
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Gross Telehealth Revenue</span>
+                    <span className="admin-kpi-sub">{tr('ui.grossTelehealthRevenue')}</span>
                     <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
                     </div>
                   </div>
                   <div className="admin-kpi-val">{money(overview?.gross_volume)}</div>
-                  <span className="admin-kpi-delta neutral">Across {transactions.length} transaction{transactions.length === 1 ? '' : 's'}</span>
+                  <span className="admin-kpi-delta neutral">{tr(transactions.length === 1 ? 'mix.acrossTxOne' : 'mix.acrossTxMany', { count: transactions.length })}</span>
                 </div>
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">24h Chat Revenue</span>
+                    <span className="admin-kpi-sub">{tr('ui.n24hChatRevenue')}</span>
                     <div className="admin-kpi-icon-circle blue" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                     </div>
@@ -934,30 +939,30 @@ function AdminPortalContent() {
                   <div className="admin-kpi-val">{money(modalitySplit.chatRevenue)}</div>
                   <div className="kpi-micro-chart">
                     <div className="kpi-donut-legend">
-                      <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#2563EB' }}></span> {modalitySplit.videoCount} video consultation{modalitySplit.videoCount === 1 ? '' : 's'}</div>
-                      <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#E2E8F0' }}></span> {modalitySplit.chatCount} chat session{modalitySplit.chatCount === 1 ? '' : 's'}</div>
+                      <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#2563EB' }}></span> {tr(modalitySplit.videoCount === 1 ? 'mix.videoConsultsOne' : 'mix.videoConsultsMany', { count: modalitySplit.videoCount })}</div>
+                      <div className="kpi-donut-legend-item"><span className="dot" style={{ background: '#E2E8F0' }}></span> {tr(modalitySplit.chatCount === 1 ? 'mix.chatSessionsOne' : 'mix.chatSessionsMany', { count: modalitySplit.chatCount })}</div>
                     </div>
                   </div>
                 </div>
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Platform Fee (20%)</span>
+                    <span className="admin-kpi-sub">{tr('ui.platformFee20')}</span>
                     <div className="admin-kpi-icon-circle teal" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     </div>
                   </div>
                   <div className="admin-kpi-val">{money(overview?.platform_fees)}</div>
-                  <span className="admin-kpi-delta neutral">Automated commission cut</span>
+                  <span className="admin-kpi-delta neutral">{tr('ui.automatedCommissionCut')}</span>
                   {(modalitySplit.videoRevenue + modalitySplit.chatRevenue) > 0 && (
                     <div className="kpi-micro-chart kpi-stacked-bar">
                       <div className="kpi-bar-row">
-                        <span className="kpi-bar-label">Video</span>
+                        <span className="kpi-bar-label">{tr('ui.video')}</span>
                         <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: `${Math.round((modalitySplit.videoRevenue / (modalitySplit.videoRevenue + modalitySplit.chatRevenue)) * 100)}%`, background: 'linear-gradient(90deg,#0D9488,#5EEAD4)' }}></div></div>
                         <span className="kpi-bar-value">{money(modalitySplit.videoRevenue)}</span>
                       </div>
                       <div className="kpi-bar-row">
-                        <span className="kpi-bar-label">Chat</span>
+                        <span className="kpi-bar-label">{tr('ui.chat')}</span>
                         <div className="kpi-bar-track"><div className="kpi-bar-fill" style={{ width: `${Math.round((modalitySplit.chatRevenue / (modalitySplit.videoRevenue + modalitySplit.chatRevenue)) * 100)}%`, background: 'linear-gradient(90deg,#14B8A6,#99F6E4)' }}></div></div>
                         <span className="kpi-bar-value">{money(modalitySplit.chatRevenue)}</span>
                       </div>
@@ -967,7 +972,7 @@ function AdminPortalContent() {
 
                 <div className="admin-kpi-card" style={{ borderColor: '#FCD34D' }}>
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Unpaid Doctor Earnings</span>
+                    <span className="admin-kpi-sub">{tr('ui.unpaidDoctorEarnings')}</span>
                     <div className="admin-kpi-icon-circle amber" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </div>
@@ -984,8 +989,8 @@ function AdminPortalContent() {
                       <div className="kpi-pulse-dot" style={{ background: doctorsAwaitingCount === 0 ? '#059669' : '#D97706' }}></div>
                       <span className="kpi-pulse-text" style={{ color: doctorsAwaitingCount === 0 ? '#059669' : '#D97706' }}>
                         {doctorsAwaitingCount === 0
-                          ? 'No pending earning balance'
-                          : `${doctorsAwaitingCount} doctor${doctorsAwaitingCount === 1 ? '' : 's'} awaiting disbursement`}
+                          ? tr('tpl.noPendingEarning')
+                          : tr(doctorsAwaitingCount === 1 ? 'tpl.doctorsAwaitingOne' : 'tpl.doctorsAwaitingMany', { count: doctorsAwaitingCount })}
                       </span>
                     </div>
                   </div>
@@ -994,7 +999,7 @@ function AdminPortalContent() {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#64748B', margin: '-8px 0 16px' }}>
                 <span>ℹ️</span>
-                <span>Total calculation is based including the platform charge 20%.</span>
+                <span>{tr('ui.totalCalculationIsBasedIncludingThe')}</span>
               </div>
               </>}
 
@@ -1002,8 +1007,8 @@ function AdminPortalContent() {
               <div className="admin-card">
                 <div className="admin-card-header" style={{ flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
                   <div>
-                    <div className="admin-card-title">Physician Payouts</div>
-                    <div className="admin-card-subtitle">Gross earnings → 20% platform charge → final net take-home, per doctor and statement month.</div>
+                    <div className="admin-card-title">{tr('ui.physicianPayouts')}</div>
+                    <div className="admin-card-subtitle">{tr('ui.grossEarnings20PlatformChargeFinal')}</div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -1012,7 +1017,7 @@ function AdminPortalContent() {
                       <input
                         type="text"
                         maxLength={150}
-                        placeholder="Search doctor, Professional registration #, specialty, method..."
+                        placeholder={tr('ui.searchDoctorProfessionalRegistrationSpec')}
                         value={doctorSearchQuery}
                         onChange={(e) => setDoctorSearchQuery(e.target.value)}
                         style={{ width: '100%', padding: '7px 12px 7px 30px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '11.5px', background: '#fff', outline: 'none' }}
@@ -1020,9 +1025,9 @@ function AdminPortalContent() {
                     </div>
 
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button className={`admin-filter-pill ${doctorStatusFilter === 'all' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('all')}>All ({Object.keys(doctorStore).length})</button>
-                      <button className={`admin-filter-pill ${doctorStatusFilter === 'pending' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('pending')}>Pending ({doctorsAwaitingCount})</button>
-                      <button className={`admin-filter-pill ${doctorStatusFilter === 'settled' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('settled')}>Settled ({doctorsSettledCount})</button>
+                      <button className={`admin-filter-pill ${doctorStatusFilter === 'all' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('all')}>{tr('mix.allCount', { count: Object.keys(doctorStore).length })}</button>
+                      <button className={`admin-filter-pill ${doctorStatusFilter === 'pending' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('pending')}>{tr('mix.pendingCount', { count: doctorsAwaitingCount })}</button>
+                      <button className={`admin-filter-pill ${doctorStatusFilter === 'settled' ? 'active' : ''}`} onClick={() => setDoctorStatusFilter('settled')}>{tr('mix.settledCount', { count: doctorsSettledCount })}</button>
                     </div>
                   </div>
                 </div>
@@ -1031,16 +1036,16 @@ function AdminPortalContent() {
                   <table className="admin-table">
                     <thead>
                       <tr>
-                        <th>Doctor</th>
-                        <th>KMPDC Reg. #</th>
-                        <th>Video visits</th>
-                        <th>Chat sessions</th>
-                        <th>Monthly gross</th>
-                        <th>Platform charge (20%)</th>
-                        <th>Final net take-home</th>
-                        <th>Payout method</th>
-                        <th>Status</th>
-                        <th>Actions</th>
+                        <th>{tr('ui.doctor')}</th>
+                        <th>{tr('ui.kmpdcReg')}</th>
+                        <th>{tr('ui.videoVisits')}</th>
+                        <th>{tr('ui.chatSessions')}</th>
+                        <th>{tr('ui.monthlyGross')}</th>
+                        <th>{tr('ui.platformCharge20')}</th>
+                        <th>{tr('ui.finalNetTakeHome')}</th>
+                        <th>{tr('ui.payoutMethod')}</th>
+                        <th>{tr('ui.status')}</th>
+                        <th>{tr('ui.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1067,23 +1072,23 @@ function AdminPortalContent() {
                             <td><span className="badge badge-slate" style={{ fontWeight: 750 }}>{doc.registrationNumber}</span><div>{doc.professionalVerificationStatus}</div></td>
                             <td><b>{doc.kpiVisits}</b></td>
                             <td>{doc.kpiChats}</td>
-                            <td>{!paymentRequired ? 'Deferred' : doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.gross || 0).toLocaleString()}` : 'Unavailable'}</td>
-                            <td style={{ color: '#64748B' }}>{!paymentRequired ? 'Deferred' : doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.platformCharge || 0).toLocaleString()}` : 'Unavailable'}</td>
-                            <td style={{ fontWeight: 850, color: '#059669' }}>{!paymentRequired ? 'Deferred' : doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.finalPayable).toLocaleString()}` : 'Unavailable'}</td>
+                            <td>{!paymentRequired ? tr('ui2.deferred') : doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.gross || 0).toLocaleString()}` : tr('ui2.unavailable')}</td>
+                            <td style={{ color: '#64748B' }}>{!paymentRequired ? tr('ui2.deferred') : doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.platformCharge || 0).toLocaleString()}` : tr('ui2.unavailable')}</td>
+                            <td style={{ fontWeight: 850, color: '#059669' }}>{!paymentRequired ? tr('ui2.deferred') : doc.payoutRouting ? `${doc.payoutRouting.currency} ${Number(doc.payoutRouting.finalPayable).toLocaleString()}` : tr('ui2.unavailable')}</td>
                             <td>
                               {!paymentRequired ? (
-                                <span className="payout-method-badge bank">Financial module deferred</span>
+                                <span className="payout-method-badge bank">{tr('ui.financialModuleDeferred')}</span>
                               ) : (
                               <span className="payout-method-badge bank">
                                 {doc.payoutRouting?.provider
                                   ? `${doc.payoutRouting.provider} ${doc.payoutRouting.maskedDestination || ''}`
-                                  : 'Payout setup required'}
+                                  : tr('ui2.payoutSetupRequired')}
                               </span>
                               )}
                             </td>
                             <td>
                               {!paymentRequired ? (
-                                <span className="badge badge-slate doc-payout-status">Deferred</span>
+                                <span className="badge badge-slate doc-payout-status">{tr('ui.deferred')}</span>
                               ) : (
                               <>
                               {/* The backend's `readiness` field is never literally the
@@ -1097,9 +1102,9 @@ function AdminPortalContent() {
                                   "something usable is on file", not "matches one
                                   specific string". */}
                               <span className={`badge ${doc.payoutRouting?.readiness && doc.payoutRouting.readiness !== 'PAYOUT_SETUP_REQUIRED' ? 'badge-green' : 'badge-amber'} doc-payout-status`}>
-                                {doc.payoutRouting?.disbursementStatus || doc.payoutRouting?.readiness || 'Payout setup required'}
+                                {doc.payoutRouting?.disbursementStatus || doc.payoutRouting?.readiness || tr('ui2.payoutSetupRequired')}
                               </span>
-                              <div style={{ fontSize: '10px' }}>{doc.payoutRouting?.statementStatus || 'Not loaded'} · {doc.payoutRouting?.readiness || 'Unknown'}</div>
+                              <div style={{ fontSize: '10px' }}>{doc.payoutRouting?.statementStatus || tr('ui2.notLoaded')} · {doc.payoutRouting?.readiness || tr('ui2.unknown')}</div>
                               </>
                               )}
                             </td>
@@ -1111,7 +1116,7 @@ function AdminPortalContent() {
                                   setSelectedDoctorKey(doc.key);
                                 }}
                               >
-                                View History ↗
+                                {tr('ui.viewHistory')}
                               </button>
                             </td>
                           </tr>
@@ -1221,13 +1226,13 @@ function AdminPortalContent() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div className="afya-page-head" style={{ flex: 1 }}>
                   <div>
-                    <h2>Payment Settings</h2>
-                    <p>How the platform collects payment (M-Pesa, card or a future provider). Separate from patients&apos; payment methods and doctors&apos; payout destinations. Credentials are encrypted and never returned.</p>
+                    <h2>{tr('ui.paymentSettings')}</h2>
+                    <p>{tr('ui.howThePlatformCollectsPaymentM')}</p>
                   </div>
                 </div>
                 {paymentRequired && (
                 <button className="admin-btn-pri" onClick={() => setAddPaymentMethodModalOpen(true)} style={{ padding: '7px 14px', fontSize: '11.5px' }}>
-                  + Add Payment Method
+                  {tr('ui.addPaymentMethod')}
                 </button>
                 )}
               </div>
@@ -1237,16 +1242,16 @@ function AdminPortalContent() {
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th>Provider</th>
-                      <th>Label</th>
-                      <th>Display</th>
-                      <th>Status</th>
-                      <th>Actions</th>
+                      <th>{tr('ui.provider')}</th>
+                      <th>{tr('ui.label')}</th>
+                      <th>{tr('ui.display')}</th>
+                      <th>{tr('ui.status')}</th>
+                      <th>{tr('ui.actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {platformPaymentMethods.length === 0 ? (
-                      <tr><td colSpan={5} style={{ textAlign: 'center', color: '#94A3B8', padding: '24px' }}>No platform payment methods configured yet.</td></tr>
+                      <tr><td colSpan={5} style={{ textAlign: 'center', color: '#94A3B8', padding: '24px' }}>{tr('ui.noPlatformPaymentMethodsConfiguredYet')}</td></tr>
                     ) : (
                       platformPaymentMethods.map((m) => (
                         <tr key={m.id}>
@@ -1255,17 +1260,17 @@ function AdminPortalContent() {
                           <td style={{ fontFamily: 'monospace' }}>{m.masked_display}</td>
                           <td>
                             <span className={`badge ${m.is_primary ? 'badge-green' : 'badge-amber'}`}>
-                              {m.is_primary ? 'Primary' : 'Active'}
+                              {m.is_primary ? tr('ui2.primary') : tr('ui2.active')}
                             </span>
                           </td>
                           <td style={{ display: 'flex', gap: '8px' }}>
                             {!m.is_primary && (
                               <button className="admin-btn-sec" disabled={paymentMethodsBusy} onClick={() => handleSetPrimaryPlatformPaymentMethod(m.id)} style={{ fontSize: '11px', padding: '5px 10px' }}>
-                                Make Primary
+                                {tr('ui.makePrimary')}
                               </button>
                             )}
                             <button className="admin-btn-sec" disabled={paymentMethodsBusy} onClick={() => handleDeactivatePlatformPaymentMethod(m.id)} style={{ fontSize: '11px', padding: '5px 10px', color: '#DC2626' }}>
-                              Remove
+                              {tr('ui.remove')}
                             </button>
                           </td>
                         </tr>
@@ -1283,22 +1288,22 @@ function AdminPortalContent() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div className="afya-page-head" style={{ flex: 1 }}>
                   <div>
-                    <h2>All Payments &amp; Escrow</h2>
-                    <p>Patient payments, escrow, the 20% platform charge, payouts and refunds.</p>
+                    <h2>{tr('ui.allPaymentsEscrow2')}</h2>
+                    <p>{tr('ui.patientPaymentsEscrowThe20Platform')}</p>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button type="button" className="afya-btn-secondary" onClick={() => navigateAdmin('doctors')}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3s3.5 1 3.5 3a3.5 3.5 0 0 1-7 0"/></svg>
-                    <span>Settlements &amp; Payouts →</span>
+                    <span>{tr('ui.settlementsPayouts3')}</span>
                   </button>
                   {paymentRequired && (<>
-                  <button className="admin-action-btn" onClick={() => showToast('Not Yet Available', 'Automated MFS webhook reconciliation is not implemented yet — no backend reconciliation service exists to check against.', 'ℹ️', 'info')} style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#64748B', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                    <span>Reconcile MFS Webhooks</span>
+                  <button className="admin-action-btn" onClick={() => showToast(tr('ui.notYetAvailable'), tr('ui.automatedMfsWebhookReconciliationIsNot'), 'ℹ️', 'info')} style={{ background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#64748B', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                    <span>{tr('ui.reconcileMfsWebhooks')}</span>
                   </button>
                   <button className="admin-action-btn" onClick={handleExportLedgerCsv} style={{ background: 'var(--afya-green)', border: '1px solid var(--afya-green)', color: '#FFFFFF', fontWeight: 700, fontSize: '12px', padding: '8px 14px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                    <span>Export Ledger CSV</span>
+                    <span>{tr('ui.exportLedgerCsv')}</span>
                   </button>
                   </>)}
                 </div>
@@ -1309,7 +1314,7 @@ function AdminPortalContent() {
               <div className="admin-kpi-grid">
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Total Platform GMV Inflow</span>
+                    <span className="admin-kpi-sub">{tr('ui.totalPlatformGmvInflow')}</span>
                     <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
                     </div>
@@ -1320,48 +1325,48 @@ function AdminPortalContent() {
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Active Escrow Locked</span>
+                    <span className="admin-kpi-sub">{tr('ui.activeEscrowLocked')}</span>
                     <div className="admin-kpi-icon-circle blue" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     </div>
                   </div>
                   <div className="admin-kpi-val" style={{ color: '#2563EB' }}>{money(transactions.filter((t) => t.escrowStatus === 'ESCROW_LOCKED').reduce((s, t) => s + t.grossAmount, 0))}</div>
-                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>Held securely pending doctor sign-off</span>
+                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>{tr('ui.heldSecurelyPendingDoctorSignOff')}</span>
                 </div>
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">HeloDoc 20% Commission</span>
+                    <span className="admin-kpi-sub">{tr('ui.helodoc20Commission')}</span>
                     <div className="admin-kpi-icon-circle green" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#ECFDF5', color: '#059669' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     </div>
                   </div>
                   <div className="admin-kpi-val" style={{ color: '#059669' }}>{money(financeSummary?.total_platform_fee)}</div>
-                  <span className="admin-kpi-delta up">Net Platform Operating Revenue</span>
+                  <span className="admin-kpi-delta up">{tr('ui.netPlatformOperatingRevenue')}</span>
                 </div>
 
                 <div className="admin-kpi-card">
                   <div className="kpi-top-row">
-                    <span className="admin-kpi-sub">Total Net Payable to Doctors</span>
+                    <span className="admin-kpi-sub">{tr('ui.totalNetPayableToDoctors')}</span>
                     <div className="admin-kpi-icon-circle purple" style={{ width: '34px', height: '34px', borderRadius: '10px', background: '#F5F3FF', color: '#7C3AED' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
                     </div>
                   </div>
                   <div className="admin-kpi-val">{money(financeSummary?.total_net)}</div>
-                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>Settled + pending, across all doctors</span>
+                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>{tr('ui.settledPendingAcrossAllDoctors')}</span>
                 </div>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#64748B', margin: '-8px 0 16px' }}>
                 <span>ℹ️</span>
-                <span>Total calculation is based including the platform charge 20%.</span>
+                <span>{tr('ui.totalCalculationIsBasedIncludingThe')}</span>
               </div>
 
               <div className="admin-card">
                 <div className="admin-card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <div className="admin-card-title">Omnichannel Financial Audit Table</div>
-                    <div className="admin-card-subtitle">Complete ledger of MFS gateway checkouts, fee splits, doctor wallets, and clinical escrow holds</div>
+                    <div className="admin-card-title">{tr('ui.omnichannelFinancialAuditTable')}</div>
+                    <div className="admin-card-subtitle">{tr('ui.completeLedgerOfMfsGatewayCheckouts')}</div>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
@@ -1369,7 +1374,7 @@ function AdminPortalContent() {
                       <input
                         type="text"
                         maxLength={150}
-                        placeholder="Search TxID, Patient, Doctor, Ref..."
+                        placeholder={tr('ui.searchTxidPatientDoctorRef')}
                         value={financeSearchQuery}
                         onChange={(e) => setFinanceSearchQuery(e.target.value)}
                         style={{ width: '100%', padding: '7px 10px 7px 32px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none', background: '#FFFFFF' }}
@@ -1377,19 +1382,19 @@ function AdminPortalContent() {
                     </div>
 
                     <select value={financeGatewayFilter} onChange={(e) => setFinanceGatewayFilter(e.target.value)} style={{ padding: '7px 10px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#FFFFFF', color: '#334155', outline: 'none' }}>
-                      <option value="ALL">All Gateways</option>
+                      <option value="ALL">{tr('ui.allGateways')}</option>
                       <option value="MPESA">M-Pesa</option>
-                      <option value="BANK_TRANSFER">Kenyan bank transfer</option>
-                      <option value="CARD">Card (if payout-capable)</option>
-                      <option value="ALL">All configured providers</option>
+                      <option value="BANK_TRANSFER">{tr('ui.kenyanBankTransfer')}</option>
+                      <option value="CARD">{tr('ui.cardIfPayoutCapable')}</option>
+                      <option value="ALL">{tr('ui.allConfiguredProviders')}</option>
                     </select>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#F1F5F9', padding: '3px', borderRadius: '8px' }}>
-                      <button className={`admin-filter-pill ${financeTypeFilter === 'ALL' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('ALL')}>All</button>
-                      <button className={`admin-filter-pill ${financeTypeFilter === 'INFLOW' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('INFLOW')}>Inflow 📥</button>
-                      <button className={`admin-filter-pill ${financeTypeFilter === 'ESCROW' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('ESCROW')}>Escrow 🔒</button>
-                      <button className={`admin-filter-pill ${financeTypeFilter === 'PAYOUT' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('PAYOUT')}>Payout 📤</button>
-                      <button className={`admin-filter-pill ${financeTypeFilter === 'REFUND' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('REFUND')}>Refund ↩️</button>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'ALL' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('ALL')}>{tr('ui.all')}</button>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'INFLOW' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('INFLOW')}>{tr('ui.inflow')}</button>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'ESCROW' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('ESCROW')}>{tr('ui.escrow')}</button>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'PAYOUT' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('PAYOUT')}>{tr('ui.payout')}</button>
+                      <button className={`admin-filter-pill ${financeTypeFilter === 'REFUND' ? 'active' : ''}`} onClick={() => setFinanceTypeFilter('REFUND')}>{tr('ui.refund')}</button>
                     </div>
                   </div>
                 </div>
@@ -1398,16 +1403,16 @@ function AdminPortalContent() {
                   <table className="admin-table">
                     <thead>
                       <tr>
-                        <th>TxID &amp; MFS Ref</th>
-                        <th>Timestamp</th>
-                        <th>Channel &amp; Type</th>
-                        <th>Consultation / Case</th>
-                        <th>Parties (Patient / Doctor)</th>
-                        <th style={{ textAlign: 'right' }}>Gross (KES )</th>
-                        <th style={{ textAlign: 'right' }}>HeloDoc Cut</th>
-                        <th style={{ textAlign: 'right' }}>Net (KES )</th>
-                        <th>Gateway &amp; Escrow State</th>
-                        <th style={{ textAlign: 'center' }}>Action</th>
+                        <th>{tr('ui.txidMfsRef')}</th>
+                        <th>{tr('ui.timestamp')}</th>
+                        <th>{tr('ui.channelType')}</th>
+                        <th>{tr('ui.consultationCase')}</th>
+                        <th>{tr('ui.partiesPatientDoctor')}</th>
+                        <th style={{ textAlign: 'right' }}>{tr('ui.grossKes')}</th>
+                        <th style={{ textAlign: 'right' }}>{tr('ui.helodocCut')}</th>
+                        <th style={{ textAlign: 'right' }}>{tr('ui.netKes')}</th>
+                        <th>{tr('ui.gatewayEscrowState')}</th>
+                        <th style={{ textAlign: 'center' }}>{tr('ui.action')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1444,7 +1449,7 @@ function AdminPortalContent() {
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <button onClick={(e) => { e.stopPropagation(); setSelectedTransactionId(tx.txId); }} style={{ padding: '4px 8px', border: '1px solid #CBD5E1', background: '#FFFFFF', borderRadius: '6px', fontSize: '11px', fontWeight: 700, color: '#334155', cursor: 'pointer' }}>
-                              Receipt 🔍
+                              {tr('ui.receipt')}
                             </button>
                           </td>
                         </tr>
@@ -1457,28 +1462,28 @@ function AdminPortalContent() {
               <div className="admin-card">
                 <div className="admin-card-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <div className="admin-card-title">Refund Request Resolution</div>
-                    <div className="admin-card-subtitle">Board-approved refunds awaiting Finance execution against the payment provider — distinct from grievance adjudication, which only approves the refund</div>
+                    <div className="admin-card-title">{tr('ui.refundRequestResolution')}</div>
+                    <div className="admin-card-subtitle">{tr('ui.boardApprovedRefundsAwaitingFinanceExecu')}</div>
                   </div>
-                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>{refundRequests.filter((r) => r.status !== 'REFUNDED').length} pending of {refundRequests.length}</span>
+                  <span className="admin-kpi-delta" style={{ color: '#64748B' }}>{tr('mix.pendingOf', { pending: refundRequests.filter((r) => r.status !== 'REFUNDED').length, total: refundRequests.length })}</span>
                 </div>
 
                 <div style={{ overflowX: 'auto' }}>
                   <table className="admin-table">
                     <thead>
                       <tr>
-                        <th>Approved</th>
-                        <th>Grievance / Transaction</th>
-                        <th style={{ textAlign: 'right' }}>Amount</th>
-                        <th>Previous Payment Status</th>
-                        <th>Provider Reference</th>
-                        <th>Status</th>
-                        <th style={{ textAlign: 'right' }}>Actions</th>
+                        <th>{tr('ui.approved')}</th>
+                        <th>{tr('ui.grievanceTransaction')}</th>
+                        <th style={{ textAlign: 'right' }}>{tr('ui.amount')}</th>
+                        <th>{tr('ui.previousPaymentStatus')}</th>
+                        <th>{tr('ui.providerReference')}</th>
+                        <th>{tr('ui.status')}</th>
+                        <th style={{ textAlign: 'right' }}>{tr('ui.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {refundRequests.length === 0 && (
-                        <tr><td colSpan={7} style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: '12px' }}>No refund requests. These appear once a grievance refund is board-approved.</td></tr>
+                        <tr><td colSpan={7} style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: '12px' }}>{tr('ui.noRefundRequestsTheseAppearOnce')}</td></tr>
                       )}
                       {refundRequests.map((r) => {
                         const busy = refundBusy === r.id;
@@ -1494,13 +1499,13 @@ function AdminPortalContent() {
                             <td><span className={`badge ${statusCls}`}>{r.status.replace(/_/g, ' ')}</span></td>
                             <td style={{ textAlign: 'right' }}>
                               {terminal ? (
-                                <span style={{ fontSize: '11px', color: '#94A3B8' }}>Finalized</span>
+                                <span style={{ fontSize: '11px', color: '#94A3B8' }}>{tr('ui.finalized')}</span>
                               ) : (
                                 <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'PROCESSING')} style={{ padding: '4px 8px', border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#1D4ED8', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>Processing</button>
-                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'REFUNDED')} style={{ padding: '4px 8px', border: '1px solid #86EFAC', background: '#F0FDF4', color: '#166534', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>Refunded</button>
-                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'FAILED')} style={{ padding: '4px 8px', border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>Failed</button>
-                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'RECONCILIATION_REQUIRED')} style={{ padding: '4px 8px', border: '1px solid #FDE68A', background: '#FFFBEB', color: '#B45309', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>Needs Reconciliation</button>
+                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'PROCESSING')} style={{ padding: '4px 8px', border: '1px solid #BFDBFE', background: '#EFF6FF', color: '#1D4ED8', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>{tr('ui.processing')}</button>
+                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'REFUNDED')} style={{ padding: '4px 8px', border: '1px solid #86EFAC', background: '#F0FDF4', color: '#166534', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>{tr('ui.refunded')}</button>
+                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'FAILED')} style={{ padding: '4px 8px', border: '1px solid #FECACA', background: '#FEF2F2', color: '#DC2626', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>{tr('ui.failed')}</button>
+                                  <button disabled={busy} onClick={() => handleTransitionRefund(r.id, 'RECONCILIATION_REQUIRED')} style={{ padding: '4px 8px', border: '1px solid #FDE68A', background: '#FFFBEB', color: '#B45309', borderRadius: '6px', fontSize: '10.5px', fontWeight: 700, cursor: 'pointer' }}>{tr('ui.needsReconciliation')}</button>
                                 </div>
                               )}
                             </td>
@@ -1531,21 +1536,21 @@ function AdminPortalContent() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ fontSize: '16.5px', fontWeight: 800, color: '#FFFFFF' }}>{selectedDocObj.name}</span>
                     <span className="badge badge-green">{selectedDocObj.registrationNumber}</span>
-                    <span className="badge badge-blue">Verified Specialist</span>
-                    <span className="badge" style={{ background: 'rgba(255,255,255,0.12)', color: '#E2E8F0', fontSize: '10px' }}>Active Practitioner</span>
+                    <span className="badge badge-blue">{tr('ui.verifiedSpecialist')}</span>
+                    <span className="badge" style={{ background: 'rgba(255,255,255,0.12)', color: '#E2E8F0', fontSize: '10px' }}>{tr('ui.activePractitioner')}</span>
                   </div>
                   <div style={{ fontSize: '11.5px', color: '#94A3B8', marginTop: '2px' }}>{selectedDocObj.meta}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginTop: '6px', fontSize: '11px', flexWrap: 'wrap' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94A3B8' }}>
-                      <span>Phone:</span> <b style={{ color: '#FFFFFF', fontFamily: 'monospace' }}>{selectedDocObj.phone}</b>
+                      <span>{tr('ui.phone')}</span> <b style={{ color: '#FFFFFF', fontFamily: 'monospace' }}>{selectedDocObj.phone}</b>
                     </span>
                     <span style={{ color: '#475569' }}>•</span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94A3B8' }}>
-                      <span>Residence:</span> <b style={{ color: '#FFFFFF' }}>{selectedDocObj.residence}</b>
+                      <span>{tr('ui.residence')}</span> <b style={{ color: '#FFFFFF' }}>{selectedDocObj.residence}</b>
                     </span>
                     <span style={{ color: '#475569' }}>•</span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#94A3B8' }}>
-                      <span>Email:</span> <b style={{ color: '#E2E8F0' }}>{selectedDocObj.email}</b>
+                      <span>{tr('ui.email')}</span> <b style={{ color: '#E2E8F0' }}>{selectedDocObj.email}</b>
                     </span>
                   </div>
                 </div>
@@ -1555,51 +1560,51 @@ function AdminPortalContent() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: '#E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Lifetime Consultations</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>{tr('ui.lifetimeConsultations')}</div>
                 <div style={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', marginTop: '2px' }}>{selectedDocObj.kpiVisits}</div>
               </div>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>24h Chat Sessions</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>{tr('ui.n24hChatSessions')}</div>
                 <div style={{ fontSize: '18px', fontWeight: 800, color: '#2563EB', marginTop: '2px' }}>{selectedDocObj.kpiChats}</div>
               </div>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Total Gross Revenue</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>{paymentRequired ? selectedDocObj.kpiGross : 'Deferred'}</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>{tr('ui.totalGrossRevenue')}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#059669', marginTop: '2px' }}>{paymentRequired ? selectedDocObj.kpiGross : tr('ui2.deferred')}</div>
               </div>
               <div style={{ background: '#fff', padding: '12px 16px', textAlign: 'center' }}>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Net Payouts Disbursed</div>
-                <div style={{ fontSize: '18px', fontWeight: 800, color: '#047857', marginTop: '2px' }}>{paymentRequired ? selectedDocObj.kpiDisbursed : 'Deferred'}</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>{tr('ui.netPayoutsDisbursed')}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, color: '#047857', marginTop: '2px' }}>{paymentRequired ? selectedDocObj.kpiDisbursed : tr('ui2.deferred')}</div>
               </div>
             </div>
             {paymentRequired && <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: '#64748B', padding: '8px 16px 0' }}>
               <span>ℹ️</span>
-              <span>Total calculation is based including the platform charge 20%.</span>
+              <span>{tr('ui.totalCalculationIsBasedIncludingThe')}</span>
             </div>}
 
             <div style={{ padding: '18px 22px', overflowY: 'auto', flex: 1 }}>
               {paymentRequired && selectedDocObj.payoutRouting?.disbursementItemId && selectedDocObj.payoutRouting.disbursementStatus === 'PENDING_APPROVAL' && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', padding: '12px 14px', marginBottom: '16px', border: '1px solid #FCD34D', borderRadius: '10px', background: '#FFFBEB' }}>
                   <div>
-                    <strong style={{ fontSize: '12px', color: '#92400E' }}>KES disbursement awaiting Finance approval</strong>
-                    <div style={{ fontSize: '10.5px', color: '#78350F', marginTop: '2px' }}>Approval records authorization only; payment remains unconfirmed until a provider integration reports success.</div>
+                    <strong style={{ fontSize: '12px', color: '#92400E' }}>{tr('ui.kesDisbursementAwaitingFinanceApproval')}</strong>
+                    <div style={{ fontSize: '10.5px', color: '#78350F', marginTop: '2px' }}>{tr('ui.approvalRecordsAuthorizationOnlyPaymentR')}</div>
                   </div>
-                  <button className="admin-btn-pri" disabled={financeBusy} onClick={() => handleApproveDoctorDisbursement(selectedDocObj.payoutRouting!.disbursementItemId!)}>Approve</button>
+                  <button className="admin-btn-pri" disabled={financeBusy} onClick={() => handleApproveDoctorDisbursement(selectedDocObj.payoutRouting!.disbursementItemId!)}>{tr('ui.approve')}</button>
                 </div>
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>Recent Consultation Encounters &amp; Issued Prescriptions</strong>
-                <span style={{ fontSize: '11px', color: '#64748B' }}>Archived across all patient encounters</span>
+                <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>{tr('ui.recentConsultationEncountersIssuedPrescr')}</strong>
+                <span style={{ fontSize: '11px', color: '#64748B' }}>{tr('ui.archivedAcrossAllPatientEncounters')}</span>
               </div>
 
               <table className="admin-table">
                 <thead>
                   <tr>
-                    <th>Date &amp; Time</th>
-                    <th>Patient Name</th>
-                    <th>Consultation Mode</th>
-                    <th>Fee (KES )</th>
-                    <th>Clinical Diagnosis</th>
-                    <th>Rx Issued</th>
+                    <th>{tr('ui.dateTime')}</th>
+                    <th>{tr('ui.patientName')}</th>
+                    <th>{tr('ui.consultationMode')}</th>
+                    <th>{tr('ui.feeKes')}</th>
+                    <th>{tr('ui.clinicalDiagnosis')}</th>
+                    <th>{tr('ui.rxIssued')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1617,14 +1622,14 @@ function AdminPortalContent() {
               </table>
 
               <div style={{ marginTop: '20px' }}>
-                <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>Recent Financial Wallet Disbursements (20% Platform Fee Enforced)</strong>
-                {!paymentRequired && <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '8px' }}>Financial module not yet active — no disbursements are created for deferred consultations.</div>}
+                <strong style={{ fontSize: '13.5px', color: '#0F172A' }}>{tr('ui.recentFinancialWalletDisbursements20Plat')}</strong>
+                {!paymentRequired && <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '8px' }}>{tr('ui.financialModuleNotYetActiveNo')}</div>}
                 {paymentRequired && <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {selectedDocObj.disbursements.map((dsb, idx) => (
                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '11.5px' }}>
                       <div>
-                        <b>{dsb.date}: {dsb.amount}</b> Assigned destination <span className="badge" style={{ background: '#FCE7F3', color: '#DB2777', fontWeight: 800 }}>{dsb.method}</span>
-                        <div style={{ fontSize: '10px', color: '#64748B' }}>TxID: {dsb.txId} • Commission Deducted: {dsb.commission}</div>
+                        <b>{dsb.date}: {dsb.amount}</b> {tr('ui.assignedDestination')} <span className="badge" style={{ background: '#FCE7F3', color: '#DB2777', fontWeight: 800 }}>{dsb.method}</span>
+                        <div style={{ fontSize: '10px', color: '#64748B' }}>{tr('mix.txCommission', { tx: dsb.txId, commission: dsb.commission })}</div>
                       </div>
                       <span className="badge badge-green">{dsb.status}</span>
                     </div>
@@ -1634,14 +1639,14 @@ function AdminPortalContent() {
             </div>
 
             <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '11px', color: '#64748B' }}>Professional registration Verified Credential Ledger • AfyaMkononi Kenya</span>
+              <span style={{ fontSize: '11px', color: '#64748B' }}>{tr('ui.professionalRegistrationVerifiedCredenti')}</span>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   className="admin-btn-sec"
                   disabled={dataRightsBusy === selectedDoctorKey}
                   onClick={() => selectedDoctorKey && handleExportDoctorData(selectedDoctorKey)}
                 >
-                  {dataRightsBusy === selectedDoctorKey ? 'Working…' : 'Export Data (JSON)'}
+                  {dataRightsBusy === selectedDoctorKey ? tr('ui2.working') : tr('ui2.exportDataJson')}
                 </button>
                 <button
                   className="admin-btn-sec"
@@ -1649,9 +1654,9 @@ function AdminPortalContent() {
                   disabled={dataRightsBusy === selectedDoctorKey}
                   onClick={() => selectedDoctorKey && handleEraseDoctorData(selectedDoctorKey, selectedDocObj?.name || 'this doctor')}
                 >
-                  Erase / Anonymize Data
+                  {tr('ui.eraseAnonymizeData')}
                 </button>
-                <button className="admin-btn-sec" onClick={() => setSelectedDoctorKey(null)}>Close Dossier</button>
+                <button className="admin-btn-sec" onClick={() => setSelectedDoctorKey(null)}>{tr('ui.closeDossier')}</button>
               </div>
             </div>
           </div>
@@ -1748,7 +1753,7 @@ function AdminPortalContent() {
             </div>
 
             <div style={{ padding: '14px 22px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button className="admin-btn-sec" onClick={() => setSelectedLogId(null)}>Close Dossier</button>
+              <button className="admin-btn-sec" onClick={() => setSelectedLogId(null)}>{tr('ui.closeDossier')}</button>
               <div style={{ display: 'flex', gap: '8px' }}>
                 {selectedLogObj.status === 'UNRESOLVED' && (
                   <button disabled={logActionBusy === selectedLogObj.id} className="slot-subtle-btn" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '8px 14px', borderRadius: '8px', fontSize: '11.5px', fontWeight: 750, cursor: 'pointer' }} onClick={() => handleAcknowledgeLog(selectedLogObj.id)}>
@@ -1776,8 +1781,8 @@ function AdminPortalContent() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ fontSize: '20px' }}>💳</span>
                 <div>
-                  <strong style={{ fontSize: '15px' }}>Add Platform Payment Method</strong>
-                  <div style={{ fontSize: '11px', color: '#94A3B8' }}>The platform&apos;s own merchant configuration — not a patient&apos;s or doctor&apos;s</div>
+                  <strong style={{ fontSize: '15px' }}>{tr('ui.addPlatformPaymentMethod')}</strong>
+                  <div style={{ fontSize: '11px', color: '#94A3B8' }}>{tr('ui.thePlatformSOwnMerchantConfiguration')}</div>
                 </div>
               </div>
               <button onClick={() => setAddPaymentMethodModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '18px', cursor: 'pointer' }}>✕</button>
@@ -1785,40 +1790,40 @@ function AdminPortalContent() {
 
             <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div style={{ fontSize: '11px', color: '#64748B', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px', padding: '8px 10px' }}>
-                Credentials are encrypted at rest and never returned by the API. The first saved method for a given provider becomes primary automatically.
+                {tr('ui.credentialsAreEncryptedAtRestAnd')}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                 <div>
-                  <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Provider Code</label>
+                  <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>{tr('ui.providerCode')}</label>
                   <select value={newProviderCode} onChange={(e) => setNewProviderCode(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }}>
                     <option value="MPESA_PAYBILL">M-Pesa Paybill</option>
                     <option value="MPESA_TILL">M-Pesa Till</option>
-                    <option value="CARD_AGGREGATOR">Card Aggregator</option>
-                    <option value="OTHER">Other</option>
+                    <option value="CARD_AGGREGATOR">{tr('ui.cardAggregator')}</option>
+                    <option value="OTHER">{tr('ui.other')}</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Label</label>
-                  <input type="text" maxLength={80} placeholder="e.g. Primary M-Pesa Paybill" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none' }} />
+                  <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>{tr('ui.label')}</label>
+                  <input type="text" maxLength={80} placeholder={tr('ui.eGPrimaryMPesaPaybill')} value={newLabel} onChange={(e) => setNewLabel(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none' }} />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Display Text (shown in lists, e.g. &quot;Paybill ****1234&quot;)</label>
+                <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>{tr('ui.displayTextShownInListsE')}</label>
                 <input type="text" maxLength={80} placeholder="Paybill ****1234" value={newMaskedDisplay} onChange={(e) => setNewMaskedDisplay(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', outline: 'none' }} />
               </div>
 
               <div>
-                <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>Credentials (JSON — whatever fields the real provider driver will need)</label>
+                <label style={{ fontSize: '11.5px', fontWeight: 750, color: '#334155', display: 'block', marginBottom: '5px' }}>{tr('ui.credentialsJsonWhateverFieldsTheReal')}</label>
                 <textarea rows={5} value={newCredentialsJson} onChange={(e) => setNewCredentialsJson(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }} />
               </div>
             </div>
 
             <div style={{ padding: '14px 20px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-              <button disabled={paymentMethodsBusy} className="admin-btn-sec" onClick={() => setAddPaymentMethodModalOpen(false)}>Cancel</button>
+              <button disabled={paymentMethodsBusy} className="admin-btn-sec" onClick={() => setAddPaymentMethodModalOpen(false)}>{tr('ui.cancel')}</button>
               <button disabled={paymentMethodsBusy} className="admin-btn-pri" onClick={handleSavePlatformPaymentMethod}>
-                <span>💳 Save Payment Method</span>
+                <span>{tr('ui.savePaymentMethod')}</span>
               </button>
             </div>
           </div>
@@ -1835,10 +1840,10 @@ function AdminPortalContent() {
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>{selectedGrvObj.id}</span>
-                    <span className={`badge ${selectedGrvObj.target === 'DOCTOR' ? 'badge-rose' : 'badge-blue'}`}>{selectedGrvObj.target === 'DOCTOR' ? 'Against Doctor' : 'Against System'}</span>
+                    <span className={`badge ${selectedGrvObj.target === 'DOCTOR' ? 'badge-rose' : 'badge-blue'}`}>{selectedGrvObj.target === 'DOCTOR' ? tr('ui2.againstDoctor') : tr('ui2.againstSystem')}</span>
                     <span className="badge badge-amber">{selectedGrvObj.status.replace(/_/g, ' ')}</span>
                   </div>
-                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>Filed {selectedGrvObj.timeFormatted} • Ref #{selectedGrvObj.consultationId}</div>
+                  <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>{tr('mix.filedRef', { time: selectedGrvObj.timeFormatted, ref: selectedGrvObj.consultationId })}</div>
                 </div>
               </div>
               <button onClick={() => setSelectedGrievanceId(null)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: '20px', cursor: 'pointer' }}>✕</button>
@@ -1847,13 +1852,13 @@ function AdminPortalContent() {
             <div style={{ padding: '20px', maxHeight: 'calc(85vh - 130px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', background: '#F8FAFC' }}>
-                  <div style={{ fontSize: '10.5px', fontWeight: 750, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>👤 Complainant (Patient)</div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 750, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>{tr('ui.complainantPatient')}</div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{selectedGrvObj.patient.name} ({selectedGrvObj.patient.ageGender})</div>
-                  <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>Phone: {selectedGrvObj.patient.phone}</div>
+                  <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>{tr('mix.phonePrefix')}{selectedGrvObj.patient.phone}</div>
                 </div>
 
                 <div style={{ border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px 14px', background: '#F8FAFC' }}>
-                  <div style={{ fontSize: '10.5px', fontWeight: 750, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>Treating Doctor</div>
+                  <div style={{ fontSize: '10.5px', fontWeight: 750, color: '#475569', textTransform: 'uppercase', marginBottom: '6px' }}>{tr('ui.treatingDoctor')}</div>
                   <div style={{ fontSize: '14px', fontWeight: 800, color: '#0F172A' }}>{selectedGrvObj.doctor.name}</div>
                   <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '2px' }}>{selectedGrvObj.doctor.registrationNumber} • Fee: {selectedGrvObj.doctor.fee}</div>
                 </div>
@@ -1867,22 +1872,22 @@ function AdminPortalContent() {
               </div>
 
               <div style={{ border: '1px solid #CBD5E1', borderRadius: '10px', padding: '14px 16px', background: '#F8FAFC' }}>
-                <div style={{ fontSize: '11px', fontWeight: 800, color: '#1E293B', textTransform: 'uppercase', marginBottom: '10px' }}>📊 Forensic Telemetry &amp; System Audit</div>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#1E293B', textTransform: 'uppercase', marginBottom: '10px' }}>{tr('ui.forensicTelemetrySystemAudit')}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
                   <div style={{ background: '#fff', border: '1px solid #E2E8F0', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: '#64748B' }}>Call Duration</div>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>{tr('ui.callDuration')}</div>
                     <div style={{ fontSize: '12px', fontWeight: 800, color: '#DC2626' }}>{selectedGrvObj.telemetryEvidence.callDuration}</div>
                   </div>
                   <div style={{ background: '#fff', border: '1px solid #E2E8F0', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: '#64748B' }}>WebRTC Audio/Video</div>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>{tr('ui.webrtcAudioVideo')}</div>
                     <div style={{ fontSize: '12px', fontWeight: 800, color: '#059669' }}>{selectedGrvObj.telemetryEvidence.connectionStatus}</div>
                   </div>
                   <div style={{ background: '#fff', border: '1px solid #E2E8F0', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: '#64748B' }}>e-Prescription</div>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>{tr('ui.ePrescription')}</div>
                     <div style={{ fontSize: '12px', fontWeight: 800, color: '#DC2626' }}>{selectedGrvObj.telemetryEvidence.rxIssued}</div>
                   </div>
                   <div style={{ background: '#fff', border: '1px solid #E2E8F0', padding: '8px 10px', borderRadius: '8px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: '#64748B' }}>Settlement</div>
+                    <div style={{ fontSize: '10px', color: '#64748B' }}>{tr('ui.settlement')}</div>
                     <div style={{ fontSize: '12px', fontWeight: 800, color: '#2563EB' }}>{selectedGrvObj.telemetryEvidence.paymentStatus}</div>
                   </div>
                 </div>
@@ -1891,28 +1896,28 @@ function AdminPortalContent() {
               {selectedGrvObj.backendId && <GrievanceInvestigation key={selectedGrvObj.backendId} grievanceId={selectedGrvObj.backendId} />}
 
               <label>Investigation decision notes
-                <textarea className="auth-input" aria-label="Investigation decision notes" minLength={8} maxLength={1000} value={adjudicationNotes} onChange={e => setAdjudicationNotes(e.target.value)} placeholder="Record the evidence and reason for this decision." />
+                <textarea className="auth-input" aria-label={tr('ui.investigationDecisionNotes')} minLength={8} maxLength={1000} value={adjudicationNotes} onChange={e => setAdjudicationNotes(e.target.value)} placeholder={tr('ui.recordTheEvidenceAndReasonFor')} />
               </label>
 
               {selectedGrvObj.adjudication && (
                 <div style={{ border: '1px solid #86EFAC', borderRadius: '10px', padding: '12px 14px', background: '#F0FDF4' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 750, color: '#166534', textTransform: 'uppercase', marginBottom: '4px' }}>✓ Adjudication Decision Recorded</div>
+                  <div style={{ fontSize: '11px', fontWeight: 750, color: '#166534', textTransform: 'uppercase', marginBottom: '4px' }}>{tr('ui.adjudicationDecisionRecorded')}</div>
                   <div style={{ fontSize: '12px', color: '#14532D' }}>{selectedGrvObj.adjudication.notes}</div>
                 </div>
               )}
             </div>
 
             <div style={{ padding: '14px 20px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button className="admin-btn-sec" onClick={() => setSelectedGrievanceId(null)}>Close</button>
+              <button className="admin-btn-sec" onClick={() => setSelectedGrievanceId(null)}>{tr('ui.close')}</button>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button disabled={financeBusy || !selectedGrvObj.backendId || adjudicationNotes.trim().length < 8} className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.backendId!, 'REFUND')} style={{ background: '#059669', borderColor: '#059669' }}>
-                  <span>Record refund decision</span>
+                  <span>{tr('ui.recordRefundDecision')}</span>
                 </button>
                 <button disabled={financeBusy || !selectedGrvObj.backendId || adjudicationNotes.trim().length < 8} className="admin-btn-pri" onClick={() => handleAdjudicateGrievance(selectedGrvObj.backendId!, 'WARN')} style={{ background: '#DC2626', borderColor: '#DC2626' }}>
-                  <span>Record Doctor warning</span>
+                  <span>{tr('ui.recordDoctorWarning')}</span>
                 </button>
                 <button disabled={financeBusy || !selectedGrvObj.backendId || adjudicationNotes.trim().length < 8} className="admin-btn-sec" onClick={() => handleAdjudicateGrievance(selectedGrvObj.backendId!, 'RESOLVE')}>
-                  <span>Dismiss grievance</span>
+                  <span>{tr('ui.dismissGrievance')}</span>
                 </button>
               </div>
             </div>
@@ -1943,43 +1948,43 @@ function AdminPortalContent() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: '#E2E8F0', borderBottom: '1px solid #E2E8F0' }}>
               <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
-                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>Gross Inflow (Fee)</div>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>{tr('ui.grossInflowFee')}</div>
                 <div style={{ fontSize: '20px', fontWeight: 900, color: '#0F172A', marginTop: '4px' }}>KES  {selectedTxObj.grossAmount}</div>
-                <div style={{ fontSize: '10.5px', color: '#10B981', fontWeight: 700 }}>Debited from MFS Wallet</div>
+                <div style={{ fontSize: '10.5px', color: '#10B981', fontWeight: 700 }}>{tr('ui.debitedFromMfsWallet')}</div>
               </div>
               <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
-                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>HeloDoc Platform Fee (20%)</div>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>{tr('ui.helodocPlatformFee20')}</div>
                 <div style={{ fontSize: '20px', fontWeight: 900, color: '#059669', marginTop: '4px' }}>KES  {selectedTxObj.platformFeeAmount} ({selectedTxObj.platformFeePercent}%)</div>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Platform Commission Cut</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>{tr('ui.platformCommissionCut')}</div>
               </div>
               <div style={{ background: '#FFFFFF', padding: '14px 18px' }}>
-                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>Doctor Net / Refund</div>
+                <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#64748B' }}>{tr('ui.doctorNetRefund')}</div>
                 <div style={{ fontSize: '20px', fontWeight: 900, color: '#2563EB', marginTop: '4px' }}>KES  {selectedTxObj.netAmount}</div>
-                <div style={{ fontSize: '10.5px', color: '#64748B' }}>Payable to Physician Wallet</div>
+                <div style={{ fontSize: '10.5px', color: '#64748B' }}>{tr('ui.payableToPhysicianWallet')}</div>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', color: '#64748B', padding: '8px 18px 0', background: '#FFFFFF' }}>
               <span>ℹ️</span>
-              <span>Total calculation is based including the platform charge 20%.</span>
+              <span>{tr('ui.totalCalculationIsBasedIncludingThe')}</span>
             </div>
 
             <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '60vh', overflowY: 'auto', background: '#FAFAFA' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>Payer (Patient)</div>
+                  <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>{tr('ui.payerPatient')}</div>
                   <strong style={{ fontSize: '13px', color: '#0F172A' }}>{selectedTxObj.patient.name}</strong>
                   <div style={{ fontSize: '11px', color: '#64748B' }}>{selectedTxObj.patient.phone}</div>
                 </div>
 
                 <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px' }}>
-                  <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>Recipient (Doctor / System)</div>
+                  <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>{tr('ui.recipientDoctorSystem')}</div>
                   <strong style={{ fontSize: '13px', color: '#0F172A' }}>{selectedTxObj.doctor.name}</strong>
                   <div style={{ fontSize: '11px', color: '#64748B' }}>{selectedTxObj.doctor.registrationNumber} • {selectedTxObj.doctor.specialty}</div>
                 </div>
               </div>
 
               <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>MFS Webhook Payload</div>
+                <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', marginBottom: '8px' }}>{tr('ui.mfsWebhookPayload')}</div>
                 <pre style={{ background: '#0F172A', color: '#E2E8F0', padding: '12px', borderRadius: '8px', fontFamily: 'monospace', fontSize: '11px', overflowX: 'auto', margin: 0 }}>
                   {JSON.stringify(selectedTxObj.gatewayPayload, null, 2)}
                 </pre>
@@ -1987,11 +1992,11 @@ function AdminPortalContent() {
             </div>
 
             <div style={{ padding: '14px 22px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button className="sheet-btn" onClick={() => showToast('Not Yet Available', 'Tax voucher/receipt generation is not implemented yet — no backend document generation exists for this.', 'ℹ️', 'info')} style={{ padding: '8px 16px', fontSize: '12px', background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#334155', borderRadius: '8px', cursor: 'pointer' }}>
-                📄 Print / Save Tax Voucher
+              <button className="sheet-btn" onClick={() => showToast(tr('ui.notYetAvailable'), tr('ui.taxVoucherReceiptGenerationIsNot'), 'ℹ️', 'info')} style={{ padding: '8px 16px', fontSize: '12px', background: '#F1F5F9', border: '1px solid #CBD5E1', color: '#334155', borderRadius: '8px', cursor: 'pointer' }}>
+                {tr('ui.printSaveTaxVoucher')}
               </button>
               <button className="sheet-btn primary" onClick={() => setSelectedTransactionId(null)} style={{ padding: '8px 20px', fontSize: '12px', background: 'var(--afya-green)', color: '#fff', borderRadius: '10px', cursor: 'pointer' }}>
-                Close Audit Window
+                {tr('ui.closeAuditWindow')}
               </button>
             </div>
           </div>

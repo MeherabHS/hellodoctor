@@ -1,3 +1,4 @@
+import { tr } from './i18n/core.ts';
 // Facilities & Services: types and client-side validation mirroring the
 // backend (services/backend/src/domain/facilities.rs). The server remains the
 // authority; these checks give Admins immediate feedback.
@@ -123,7 +124,7 @@ export function openingHoursErrors(hours: OpeningHours | null): string[] {
   });
   all.sort((a, b) => a[0] - b[0]);
   for (let i = 1; i < all.length; i++) {
-    if (all[i][0] < all[i - 1][1] && !errors.some(e => e.includes('overlap'))) errors.push('An overnight period overlaps the next day.');
+    if (all[i][0] < all[i - 1][1] && !errors.some(e => e.includes('overlap'))) errors.push(tr('lib.overnightOverlaps'));
   }
   const week = 7 * 1440;
   const last = all[all.length - 1]; const first = all[0];
@@ -135,11 +136,11 @@ export function openingHoursErrors(hours: OpeningHours | null): string[] {
 export function facilityErrors(c: FacilityContent): string[] {
   const errors: string[] = [];
   const name = c.name.trim();
-  if (name.length < 2 || name.length > 120) errors.push('Facility name must be 2–120 characters.');
-  if (c.description.trim().length > 2000) errors.push('Description is limited to 2000 characters.');
-  if (c.location_text.trim().length > 200) errors.push('Location is limited to 200 characters.');
-  if (c.contact_phone.trim() && !normalizeKenyanPhone(c.contact_phone)) errors.push('Enter a valid Kenyan phone number, e.g. 0712 345 678.');
-  if (c.google_maps_url.trim() && !isGoogleMapsLink(c.google_maps_url)) errors.push('Directions link must be an https Google Maps link (google.com/maps, maps.google.com or maps.app.goo.gl).');
+  if (name.length < 2 || name.length > 120) errors.push(tr('lib.facilityNameLength'));
+  if (c.description.trim().length > 2000) errors.push(tr('lib.descriptionLimit'));
+  if (c.location_text.trim().length > 200) errors.push(tr('lib.locationLimit'));
+  if (c.contact_phone.trim() && !normalizeKenyanPhone(c.contact_phone)) errors.push(tr('lib.validKenyanPhone'));
+  if (c.google_maps_url.trim() && !isGoogleMapsLink(c.google_maps_url)) errors.push(tr('lib.directionsLink'));
   errors.push(...openingHoursErrors(c.opening_hours));
   return errors;
 }
@@ -147,11 +148,11 @@ export function facilityErrors(c: FacilityContent): string[] {
 /** What still blocks publication. */
 export function publishProblems(c: FacilityContent, hasImage: boolean): string[] {
   const p: string[] = [];
-  if (!c.county) p.push('County is required.');
-  if (!c.location_text.trim()) p.push('Location is required.');
-  if (!c.contact_phone.trim()) p.push('Contact phone is required.');
-  if (!c.google_maps_url.trim()) p.push('Location URL (Google Maps) is required.');
-  if (!c.services.length) p.push('Select at least one service.');
+  if (!c.county) p.push(tr('lib.countyRequired'));
+  if (!c.location_text.trim()) p.push(tr('lib.locationRequired'));
+  if (!c.contact_phone.trim()) p.push(tr('lib.phoneRequired'));
+  if (!c.google_maps_url.trim()) p.push(tr('lib.mapsRequired'));
+  if (!c.services.length) p.push(tr('lib.selectService'));
   if (!hasImage) p.push('A facility photo is required.');
   return p;
 }

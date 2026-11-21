@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../../core/l10n/kenya_time.dart';
 import '../../../core/notifications/battery_optimization.dart';
+import '../../../core/notifications/local_notification_service.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/theme/tokens.dart';
 import '../../../core/utils/time_format.dart';
@@ -90,8 +91,10 @@ class _PatientHomePageState extends State<PatientHomePage> {
       context.read<HomeCubit>().load();
       context.read<ProfileCubit>().load();
       context.read<FamilyProfilesCubit>().load();
-      // Once per install: how to stop this phone delaying reminders.
-      unawaited(BatteryOptimization.maybePrompt(context));
+      // Notification permission, then the battery exemption, each after a
+      // short explanation (2026-11-20); re-asked on a later launch.
+      unawaited(BatteryOptimization.ensureReady(context,
+          requestPermission: LocalNotificationService.requestPermission));
     });
   }
 

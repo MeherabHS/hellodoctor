@@ -12,7 +12,9 @@ import '../../core/video/join_eligibility.dart';
 import '../../core/video/mint_failure.dart';
 import 'call_close_out_page.dart';
 import 'doctor_cubit.dart';
+import 'doctor_pages.dart' show ChatThreadPage;
 import 'doctor_repository.dart';
+import 'in_call_chat.dart';
 
 /// Real Agora RTC consultation call screen. Reuses the existing server
 /// contract (`POST /consultations/:id/rtc-token`) exclusively â€” this screen
@@ -28,8 +30,23 @@ class AgoraPage extends StatefulWidget {
       required this.appointmentId,
       this.closeOutOnExit = false,
       this.loadJoin,
-      this.loadToken});
+      this.loadToken,
+      this.loadChat,
+      this.engine,
+      this.requestPermissions});
   final String appointmentId;
+
+  /// The chat shown from the in-call chat button. Peer support calls pass
+  /// their session chat; doctor consultations default to the appointment's
+  /// own conversation (video consultations have one too).
+  final Future<Widget> Function()? loadChat;
+
+  /// Design previews and tests only: a stand-in for the Agora engine and the
+  /// camera/microphone permission prompt. Null in the app.
+  @visibleForTesting
+  final AgoraEngineAdapter? engine;
+  @visibleForTesting
+  final Future<bool> Function()? requestPermissions;
 
   /// Peer Navigator support calls pass their own join and token endpoints
   /// (`/peer-requests/:id/call` and `/rtc-token`); the timing rules are the
@@ -66,9 +83,9 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller = CallController(
-      engine: RealAgoraEngine(),
+      engine: widget.engine ?? RealAgoraEngine(),
       mintToken: _mintToken,
-      requestPermissions: _requestPermissions,
+      requestPermissions: widget.requestPermissions ?? _requestPermissions,
       telemetrySubmit: (events) async {
         if (widget.isPeerCall) return;
         await context
@@ -167,6 +184,17 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
   Future<bool> _requestPermissions() async {
     final result = await [Permission.camera, Permission.microphone].request();
     return result.values.every((status) => status.isGranted);
+  }
+
+  /// Null when this call has no chat to show.
+  Future<Widget> Function()? get _chatLoader {
+    if (widget.loadChat != null) return widget.loadChat;
+    if (widget.isPeerCall) return null;
+    return () async {
+      final chat = await _repo.conversationForAppointment(
+          CallCloseOutPage.resolve(context, widget.appointmentId));
+      return ChatThreadPage(chat: chat, inCall: true);
+    };
   }
 
   void _onControllerChanged() {
@@ -291,7 +319,11 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
         );
       case CallScreenState.connected:
       case CallScreenState.reconnecting:
-        return _InCallView(controller: _controller, onLeave: _leaveAndPop);
+        final chat = _chatLoader;
+        return _InCallView(
+            controller: _controller,
+            onLeave: _leaveAndPop,
+            onChat: chat == null ? null : () => showInCallChat(context, chat));
       case CallScreenState.failed:
         return _CenteredStatus(
           icon: Icons.cloud_off,
@@ -310,9 +342,13 @@ class _AgoraPageState extends State<AgoraPage> with WidgetsBindingObserver {
 }
 
 class _InCallView extends StatelessWidget {
-  const _InCallView({required this.controller, required this.onLeave});
+  const _InCallView(
+      {required this.controller, required this.onLeave, this.onChat});
   final CallController controller;
   final Future<void> Function() onLeave;
+
+  /// Opens the consultation chat over the call; null hides the button.
+  final Future<void> Function()? onChat;
 
   @override
   Widget build(BuildContext context) {
@@ -357,9 +393,10 @@ class _InCallView extends StatelessWidget {
                   style: TextStyle(color: Colors.white)),
             ),
           ),
-        // Title from panel 6. The elapsed timer, in-call chat, notes and
-        // checklist on the board are not built: the first needs a start
-        // time the call layer does not expose, the rest have no backend.
+        // Title from panel 6. The elapsed timer, notes and checklist on the
+        // board are not built: the first needs a start time the call layer
+        // does not expose, the rest have no backend. In-call chat is the
+        // chat button below.
         const Positioned(
           left: 16,
           top: 16,
@@ -402,6 +439,15 @@ class _InCallView extends StatelessWidget {
                 onTap: controller.switchCamera,
               ),
               const SizedBox(width: 16),
+              if (onChat != null) ...[
+                _CallControlButton(
+                  key: const ValueKey('call-open-chat'),
+                  icon: Icons.chat_bubble_outline_rounded,
+                  tooltip: 'Chat',
+                  onTap: onChat!,
+                ),
+                const SizedBox(width: 16),
+              ],
               _CallControlButton(
                 icon: Icons.call_end,
                 background: Colors.red,
@@ -417,17 +463,20 @@ class _InCallView extends StatelessWidget {
 
 class _CallControlButton extends StatelessWidget {
   const _CallControlButton({
+    super.key,
     required this.icon,
     required this.onTap,
     this.background,
+    this.tooltip,
   });
   final IconData icon;
   final Future<void> Function() onTap;
   final Color? background;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final button = InkWell(
       onTap: onTap,
       customBorder: const CircleBorder(),
       child: CircleAvatar(
@@ -436,6 +485,7 @@ class _CallControlButton extends StatelessWidget {
         child: Icon(icon, color: Colors.white),
       ),
     );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 

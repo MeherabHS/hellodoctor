@@ -8,6 +8,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../core/network/api_client.dart';
 import '../booking/booking_models.dart';
 import '../booking/booking_repository.dart';
+import 'in_call_chat.dart';
 import 'mint_failure.dart';
 
 /// Real Agora RTC consultation call screen. Reuses the existing server
@@ -29,8 +30,22 @@ class AgoraCallPage extends StatefulWidget {
     this.scheduledStartTime,
     this.loadToken,
     this.loadOpenAt,
+    this.loadChat,
+    this.engine,
+    this.requestPermissions,
   });
   final String appointmentId;
+
+  /// The chat shown from the in-call chat button (the consultation's own
+  /// chat, or the peer session chat); null hides the button.
+  final Future<Widget> Function()? loadChat;
+
+  /// Design previews and tests only: a stand-in for the Agora engine and the
+  /// camera/microphone permission prompt. Null in the app.
+  @visibleForTesting
+  final AgoraEngineAdapter? engine;
+  @visibleForTesting
+  final Future<bool> Function()? requestPermissions;
   final BookingRepository repo;
   final DateTime? scheduledStartTime;
 
@@ -53,9 +68,9 @@ class _AgoraCallPageState extends State<AgoraCallPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _controller = CallController(
-      engine: RealAgoraEngine(),
+      engine: widget.engine ?? RealAgoraEngine(),
       mintToken: _mintToken,
-      requestPermissions: _requestPermissions,
+      requestPermissions: widget.requestPermissions ?? _requestPermissions,
       telemetrySubmit: widget._isPeerCall
           ? null
           : (events) =>
@@ -205,8 +220,12 @@ class _AgoraCallPageState extends State<AgoraCallPage>
         );
       case CallScreenState.connected:
       case CallScreenState.reconnecting:
+        final chat = widget.loadChat;
         return _InCallView(
-            controller: _controller, onLeave: _leaveAndPop, t: t);
+            controller: _controller,
+            onLeave: _leaveAndPop,
+            t: t,
+            onChat: chat == null ? null : () => showInCallChat(context, chat));
       case CallScreenState.failed:
         return _CenteredStatus(
           icon: Icons.cloud_off,
@@ -223,10 +242,16 @@ class _AgoraCallPageState extends State<AgoraCallPage>
 
 class _InCallView extends StatelessWidget {
   const _InCallView(
-      {required this.controller, required this.onLeave, required this.t});
+      {required this.controller,
+      required this.onLeave,
+      required this.t,
+      this.onChat});
   final CallController controller;
   final Future<void> Function() onLeave;
   final AppLocalizations t;
+
+  /// Opens the chat over the call; null hides the button.
+  final Future<void> Function()? onChat;
 
   @override
   Widget build(BuildContext context) {
@@ -295,6 +320,15 @@ class _InCallView extends StatelessWidget {
                 onTap: controller.switchCamera,
               ),
               const SizedBox(width: 16),
+              if (onChat != null) ...[
+                _CallControlButton(
+                  key: const ValueKey('call-open-chat'),
+                  icon: Icons.chat_bubble_outline_rounded,
+                  tooltip: t.callOpenChat,
+                  onTap: onChat!,
+                ),
+                const SizedBox(width: 16),
+              ],
               _CallControlButton(
                 icon: Icons.call_end,
                 background: Colors.red,
@@ -310,17 +344,20 @@ class _InCallView extends StatelessWidget {
 
 class _CallControlButton extends StatelessWidget {
   const _CallControlButton({
+    super.key,
     required this.icon,
     required this.onTap,
     this.background,
+    this.tooltip,
   });
   final IconData icon;
   final Future<void> Function() onTap;
   final Color? background;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final button = InkWell(
       onTap: onTap,
       customBorder: const CircleBorder(),
       child: CircleAvatar(
@@ -329,6 +366,7 @@ class _CallControlButton extends StatelessWidget {
         child: Icon(icon, color: Colors.white),
       ),
     );
+    return tooltip == null ? button : Tooltip(message: tooltip!, child: button);
   }
 }
 

@@ -223,9 +223,9 @@
   "@bookingVideoTitle": {
     "description": "Booking screen title for a video consultation."
   },
-  "bookingChatTitle": "Book 24h Chat",
+  "bookingChatTitle": "Book Chat Consultation",
   "@bookingChatTitle": {
-    "description": "Booking screen title for a 24h chat consultation."
+    "description": "Booking screen title for a chat consultation (open until 24 hours after its booked time)."
   },
   "bookingNoSlots": "This doctor has no bookable slots right now.",
   "@bookingNoSlots": {
@@ -247,7 +247,7 @@
   "@bookingFormatSubtitle": {
     "description": "Patient interface: bookingFormatSubtitle"
   },
-  "bookingChatRow": "24-Hour Dedicated Chat",
+  "bookingChatRow": "Dedicated Chat Consultation",
   "@bookingChatRow": {
     "description": "Patient interface: bookingChatRow"
   },
@@ -255,11 +255,11 @@
   "@bookingIncludedFree": {
     "description": "Patient interface: bookingIncludedFree"
   },
-  "bookingChatIncludedLabel": "24-Hour Chat Included:",
+  "bookingChatIncludedLabel": "Chat Included:",
   "@bookingChatIncludedLabel": {
     "description": "Patient interface: bookingChatIncludedLabel"
   },
-  "bookingChatIncludedBody": "Your video consultation automatically includes 24 hours of direct specialist chat for pre-visit history and post-visit follow-up.",
+  "bookingChatIncludedBody": "Your video consultation includes a chat with your doctor until 1 hour after the consultation ends.",
   "@bookingChatIncludedBody": {
     "description": "Patient interface: bookingChatIncludedBody"
   },
@@ -355,7 +355,7 @@
   "@bookingFeeVideo": {
     "description": "Fee summary row label for a video consultation."
   },
-  "bookingFeeChat": "24-Hour Clinical Chat Fee",
+  "bookingFeeChat": "Chat Consultation Fee",
   "@bookingFeeChat": {
     "description": "Fee summary row label for a chat consultation."
   },
@@ -653,7 +653,7 @@
   "@waitingRoomVideoTitle": {
     "description": "Waiting room screen title for a video consultation."
   },
-  "waitingRoomChatTitle": "24-Hour Clinical Chat",
+  "waitingRoomChatTitle": "Chat Consultation",
   "@waitingRoomChatTitle": {
     "description": "Waiting room screen title for a chat consultation."
   },
@@ -699,7 +699,7 @@
   "@waitingRoomVideoCallsYouDetail": {
     "description": "Waiting room video-modality readiness banner detail."
   },
-  "waitingRoomChatWindowDetail": "Your 24-hour chat window opens around your booked slot time.",
+  "waitingRoomChatWindowDetail": "You can chat with your doctor until 24 hours after your booked time. After that, the chat becomes read-only.",
   "@waitingRoomChatWindowDetail": {
     "description": "Waiting room chat-modality readiness banner detail."
   },
@@ -711,9 +711,9 @@
   "@waitingRoomOpenChat": {
     "description": "Waiting room open-chat button for chat modality."
   },
-  "waitingRoomOpen24hChat": "Open 24h Chat",
+  "waitingRoomOpen24hChat": "Open Chat",
   "@waitingRoomOpen24hChat": {
-    "description": "Waiting room secondary 24h-chat entry for video modality."
+    "description": "Waiting room secondary chat entry for video modality (chat closes 1 hour after the consultation is completed)."
   },
   "waitingRoomTestCameraMic": "Test Camera & Microphone",
   "@waitingRoomTestCameraMic": {
@@ -814,7 +814,7 @@
   "@homeServicePaidBadge": {
     "description": "Core service card badge."
   },
-  "homeServiceChatDesc": "Paid clinical text & e-Rx (24h)",
+  "homeServiceChatDesc": "Paid clinical text & e-Rx",
   "@homeServiceChatDesc": {
     "description": "Core service card description."
   },
@@ -900,7 +900,7 @@
   "@servicesChatWithDoctor": {
     "description": "Services list item title."
   },
-  "servicesChatWithDoctorDesc": "24h consultation chat",
+  "servicesChatWithDoctorDesc": "Chat consultation with a doctor",
   "@servicesChatWithDoctorDesc": {
     "description": "Services list item description."
   },
@@ -960,7 +960,7 @@
   "@chatNoMessages": {
     "description": "Chat screen empty state."
   },
-  "chatWindowClosed": "Consultation window closed (24h expired). Chat is no longer available.",
+  "chatWindowClosed": "This consultation has ended. The conversation is kept here for your records, but no new messages can be sent.",
   "@chatWindowClosed": {
     "description": "Chat screen locked/expired banner."
   },
@@ -997,7 +997,7 @@
       }
     }
   },
-  "chat24hSession": "24h Session",
+  "chat24hSession": "Chat Session",
   "@chat24hSession": {
     "description": "Chat screen session-type chip."
   },
@@ -1325,7 +1325,7 @@
   "@directoryAllDoctors": {
     "description": "Patient interface: directoryAllDoctors"
   },
-  "directoryChatTab": "24h Chat",
+  "directoryChatTab": "Chat",
   "@directoryChatTab": {
     "description": "Patient interface: directoryChatTab"
   },
@@ -1496,7 +1496,7 @@
   "@doctorVideoFee": {
     "description": "Patient interface: doctorVideoFee"
   },
-  "doctorChatFee": "24-Hour Clinical Chat Fee:",
+  "doctorChatFee": "Chat Consultation Fee:",
   "@doctorChatFee": {
     "description": "Patient interface: doctorChatFee"
   },
@@ -1530,7 +1530,7 @@
       }
     }
   },
-  "doctorChatBooking": "24h Chat (KES {fee})",
+  "doctorChatBooking": "Chat Consultation (KES {fee})",
   "@doctorChatBooking": {
     "description": "Patient interface: doctorChatBooking",
     "placeholders": {
@@ -1784,7 +1784,7 @@
   "filterAllVisits": "All consultation types",
   "consultChoose": "Choose consultation",
   "consultVideo": "Video consultation",
-  "consultChat": "24-hour chat",
+  "consultChat": "Chat consultation",
   "consultBookVideo": "Book video",
   "consultBookChat": "Book chat",
   "consultAction": "Consult",
@@ -2671,5 +2671,151 @@
       }
     }
   },
-  "remindersExactAlarmsAllow": "Allow alarms & reminders"
+  "remindersExactAlarmsAllow": "Allow alarms & reminders",
+  "callOpenChat": "Chat",
+  "@callOpenChat": {
+    "description": "In-call button that opens the consultation chat over the video call"
+  },
+  "vaultSavedOffline": "Saved on this phone",
+  "@vaultSavedOffline": {
+    "description": "Health Records: this document opens without internet"
+  },
+  "vaultNotSavedOffline": "This document isn't saved on this phone yet. Open Health Records once while online to save it.",
+  "@vaultNotSavedOffline": {
+    "description": "Health Records: tapped an unsaved document while offline"
+  },
+  "chatStatusActive": "Active",
+  "@chatStatusActive": {
+    "description": "Consultation chat status pill while messages can be sent"
+  },
+  "chatStatusExpired": "Expired",
+  "@chatStatusExpired": {
+    "description": "Consultation chat status pill once its time is over"
+  },
+  "chatActiveUntil": "You can message {doctor} until {time}.",
+  "@chatActiveUntil": {
+    "description": "Consultation chat banner body while active",
+    "placeholders": {
+      "doctor": {
+        "type": "String"
+      },
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "chatTimeOver": "Consultation time is over.",
+  "@chatTimeOver": {
+    "description": "Consultation chat expiry bar once its time is over"
+  },
+  "notificationsEarlier": "Earlier",
+  "@notificationsEarlier": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsJustNow": "Just now",
+  "@notificationsJustNow": {
+    "description": "Notification inbox (Peer Navigator design)"
+  },
+  "notificationsMinutesAgo": "{count} min ago",
+  "@notificationsMinutesAgo": {
+    "description": "Notification inbox (Peer Navigator design)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notificationsHoursAgo": "{count} h ago",
+  "@notificationsHoursAgo": {
+    "description": "Notification inbox (Peer Navigator design)",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "onboardingSkip": "Skip",
+  "@onboardingSkip": {
+    "description": "Patient onboarding (reference boards, 2026-11-20)"
+  },
+  "onboarding1Title": "Welcome to\nAfyaMkononi!",
+  "@onboarding1Title": {
+    "description": "Slide 1 title; the waving hand is drawn after it"
+  },
+  "onboarding1Body": "Your private and friendly\nhealth companion for\nHIV care, prevention and\noverall well-being.",
+  "@onboarding1Body": {
+    "description": "Slide 1 body; line breaks as in the reference"
+  },
+  "onboarding2Title": "Learn & Stay Safe",
+  "@onboarding2Title": {
+    "description": "Slide 2 title"
+  },
+  "onboarding2Body": "Get trusted information on\nHIV, prevention, testing,\ntreatment and sexual health\n— made for youth like you.",
+  "@onboarding2Body": {
+    "description": "Slide 2 body"
+  },
+  "onboarding3Title": "Get Confidential Support",
+  "@onboarding3Title": {
+    "description": "Slide 3 title"
+  },
+  "onboarding3Body": "Chat privately with trained\ncounsellors, peer supporters\nand care providers for\nguidance, questions\nor concerns.",
+  "@onboarding3Body": {
+    "description": "Slide 3 body"
+  },
+  "onboarding4Title": "Access Care, Anytime",
+  "@onboarding4Title": {
+    "description": "Slide 4 title"
+  },
+  "onboarding4Body": "Book video consultations\nwith a doctor, get reminders\nand keep your health records\nin one secure place.",
+  "@onboarding4Body": {
+    "description": "Slide 4 body"
+  },
+  "onboardingNext": "Next",
+  "@onboardingNext": {
+    "description": "Onboarding button on slides 1-3"
+  },
+  "onboardingGetStarted": "Get Started",
+  "@onboardingGetStarted": {
+    "description": "Onboarding button on the last slide"
+  },
+  "onboardingCounter": "{current} of {total}",
+  "@onboardingCounter": {
+    "description": "Onboarding progress",
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "batteryPromptAllow": "Allow",
+  "@batteryPromptAllow": {
+    "description": "Opens Android's 'always run in background' dialog"
+  },
+  "deliveryNotificationsOffTitle": "Notifications are off",
+  "@deliveryNotificationsOffTitle": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryNotificationsOffBody": "Turn them on so you don't miss consultation reminders and messages.",
+  "@deliveryNotificationsOffBody": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryChannelsOffBody": "Some notification types are switched off, so you may miss reminders or messages.",
+  "@deliveryChannelsOffBody": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryBatteryTitle": "Reminders may be delayed",
+  "@deliveryBatteryTitle": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryBatteryBody": "Battery saving can stop this app in the background. Allow it to run so reminders arrive on time.",
+  "@deliveryBatteryBody": {
+    "description": "Notification and battery readiness"
+  },
+  "deliveryFix": "Turn on",
+  "@deliveryFix": {
+    "description": "Notification and battery readiness"
+  }
 }

@@ -56,6 +56,12 @@ const sessionSecureStorage = FlutterSecureStorage(
   aOptions: AndroidOptions(sharedPreferencesName: sessionSecureStorageFile),
 );
 
+/// "Onboarding seen" flags: `onboarding_seen_v1:<account>` per patient
+/// account on this phone (plain key when the token has no subject). They
+/// belong to the install, not the session, so [SecureTokenStore] keeps them
+/// when sign-out clears the session.
+const onboardingSeenKey = 'onboarding_seen_v1';
+
 class SecureTokenStore implements TokenStore {
   SecureTokenStore([FlutterSecureStorage? storage])
       : storage = storage ?? sessionSecureStorage;
@@ -68,7 +74,21 @@ class SecureTokenStore implements TokenStore {
   @override
   Future<void> delete(String key) => storage.delete(key: key);
   @override
-  Future<void> clear() => storage.deleteAll();
+  Future<void> clear() async {
+    var kept = const <String, String>{};
+    try {
+      kept = {
+        for (final e in (await storage.readAll()).entries)
+          if (e.key == onboardingSeenKey ||
+              e.key.startsWith('$onboardingSeenKey:'))
+            e.key: e.value
+      };
+    } catch (_) {/* cleared with the rest; onboarding shows once more */}
+    await storage.deleteAll();
+    for (final e in kept.entries) {
+      await storage.write(key: e.key, value: e.value);
+    }
+  }
 }
 
 class ApiException implements Exception {
@@ -449,6 +469,32 @@ class ApiClient {
   final TokenStore _storage;
   Uri resolveServerUrl(String value) =>
       Uri.parse(_dio.options.baseUrl).resolve(value);
+
+  /// The live chat socket's address and handshake headers: the same client
+  /// type, bearer token and device proof as any authenticated request, so
+  /// the upgrade passes the normal auth middleware. Null when signed out.
+  Future<({Uri uri, Map<String, String> headers})?> liveSocket() async {
+    final token = await read('access_token');
+    if (token == null) return null;
+    final base = Uri.parse(_dio.options.baseUrl);
+    final path =
+        '${base.path.endsWith('/') ? base.path.substring(0, base.path.length - 1) : base.path}/chat/live';
+    final uri = base.replace(
+        scheme: base.scheme == 'https' ? 'wss' : 'ws', path: path, query: null);
+    final headers = <String, String>{
+      'Authorization': 'Bearer $token',
+      'X-Client-Type': 'PATIENT_FLUTTER',
+      'X-Client-Build':
+          const String.fromEnvironment('APP_BUILD', defaultValue: 'unreported'),
+    };
+    if (_proofSigner.enabled) {
+      headers['X-Device-Proof-Required'] = '1';
+      final proof = await _proofSigner.sign('GET', path, token);
+      if (proof != null) headers['X-Device-Proof'] = proof;
+    }
+    return (uri: uri, headers: headers);
+  }
+
   Future<void>? _refresh;
   int _sessionGeneration = 0;
   Future<void> _storageWrites = Future<void>.value();

@@ -1,4 +1,5 @@
 'use client';
+import { tr } from '@/lib/i18n';
 import {useEffect, useState, type CSSProperties, type ReactNode} from 'react';
 import {adminFetch} from '../../lib/adminQueue.mjs';
 import type {LucideIcon} from 'lucide-react';
@@ -93,13 +94,13 @@ export function Pagination({offset, pageSize, total, busy, onChange}: {offset: n
   const numbers = Array.from({length: Math.min(5, pages)}, (_, i) => start + i);
   return (
     <div className="afya-pagination">
-      <span>Showing {total ? offset + 1 : 0}–{Math.min(offset + pageSize, total)} of {total}</span>
+      <span>{tr('mix.showingRange', { from: total ? offset + 1 : 0, to: Math.min(offset + pageSize, total), total })}</span>
       <div className="pages">
-        <button type="button" className="afya-page-btn" aria-label="Previous page" disabled={busy || current === 1} onClick={() => onChange(offset - pageSize)}>‹</button>
+        <button type="button" className="afya-page-btn" aria-label={tr('ui.previousPage')} disabled={busy || current === 1} onClick={() => onChange(offset - pageSize)}>‹</button>
         {numbers.map(n => (
           <button key={n} type="button" className={`afya-page-btn ${n === current ? 'active' : ''}`} aria-current={n === current ? 'page' : undefined} disabled={busy} onClick={() => onChange((n - 1) * pageSize)}>{n}</button>
         ))}
-        <button type="button" className="afya-page-btn" aria-label="Next page" disabled={busy || current >= pages} onClick={() => onChange(offset + pageSize)}>›</button>
+        <button type="button" className="afya-page-btn" aria-label={tr('ui.nextPage')} disabled={busy || current >= pages} onClick={() => onChange(offset + pageSize)}>›</button>
       </div>
     </div>
   );

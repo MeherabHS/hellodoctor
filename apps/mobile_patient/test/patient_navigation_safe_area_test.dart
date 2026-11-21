@@ -12,7 +12,8 @@ import 'package:hellodoctor_mobile_patient/features/auth/auth_entry_page.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() {
-    FlutterSecureStorage.setMockInitialValues({});
+    // Onboarding was already seen on this phone.
+    FlutterSecureStorage.setMockInitialValues({onboardingSeenKey: '1'});
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(

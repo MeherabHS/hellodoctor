@@ -1,4 +1,5 @@
 'use client';
+import { tr } from '@/lib/i18n';
 import { useState } from 'react';
 import { PREVIEW_BODY_LIMIT, PREVIEW_TITLE_LIMIT, truncateForPreview } from '@/lib/notificationPreviewText';
 
@@ -17,8 +18,8 @@ export function CampaignNotificationPreview({ titleEn, bodyEn, titleSw, bodySw }
   const [lang, setLang] = useState<'en' | 'sw'>('en');
   const [platform, setPlatform] = useState<'android' | 'ios'>('android');
 
-  const rawTitle = (lang === 'sw' ? titleSw : titleEn).trim() || 'Notification title';
-  const rawBody = (lang === 'sw' ? bodySw : bodyEn).trim() || 'Notification message body appears here as you type.';
+  const rawTitle = (lang === 'sw' ? titleSw : titleEn).trim() || tr('ui2.notificationTitle');
+  const rawBody = (lang === 'sw' ? bodySw : bodyEn).trim() || tr('ui2.notificationMessageBodyAppearsHereAs');
   const title = truncateForPreview(rawTitle, PREVIEW_TITLE_LIMIT);
   const body = truncateForPreview(rawBody, PREVIEW_BODY_LIMIT);
 
@@ -26,15 +27,15 @@ export function CampaignNotificationPreview({ titleEn, bodyEn, titleSw, bodySw }
     <div className="campaign-preview-panel">
       <div className="campaign-preview-toolbar">
         <div>
-          <div className="campaign-preview-label">Live notification preview</div>
-          <div className="campaign-preview-sim-badge">SIMULATED — no notification is sent by this preview</div>
+          <div className="campaign-preview-label">{tr('ui.liveNotificationPreview')}</div>
+          <div className="campaign-preview-sim-badge">{tr('ui.simulatedNoNotificationIsSentBy')}</div>
         </div>
         <div className="campaign-preview-toggles">
-          <div className="campaign-preview-toggle-group" role="group" aria-label="Preview language">
+          <div className="campaign-preview-toggle-group" role="group" aria-label={tr('ui.previewLanguage')}>
             <button type="button" className={lang === 'en' ? 'active' : ''} onClick={() => setLang('en')}>EN</button>
             <button type="button" className={lang === 'sw' ? 'active' : ''} onClick={() => setLang('sw')}>SW</button>
           </div>
-          <div className="campaign-preview-toggle-group" role="group" aria-label="Preview platform">
+          <div className="campaign-preview-toggle-group" role="group" aria-label={tr('ui.previewPlatform')}>
             <button type="button" className={platform === 'android' ? 'active' : ''} onClick={() => setPlatform('android')}>Android</button>
             <button type="button" className={platform === 'ios' ? 'active' : ''} onClick={() => setPlatform('ios')}>iOS</button>
           </div>
@@ -48,7 +49,7 @@ export function CampaignNotificationPreview({ titleEn, bodyEn, titleSw, bodySw }
             <div className="campaign-preview-card campaign-preview-card-android">
               <div className="campaign-preview-card-row">
                 <span className="campaign-preview-app-icon">A</span>
-                <span className="campaign-preview-app-name">AfyaMkononi · now</span>
+                <span className="campaign-preview-app-name">{tr('ui.afyamkononiNow')}</span>
               </div>
               <div className="campaign-preview-title">{title.shown}</div>
               <div className="campaign-preview-body">{body.shown}</div>
@@ -69,12 +70,12 @@ export function CampaignNotificationPreview({ titleEn, bodyEn, titleSw, bodySw }
 
       {(title.truncated || body.truncated) && (
         <p className="campaign-preview-truncation-note">
-          {title.truncated && 'Title is truncated on most lock screens. '}
-          {body.truncated && 'Message body is truncated on most lock screens.'}
+          {title.truncated && tr('ui2.titleIsTruncatedOnMostLock')}
+          {body.truncated && tr('ui2.messageBodyIsTruncatedOnMost')}
         </p>
       )}
       <p className="campaign-preview-privacy-note">
-        This is exactly what the recipient sees on their lock screen — never include a patient name, diagnosis, or other identifying clinical detail here.
+        {tr('ui.thisIsExactlyWhatTheRecipient')}
       </p>
 
       <style jsx>{`

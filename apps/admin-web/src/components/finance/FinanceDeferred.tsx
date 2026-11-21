@@ -1,4 +1,5 @@
 'use client';
+import { tr } from '@/lib/i18n';
 import {AlertCircle,ClipboardCheck,CreditCard,Layers,ShieldCheck,Stethoscope,Wallet} from 'lucide-react';
 import type {ReactNode} from 'react';
 import {Card,Chip,StatTile} from '../ui/afya';
@@ -24,22 +25,22 @@ function InfoCard({icon:Icon,title,children}:{icon:typeof Wallet;title:ReactNode
 
 export function PaymentsDeferred(){
   return <div className="afya-stack" style={{gap:16}}>
-    <Banner title="Finance Module: Deferred (Read-Only)">Payments and escrow are not live yet. Consultations currently proceed without charge. Records, if any, stay visible below; no financial action can be taken.</Banner>
+    <Banner title={tr('ui.financeModuleDeferredReadOnly')}>{tr('ui.paymentsAndEscrowAreNotLive')}</Banner>
     <div className="afya-finance-grid">
-      <InfoCard icon={CreditCard} title="Payments">In-app payment for consultations once the module is enabled.</InfoCard>
-      <InfoCard icon={ShieldCheck} title="Escrow">A payment is held until the consultation is completed, then settled to the doctor.</InfoCard>
-      <InfoCard icon={Layers} title={<>Status <Chip tone="warn">Deferred</Chip></>}>Enabled by deployment configuration in a future release.</InfoCard>
+      <InfoCard icon={CreditCard} title={tr('ui.payments')}>{tr('ui.inAppPaymentForConsultationsOnce')}</InfoCard>
+      <InfoCard icon={ShieldCheck} title={tr('ui.escrow2')}>{tr('ui.aPaymentIsHeldUntilThe')}</InfoCard>
+      <InfoCard icon={Layers} title={<>{tr('ui.status')} <Chip tone="warn">{tr('ui.deferred')}</Chip></>}>{tr('ui.enabledByDeploymentConfigurationInA')}</InfoCard>
     </div>
   </div>;
 }
 
 export function SettlementsDeferred({consultations}:{consultations:number|null}){
   return <div className="afya-stack" style={{gap:16}}>
-    <Banner title="Settlements & Payouts: Deferred (Read-Only)">Physician payouts are not live yet. Doctors are not paid through the platform while the module is deferred.</Banner>
+    <Banner title={tr('ui.settlementsPayoutsDeferredReadOnly')}>{tr('ui.physicianPayoutsAreNotLiveYet')}</Banner>
     <div className="afya-stat-grid">
-      <StatTile icon={Stethoscope} tone="green" value={consultations??'—'} label="Consultations booked"/>
-      <StatTile icon={Wallet} tone="green" value="KES 0" label="Earnings to settle" note="No consultation is charged while deferred"/>
-      <StatTile icon={ClipboardCheck} tone="amber" value={<Chip tone="warn">Deferred</Chip>} label="Next settlement"/>
+      <StatTile icon={Stethoscope} tone="green" value={consultations??'—'} label={tr('ui.consultationsBooked')}/>
+      <StatTile icon={Wallet} tone="green" value="KES 0" label={tr('ui.earningsToSettle')} note={tr('ui4.noConsultationIsChargedWhileDeferred')}/>
+      <StatTile icon={ClipboardCheck} tone="amber" value={<Chip tone="warn">{tr('ui.deferred')}</Chip>} label={tr('ui.nextSettlement')}/>
     </div>
     <p className="afya-stat-note" style={{margin:0}}>{PLATFORM_CHARGE_NOTE}</p>
   </div>;
@@ -47,31 +48,31 @@ export function SettlementsDeferred({consultations}:{consultations:number|null})
 
 export function SettingsDeferred(){
   return <div className="afya-stack" style={{gap:16}}>
-    <Banner title="Finance Mode: Deferred (Read-Only)">Financial configuration cannot be changed until the finance module goes live. This page summarises the settings that will apply.</Banner>
+    <Banner title={tr('ui.financeModeDeferredReadOnly')}>{tr('ui.financialConfigurationCannotBeChangedUnt')}</Banner>
     <div className="afya-two-col" style={{gridTemplateColumns:'1fr 1fr'}}>
-      <Card title="Finance mode">
-        <div style={{display:'flex',alignItems:'center',gap:12}}><span className="afya-stat-icon afya-tone-green" style={{width:46,height:46}}><Layers size={22} aria-hidden/></span><Chip tone="warn">Deferred</Chip></div>
-        <p className="afya-stat-note" style={{margin:'10px 0 0'}}>Payments, escrow and settlements are switched off. Set by FINANCIAL_MODULE_MODE on the server.</p>
+      <Card title={tr('ui.financeMode')}>
+        <div style={{display:'flex',alignItems:'center',gap:12}}><span className="afya-stat-icon afya-tone-green" style={{width:46,height:46}}><Layers size={22} aria-hidden/></span><Chip tone="warn">{tr('ui.deferred')}</Chip></div>
+        <p className="afya-stat-note" style={{margin:'10px 0 0'}}>{tr('ui.paymentsEscrowAndSettlementsAreSwitched')}</p>
       </Card>
-      <Card title="Module visibility (read-only)">
-        <label className="afya-switch-row" style={{marginTop:0}}><span>Show payments in the apps</span><input type="checkbox" role="switch" checked={false} disabled readOnly/></label>
-        <label className="afya-switch-row"><span>Show doctor wallet and escrow</span><input type="checkbox" role="switch" checked={false} disabled readOnly/></label>
+      <Card title={tr('ui.moduleVisibilityReadOnly')}>
+        <label className="afya-switch-row" style={{marginTop:0}}><span>{tr('ui.showPaymentsInTheApps')}</span><input type="checkbox" role="switch" checked={false} disabled readOnly/></label>
+        <label className="afya-switch-row"><span>{tr('ui.showDoctorWalletAndEscrow')}</span><input type="checkbox" role="switch" checked={false} disabled readOnly/></label>
       </Card>
-      <Card title="Settlement rules">
+      <Card title={tr('ui.settlementRules')}>
         <dl className="afya-dl">
-          <div><dt>Settlement frequency</dt><dd>Monthly statement</dd></div>
-          <div><dt>Platform charge</dt><dd>20%</dd></div>
-          <div><dt>Escrow holding period</dt><dd>Until the consultation is completed</dd></div>
-          <div><dt>Payout method</dt><dd>Doctor&apos;s saved payout destination</dd></div>
+          <div><dt>{tr('ui.settlementFrequency')}</dt><dd>{tr('ui.monthlyStatement')}</dd></div>
+          <div><dt>{tr('ui.platformCharge')}</dt><dd>20%</dd></div>
+          <div><dt>{tr('ui.escrowHoldingPeriod')}</dt><dd>{tr('ui.untilTheConsultationIsCompleted')}</dd></div>
+          <div><dt>{tr('ui.payoutMethod')}</dt><dd>{tr('ui.doctorSSavedPayoutDestination')}</dd></div>
         </dl>
         <p className="afya-stat-note" style={{margin:'8px 0 0'}}>{PLATFORM_CHARGE_NOTE}</p>
       </Card>
-      <Card title="Audit & compliance">
+      <Card title={tr('ui.auditCompliance')}>
         <ul className="afya-check-list">
-          <li>Every payment, refund and payout action is written to the audit trail</li>
-          <li>Payouts follow a finalised monthly statement</li>
-          <li>Refunds need an Admin decision on a grievance</li>
-          <li>Payment credentials are encrypted and never shown</li>
+          <li>{tr('ui.everyPaymentRefundAndPayoutAction')}</li>
+          <li>{tr('ui.payoutsFollowAFinalisedMonthlyStatement')}</li>
+          <li>{tr('ui.refundsNeedAnAdminDecisionOn')}</li>
+          <li>{tr('ui.paymentCredentialsAreEncryptedAndNever')}</li>
         </ul>
       </Card>
     </div>

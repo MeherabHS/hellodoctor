@@ -155,10 +155,13 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('an image document still uses the existing in-app image viewer',
+    testWidgets('an image document opens in the in-app image viewer from bytes',
         (tester) async {
-      final repo =
-          _FakeVaultRepository([PatientDocumentDto.fromJson(_imageDoc)]);
+      final repo = _FakeVaultRepository(
+          [PatientDocumentDto.fromJson(_imageDoc)],
+          fetch: () async => TypedBytes(
+              bytes: Uint8List.fromList(const [0xFF, 0xD8, 0xFF]),
+              contentType: 'image/jpeg'));
       await tester.pumpWidget(_harness(repo));
       await tester.pumpAndSettle();
 
@@ -169,9 +172,12 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      // The existing image path never calls fetchDocumentBytes — it still
-      // resolves a URL and uses Image.network directly, unchanged.
-      expect(repo.fetchCount, 0);
+      // Offline Health Records (2026-11-20): images are fetched as bytes once
+      // (which also saves them encrypted for offline use) and shown with
+      // Image.memory, so they open without internet and never spend the
+      // one-time download grant on an image-widget retry.
+      expect(repo.fetchCount, 1);
+      expect(find.byType(Image), findsOneWidget);
       expect(find.byType(ClinicalPdfViewer), findsNothing);
       // The pre-existing _ImageViewerPage is private to health_vault_page.dart;
       // its presence is confirmed by the Scaffold it pushes having a black

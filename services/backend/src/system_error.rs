@@ -312,6 +312,97 @@ pub(crate) fn redact(message: &str) -> String {
     out
 }
 
+/// Forwards every WARN and ERROR the backend logs to the Admin incident log
+/// (product owner, 2026-11-20: "every error incident has to be reported").
+///
+/// Request failures already reach the log through `AppError`, the panic
+/// handler and the incident-reporting middleware. Background work — the
+/// notification scheduler, email dispatch, uploads and erasure clean-ups,
+/// payment-hold sweeps, campaign fan-out and the rest — only ever wrote to
+/// the server log, so a failing job was invisible to Admins. This layer
+/// closes that gap for every current and future log line in the crate.
+///
+/// Rows group per log line (file:line) and level, so a recurring failure is
+/// one incident with an occurrence count. ERROR lines are stored under
+/// [`SERVER_LOG`], WARN lines under [`SERVER_LOG_WARNING`]. The message is
+/// redacted with the same rules as every other incident. Modules that
+/// already report their failures in full, and this module itself (so a
+/// failure to store an incident can never loop), are skipped.
+pub struct IncidentLogLayer;
+
+pub const SERVER_LOG: &str = "SERVER_LOG";
+pub const SERVER_LOG_WARNING: &str = "SERVER_LOG_WARNING";
+
+const ALREADY_REPORTED: &[&str] = &[
+    "hellodoctor_backend::system_error",
+    "hellodoctor_backend::error",
+    "hellodoctor_backend::api::router",
+    "hellodoctor_backend::api::middleware::incident_reporting",
+    "hellodoctor_backend::admission",
+];
+
+impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for IncidentLogLayer {
+    fn on_event(
+        &self,
+        event: &tracing::Event<'_>,
+        _ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        let meta = event.metadata();
+        let (severity, subsystem, code) = match *meta.level() {
+            tracing::Level::ERROR => (ErrorSeverity::Error, SERVER_LOG, "LOGGED_ERROR"),
+            tracing::Level::WARN => (ErrorSeverity::Warning, SERVER_LOG_WARNING, "LOGGED_WARNING"),
+            _ => return,
+        };
+        let target = meta.target();
+        if !target.starts_with("hellodoctor_backend")
+            || ALREADY_REPORTED
+                .iter()
+                .any(|skip| target == *skip || target.starts_with(&format!("{skip}::")))
+        {
+            return;
+        }
+        struct Text(String);
+        impl tracing::field::Visit for Text {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                if self.0.len() > 600 {
+                    return;
+                }
+                if !self.0.is_empty() {
+                    self.0.push_str("; ");
+                }
+                if field.name() == "message" {
+                    self.0.push_str(&format!("{value:?}"));
+                } else {
+                    self.0.push_str(&format!("{}={value:?}", field.name()));
+                }
+            }
+        }
+        let mut text = Text(String::new());
+        event.record(&mut text);
+        let location = match (meta.file(), meta.line()) {
+            (Some(file), Some(line)) => format!("{file}:{line}"),
+            _ => meta.name().to_string(),
+        };
+        let mut incident = ErrorEvent::new(
+            severity,
+            subsystem,
+            target,
+            code,
+            redact(&text.0),
+            crate::api::middleware::request_context::request_id(),
+        )
+        .with_stack_trace(location.clone());
+        incident.fingerprint_context = Some(location);
+        // A log line is not a failed request: it must never add a
+        // CONSULTATION_REQUEST_FAILED reference to the consultation whose
+        // request happened to log it. Stored in the background, such a
+        // reference also briefly locked the appointment row, so a payment-hold
+        // sweep running at that moment skipped it (FOR UPDATE SKIP LOCKED).
+        incident.consultation_evidence = None;
+        report(incident);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

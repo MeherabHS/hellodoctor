@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_client.dart';
+import '../../core/cache/offline_documents.dart';
 import '../../core/cache/patient_cache_store.dart';
 import '../../core/widgets/person_photo.dart';
 import '../../core/validation/kenya_phone.dart';
@@ -115,6 +116,7 @@ class AuthCubit extends Cubit<AuthState> {
       authDiag(
           'auth.signedOutByExpiry', {'state': state.runtimeType.toString()});
       cache?.clear();
+      unawaited(OfflineDocuments.clear());
       PersonPhotoCache.clear();
       if (!isClosed) emit(const SignedOut());
     };
@@ -218,6 +220,7 @@ class AuthCubit extends Cubit<AuthState> {
           otpCode: otp.trim(),
           acceptedDocuments: acceptedDocuments);
       await cache?.clear();
+      unawaited(OfflineDocuments.clear());
       final access = await api.read('access_token');
       if (access != null) await cache?.initializeScope(access);
       emit(const SignedIn());
@@ -257,6 +260,7 @@ class AuthCubit extends Cubit<AuthState> {
           await api.read('refresh_token').timeout(const Duration(seconds: 4));
       if (refreshBeforeRestore == null) {
         await cache?.clear();
+        unawaited(OfflineDocuments.clear());
         emit(const SignedOut());
         return;
       }
@@ -276,6 +280,7 @@ class AuthCubit extends Cubit<AuthState> {
         emit(const SignedIn());
       } else {
         await cache?.clear();
+        unawaited(OfflineDocuments.clear());
         emit(const SignedOut());
       }
     } on TimeoutException {
@@ -409,6 +414,7 @@ class AuthCubit extends Cubit<AuthState> {
     } finally {
       await api.clearSession();
       await cache?.clear();
+      unawaited(OfflineDocuments.clear());
       PersonPhotoCache.clear();
       emit(SignedOut(notice: notice));
       _busy = false;

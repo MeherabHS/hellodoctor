@@ -79,16 +79,22 @@ class _HealthVaultPageState extends State<HealthVaultPage> {
 
   Future<void> _open(PatientDocumentDto doc) async {
     if (_openingIds.contains(doc.id)) return;
+    if (widget.repo.isOffline && !_cubit.state.savedIds.contains(doc.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context).vaultNotSavedOffline)));
+      return;
+    }
     setState(() => _openingIds.add(doc.id));
     try {
       final mime = doc.mimeType?.toLowerCase();
       if (mime == 'image/jpeg' || mime == 'image/png') {
-        final url =
-            await widget.repo.resolveDownloadUrl(doc.appointmentId, doc.id);
+        // Bytes, not a URL: works offline from the saved copy and never
+        // spends the one-time download grant on an image widget retry.
+        final bytes = await _loadVerifiedBytes(doc);
         if (!mounted) return;
         await Navigator.of(context).push(MaterialPageRoute(
           builder: (_) =>
-              _ImageViewerPage(url: url, title: _titleOf(context, doc)),
+              _ImageViewerPage(bytes: bytes, title: _titleOf(context, doc)),
         ));
       } else if (mime == 'application/pdf') {
         if (!mounted) return;
@@ -103,10 +109,18 @@ class _HealthVaultPageState extends State<HealthVaultPage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(AppLocalizations.of(context).vaultOpenError)));
       }
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      // The server's own reason (e.g. "The document file is unavailable; it
+      // must be uploaded again.") instead of a generic message: a refused
+      // request (4xx) is not a server error, so it never reaches the Admin
+      // System Errors page and the text shown here is the only clue.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(AppLocalizations.of(context).vaultOpenNowError)));
+          content: Text(e is ApiException && e.status != null
+              ? '${AppLocalizations.of(context).vaultOpenNowError} '
+                  '(${e.status}: ${e.userMessage})'
+              : AppLocalizations.of(context).vaultOpenNowError)));
+      return;
     } finally {
       if (mounted) setState(() => _openingIds.remove(doc.id));
     }
@@ -146,6 +160,7 @@ class _HealthVaultPageState extends State<HealthVaultPage> {
                     onRefresh: _cubit.load,
                     child: _VaultList(
                       state: state,
+                      savedIds: state.savedIds,
                       kindFilter: _kindFilter,
                       openingIds: _openingIds,
                       onOpen: _open,
@@ -174,28 +189,33 @@ class _KindTabs extends StatelessWidget {
       ('PRESCRIPTION', l10n.vaultPrescriptions),
       ('INTAKE', l10n.vaultUploads),
     ];
+    // Scrolls sideways: the three chips do not fit on a 360 dp phone.
     return Container(
       color: PatientTokens.surface,
-      padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
-      child: Row(children: [
-        for (final t in tabs)
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: ChoiceChip(
-              label: Text(t.$2),
-              selected: selected == t.$1,
-              onSelected: (_) => onSelected(t.$1),
-              selectedColor: PatientTokens.primaryLight,
-              labelStyle: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: selected == t.$1
-                      ? PatientTokens.primaryDark
-                      : PatientTokens.text),
-              side: const BorderSide(color: PatientTokens.border),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        child: Row(children: [
+          for (final t in tabs)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(t.$2),
+                selected: selected == t.$1,
+                onSelected: (_) => onSelected(t.$1),
+                selectedColor: PatientTokens.primaryLight,
+                labelStyle: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: selected == t.$1
+                        ? PatientTokens.primaryDark
+                        : PatientTokens.text),
+                side: const BorderSide(color: PatientTokens.border),
+              ),
             ),
-          ),
-      ]),
+        ]),
+      ),
     );
   }
 }
@@ -203,11 +223,13 @@ class _KindTabs extends StatelessWidget {
 class _VaultList extends StatelessWidget {
   const _VaultList({
     required this.state,
+    required this.savedIds,
     required this.kindFilter,
     required this.openingIds,
     required this.onOpen,
   });
   final VaultState state;
+  final Set<String> savedIds;
   final String kindFilter;
   final Set<String> openingIds;
   final void Function(PatientDocumentDto) onOpen;
@@ -268,6 +290,7 @@ class _VaultList extends StatelessWidget {
           padding: const EdgeInsets.only(bottom: 8),
           child: _DocumentTile(
             doc: doc,
+            saved: savedIds.contains(doc.id),
             opening: openingIds.contains(doc.id),
             onTap: () => onOpen(doc),
           ),
@@ -348,9 +371,15 @@ class _SectionLabel extends StatelessWidget {
 
 class _DocumentTile extends StatelessWidget {
   const _DocumentTile(
-      {required this.doc, required this.opening, required this.onTap});
+      {required this.doc,
+      required this.opening,
+      required this.onTap,
+      this.saved = false});
   final PatientDocumentDto doc;
   final bool opening;
+
+  /// Saved (encrypted) on this phone: opens offline.
+  final bool saved;
   final VoidCallback onTap;
 
   @override
@@ -397,6 +426,20 @@ class _DocumentTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                       fontSize: 11.5, color: PatientTokens.textSub)),
+              if (saved)
+                Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.offline_pin_rounded,
+                        size: 13, color: PatientTokens.primary),
+                    const SizedBox(width: 4),
+                    Text(AppLocalizations.of(context).vaultSavedOffline,
+                        style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: PatientTokens.primary)),
+                  ]),
+                ),
             ]),
           ),
           if (opening)
@@ -421,8 +464,8 @@ class _DocumentTile extends StatelessWidget {
 }
 
 class _ImageViewerPage extends StatelessWidget {
-  const _ImageViewerPage({required this.url, required this.title});
-  final Uri url;
+  const _ImageViewerPage({required this.bytes, required this.title});
+  final Uint8List bytes;
   final String title;
 
   @override
@@ -435,8 +478,9 @@ class _ImageViewerPage extends StatelessWidget {
         ),
         body: Center(
           child: InteractiveViewer(
-            child: Image.network(
-              url.toString(),
+            child: Image.memory(
+              bytes,
+              gaplessPlayback: true,
               errorBuilder: (context, error, stack) => Padding(
                 padding: EdgeInsets.all(24),
                 child: Text(AppLocalizations.of(context).vaultImageError,

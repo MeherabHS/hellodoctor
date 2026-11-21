@@ -7,9 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
 
+import 'core/cache/offline_documents.dart';
+import 'features/onboarding/onboarding_page.dart';
 import 'core/cache/patient_cache_store.dart';
 import 'core/l10n/locale_controller.dart';
 import 'core/network/api_client.dart';
+import 'core/network/chat_live.dart';
 import 'core/network/screen_refresh.dart';
 import 'core/network/client_error_reporter.dart';
 import 'core/notifications/push_notification_service.dart';
@@ -119,6 +122,8 @@ class _AppState extends State<HelloDoctorPatientApp>
     try {
       secureStore = SecureTokenStore();
       cache = PatientCacheStore(secureStore!);
+      // Offline Health Records: encrypted document copies, wiped at sign-out.
+      OfflineDocuments.configure(secureStore!);
       connectivity = ConnectivityService();
       api = widget.apiClientFactory?.call(secureStore!) ??
           ApiClient(tokenStore: secureStore);
@@ -127,11 +132,22 @@ class _AppState extends State<HelloDoctorPatientApp>
       ClientErrorReporter.current!.loadBuildMetadata();
       auth = AuthCubit(api!, cache: cache);
       locale = LocaleController(secureStore!)..load();
-      locale!.bindBackendSync((languageCode) =>
-          NotificationRepository(api!).syncLanguage(languageCode));
+      // Signed out, a choice stays pending until sign-in.
+      locale!.bindBackendSync((languageCode) => auth?.state is SignedIn
+          ? NotificationRepository(api!).syncLanguage(languageCode)
+          : Future<void>.error(StateError('signed out')));
       _authSubscription = auth!.stream.listen((state) {
         _incidentRetryTimer?.cancel();
+        // Live chat nudges run only while signed in.
         if (state is SignedIn) {
+          ChatLive.current ??= ChatLive(api!)..start();
+        } else if (state is! SessionRestoring) {
+          unawaited(ChatLive.current?.stop());
+          ChatLive.current = null;
+        }
+        if (state is SignedIn) {
+          // A language picked while signed out reaches the account.
+          locale?.flushPendingSync();
           unawaited(ClientErrorReporter.current?.flushStartup());
           _incidentRetryTimer =
               Timer.periodic(const Duration(seconds: 30), (_) {
@@ -179,10 +195,15 @@ class _AppState extends State<HelloDoctorPatientApp>
                   home: home,
                 );
             if (state is SignedIn) {
-              return application(_SignedInRoot(
-                api: api!,
-                cache: cache!,
-                connectivity: connectivity!,
+              // Right after sign-in or account creation: onboarding, once
+              // per account on this phone (product owner, 2026-11-21).
+              return application(OnboardingGate(
+                store: secureStore!,
+                child: _SignedInRoot(
+                  api: api!,
+                  cache: cache!,
+                  connectivity: connectivity!,
+                ),
               ));
             }
             return application(state is SessionRestoring

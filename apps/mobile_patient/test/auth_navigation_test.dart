@@ -32,7 +32,8 @@ Finder field(String label) => find.descendant(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() {
-    FlutterSecureStorage.setMockInitialValues({});
+    // Onboarding was already seen on this phone.
+    FlutterSecureStorage.setMockInitialValues({onboardingSeenKey: '1'});
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(

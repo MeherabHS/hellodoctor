@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 # Async Runtime & HTTP Server
 tokio = { version = "1.40", features = ["full"] }
-axum = { version = "0.7", features = ["multipart"] }
+axum = { version = "0.7", features = ["multipart", "ws"] }
 tower = { version = "0.4", features = ["timeout", "load-shed", "limit", "util"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "compression-full", "limit", "catch-panic"] }
 
@@ -80,4 +80,7 @@ http-body = "1"
 [dev-dependencies]
 tower = { version = "0.4", features = ["util"] }
 http-body-util = "0.1"
+# Live chat socket end-to-end test only (already in the tree via axum "ws").
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "rustls-tls"] }

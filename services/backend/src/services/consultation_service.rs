@@ -562,6 +562,12 @@ impl ConsultationService {
             .await?;
         match result.as_str() {
             "COMPLETED" => {
+                // A video consultation's chat closes 1 hour after completion
+                // (product owner, 2026-11-21). No-op for chat consultations.
+                sqlx::query("SELECT finish_video_chat_window($1)")
+                    .bind(appointment_id)
+                    .execute(&mut **tx)
+                    .await?;
                 crate::services::NotificationService::notify_consultation_completed(
                     tx,
                     appointment_id,

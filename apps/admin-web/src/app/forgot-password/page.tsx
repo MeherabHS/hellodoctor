@@ -1,5 +1,7 @@
 'use client';
 
+import { tr, LanguageSwitch, useT } from '@/lib/i18n';
+import { authErrorMessage } from '@/lib/i18n/apiErrors';
 import React, { useState } from 'react';
 import { BotChallenge } from '@/components/BotChallenge';
 
@@ -23,10 +25,11 @@ type Stage = 'email' | 'code' | 'password' | 'done';
 async function post(path: string, body: Record<string, unknown>) {
   const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store', credentials: 'same-origin' });
   const json = await res.json().catch(() => null);
-  return { ok: res.ok && json?.success === true, data: json?.data, error: typeof json?.error === 'string' ? json.error : 'Something went wrong. Please try again.' };
+  return { ok: res.ok && json?.success === true, data: json?.data, error: authErrorMessage(res.status, json?.error, tr('ui2.somethingWentWrongPleaseTryAgain')) };
 }
 
 export default function ForgotPasswordPage() {
+  useT(); // re-render this screen when the language changes
   const [stage, setStage] = useState<Stage>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -42,7 +45,7 @@ export default function ForgotPasswordPage() {
   async function requestCode(e: React.FormEvent) {
     e.preventDefault();
     const value = email.trim();
-    if (!EMAIL.test(value)) { setError('Enter a valid email address.'); return; }
+    if (!EMAIL.test(value)) { setError(tr('ui.enterAValidEmailAddress')); return; }
     if (challengeToken === null || busy) return;
     setBusy(true); setError('');
     const result = await post('/api/password-reset/request', { email: value, turnstile_token: challengeToken });
@@ -58,7 +61,7 @@ export default function ForgotPasswordPage() {
 
   async function verifyCode(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^[0-9]{6}$/.test(code)) { setError('Enter the 6-digit code from the email.'); return; }
+    if (!/^[0-9]{6}$/.test(code)) { setError(tr('ui.enterThe6DigitCodeFrom')); return; }
     if (busy) return;
     setBusy(true); setError('');
     const result = await post('/api/password-reset/verify', { email, otp_code: code });
@@ -88,63 +91,64 @@ export default function ForgotPasswordPage() {
         <div className="afya-login-brand-top">
           {/* eslint-disable-next-line @next/next/no-img-element -- static same-origin asset */}
           <img src="/brand/afya_logo_white.png" alt="" />
-          <div><div className="afya-login-brand-name">AfyaMkononi</div><div className="afya-login-brand-sub">Health for You</div></div>
+          <div><div className="afya-login-brand-name">AfyaMkononi</div><div className="afya-login-brand-sub">{tr('ui.healthForYou')}</div></div>
         </div>
-        <div><h2>Reset your password</h2><p>We will email a 6-digit code to your Admin address. The code works once and expires quickly.</p></div>
-        <p className="afya-login-brand-foot">Kenya deployment · English and Kiswahili</p>
+        <div><h2>{tr('ui.resetYourPassword')}</h2><p>{tr('ui.weWillEmailA6Digit')}</p></div>
+        <p className="afya-login-brand-foot">{tr('ui.kenyaDeploymentEnglishAndKiswahili')}</p>
       </section>
       <main className="afya-login-main">
+        <LanguageSwitch className="afya-login-lang" />
         <div className="afya-login-card">
           {stage === 'email' && (
             <>
-              <div className="afya-login-head"><h1>Forgot password</h1><p>Enter the email address you use to sign in to the Admin console.</p></div>
+              <div className="afya-login-head"><h1>{tr('ui.forgotPassword')}</h1><p>{tr('ui.enterTheEmailAddressYouUse')}</p></div>
               <form onSubmit={requestCode} className="afya-login-form" noValidate>
                 {error && <div className="afya-login-error" role="alert">{error}</div>}
-                <label htmlFor="fp-email">Email address</label>
+                <label htmlFor="fp-email">{tr('ui.emailAddress')}</label>
                 <input id="fp-email" type="email" autoComplete="username" required maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} />
                 <BotChallenge action="admin_password_reset" reset={challengeReset} onToken={setChallengeToken} />
-                <button type="submit" className="afya-btn-primary afya-login-submit" disabled={busy || challengeToken === null || !email.trim()}>{busy ? 'Sending…' : 'Send code'}</button>
+                <button type="submit" className="afya-btn-primary afya-login-submit" disabled={busy || challengeToken === null || !email.trim()}>{busy ? tr('ui2.sending') : tr('ui2.sendCode')}</button>
               </form>
             </>
           )}
           {stage === 'code' && (
             <>
-              <div className="afya-login-head"><h1>Check your email</h1><p>If an Admin account exists for <strong>{email}</strong>, we sent it a 6-digit code.</p></div>
+              <div className="afya-login-head"><h1>{tr('ui.checkYourEmail')}</h1><p>{tr('ui.ifAnAdminAccountExistsFor')} <strong>{email}</strong>{tr('ui.weSentItA6Digit')}</p></div>
               <form onSubmit={verifyCode} className="afya-login-form" noValidate>
                 {error && <div className="afya-login-error" role="alert">{error}</div>}
-                {devCode && <p className="afya-login-debug" role="status">Development only: code <span>{devCode}</span></p>}
-                <label htmlFor="fp-code">6-digit code</label>
+                {devCode && <p className="afya-login-debug" role="status">{tr('ui.developmentOnlyCode')} <span>{devCode}</span></p>}
+                <label htmlFor="fp-code">{tr('ui.n6DigitCode')}</label>
                 <input id="fp-code" inputMode="numeric" autoComplete="one-time-code" required maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))} />
-                <button type="submit" className="afya-btn-primary afya-login-submit" disabled={busy || code.length !== 6}>{busy ? 'Checking…' : 'Continue'}</button>
-                <button type="button" className="afya-btn-secondary" onClick={restart}>Use a different email</button>
+                <button type="submit" className="afya-btn-primary afya-login-submit" disabled={busy || code.length !== 6}>{busy ? tr('ui2.checking') : tr('ui2.continue')}</button>
+                <button type="button" className="afya-btn-secondary" onClick={restart}>{tr('ui.useADifferentEmail')}</button>
               </form>
             </>
           )}
           {stage === 'password' && (
             <>
-              <div className="afya-login-head"><h1>Choose a new password</h1><p>For <strong>{email}</strong>. You will be signed out everywhere else.</p></div>
+              <div className="afya-login-head"><h1>{tr('ui.chooseANewPassword')}</h1><p>{tr('ui.for')} <strong>{email}</strong>{tr('ui.youWillBeSignedOutEverywhere')}</p></div>
               <form onSubmit={savePassword} className="afya-login-form" noValidate>
                 {error && <div className="afya-login-error" role="alert">{error}</div>}
-                <label htmlFor="fp-password">New password</label>
+                <label htmlFor="fp-password">{tr('ui.newPassword')}</label>
                 <input id="fp-password" type="password" autoComplete="new-password" required maxLength={128} value={password} onChange={(e) => setPassword(e.target.value)} />
-                <ul className="afya-check-list" style={{ margin: '4px 0 2px', gap: 4, fontSize: 12.5 }} aria-label="Password requirements">
+                <ul className="afya-check-list" style={{ margin: '4px 0 2px', gap: 4, fontSize: 12.5 }} aria-label={tr('ui.passwordRequirements')}>
                   {RULES.map(([label, test]) => <li key={label} style={{ color: test(password) ? 'var(--afya-success-fg)' : 'var(--afya-muted)' }}>{label}</li>)}
                 </ul>
-                <label htmlFor="fp-confirm">Confirm new password</label>
+                <label htmlFor="fp-confirm">{tr('ui.confirmNewPassword')}</label>
                 <input id="fp-confirm" type="password" autoComplete="new-password" required maxLength={128} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-                {confirm && password !== confirm && <span className="afya-stat-note" role="alert">Passwords do not match.</span>}
-                <button type="submit" className="afya-btn-primary afya-login-submit" disabled={busy || !rulesMet || password !== confirm}>{busy ? 'Saving…' : 'Set new password'}</button>
+                {confirm && password !== confirm && <span className="afya-stat-note" role="alert">{tr('ui.passwordsDoNotMatch')}</span>}
+                <button type="submit" className="afya-btn-primary afya-login-submit" disabled={busy || !rulesMet || password !== confirm}>{busy ? tr('ui2.saving') : tr('ui2.setNewPassword')}</button>
               </form>
             </>
           )}
           {stage === 'done' && (
             <div className="afya-login-head">
-              <h1>Password changed</h1>
-              <p>Sign in with <strong>{email}</strong> and your new password. Every other session was signed out.</p>
-              <a className="afya-btn-primary afya-login-submit" href="/login" style={{ textDecoration: 'none' }}>Go to sign in</a>
+              <h1>{tr('ui.passwordChanged')}</h1>
+              <p>{tr('ui.signInWith')} <strong>{email}</strong> {tr('ui.andYourNewPasswordEveryOther')}</p>
+              <a className="afya-btn-primary afya-login-submit" href="/login" style={{ textDecoration: 'none' }}>{tr('ui.goToSignIn')}</a>
             </div>
           )}
-          {stage !== 'done' && <p className="afya-login-note"><a href="/login">Back to sign in</a> · Codes are single use. All Admin actions are audited.</p>}
+          {stage !== 'done' && <p className="afya-login-note"><a href="/login">{tr('ui.backToSignIn')}</a> {tr('ui.codesAreSingleUseAllAdmin')}</p>}
         </div>
       </main>
     </div>

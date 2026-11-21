@@ -76,12 +76,26 @@ class NotificationChannels {
     enableVibration: true,
   );
 
+  /// Admin-published announcements (ADMIN_CAMPAIGN), always at maximum
+  /// importance (product owner, 2026-11-21). The backend names this id in
+  /// its pushes for every role (`notification_transport.rs`).
+  static const announcements = AndroidNotificationChannel(
+    'ANNOUNCEMENTS_V3',
+    'Announcements',
+    description: 'Messages from the AfyaMkononi team.',
+    importance: Importance.max,
+    playSound: true,
+    sound: NotificationSounds.quick,
+    enableVibration: true,
+  );
+
   static const all = [
     consultationReminders,
     messages,
     appointments,
     grievance,
     general,
+    announcements,
   ];
 
   /// Channels replaced by the forced-sound set; deleted at start-up so they
@@ -122,6 +136,8 @@ class NotificationChannels {
       case 'BOOKING_HOLD_ONE_MINUTE':
       case 'BOOKING_HOLD_EXPIRED':
         return appointments;
+      case 'ADMIN_CAMPAIGN':
+        return announcements;
       default:
         return general;
     }

@@ -1,4 +1,5 @@
 'use client';
+import { tr, useT } from '@/lib/i18n';
 import {createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode} from 'react';
 
 type Blocker={dirty:boolean;pending:boolean};
@@ -7,6 +8,7 @@ type Guard={update:(key:symbol,value:Blocker)=>void;remove:(key:symbol)=>void;re
 const Context=createContext<Guard|null>(null);
 
 export function NavigationGuard({children}:{children:ReactNode}) {
+  useT(); // re-render this screen when the language changes
   const blockers=useRef(new Map<symbol,Blocker>()),destination=useRef<Navigation|null>(null),allowUnload=useRef(false);
   const [flags,setFlags]=useState({unsafe:false,pending:false}),[dialog,setDialog]=useState(false);
   const refresh=useCallback(()=>{
@@ -67,8 +69,8 @@ export function NavigationGuard({children}:{children:ReactNode}) {
     const action=destination.current;destination.current=null;setDialog(false);if(action)void action();
   }
   return <Context.Provider value={guard}>{children}{dialog&&<div className="admin-modal-backdrop" style={{zIndex:10000}}><section role="alertdialog" aria-modal="true" aria-labelledby="unsaved-title" aria-describedby="unsaved-description" className="admin-modal-card" style={{maxWidth:480,padding:24}}>
-    <h2 id="unsaved-title" className="afya-modal-title">Leave without saving?</h2><p id="unsaved-description" className="afya-modal-sub" style={{marginTop:8}}>{flags.pending?'Still saving. Wait a moment, then leave.':'Your changes have not been saved and will be lost.'}</p>
-    <div className="afya-guard-actions"><button type="button" className="afya-btn-secondary" autoFocus onClick={stay}>Keep editing</button><button type="button" className="afya-btn-danger" disabled={flags.pending} onClick={leave}>Discard changes</button></div>
+    <h2 id="unsaved-title" className="afya-modal-title">{tr('ui.leaveWithoutSaving')}</h2><p id="unsaved-description" className="afya-modal-sub" style={{marginTop:8}}>{flags.pending?tr('ui2.stillSavingWaitAMomentThen'):tr('ui2.yourChangesHaveNotBeenSaved')}</p>
+    <div className="afya-guard-actions"><button type="button" className="afya-btn-secondary" autoFocus onClick={stay}>{tr('ui.keepEditing')}</button><button type="button" className="afya-btn-danger" disabled={flags.pending} onClick={leave}>{tr('ui.discardChanges')}</button></div>
   </section></div>}</Context.Provider>;
 }
 

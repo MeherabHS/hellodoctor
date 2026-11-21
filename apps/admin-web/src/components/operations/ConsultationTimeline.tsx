@@ -1,4 +1,6 @@
 'use client';
+import { tr } from '@/lib/i18n';
+import { apiErrorMessage } from '@/lib/i18n/apiErrors';
 import {useEffect,useState} from 'react';
 import {X} from 'lucide-react';
 import {request} from '../../lib/api';
@@ -20,7 +22,7 @@ const at=(value:string|null|undefined)=>value?new Date(value).toLocaleString('en
 /** One merged, time-ordered list: app events and signed Agora presence events. */
 export function timelineRows(data:ConsultationTimelineData){
   const rows=[
-    ...data.events.map(e=>({time:e.occurred_at??e.created_at??'',label:words(e.event_type),source:'App'})),
+    ...data.events.map(e=>({time:e.occurred_at??e.created_at??'',label:words(e.event_type),source:tr('ui2.app')})),
     ...data.provider_presence_events.map(e=>({time:e.provider_event_at??e.received_at??'',label:`${words(e.participant_role)} · ${words(e.event_type)}`,source:'Agora'})),
   ];
   return rows.sort((a,b)=>a.time.localeCompare(b.time));
@@ -29,29 +31,29 @@ export function timelineRows(data:ConsultationTimelineData){
 /** The consultation timeline in a panel over the dashboard, instead of raw JSON in a new tab. */
 export function ConsultationTimeline({path,onClose}:{path:string;onClose:()=>void}){
   const [data,setData]=useState<ConsultationTimelineData|null>(null);const [error,setError]=useState('');
-  useEffect(()=>{let active=true;request<ConsultationTimelineData>(path).then(d=>{if(active)setData(d);}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load the timeline.');});return()=>{active=false;};},[path]);
+  useEffect(()=>{let active=true;request<ConsultationTimelineData>(path).then(d=>{if(active)setData(d);}).catch(e=>{if(active)setError(apiErrorMessage(e, tr('ui.unableToLoadTheTimeline')));});return()=>{active=false;};},[path]);
   useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[onClose]);
   const rows=data?timelineRows(data):[];
   return <div className="admin-modal-backdrop" role="presentation" onClick={onClose}>
     <section role="dialog" aria-modal="true" aria-labelledby="timeline-title" className="admin-modal-card afya-timeline-panel" onClick={e=>e.stopPropagation()}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12}}>
-        <div><h2 id="timeline-title" className="afya-modal-title">Consultation timeline</h2><p className="afya-modal-sub">Times in Africa/Nairobi</p></div>
-        <button type="button" className="afya-icon-btn" aria-label="Close timeline" onClick={onClose}><X size={18}/></button>
+        <div><h2 id="timeline-title" className="afya-modal-title">{tr('ui.consultationTimeline')}</h2><p className="afya-modal-sub">{tr('ui.timesInAfricaNairobi')}</p></div>
+        <button type="button" className="afya-icon-btn" aria-label={tr('ui.closeTimeline')} onClick={onClose}><X size={18}/></button>
       </div>
       {error&&<div role="alert" className="afya-login-error" style={{marginTop:12}}>{error}</div>}
-      {!data&&!error&&<p className="afya-stat-note">Loading…</p>}
+      {!data&&!error&&<p className="afya-stat-note">{tr('ui.loading')}</p>}
       {data&&<>
         <dl className="afya-timeline-summary">
-          <div><dt>Status</dt><dd><Chip tone={data.recovery_state==='NEEDS_REVIEW'?'warn':'neutral'}>{words(data.status)}</Chip></dd></div>
-          <div><dt>Started</dt><dd>{at(data.started_at)}</dd></div>
-          <div><dt>Ended</dt><dd>{data.ended_at?at(data.ended_at):'Not ended'}</dd></div>
-          <div><dt>In the room now</dt><dd>{[data.patient_present&&'Patient',data.doctor_present&&'Doctor'].filter(Boolean).join(' and ')||'Nobody'}</dd></div>
-          <div><dt>Recovery</dt><dd>{words(data.recovery_state)}{data.recovery_resolution?.outcome?` · ${words(data.recovery_resolution.outcome)}`:''}</dd></div>
-          <div><dt>Reconnects · grievances · app errors</dt><dd>{data.reconnect_windows.length} · {data.related_grievances.length} · {data.related_system_errors.length}</dd></div>
+          <div><dt>{tr('ui.status')}</dt><dd><Chip tone={data.recovery_state==='NEEDS_REVIEW'?'warn':'neutral'}>{words(data.status)}</Chip></dd></div>
+          <div><dt>{tr('ui.started')}</dt><dd>{at(data.started_at)}</dd></div>
+          <div><dt>{tr('ui.ended')}</dt><dd>{data.ended_at?at(data.ended_at):tr('ui2.notEnded')}</dd></div>
+          <div><dt>{tr('ui.inTheRoomNow')}</dt><dd>{[data.patient_present&&tr('ui2.patient'),data.doctor_present&&tr('ui2.doctor')].filter(Boolean).join(' and ')||tr('ui2.nobody')}</dd></div>
+          <div><dt>{tr('ui.recovery')}</dt><dd>{words(data.recovery_state)}{data.recovery_resolution?.outcome?` · ${words(data.recovery_resolution.outcome)}`:''}</dd></div>
+          <div><dt>{tr('ui.reconnectsGrievancesAppErrors')}</dt><dd>{data.reconnect_windows.length} · {data.related_grievances.length} · {data.related_system_errors.length}</dd></div>
         </dl>
-        <h3 className="afya-timeline-heading">Events</h3>
+        <h3 className="afya-timeline-heading">{tr('ui.events')}</h3>
         {rows.length?<ol className="afya-timeline-list">{rows.map((r,i)=><li key={i}><span className="afya-timeline-time">{at(r.time)}</span><span>{r.label}</span><Chip tone={r.source==='Agora'?'topic':'outlined'}>{r.source}</Chip></li>)}</ol>
-          :<p className="afya-stat-note">No events yet. Nobody has joined this consultation’s room.</p>}
+          :<p className="afya-stat-note">{tr('ui.noEventsYetNobodyHasJoined')}</p>}
       </>}
     </section>
   </div>;
