@@ -393,6 +393,12 @@ impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for IncidentLogLayer {
         )
         .with_stack_trace(location.clone());
         incident.fingerprint_context = Some(location);
+        // A log line is not a failed request: it must never add a
+        // CONSULTATION_REQUEST_FAILED reference to the consultation whose
+        // request happened to log it. Stored in the background, such a
+        // reference also briefly locked the appointment row, so a payment-hold
+        // sweep running at that moment skipped it (FOR UPDATE SKIP LOCKED).
+        incident.consultation_evidence = None;
         report(incident);
     }
 }

@@ -67,6 +67,11 @@ pub async fn middleware(request: Request, next: Next) -> Response {
     .with_http_status(status.as_u16())
     .with_endpoint(endpoint.clone());
     event.fingerprint_context = Some(endpoint);
+    // The Admin incident log only: a refused request adds no
+    // CONSULTATION_REQUEST_FAILED reference to the consultation trace (stored
+    // in the background, such a reference would also briefly lock the
+    // appointment row that payment and expiry work is about to update).
+    event.consultation_evidence = None;
     system_error::report(event);
     response
 }
