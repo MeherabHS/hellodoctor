@@ -1,53 +1,56 @@
-//! Admin step-up re-authentication (product owner, 2026-11-21: "all
-//! sensitive actions").
+//! Password step-up for sensitive Admin actions.
 //!
-//! Sensitive Admin actions (doctor verification, Peer Navigator decisions,
-//! grievance decisions and refunds, data erasure, finance, publishing push
-//! campaigns) require the Admin to have re-entered their password within the
-//! last [`STEP_UP_TTL_SECS`] on this session. `POST /admin/step-up` checks the
-//! password (5 wrong passwords per 15 minutes lock it, every wrong one is
-//! audited) and marks the session; [`require`] answers 403 with code
-//! `STEP_UP_REQUIRED` otherwise, which Admin Web turns into a password prompt
-//! and a retry. Admin team invitations keep their per-request password.
+//! A stolen Admin session must not be enough to approve doctors, move or
+//! refund money, erase accounts or reveal identities. Those handlers call
+//! [`require`]; it answers `REAUTH_REQUIRED` (403) unless the Admin confirmed
+//! their password in this sign-in session within the last
+//! [`STEP_UP_TTL_SECS`]. Admin Web then asks for the password, calls
+//! `POST /admin/reauth` ([`confirm_and_grant`]) and retries the action.
+//!
+//! The grant is keyed by the session family (`sid` in the access token), so
+//! it survives access-token refresh but not sign-out, and never carries over
+//! to another device. Redis outages fail closed.
 
-use crate::abac::{self, Action};
 use crate::auth_context::AuthContext;
-use crate::domain::models::UserRole;
 use crate::error::AppError;
 use crate::repository::AppState;
-use axum::extract::State;
-use axum::Json;
-use serde::Deserialize;
 use std::time::Duration;
 
-/// How long one password confirmation covers sensitive actions.
-pub const STEP_UP_TTL_SECS: u64 = 2 * 60;
+/// How long one password confirmation unlocks sensitive actions.
+/// Product owner, 2026-11-21: two minutes, shown as a countdown in Admin Web.
+pub const STEP_UP_TTL_SECS: u64 = 120;
+
+/// After 5 wrong passwords in 15 minutes further checks are refused (correct
+/// ones never count).
 const REAUTH_MAX_FAILURES: u32 = 5;
 const REAUTH_WINDOW_SECS: u64 = 900;
+const REDIS_DEADLINE: Duration = Duration::from_millis(250);
 
-/// The mark is per login (token family), so it survives the silent access
-/// token refresh, which replaces the session row but keeps its family.
-async fn marker_key(state: &AppState, ctx: &AuthContext) -> Result<Option<String>, AppError> {
-    let Some(session) = ctx.session_id else {
-        return Ok(None);
-    };
+/// One grant per sign-in (token family): the silent access-token refresh
+/// replaces the session row but keeps its family, so a refresh does not
+/// throw away a password the Admin just confirmed.
+async fn grant_key(state: &AppState, session_id: uuid::Uuid) -> Result<String, AppError> {
     let family: Option<uuid::Uuid> =
         sqlx::query_scalar("SELECT token_family_id FROM auth_sessions WHERE id = $1")
-            .bind(session)
+            .bind(session_id)
             .fetch_optional(&state.auth_db)
             .await?;
-    Ok(family.map(|family| format!("admin-step-up:{}:{family}", ctx.user_id)))
+    let family = family.ok_or(AppError::ReauthRequired)?;
+    Ok(format!("admin-stepup:{family}"))
 }
 
-/// Re-checks the signed-in Admin's password. After 5 wrong passwords in 15
-/// minutes further checks are refused (correct ones never count); every wrong
-/// password is audited (visible in the Activity Log). A wrong password
+fn store_unavailable(detail: impl std::fmt::Display) -> AppError {
+    AppError::rate_limit_service_unavailable(format!("Step-up store unavailable: {detail}"))
+}
+
+/// Re-checks the signed-in Admin's password. Every wrong password is audited
+/// (visible in the Activity Log) under `audit_resource`. A wrong password
 /// answers 403, not 401, so the session itself stays valid.
 pub async fn confirm_password(
     state: &AppState,
     ctx: &AuthContext,
     password: &str,
-    resource_type: &str,
+    audit_resource: &'static str,
 ) -> Result<(), AppError> {
     if password.is_empty() || password.len() > 128 {
         return Err(AppError::Forbidden(
@@ -80,7 +83,7 @@ pub async fn confirm_password(
                 Some(ctx.user_id),
                 ctx.role,
                 "ADMIN_REAUTH_FAILED",
-                resource_type,
+                audit_resource,
                 None,
                 "DENIED",
             ),
@@ -93,98 +96,67 @@ pub async fn confirm_password(
     Ok(())
 }
 
-async fn redis_conn(state: &AppState) -> Result<deadpool_redis::Connection, AppError> {
-    state
-        .redis
-        .get()
-        .await
-        .map_err(|e| AppError::service_unavailable(format!("Step-up store unavailable: {e}")))
-}
-
-#[derive(Deserialize)]
-pub struct StepUpRequest {
-    pub current_password: String,
-}
-
-impl std::fmt::Debug for StepUpRequest {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("StepUpRequest")
-            .field("current_password", &"[redacted]")
-            .finish()
-    }
-}
-
-/// `POST /admin/step-up` — confirms the password and marks this session as
-/// recently re-authenticated for [`STEP_UP_TTL_SECS`].
-pub async fn step_up(
-    State(state): State<AppState>,
-    ctx: AuthContext,
-    Json(body): Json<StepUpRequest>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    abac::authorize(&ctx, Action::ViewAdminOverview)?;
-    let key = marker_key(&state, &ctx)
-        .await?
-        .ok_or_else(|| AppError::Unauthorized("Sign in again to continue.".into()))?;
-    confirm_password(&state, &ctx, &body.current_password, "ADMIN_STEP_UP").await?;
-    let mut conn = redis_conn(&state).await?;
-    tokio::time::timeout(
-        Duration::from_millis(500),
-        deadpool_redis::redis::cmd("SET")
+/// `POST /admin/reauth`: confirms the password and unlocks sensitive actions
+/// for this sign-in session for [`STEP_UP_TTL_SECS`].
+pub async fn confirm_and_grant(
+    state: &AppState,
+    ctx: &AuthContext,
+    password: &str,
+) -> Result<(), AppError> {
+    let session_id = ctx.session_id.ok_or(AppError::ReauthRequired)?;
+    confirm_password(state, ctx, password, "ADMIN_STEP_UP").await?;
+    let key = grant_key(state, session_id).await?;
+    let write = async {
+        let mut conn = state.redis.get().await.map_err(store_unavailable)?;
+        let stored: Result<(), _> = deadpool_redis::redis::cmd("SET")
             .arg(&key)
             .arg(1)
             .arg("EX")
             .arg(STEP_UP_TTL_SECS)
-            .query_async::<()>(&mut conn),
-    )
-    .await
-    .map_err(|_| AppError::service_unavailable("Step-up store deadline exceeded.".into()))?
-    .map_err(|e| AppError::service_unavailable(format!("Step-up store error: {e}")))?;
+            .query_async(&mut conn)
+            .await;
+        stored.map_err(store_unavailable)
+    };
+    tokio::time::timeout(REDIS_DEADLINE, write)
+        .await
+        .map_err(|_| store_unavailable("deadline exceeded"))??;
     crate::services::AuditService::log(
-        &state,
-        &ctx,
+        state,
+        ctx,
         crate::services::AuditLogEntry::new(
             Some(ctx.user_id),
             ctx.role,
+            "ADMIN_REAUTH_CONFIRMED",
             "ADMIN_STEP_UP",
-            "ADMIN_STEP_UP",
-            ctx.session_id,
+            None,
             "SUCCESS",
         ),
     )
     .await?;
-    Ok(Json(serde_json::json!({
-        "success": true,
-        "data": {"valid_for_seconds": STEP_UP_TTL_SECS}
-    })))
+    Ok(())
 }
 
-/// Guard for sensitive Admin actions: passes only if this session re-entered
-/// the Admin password within [`STEP_UP_TTL_SECS`]. Fails closed when the
-/// store is unreachable.
+/// Call at the top of a sensitive Admin handler, after `abac::authorize`.
 pub async fn require(state: &AppState, ctx: &AuthContext) -> Result<(), AppError> {
-    if ctx.role != UserRole::Admin {
-        return Ok(()); // Role checks are the handler's own authorize call.
+    if !state.config.admin_step_up_required {
+        return Ok(());
     }
-    let Some(key) = marker_key(state, ctx).await? else {
-        return Err(step_up_required());
-    };
-    let mut conn = redis_conn(state).await?;
-    let present: bool = tokio::time::timeout(
-        Duration::from_millis(250),
-        deadpool_redis::redis::cmd("EXISTS")
+    let session_id = ctx.session_id.ok_or(AppError::ReauthRequired)?;
+    let key = grant_key(state, session_id).await?;
+    let read = async {
+        let mut conn = state.redis.get().await.map_err(store_unavailable)?;
+        let exists: Result<bool, _> = deadpool_redis::redis::cmd("EXISTS")
             .arg(&key)
-            .query_async(&mut conn),
-    )
-    .await
-    .map_err(|_| AppError::service_unavailable("Step-up store deadline exceeded.".into()))?
-    .map_err(|e| AppError::service_unavailable(format!("Step-up store error: {e}")))?;
-    if present {
+            .query_async(&mut conn)
+            .await;
+        exists.map_err(store_unavailable)
+    };
+    let granted = tokio::time::timeout(REDIS_DEADLINE, read)
+        .await
+        .map_err(|_| store_unavailable("deadline exceeded"))??;
+    if granted {
         Ok(())
     } else {
-        Err(step_up_required())
+        Err(AppError::ReauthRequired)
     }
-}
-
-fn step_up_required() -> AppError {
-    AppError::StepUpRequired("Re-enter your password to confirm this action.".into())
 }

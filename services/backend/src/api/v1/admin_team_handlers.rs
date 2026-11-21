@@ -53,6 +53,34 @@ impl std::fmt::Debug for ConfirmRequest {
     }
 }
 
+async fn confirm_password(
+    state: &AppState,
+    ctx: &AuthContext,
+    password: &str,
+) -> Result<(), AppError> {
+    crate::services::admin_step_up::confirm_password(state, ctx, password, "ADMIN_INVITATION").await
+}
+
+/// `POST /admin/reauth` — confirms the Admin's password and unlocks the
+/// sensitive Admin actions for this sign-in session for two minutes
+/// (`services::admin_step_up`).
+pub async fn reauth(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Json(payload): Json<ConfirmRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ViewAdminOverview)?;
+    crate::services::admin_step_up::confirm_and_grant(&state, &ctx, &payload.current_password)
+        .await?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: serde_json::json!({
+            "confirmed": true,
+            "valid_for_seconds": crate::services::admin_step_up::STEP_UP_TTL_SECS,
+        }),
+    }))
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InvitationTokenRequest {
@@ -96,13 +124,7 @@ pub async fn invite(
     Json(payload): Json<InviteRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManageAdminTeam)?;
-    crate::services::admin_step_up::confirm_password(
-        &state,
-        &ctx,
-        &payload.current_password,
-        "ADMIN_INVITATION",
-    )
-    .await?;
+    confirm_password(&state, &ctx, &payload.current_password).await?;
     let result = AdminInvitationService::invite(&state, &ctx, &payload.email, None).await?;
     Ok((
         axum::http::StatusCode::CREATED,
@@ -121,13 +143,7 @@ pub async fn resend(
     Json(payload): Json<ConfirmRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManageAdminTeam)?;
-    crate::services::admin_step_up::confirm_password(
-        &state,
-        &ctx,
-        &payload.current_password,
-        "ADMIN_INVITATION",
-    )
-    .await?;
+    confirm_password(&state, &ctx, &payload.current_password).await?;
     let result = AdminInvitationService::resend(&state, &ctx, id).await?;
     Ok(Json(ApiResponse {
         success: true,
@@ -142,6 +158,8 @@ pub async fn revoke(
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManageAdminTeam)?;
+    // Revoking needs a fresh password too (product owner, 2026-11-20).
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     AdminInvitationService::revoke(&state, &ctx, id).await?;
     Ok(Json(ApiResponse {
         success: true,

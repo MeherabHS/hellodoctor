@@ -3,6 +3,7 @@
 //! the approved-peer list patients choose from, and Admin approval.
 
 use crate::abac::{self, Action};
+use crate::api::json::Json;
 use crate::auth_context::AuthContext;
 use crate::domain::ids::UserId;
 use crate::domain::models::{User, UserRole};
@@ -16,7 +17,6 @@ use axum::{
     extract::{ConnectInfo, OriginalUri, Path, Query, State},
     http::{HeaderMap, Method, StatusCode},
     response::IntoResponse,
-    Json,
 };
 use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;

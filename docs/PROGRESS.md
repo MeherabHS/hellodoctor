@@ -1,3 +1,91 @@
+# AfyaMkononi (HelloDoctor) — Progress
+
+## Current status — 2026-11-20
+
+This section replaces the milestone table further down (dated 2026-10-04), which still
+marked M4–M18 as pending long after they shipped. Everything below the
+"Engineering Progress & Milestone Tracker" heading is kept as history.
+
+**Summary.** The product is built. All five surfaces work end to end against the Rust
+backend, CI is green on `main` (`0f4a32c`, PR #48), ARM64 images are published to GHCR and
+internal-test APKs build from `main`. The system is running in production on the ARM64 VM.
+What remains is small changes, an external penetration test, the Google Play release and a
+wider real-device pilot.
+
+| Surface | Path | State |
+|---|---|---|
+| Rust backend (Axum, SQLx, PostgreSQL 16, Redis) | `services/backend` | Complete for the current scope; 132 reversible migrations; full suite runs in CI on every PR |
+| Patient app (Flutter) | `apps/mobile_patient` | Complete; matches the 11-panel reference |
+| Care app — Doctor and Peer Navigator (Flutter) | `apps/mobile` | Complete; Doctor matches the 11/14-panel reference; Peer Navigator role added 2026-11-15 |
+| Doctor Web (Next.js) | `apps/doctor-web` | Complete; redesigned 2026-11-14 |
+| Admin Web (Next.js) | `apps/admin-web` | Complete; redesigned 2026-11-13; Articles, Videos and Quizzes split 2026-11-16 |
+| Public website (afyamkononi.app) | `apps/afyamkononi-website` | Built; privacy, terms and Peer Navigator terms pages |
+
+### Roadmap milestones
+
+| Milestone | Status | Notes |
+|---|---|---|
+| M0–M3 Architecture, security model, database v2, auth | **Complete** | Ed25519 JWT, Argon2id, five capability roles, FORCE RLS |
+| M4 Agora setup | **Complete** | Agora RTC in both Flutter apps and Doctor Web; server-minted tokens, join window enforced server-side |
+| M5 Specialist discovery (no star ratings) | **Complete** | KMPDC registration, experience and affiliations only |
+| M6 Patient Home | **Complete** | Per the 2026-11-12/13/17 decisions: no emergency banner or search on Home; Upcoming Consultation card from 15 minutes before start |
+| M7 Atomic booking and payment hold | **Complete, payments deferred** | Row-locked booking; production runs `FINANCIAL_MODULE_MODE=deferred` (no gateway) |
+| M8 Prescription uploads | **Complete** | 1–20 images per consultation, 600 KB each (was 40 KB until 2026-11-18); phones resize to 2000 px |
+| M9 Waiting room | **Complete** | |
+| M10 Video and telemetry | **Complete** | |
+| M11 Clinical chat | **Complete** | HTTP polling with adaptive intervals and read receipts (2026-11-18) |
+| M12 Prescription photos and health vault | **Complete** | Encrypted object storage; integrity hashes |
+| M13 Doctor wallet and 20% settlement | **Complete, dormant** | Built; inactive while finance is deferred |
+| M14 Grievance redressal | **Complete** | |
+| M15 Admin consoles and dossiers | **Complete** | Patient medical conditions are never shown in Admin |
+| M16 English and Swahili | **Complete** | Kenya only |
+| M17 Offline guards | **Complete** | |
+| M-SECURITY | **Core complete; external pentest not yet run** | See [assurance/SECURITY_STATUS.md](assurance/SECURITY_STATUS.md): 3 fixed, 5 partial, 3 open, 2 deferred; none critical |
+| M18 Production sign-off | **Deployed; sign-off open** | Running on the ARM64 VM; external pentest and Play release still to do |
+
+Features added beyond the original roadmap: Peer Navigator (patients book peers; chat and
+calls; peer approval in Admin), FCM push notifications with forced sounds, booking emails
+for every role and a nightly error digest, Admin CMS (articles, videos, quizzes),
+on-device patient reminders, and saved profile photos everywhere (2026-11-19, PR #48:
+own photo in the Doctor and Peer headers, the other person's photo in Doctor↔Patient and
+Peer↔Patient chats and on incoming peer requests; peers can now set a photo).
+
+### Delivery state on 2026-11-20
+
+- `main` at `0f4a32c`; CI green (backend suite, both Flutter apps, both web apps).
+- ARM64 GHCR images published from `0f4a32c` (run 44557139554): backend, admin-web,
+  doctor-web. Roll these out on the VM for the photo fix; migration `20261222000014`
+  (counterpart photos) applies when the new backend starts.
+- Internal-test APKs (Patient and Care) built from `0f4a32c` (run 44558068186).
+- The Play Store AAB release workflow (`.github/workflows/play-release-aab.yml`) and
+  release-signing changes are drafted on a workstation but not committed.
+
+### What remains, in order
+
+1. **Keep the VM current:** roll out the `0f4a32c` images. The system already runs in
+   production on the ARM64 VM.
+2. **Fix the Security Scan CI workflow**, which has failed to start on every run since
+   2026-11-11 (cargo-audit, OSV and secret scanning are not running).
+3. **External-style penetration test** against the deployed baseline (OWASP ASVS L2 / API
+   Top 10, cross-role authorization, token tampering, upload attacks). Close beforehand:
+   JWT key rotation (`kid`), a route inventory check, and password step-up for finance and
+   doctor-verification actions.
+4. **Google Play release** from the Circle Technology Ltd account: commit the AAB workflow,
+   privacy policy, health-app declaration, data-safety form; internal testing track first,
+   then staged rollouts.
+5. **Real-device pilot** with a small group of doctors, peers and patients.
+6. Small items: a peer notification opens the inbox rather than the chat; peers have no
+   legal documents of their own yet.
+
+### Open business decisions (not blocking)
+
+- Payment gateway (Q-001): deferred. When chosen, the webhook must check amount, currency
+  and merchant before money moves.
+- Clinical record retention period in Kenya (Q-NEW-1): records are kept indefinitely.
+- Malware scanning of uploads: deferred to an external scanner.
+
+---
+
 ## Doctor Web full redesign — 2026-11-14
 
 Product-owner instruction: full Doctor Web UI redesign from six proposal boards, plus
@@ -165,6 +253,9 @@ A genuine, minimal, additive backend defect was found and fixed in this pass: `l
 
 The Doctor Flutter app must replicate the canonical source file `prototype/index.html` in every visual and interaction detail. This is a hard rule for all future work: every screen or component change must be checked back and forth between the prototype and the rendered Flutter screen. The required loop is inspect HTML/CSS/JS, render Flutter, compare, correct discrepancies, and compare again. Code inspection, analyzer success, and widget tests do not replace rendered comparison evidence. The app remains `DOCTOR_FLUTTER_NOT_VERIFIED` until every required screen passes this gate.
 # HelloDoctor â€” Engineering Progress & Milestone Tracker
+
+> **History.** The tracker below is dated 2026-10-04 and is superseded by "Current status — 2026-11-20" at the top of this file. Its milestone table is kept as a record and is not current.
+
 
 > **Document Version:** 1.2.0
 > **Status:** M2 (Database v2) and M3 (Auth v2) implemented and verified against a real PostgreSQL instance. M-SECURITY (backend hardening: default-deny auth, ABAC, five-role RLS, rate limiting/IP jail, webhook signatures, N+1 cleanup, load testing) is implemented and verified end-to-end against a live Postgres 16 + Redis instance. Two load-testing passes exist: an unconstrained-hardware pass (`docs/CAPACITY_EVIDENCE_REPORT.md`, `LOCAL_BACKEND_VALIDATION_PASSED`) and a resource-constrained pass (`docs/CONSTRAINED_CAPACITY_TEST.md`) that first found Postgres CPU-saturated at a 2.5-core profile (`LOCAL_CONSTRAINED_CAPACITY_TARGET_FAILED`, ~20â€“30 RPS healthy ceiling), then â€” per explicit instruction â€” reran once with CPU rebalanced toward Postgres within a genuine 2.0-vCPU budget, found and fixed a PostgreSQL JIT-compilation overhead bug along the way, and reached **`LOCAL_CONSTRAINED_CAPACITY_TARGET_PASSED` up to ~200 RPS** (a 7â€“10x improvement), confirming the original failure was substantially a resource-allocation/configuration problem, not an application-design flaw. Zero data corruption and no security control weakened at any stage of either pass. See `docs/PILOT_READINESS_DECISION.md` for the still-standing `NOT_READY_FOR_UNSUPERVISED_1200_USER_PILOT` decision (unchanged â€” the constrained-capacity result is encouraging but still a local-laptop simulation, not a real production VPS run). M4+ (Flutter mobile, Agora client UI, localization, offline guards) remain pending and explicitly not started per user sequencing ("introduce all of these before we touch flutter").

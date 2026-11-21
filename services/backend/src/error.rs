@@ -65,6 +65,12 @@ pub enum AppError {
     #[error("Forbidden: {0}")]
     Forbidden(String),
 
+    /// A sensitive Admin action needs a fresh password check
+    /// (`services::admin_step_up`). 403 with code `REAUTH_REQUIRED`, so Admin
+    /// Web can ask for the password and retry; the session stays valid.
+    #[error("Re-authentication required")]
+    ReauthRequired,
+
     #[error("Rate limit exceeded: {0}")]
     RateLimitExceeded(String),
 
@@ -90,11 +96,6 @@ pub enum AppError {
         reason: &'static str,
         message: String,
     },
-
-    /// A sensitive Admin action needs a recent password re-entry
-    /// (`services::admin_step_up`); Admin Web prompts and retries.
-    #[error("Step-up required: {0}")]
-    StepUpRequired(String),
 
     #[error("Capacity limit reached: {0}")]
     CapacityLimitReached(String),
@@ -255,6 +256,11 @@ impl IntoResponse for AppError {
             AppError::Conflict(msg) => (StatusCode::CONFLICT, "RESOURCE_CONFLICT", msg.clone()),
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone()),
             AppError::Forbidden(msg) => (StatusCode::FORBIDDEN, "FORBIDDEN", msg.clone()),
+            AppError::ReauthRequired => (
+                StatusCode::FORBIDDEN,
+                "REAUTH_REQUIRED",
+                "Confirm your password to continue.".into(),
+            ),
             AppError::RateLimitExceeded(msg) => (
                 StatusCode::TOO_MANY_REQUESTS,
                 "RATE_LIMIT_EXCEEDED",
@@ -278,9 +284,6 @@ impl IntoResponse for AppError {
                     _ => StatusCode::CONFLICT,
                 };
                 (status, *reason, message.clone())
-            }
-            AppError::StepUpRequired(msg) => {
-                (StatusCode::FORBIDDEN, "STEP_UP_REQUIRED", msg.clone())
             }
             AppError::PaymentRequired(msg) => (
                 StatusCode::PAYMENT_REQUIRED,

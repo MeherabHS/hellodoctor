@@ -52,6 +52,7 @@ pub async fn trace_identity(
         .await?;
         return Err(error);
     }
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     if !["USER", "PATIENT", "DOCTOR", "APPOINTMENT", "CONSULTATION"]
         .contains(&body.target_type.as_str())
         || !(8..=300).contains(&body.reason.trim().chars().count())
@@ -545,6 +546,7 @@ pub async fn create_doctor(
     Json(payload): Json<CreateDoctorRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManageDoctorCredentialing)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     if payload.current_hospital.trim().is_empty()
         || payload.current_hospital.chars().count() > 200
         || payload.qualifications.as_ref().is_some_and(|entries| {
@@ -1436,6 +1438,7 @@ pub async fn execute_patient_data_rights(
     Path(id): Path<Uuid>,
     Json(body): Json<DataRightsExecutionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ExecuteDataRightsAction)?;
     crate::services::admin_step_up::require(&state, &ctx).await?;
     let reason = validated_data_rights_reason(&body.reason)?;
     let outcome = crate::services::data_rights_service::execute_patient_erasure(
@@ -1466,6 +1469,7 @@ pub async fn execute_doctor_data_rights(
     Path(id): Path<Uuid>,
     Json(body): Json<DataRightsExecutionRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ExecuteDataRightsAction)?;
     crate::services::admin_step_up::require(&state, &ctx).await?;
     let reason = validated_data_rights_reason(&body.reason)?;
     let outcome = crate::services::data_rights_service::execute_doctor_erasure(
@@ -2466,6 +2470,7 @@ pub async fn save_platform_payment_method(
     Json(payload): Json<SavePlatformPaymentMethodRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManagePlatformPaymentMethod)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let provider_code = payload.provider_code.trim().to_uppercase();
     if provider_code.is_empty() || provider_code.len() > 40 {
         return Err(AppError::Validation(
@@ -2544,6 +2549,7 @@ pub async fn deactivate_platform_payment_method(
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::ManagePlatformPaymentMethod)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let mut tx = state.begin_authed(&ctx).await?;
     let removed = payment_methods_repo::deactivate_platform_payment_method(&mut *tx, id).await?;
     if !removed {

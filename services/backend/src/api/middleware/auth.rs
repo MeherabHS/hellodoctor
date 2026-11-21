@@ -92,10 +92,10 @@ fn authenticate(state: &AppState, request: &Request) -> Result<(AuthContext, Uui
         AppError::Unauthorized("Authorization header must be a Bearer token.".into())
     })?;
 
-    let claims = crypto::verify_access_token_rotating(
+    let claims = crypto::verify_access_token_with_keys(
         token,
         &state.config.jwt_ed25519_public_key_b64,
-        &state.config.jwt_previous_public_keys_b64,
+        &state.config.jwt_ed25519_previous_public_keys_b64,
     )?;
 
     let user_id = Uuid::parse_str(&claims.user_id)

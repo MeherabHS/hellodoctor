@@ -554,10 +554,10 @@ fn principal(state: &AppState, request: &Request, addr: SocketAddr) -> String {
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "));
     match token.and_then(|t| {
-        crate::crypto::verify_access_token_rotating(
+        crate::crypto::verify_access_token_with_keys(
             t,
             &state.config.jwt_ed25519_public_key_b64,
-            &state.config.jwt_previous_public_keys_b64,
+            &state.config.jwt_ed25519_previous_public_keys_b64,
         )
         .ok()
     }) {

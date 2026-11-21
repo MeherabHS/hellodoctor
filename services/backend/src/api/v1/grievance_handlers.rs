@@ -182,6 +182,7 @@ pub async fn transition_refund_request(
     Json(payload): Json<TransitionRefundRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::InitiateDisbursement)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let provider_reference = payload
         .provider_reference
         .map(|r| {
