@@ -64,8 +64,16 @@ jobs:
 
   flutter-dependency-audit:
     name: Flutter dependency vulnerability scan (OSV-Scanner)
+    # The reusable OSV workflow's job declares `actions: read`, `contents:
+    # read` and `security-events: write`. A caller that grants less makes
+    # GitHub refuse to start the WHOLE Security Scan run (startup_failure,
+    # seen on every run on 2026-11-21), silently disabling cargo-audit and
+    # secret scanning too. security-events: write stays unused while
+    # upload-sarif is false.
     permissions:
+      actions: read
       contents: read
+      security-events: write
     # Scans the two committed Flutter pubspec.lock files (apps/mobile — the
     # Doctor app — and apps/mobile_patient — the Patient app) against the OSV
     # database. OSV-Scanner natively parses pubspec.lock for the Pub
