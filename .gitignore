@@ -80,3 +80,14 @@ docs/assurance/evidence/**/*.dump
 # Stray Gradle state and SDK path from building Android at the repo root
 /.gradle/
 /local.properties
+
+# Original HelloDoctor design exports, PDF text dumps and one-off scripts: kept locally, not published
+/Hello Doctor [[]B[]]*
+/AfyaMkononi_Patient_UI_Replication_*.docx
+/ChatGPT Image *.png
+/all_pdf_texts.txt
+/pdf_summary*.txt
+/BOX.py
+/COT.txt.txt
+/fix.py
+/update_docs*.py
