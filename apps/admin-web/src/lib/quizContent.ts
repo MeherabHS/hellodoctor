@@ -1,3 +1,4 @@
+import { tr } from './i18n/core.ts';
 export type QuizLanguage='en'|'sw';
 export interface QuizOption{id:string;text_en:string;text_sw:string}
 export interface QuizQuestion{id:string;text_en:string;text_sw:string;explanation_en:string;explanation_sw:string;options:QuizOption[];correct_option_id:string|null}
@@ -14,25 +15,25 @@ export const quizRevision=(doc:QuizDocument)=>doc.draft||doc.published;
 export const editableQuiz=(r:QuizContent):QuizContent=>({include_quiz:r.include_quiz,questions:r.questions.map(q=>({...q,options:q.options.map(o=>({...o}))}))});
 export function quizErrors(quiz:QuizContent,complete=false):QuizIssue[]{
   const errors:QuizIssue[]=[];const add=(row:number,field:string,message:string)=>errors.push({row,field,message});
-  if(quiz.questions.length>50||(complete&&!quiz.questions.length))add(0,'questions','Use 1–50 questions for an included quiz; excluded drafts may be empty.');
+  if(quiz.questions.length>50||(complete&&!quiz.questions.length))add(0,'questions',tr('lib.quizQuestionCount'));
   const questionIds=new Set<string>(),optionIds=new Set<string>(),en=new Set<string>(),sw=new Set<string>();let bytes=0;
   const normalized=(s:string)=>s.trim().toLowerCase().replace(/\s+/g,' ');
   quiz.questions.forEach((q,i)=>{
-    const row=i+1;if(!q.id||questionIds.has(q.id))add(row,'id','Question IDs must be unique.');questionIds.add(q.id);
+    const row=i+1;if(!q.id||questionIds.has(q.id))add(row,'id',tr('lib.questionIdsUnique'));questionIds.add(q.id);
     for(const [field,max,required] of [['text_en',2000,complete],['text_sw',2000,false],['explanation_en',4000,complete],['explanation_sw',4000,false]] as const){
       const text=q[field];bytes+=new TextEncoder().encode(text).length;
       if((required&&!text.trim())||Array.from(text).length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text))add(row,field,'Text is missing, too long or contains prohibited control characters.');
     }
-    for(const [text,seen] of [[q.text_en,en],[q.text_sw,sw]] as const){const key=normalized(text);if(key&&seen.has(key))add(row,'text','Duplicate question.');if(key)seen.add(key);}
-    if(q.options.length>6||(complete&&q.options.length<2))add(row,'options','Use 2–6 options before publishing.');
+    for(const [text,seen] of [[q.text_en,en],[q.text_sw,sw]] as const){const key=normalized(text);if(key&&seen.has(key))add(row,'text',tr('lib.duplicateQuestion'));if(key)seen.add(key);}
+    if(q.options.length>6||(complete&&q.options.length<2))add(row,'options',tr('lib.optionsCount'));
     const hasSw=Boolean(q.text_sw.trim()||q.explanation_sw.trim()||q.options.some(o=>o.text_sw.trim()));
-    q.options.forEach(o=>{if(!o.id||optionIds.has(o.id))add(row,'options.id','Option IDs must be unique.');optionIds.add(o.id);
+    q.options.forEach(o=>{if(!o.id||optionIds.has(o.id))add(row,'options.id',tr('lib.optionIdsUnique'));optionIds.add(o.id);
       for(const lang of ['en','sw'] as const){const text=o[`text_${lang}`];bytes+=new TextEncoder().encode(text).length;if((complete&&(lang==='en'||hasSw)&&!text.trim())||Array.from(text).length>500||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(text))add(row,`options.text_${lang}`,'Option text is missing, too long or contains prohibited control characters.');}
     });
-    if(complete&&hasSw&&(!q.text_sw.trim()||!q.explanation_sw.trim()))add(row,'translation','Complete all Kiswahili fields or leave all blank for English fallback.');
-    if((q.correct_option_id&&!q.options.some(o=>o.id===q.correct_option_id))||(complete&&!q.correct_option_id))add(row,'correct_option_id','Select one answer belonging to this question.');
+    if(complete&&hasSw&&(!q.text_sw.trim()||!q.explanation_sw.trim()))add(row,'translation',tr('lib.completeSwFields'));
+    if((q.correct_option_id&&!q.options.some(o=>o.id===q.correct_option_id))||(complete&&!q.correct_option_id))add(row,'correct_option_id',tr('lib.selectOneAnswer'));
   });
-  if(bytes>256*1024)add(0,'questions','Total quiz text is limited to 256 KiB.');return errors;
+  if(bytes>256*1024)add(0,'questions',tr('lib.quizTextLimit'));return errors;
 }
 export function questionLanguage(q:QuizQuestion,language:QuizLanguage){
   const sw=language==='sw'&&Boolean(q.text_sw.trim()&&q.explanation_sw.trim()&&q.options.every(o=>o.text_sw.trim()));
@@ -40,8 +41,8 @@ export function questionLanguage(q:QuizQuestion,language:QuizLanguage){
 }
 export async function readQuizFile(file:File):Promise<{format:'csv'|'json';content:string}>{
   const format=file.name.toLowerCase().split('.').pop();
-  if(!['csv','json'].includes(format||'')||!file.size||file.size>128*1024)throw new Error('Choose a nonempty CSV or JSON file up to 128 KiB.');
-  let content:string;try{content=new TextDecoder('utf-8',{fatal:true}).decode(await file.arrayBuffer());}catch{throw new Error('Import files must contain valid UTF-8 text.');}
+  if(!['csv','json'].includes(format||'')||!file.size||file.size>128*1024)throw new Error(tr('lib.importFileLimit'));
+  let content:string;try{content=new TextDecoder('utf-8',{fatal:true}).decode(await file.arrayBuffer());}catch{throw new Error(tr('lib.importUtf8'));}
   return {format:format as 'csv'|'json',content};
 }
 export function csvCell(value:string){const safe=/^\s*[=+\-@]/.test(value)?`'${value}`:value;return `"${safe.replaceAll('"','""')}"`;}

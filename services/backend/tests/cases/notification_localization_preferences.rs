@@ -626,3 +626,66 @@ async fn test_push_delivery_pass_is_idempotent_for_already_sent_rows(pool: PgPoo
         "an already-sent row must never be reclaimed/resent"
     );
 }
+
+/// Product owner, 2026-11-21: admin-published notifications showed in the
+/// inbox but never pinged the device once a user had received three in a
+/// day (ADMIN_CAMPAIGN was capped at 3 pushes per day). Every same-day admin
+/// notification must now reach the push provider.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_admin_campaign_pushes_are_not_capped_per_day(pool: PgPool) {
+    let (app, pool, mut state) = test_app_and_state(pool).await;
+    let doctor_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let user = UserId::from(uid(DOCTOR1_USER_ID));
+    let register = post(
+        &app,
+        "/api/v1/notifications/devices",
+        Some(&doctor_token),
+        &serde_json::json!({"platform": "android", "push_token": "campaign-token"}),
+    )
+    .await;
+    assert_eq!(register.status(), StatusCode::CREATED);
+
+    let mut ids = Vec::new();
+    for i in 0..5 {
+        let id = Uuid::new_v4();
+        assert!(notification_repo::insert_if_new(
+            &pool,
+            id,
+            user,
+            "ADMIN_CAMPAIGN",
+            "Announcement",
+            "A message from AfyaMkononi.",
+            None,
+            None,
+            None,
+            &format!("campaign-uncapped-{i}"),
+            None,
+        )
+        .await
+        .unwrap());
+        ids.push(id);
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+
+    let mut outcomes = HashMap::new();
+    outcomes.insert(
+        "campaign-token".to_string(),
+        PushOutcome::SentToProvider {
+            provider_message_id: Some("campaign-sent".into()),
+        },
+    );
+    state.notification_transport = std::sync::Arc::new(ScriptedTransport { outcomes });
+    notification_scheduler::run_push_delivery_pass(&state)
+        .await
+        .unwrap();
+
+    for id in &ids {
+        let status: String =
+            sqlx::query_scalar("SELECT delivery_status FROM notifications WHERE id = $1")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(status, "SENT_TO_PROVIDER");
+    }
+}

@@ -1,3 +1,4 @@
+import '../../../core/network/chat_live.dart';
 import '../../../core/network/screen_refresh.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'clinical_image_viewer.dart';
@@ -9,9 +10,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/tokens.dart';
+import '../../../core/l10n/kenya_time.dart';
 import '../../../core/utils/time_format.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/widgets/patient_widgets.dart';
+import '../../../core/widgets/consultation_chat_day.dart';
 import '../../../core/widgets/person_photo.dart';
 import '../../../l10n/app_localizations.dart';
 import '../booking/pre_consult_intake_modal.dart' show deletePickedSourceFile;
@@ -55,6 +58,11 @@ class _PatientChatPageState extends State<PatientChatPage> {
   DateTime? _refreshFailure;
   StreamSubscription<ChatState>? _stateSubscription;
 
+  /// Rebuilds the moment the chat window closes, so a screen left open turns
+  /// read-only and shows "Expired" without being reopened.
+  Timer? _expiryTimer;
+  late final LiveChatHook _live;
+
   @override
   void initState() {
     super.initState();
@@ -77,16 +85,30 @@ class _PatientChatPageState extends State<PatientChatPage> {
         setState(() {});
       }
     });
+    // A live nudge for this conversation fetches it at once.
+    _live = LiveChatHook(
+        wants: (nudge) => nudge.concerns(widget.conversation.id),
+        onNudge: () =>
+            unawaited(_screenRefresh.run().catchError((Object _) {})),
+        onConnectionChange: () => _screenRefresh.reschedule());
     _screenRefresh = ScreenRefresh(() async {
       await _cubit.poll();
       if (mounted) setState(() {});
     },
         interval: const Duration(seconds: 10),
-        // 3 s while the conversation is active, easing to 30 s when quiet.
-        intervalFor: () => _cubit.pollInterval(DateTime.now()),
+        // 3 s while the conversation is active, easing to 30 s when quiet;
+        // 30 s throughout while live nudges arrive.
+        intervalFor: () => _live.pollEvery(_cubit.pollInterval(DateTime.now())),
         networkChanges: widget.repo.connectivity?.changes,
         enabled: () =>
             !widget.conversation.isExpired && !_cubit.state.serverLocked);
+    final untilExpiry =
+        widget.conversation.expiresAt.difference(DateTime.now().toUtc());
+    if (!untilExpiry.isNegative) {
+      _expiryTimer = Timer(untilExpiry + const Duration(seconds: 1), () {
+        if (mounted) setState(() {});
+      });
+    }
   }
 
   void _refreshObserved(bool succeeded) {
@@ -139,7 +161,9 @@ class _PatientChatPageState extends State<PatientChatPage> {
 
   @override
   void dispose() {
+    _live.dispose();
     _screenRefresh.dispose();
+    _expiryTimer?.cancel();
     _stateSubscription?.cancel();
     _cubit.close();
     _input.dispose();
@@ -249,7 +273,9 @@ class _PatientChatPageState extends State<PatientChatPage> {
                 api: widget.repo.api,
                 grievanceRepo: GrievanceRepository(widget.repo.api)),
             _ExpiryBar(
-                expiresAt: widget.conversation.expiresAt, closed: locked),
+                expiresAt: widget.conversation.expiresAt,
+                closed: locked,
+                doctorName: widget.doctorDisplayName),
             Expanded(
               child: BlocBuilder<ChatCubit, ChatState>(
                 builder: (context, state) {
@@ -524,13 +550,15 @@ class _ChatTopBar extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     fontSize: 13,
                     color: PatientTokens.text)),
-            Text(closed ? 'Consultation closed' : 'Consultation chat active',
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: closed
-                        ? PatientTokens.textSub
-                        : PatientTokens.primary)),
+            const SizedBox(height: 3),
+            StatusChip(closed ? l10n.chatStatusExpired : l10n.chatStatusActive,
+                key: ValueKey(
+                    closed ? 'chat-status-expired' : 'chat-status-active'),
+                color: closed
+                    ? PatientTokens.surfaceSubtle
+                    : PatientTokens.primaryLight,
+                textColor:
+                    closed ? PatientTokens.textSub : PatientTokens.primaryDark),
           ]),
         ),
         _ChatIconBtn(
@@ -601,18 +629,23 @@ class _ChatIconBtn extends StatelessWidget {
 /// exactly — a single bordered pill with an hourglass/lock icon and inline
 /// text, instead of a separate label-plus-chip layout.
 class _ExpiryBar extends StatelessWidget {
-  const _ExpiryBar({required this.expiresAt, required this.closed});
+  const _ExpiryBar(
+      {required this.expiresAt,
+      required this.closed,
+      required this.doctorName});
   final DateTime expiresAt;
   final bool closed;
+  final String doctorName;
 
   @override
   Widget build(BuildContext context) {
-    final remaining = expiresAt.difference(DateTime.now().toUtc());
+    final l10n = AppLocalizations.of(context);
+    // A chat consultation closes when its booked time ends; a video
+    // consultation keeps a 24-hour follow-up chat (2026-11-20).
     final label = closed
-        ? 'Consultation window closed'
-        : remaining.isNegative
-            ? '24h consultation chat active'
-            : '24h chat active (${remaining.inHours}h ${remaining.inMinutes % 60}m remaining)';
+        ? l10n.chatTimeOver
+        : l10n.chatActiveUntil(patientDoctorName(doctorName),
+            '${consultationChatDayLabel(l10n, expiresAt)}, ${formatTime12h(kenyaTime(expiresAt))}');
     return Container(
         margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

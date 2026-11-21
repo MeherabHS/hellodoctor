@@ -1,5 +1,6 @@
 import type {ArticleCategory,TopicKey} from './blogContent';
-import {educationTopics} from './blogContent';
+import {educationTopics,TOPIC_SW,topicLabel} from './blogContent';
+import {tr} from './i18n/core.ts';
 
 /** What the Admin picks first for an article: one of the six Patient app
  *  topics, or "Other" with a name they type. Each choice is stored as an
@@ -10,13 +11,9 @@ export type TopicChoice={topic:TopicKey|'OTHER'|'';other:string};
 
 export const OTHER='OTHER' as const;
 
-/** Kiswahili names, as the Patient app shows them (app_sw.arb eduTopic*). */
-const TOPIC_SW:Record<TopicKey,string>={
-  HIV_BASICS:'Msingi wa VVU',PREP:'PrEP',CONDOMS:'Kondomu',SRH:'Afya ya Uzazi na Ujinsia',
-  STIGMA_DISCLOSURE:'Unyanyapaa na Kujiweka Wazi',HEALTHY_RELATIONSHIPS:'Mahusiano Yenye Afya',
-};
 
-export const topicOptions=[...educationTopics.map(t=>({value:t.key as TopicKey|'OTHER',label:t.label})),{value:OTHER as TopicKey|'OTHER',label:'Other'}];
+// Labels are getters so they follow the Admin's language.
+export const topicOptions:{value:TopicKey|'OTHER';label:string}[]=[...educationTopics.map(t=>({value:t.key as TopicKey|'OTHER',get label(){return topicLabel(t.key);}})),{value:OTHER as TopicKey|'OTHER',get label(){return tr('lib.otherTopic');}}];
 
 /** Videos and quizzes are listed on their own tabs in the Patient app, not
  *  under a topic; they still need a category, so they share one each. */
@@ -31,10 +28,10 @@ export function choiceFor(category:ArticleCategory|undefined):TopicChoice{
 }
 
 export function choiceErrors(choice:TopicChoice):string[]{
-  if(!choice.topic)return ['Choose a topic.'];
+  if(!choice.topic)return [tr('lib.chooseTopic')];
   if(choice.topic===OTHER){
     const name=choice.other.trim();
-    if(Array.from(name).length<2||Array.from(name).length>80)return ['Write the topic name (2–80 characters).'];
+    if(Array.from(name).length<2||Array.from(name).length>80)return [tr('lib.writeTopicName')];
   }
   return [];
 }

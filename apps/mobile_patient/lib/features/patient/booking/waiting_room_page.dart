@@ -153,6 +153,14 @@ class _WaitingRoomPageState extends State<WaitingRoomPage> {
         appointmentId: widget.appointment.id,
         scheduledStartTime: widget.appointment.startTime,
         repo: widget.repo,
+        // In-call chat: the consultation's own conversation.
+        loadChat: () async => PatientChatPage(
+          conversation:
+              await _chatRepo.conversationForAppointment(widget.appointment.id),
+          doctorDisplayName: widget.appointment.doctorDisplayName,
+          repo: _chatRepo,
+          myUserId: widget.myUserId,
+        ),
       ),
     ));
   }

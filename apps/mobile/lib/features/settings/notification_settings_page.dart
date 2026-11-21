@@ -40,7 +40,10 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       _error = null;
     });
     try {
-      final revision = DoctorLocaleScope.maybeOf(context)?.revision;
+      final controller = DoctorLocaleScope.maybeOf(context);
+      await controller?.serverSync;
+      if (!mounted) return;
+      final revision = controller?.revision;
       final prefs =
           await context.read<NotificationCubit>().repo.getPreferences();
       if (mounted) {

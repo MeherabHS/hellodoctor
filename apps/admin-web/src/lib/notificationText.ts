@@ -1,4 +1,6 @@
-/** "ADMIN_ARTICLE_PUBLISHED" -> "Admin article published" (no imports, unit-tested). */
+import {tr, type MessageKey} from './i18n/core.ts';
+
+/** "ADMIN_ARTICLE_PUBLISHED" -> "Admin article published" (unit-tested). */
 function humanize(code: string): string {
   const words = code.toLowerCase().split('_').filter(Boolean).join(' ');
   return words ? words[0].toUpperCase() + words.slice(1) : code;
@@ -25,7 +27,7 @@ const PAGE_BY_RESOURCE: Record<string, NoticePage> = {
   DISBURSEMENT_BATCH: 'finance', FINANCIAL_PERIOD: 'finance', FINANCIAL_REFUND_REQUEST: 'finance', REFUND_REQUEST: 'finance',
 };
 
-/** Plain-language titles for the events Admins most need to notice. */
+/** Plain-language titles for the events Admins most need to notice (Swahili: messages `notice`). */
 const ACTION_TITLE: Record<string, string> = {
   DOCTOR_PROFILE_CREATED: 'New doctor application',
   DOCTOR_PROFESSIONAL_VERIFY: 'Doctor verified',
@@ -67,12 +69,13 @@ const ACTION_TITLE: Record<string, string> = {
 };
 const URGENT = new Set(['AUTH_ROLE_MISMATCH', 'CONCURRENT_LIVE_PARTICIPATION_DETECTED', 'DATA_RIGHTS_ERASURE_REQUESTED']);
 const ATTENTION = new Set(['DOCTOR_PROFILE_CREATED', 'PEER_NAVIGATOR_CREATED', 'LATE_PAYMENT_RECONCILIATION_REQUIRED']);
-const ROLE: Record<string, string> = {ADMIN: 'an Admin', DOCTOR: 'a doctor', PEER: 'a Peer Navigator', PATIENT: 'a patient', SYSTEM: 'the system'};
+const ROLES = new Set(['ADMIN', 'DOCTOR', 'PEER', 'PATIENT', 'SYSTEM']);
 
 export function describeNotice(n: AdminNotice): NoticeView {
   if (n.kind === 'grievance') {
-    return {title: 'New grievance', body: `${n.grievance_number} is waiting for review.`, page: 'grievances', tone: 'warning'};
+    return {title: tr('notice.newGrievance'), body: tr('notice.grievanceWaiting', {number: n.grievance_number}), page: 'grievances', tone: 'warning'};
   }
+  // Incident notices stay in English, like the incident log itself.
   if (n.kind === 'incident') {
     const sev = n.severity.toUpperCase();
     return {
@@ -82,11 +85,11 @@ export function describeNotice(n: AdminNotice): NoticeView {
       tone: sev === 'CRITICAL' || sev === 'ERROR' ? 'urgent' : 'warning',
     };
   }
-  const who = n.actor_email ?? ROLE[n.actor_role] ?? humanize(n.actor_role);
-  const title = ACTION_TITLE[n.action] ?? humanize(n.action);
+  const who = n.actor_email ?? (ROLES.has(n.actor_role) ? tr(`notice.role_${n.actor_role}` as MessageKey) : humanize(n.actor_role));
+  const title = Object.hasOwn(ACTION_TITLE, n.action) ? tr(`notice.${n.action}` as MessageKey) : humanize(n.action);
   const page = PAGE_BY_RESOURCE[n.resource_type] ?? 'activity';
   const tone: NoticeTone = URGENT.has(n.action) ? 'urgent' : ATTENTION.has(n.action) ? 'warning' : 'info';
-  const body = n.action === 'DOCTOR_PROFILE_CREATED' ? 'A doctor registered and is waiting for verification.'
-    : n.action === 'PEER_NAVIGATOR_CREATED' ? 'A Peer Navigator signed up and is waiting for approval.' : `By ${who}.`;
+  const body = n.action === 'DOCTOR_PROFILE_CREATED' ? tr('notice.doctorWaiting')
+    : n.action === 'PEER_NAVIGATOR_CREATED' ? tr('notice.peerWaiting') : tr('notice.byWho', {who});
   return {title, body, page, tone};
 }

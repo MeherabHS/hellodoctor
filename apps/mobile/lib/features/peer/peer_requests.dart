@@ -655,8 +655,17 @@ class _PeerRequestDetailPageState extends State<PeerRequestDetailPage> {
                                 key: const ValueKey('peer-detail-call'),
                                 label: 'Start Support Call',
                                 icon: Icons.call_rounded,
-                                onPressed: () =>
-                                    openPeerCall(context, widget.repo, r.id)),
+                                onPressed: () => openPeerCall(
+                                    context, widget.repo, r.id,
+                                    chat: r.conversationId == null
+                                        ? null
+                                        : () => PeerChatPage(
+                                            repo: widget.repo,
+                                            chatId: r.conversationId!,
+                                            requestId: r.id,
+                                            name: r.patientName,
+                                            status: r.status,
+                                            callClosed: true))),
                           if (r.conversationId != null) ...[
                             const SizedBox(height: 12),
                             SizedBox(

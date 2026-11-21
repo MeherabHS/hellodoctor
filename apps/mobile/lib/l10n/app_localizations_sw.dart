@@ -209,4 +209,235 @@ class AppLocalizationsSw extends AppLocalizations {
 
   @override
   String get settingsEndsAt => 'Huisha saa';
+
+  @override
+  String get notificationsToday => 'Leo';
+
+  @override
+  String get notificationsYesterday => 'Jana';
+
+  @override
+  String get notificationsEarlier => 'Awali';
+
+  @override
+  String get notificationsFilterAll => 'Zote';
+
+  @override
+  String get notificationsFilterAppointments => 'Miadi';
+
+  @override
+  String get notificationsFilterMessages => 'Ujumbe';
+
+  @override
+  String get notificationsFilterSystem => 'Mfumo';
+
+  @override
+  String get notificationsJustNow => 'Sasa hivi';
+
+  @override
+  String notificationsMinutesAgo(int count) {
+    return 'Dakika $count zilizopita';
+  }
+
+  @override
+  String notificationsHoursAgo(int count) {
+    return 'Saa $count zilizopita';
+  }
+
+  @override
+  String get doctorOnboardingSkip => 'Ruka';
+
+  @override
+  String get doctorOnboardingBack => 'Rudi';
+
+  @override
+  String get doctorOnboardingNext => 'Endelea';
+
+  @override
+  String get doctorOnboardingGetStarted => 'Anza';
+
+  @override
+  String get doctorOnboardingFinish => 'Nenda kwenye Dashibodi';
+
+  @override
+  String doctorOnboardingCounter(int current, int total) {
+    return '$current kati ya $total';
+  }
+
+  @override
+  String get doctorOnboarding1Title => 'Karibu, Daktari!';
+
+  @override
+  String get doctorOnboarding1Body =>
+      'Jiunge na AfyaMkononi kutoa\nhuduma bora, ya siri na\nrafiki kwa vijana.';
+
+  @override
+  String get doctorOnboarding2Title => 'Toa Huduma Mtandaoni';
+
+  @override
+  String get doctorOnboarding2Body =>
+      'Hudumia wagonjwa kupitia\nvideo au gumzo salama, toa\nushauri, na usaidie\nufuatiliaji wa huduma.';
+
+  @override
+  String get doctorOnboarding3Title => 'Simamia Miadi';
+
+  @override
+  String get doctorOnboarding3Body =>
+      'Ona na usimamie ratiba\nyako ya mashauriano kwa\nurahisi, ukipata arifa na\nvikumbusho kwa wakati.';
+
+  @override
+  String get doctorOnboarding4Title => 'Uko Tayari!';
+
+  @override
+  String get doctorOnboarding4Body =>
+      'Anza kutoa huduma\nya kuaminika, ya siri na\nrafiki kwa vijana\nkupitia AfyaMkononi.';
+
+  @override
+  String get brandTagline => 'Kinga · Pima · Tibu · Dumisha Afya';
+
+  @override
+  String get peerOnboardingSkip => 'Ruka';
+
+  @override
+  String get peerOnboardingNext => 'Endelea';
+
+  @override
+  String get peerOnboardingBack => 'Rudi';
+
+  @override
+  String get peerOnboardingGetStarted => 'Anza';
+
+  @override
+  String get peerOnboardingFinish => 'Nenda kwenye Dashibodi Yangu';
+
+  @override
+  String peerOnboardingCounter(int current, int total) {
+    return '$current kati ya $total';
+  }
+
+  @override
+  String get peerOnboarding1Bubble => 'Habari! 👋\nKaribu\nAfyaMkononi!';
+
+  @override
+  String get peerOnboarding1Title => 'Karibu, Mwelekezi Rika';
+
+  @override
+  String get peerOnboarding1Body =>
+      'Wewe ni rika anayeaminika kwa vijana katika jamii yako. Shiriki taarifa sahihi, toa msaada na uwasaidie kupata huduma kwa njia salama na ya kirafiki.';
+
+  @override
+  String get peerOnboarding1Tile1 => 'Saidia\nRika Wako';
+
+  @override
+  String get peerOnboarding1Tile2 => 'Shiriki Taarifa\nza Kuaminika';
+
+  @override
+  String get peerOnboarding1Tile3 => 'Himiza\nHuduma';
+
+  @override
+  String get peerOnboarding2Bubble =>
+      'Hauko peke yako.\nTuzungumze. Niko hapa\nkusikiliza na kusaidia! 💚';
+
+  @override
+  String get peerOnboarding2Title => 'Kuwa Rika Msaidizi';
+
+  @override
+  String get peerOnboarding2Body =>
+      'Zungumza na vijana, toa faraja na shiriki uzoefu chanya katika mazingira salama na ya heshima.';
+
+  @override
+  String get peerOnboarding3Bubble =>
+      'Haya ndiyo unayoweza\nkufanya kwenye dashibodi\nyako!';
+
+  @override
+  String get peerOnboarding3Title => 'Dashibodi Yako';
+
+  @override
+  String get peerOnboarding3Body =>
+      'Kila unachohitaji kusaidia wengine, mahali pamoja.';
+
+  @override
+  String get peerOnboarding3Row1Title => 'Maombi ya Msaada';
+
+  @override
+  String get peerOnboarding3Row1Body =>
+      'Kubali au kataa maombi ya msaada wako.';
+
+  @override
+  String get peerOnboarding3Row2Title => 'Mazungumzo';
+
+  @override
+  String get peerOnboarding3Row2Body =>
+      'Endelea na mazungumzo na unaowasaidia.';
+
+  @override
+  String get peerOnboarding3Row3Title => 'Ratiba na Upatikanaji';
+
+  @override
+  String get peerOnboarding3Row3Body =>
+      'Weka muda unaopatikana na uunde nafasi za msaada.';
+
+  @override
+  String get peerOnboarding4Bubble =>
+      'Uko tayari! 👋\nAsante kwa kutembea\nna vijana katika\nsafari yao ya afya.';
+
+  @override
+  String get peerOnboarding4Row1Title => 'Kuwa mpole';
+
+  @override
+  String get peerOnboarding4Row1Body =>
+      'Fanya kila mazungumzo yawe salama na ya kirafiki.';
+
+  @override
+  String get peerOnboarding4Row2Title => 'Kuwa na heshima';
+
+  @override
+  String get peerOnboarding4Row2Body => 'Heshimu chaguo na uzoefu wa kila mtu.';
+
+  @override
+  String get peerOnboarding4Row3Title => 'Tunza siri';
+
+  @override
+  String get peerOnboarding4Row3Body =>
+      'Weka siri yale ambayo watu wanashiriki.';
+
+  @override
+  String get peerOnboarding4Title => 'Uko tayari kuanza?';
+
+  @override
+  String get peerOnboarding4Body =>
+      'Weka upatikanaji wako ili vijana waweze kuomba msaada wako.';
+
+  @override
+  String get batteryPromptAllow => 'Ruhusu';
+
+  @override
+  String get deliveryNotificationsOffTitle => 'Arifa zimezimwa';
+
+  @override
+  String get deliveryNotificationsOffBody =>
+      'Ziwashe ili usikose vikumbusho vya mashauriano na ujumbe.';
+
+  @override
+  String get deliveryChannelsOffBody =>
+      'Baadhi ya aina za arifa zimezimwa, hivyo unaweza kukosa vikumbusho au ujumbe.';
+
+  @override
+  String get deliveryBatteryTitle => 'Vikumbusho vinaweza kuchelewa';
+
+  @override
+  String get deliveryBatteryBody =>
+      'Uokoaji wa betri unaweza kusimamisha programu hii ikiwa nyuma. Iruhusu iendelee ili vikumbusho vifike kwa wakati.';
+
+  @override
+  String get deliveryFix => 'Washa';
+
+  @override
+  String get onboardingLanguage => 'Lugha';
+
+  @override
+  String get onboardingLanguageEnglish => 'Kiingereza';
+
+  @override
+  String get onboardingLanguageSwahili => 'Kiswahili';
 }

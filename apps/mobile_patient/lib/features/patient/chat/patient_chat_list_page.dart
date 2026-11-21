@@ -1,3 +1,4 @@
+import '../../../core/network/chat_live.dart';
 import '../../../core/network/screen_refresh.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -69,8 +70,14 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
   int pageDepth = 1;
   String? error;
   late final ScreenRefresh _screenRefresh;
+  late final LiveChatHook _live;
   int generation = 0;
   StreamSubscription<FamilyProfilesState>? profileSubscription;
+
+  /// The consultation chat can no longer be messaged.
+  bool chatWindowClosed(AppointmentSummaryDto a) =>
+      a.chatLocked == true ||
+      (a.chatExpiresAt?.isBefore(DateTime.now()) ?? false);
   bool isPast(AppointmentSummaryDto a) =>
       const [
         'COMPLETED',
@@ -91,6 +98,11 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
         networkChanges: widget.repo.connectivity?.changes,
         hasError: () => error != null,
         enabled: () => !past);
+    // New messages update the list (unread state, order) at once.
+    _live = LiveChatHook(
+        wants: (nudge) => nudge.isResync || nudge.kind == 'CHAT',
+        onNudge: () =>
+            unawaited(_screenRefresh.run().catchError((Object _) {})));
     String? profileId = widget.familyProfilesCubit.state.activeProfileId;
     profileSubscription = widget.familyProfilesCubit.stream.listen((s) {
       if (s.activeProfileId != profileId) {
@@ -112,6 +124,7 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
   @override
   void dispose() {
     generation++;
+    _live.dispose();
     _screenRefresh.dispose();
     profileSubscription?.cancel();
     super.dispose();
@@ -391,8 +404,19 @@ class _PatientChatListPageState extends State<PatientChatListPage> {
                                           crossAxisAlignment:
                                               WrapCrossAlignment.center,
                                           children: [
-                                            StatusChip(_statusLabel(l, a.status,
-                                                lapsed: a.lapsed)),
+                                            // A chat whose window has closed
+                                            // reads "Expired", whatever the
+                                            // appointment status says.
+                                            chatWindowClosed(a)
+                                                ? StatusChip(
+                                                    l.chatStatusExpired,
+                                                    color:
+                                                        const Color(0xFFF1F3F5),
+                                                    textColor:
+                                                        const Color(0xFF5B6B78))
+                                                : StatusChip(_statusLabel(
+                                                    l, a.status,
+                                                    lapsed: a.lapsed)),
                                             Text(l.messagesChatConsultation,
                                                 style: const TextStyle(
                                                     fontSize: 11.5,

@@ -55,6 +55,8 @@ export function consultationActionLabel(a: ActionInput, now=Date.now()): string 
 export function chatActionLabel(c: Conversation, now=Date.now()): string {
   return chatLocked(c,now) ? 'View consultation history' : c.modality==='CHAT' && !c.last_message_at ? 'Start chat consultation' : 'Open chat';
 }
+/** The chat's own time is over (product owner, 2026-11-20: a chat consultation closes when its booked slot ends; a video consultation keeps a 24-hour follow-up chat). */
+export function chatExpired(chat: Conversation, now = Date.now()): boolean { const end = Date.parse(chat.expires_at); return !Number.isFinite(end) || end <= now; }
 export function chatLocked(chat: Conversation, now = Date.now()): boolean { return ['CANCELLED','REFUNDED','EXPIRED','PREMATURE_TERMINATION','DISPUTED','PENDING_PAYMENT'].includes(chat.appointment_status ?? '') || chat.is_locked || !Number.isFinite(Date.parse(chat.expires_at)) || Date.parse(chat.expires_at) <= now; }
 export function money(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';

@@ -2,6 +2,7 @@ pub mod admin_audit;
 pub mod auth;
 pub mod global_guard;
 pub mod idempotency;
+pub mod incident_reporting;
 
 pub use auth::auth_middleware;
 pub use global_guard::global_guard_middleware;

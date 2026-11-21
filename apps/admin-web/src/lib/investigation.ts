@@ -1,3 +1,4 @@
+import { tr } from './i18n/core.ts';
 import type { InvestigationEvent } from './api';
 
 export type TimelineEvent = InvestigationEvent & { source: string };
@@ -10,8 +11,8 @@ export function investigationEvents(trace: InvestigationEvent[], audit: Investig
     return { milliseconds:Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER, microseconds:Number(fraction.padEnd(6,'0').slice(3,6)) };
   };
   return [
-    ...trace.map(event => ({ ...event, source: 'Temporary consultation trace' })),
-    ...audit.map(event => ({ ...event, source: 'Permanent audit' })),
+    ...trace.map(event => ({ ...event, source: tr('lib.temporaryTrace') })),
+    ...audit.map(event => ({ ...event, source: tr('lib.permanentAudit') })),
   ].sort((a, b) => {
     const left=timestamp(a),right=timestamp(b);
     return left.milliseconds-right.milliseconds || left.microseconds-right.microseconds || a.id.localeCompare(b.id) || a.source.localeCompare(b.source);

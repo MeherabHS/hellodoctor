@@ -13,12 +13,23 @@ import '../core/network/api_client.dart';
 import '../core/theme/tokens.dart';
 import '../features/patient/chat/chat_models.dart';
 import '../features/patient/chat/chat_repository.dart';
+import '../features/patient/booking/booking_models.dart';
+import '../features/patient/booking/booking_repository.dart';
 import '../features/patient/chat/patient_chat_page.dart';
+import '../features/patient/video/agora_call_page.dart';
 import '../l10n/app_localizations.dart';
+import 'preview_agora_engine.dart';
 import 'preview_avatar.dart';
 
 const _language =
     String.fromEnvironment('PREVIEW_LANGUAGE', defaultValue: 'en');
+
+/// `--dart-define=PREVIEW_STATE=EXPIRED` shows the chat after its booked time
+/// has ended (read-only, "Expired"). `--dart-define=PREVIEW_SCREEN=CALL`
+/// shows a video call (stand-in engine, placeholder video) with the in-call
+/// chat button.
+const _state = String.fromEnvironment('PREVIEW_STATE', defaultValue: 'ACTIVE');
+const _screen = String.fromEnvironment('PREVIEW_SCREEN', defaultValue: 'CHAT');
 
 class _NoTokens implements TokenStore {
   @override
@@ -115,15 +126,32 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Banner(
           message: 'PREVIEW DATA',
-          location: BannerLocation.topEnd,
-          child: PatientChatPage(
-              conversation: ChatConversationDto(
-                  id: 'conv-preview',
+          location: BannerLocation.bottomStart,
+          child: _screen == 'CALL'
+              ? AgoraCallPage(
                   appointmentId: 'appt-preview',
-                  expiresAt:
-                      DateTime.now().toUtc().add(const Duration(hours: 20)),
-                  isLocked: false),
-              doctorDisplayName: 'Dr. Jane Mwangi (sample)',
-              repo: _PreviewChatRepo(),
-              myUserId: 'me'))));
+                  repo: BookingRepository(_PreviewChatRepo().api),
+                  engine: PreviewAgoraEngine(),
+                  requestPermissions: () async => true,
+                  loadToken: () async => const RtcSessionDto(
+                      channelName: 'preview',
+                      appId: 'preview',
+                      token: 'preview',
+                      uid: 1,
+                      expiresInSeconds: 3600),
+                  loadChat: () async => _chat(expired: false))
+              : _chat(expired: _state == 'EXPIRED'))));
 }
+
+PatientChatPage _chat({required bool expired}) => PatientChatPage(
+    conversation: ChatConversationDto(
+        id: 'conv-preview',
+        appointmentId: 'appt-preview',
+        // A chat consultation is open until its booked time ends.
+        expiresAt: DateTime.now().toUtc().add(expired
+            ? const Duration(minutes: -15)
+            : const Duration(minutes: 8)),
+        isLocked: false),
+    doctorDisplayName: 'Dr. Jane Mwangi (sample)',
+    repo: _PreviewChatRepo(),
+    myUserId: 'me');

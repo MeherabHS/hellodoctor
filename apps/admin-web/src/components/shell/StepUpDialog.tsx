@@ -2,7 +2,8 @@
 import {useEffect, useRef, useState} from 'react';
 import {KeyRound, ShieldCheck} from 'lucide-react';
 import {confirmAdminPassword} from '@/lib/api';
-import {registerStepUpPrompt} from '@/lib/stepUp.mjs';
+import {useT} from '@/lib/i18n';
+import {clearStepUpExpiry, registerStepUpPrompt, setStepUpExpiry, subscribeStepUpExpiry} from '@/lib/stepUp.mjs';
 
 /**
  * Asks the signed-in Admin for their password before a sensitive action
@@ -11,6 +12,7 @@ import {registerStepUpPrompt} from '@/lib/stepUp.mjs';
  * retries the action after a successful confirmation. See lib/stepUp.mjs.
  */
 export function StepUpDialog() {
+  const {t} = useT();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -34,11 +36,13 @@ export function StepUpDialog() {
     if (!password || password.length > 128 || busy) return;
     setBusy(true); setError('');
     try {
-      await confirmAdminPassword(password);
+      const granted = await confirmAdminPassword(password);
+      // Start the countdown chip from the server's own validity.
+      if (typeof granted?.valid_for_seconds === 'number') setStepUpExpiry(granted.valid_for_seconds);
       finish(true);
     } catch (err) {
       const text = err instanceof Error ? err.message : '';
-      setError(text.includes('[403]') ? 'That password is not correct.' : text.includes('[429]') ? 'Too many wrong passwords. Try again in 15 minutes.' : 'Could not check your password. Try again.');
+      setError(text.includes('[403]') ? t('stepUp.wrong') : text.includes('[429]') ? t('stepUp.locked') : t('stepUp.failed'));
       setPassword('');
       input.current?.focus();
     } finally {
@@ -53,23 +57,51 @@ export function StepUpDialog() {
         <div className="afya-modal-head" style={{justifyContent: 'flex-start'}}>
           <span style={{display: 'grid', placeItems: 'center', width: 36, height: 36, borderRadius: 10, background: 'var(--afya-green-soft)', color: 'var(--afya-green)'}}><ShieldCheck size={20} aria-hidden/></span>
           <div>
-            <h2 id="stepup-title" className="afya-modal-title" style={{margin: 0}}>Confirm it&apos;s you</h2>
-            <p id="stepup-description" className="afya-modal-sub" style={{margin: 0}}>This decision needs your password. You won&apos;t be asked again for 10 minutes.</p>
+            <h2 id="stepup-title" className="afya-modal-title" style={{margin: 0}}>{t('stepUp.title')}</h2>
+            <p id="stepup-description" className="afya-modal-sub" style={{margin: 0}}>{t('stepUp.body')}</p>
           </div>
         </div>
         <div style={{padding: '18px 22px'}}>
           <label className="afya-search" style={{width: '100%'}}>
             <KeyRound size={16} color="var(--afya-faint)" aria-hidden/>
-            <input ref={input} type="password" aria-label="Your current password" placeholder="Your current password" autoComplete="current-password" maxLength={128} value={password} onChange={e => { setPassword(e.target.value); setError(''); }}/>
+            <input ref={input} type="password" aria-label={t('stepUp.password')} placeholder={t('stepUp.password')} autoComplete="current-password" maxLength={128} value={password} onChange={e => { setPassword(e.target.value); setError(''); }}/>
           </label>
           {error && <div className="afya-login-error" role="alert" style={{marginTop: 12}}>{error}</div>}
-          <p className="afya-stat-note" style={{margin: '12px 0 0'}}>Wrong passwords are recorded in the Activity Log.</p>
+          <p className="afya-stat-note" style={{margin: '12px 0 0'}}>{t('stepUp.recorded')}</p>
         </div>
         <div className="afya-modal-foot">
-          <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => finish(false)}>Cancel</button>
-          <button type="submit" className="afya-btn-primary" disabled={!password || busy}><ShieldCheck size={16} aria-hidden/>{busy ? 'Checking…' : 'Confirm and continue'}</button>
+          <button type="button" className="afya-btn-secondary" disabled={busy} onClick={() => finish(false)}>{t('stepUp.cancel')}</button>
+          <button type="submit" className="afya-btn-primary" disabled={!password || busy}><ShieldCheck size={16} aria-hidden/>{busy ? t('stepUp.checking') : t('stepUp.confirm')}</button>
         </div>
       </form>
     </section>
+  </div>;
+}
+
+/** Time left on the last password confirmation (2 minutes), bottom right. */
+export function StepUpTimer() {
+  const {t} = useT();
+  const [expiresAt, setExpiresAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => subscribeStepUpExpiry((next: number | null) => {
+    setExpiresAt(next);
+    setNow(Date.now());
+  }), []);
+  useEffect(() => {
+    if (expiresAt === null) return;
+    const timer = setInterval(() => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= expiresAt) clearStepUpExpiry();
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+  if (expiresAt === null) return null;
+  const left = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+  if (left === 0) return null;
+  const time = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  return <div className="afya-step-up-timer" title={t('stepUp.unlockedHint')} aria-live="off">
+    <span aria-hidden className="afya-step-up-dot"/>
+    {t('stepUp.unlocked', {time})}
   </div>;
 }

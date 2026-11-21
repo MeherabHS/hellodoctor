@@ -62,7 +62,7 @@ async fn confirm_password(
 }
 
 /// `POST /admin/reauth` — confirms the Admin's password and unlocks the
-/// sensitive Admin actions for this sign-in session for ten minutes
+/// sensitive Admin actions for this sign-in session for two minutes
 /// (`services::admin_step_up`).
 pub async fn reauth(
     State(state): State<AppState>,

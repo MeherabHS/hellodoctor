@@ -93,3 +93,14 @@ jobs:
         run: flutter analyze --no-pub
       - name: Full widget and unit suite (synthetic transports)
         run: flutter test --no-pub
+      # Golden images are captured on this Linux runner (see
+      # test/flutter_test_config.dart). On a failure, keep what this runner
+      # rendered so an intended UI change can be recaptured from it.
+      - name: Keep golden failure images
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: golden-failures-${{ matrix.app }}
+          path: apps/${{ matrix.app }}/test/failures/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,6 +1,7 @@
+import { tr } from './i18n/core.ts';
 import { createSoftReads } from './inflight.mjs';
 import { adminFetch } from './adminQueue.mjs';
-import { confirmStepUp, isReauthRequired } from './stepUp.mjs';
+import { clearStepUpExpiry, confirmStepUp, isReauthRequired } from './stepUp.mjs';
 // API client connecting HelloDoctor Admin Portal to the Axum Rust Backend.
 //
 // Every call goes through this Next.js server's own same-origin proxy
@@ -310,7 +311,7 @@ export function request<T>(path:string,options?:RequestInit):Promise<T>{
  return performRequest<T>(path,options).finally(()=>inflightReads.clear());
 }
 /** `POST /admin/reauth` for <StepUpDialog/>; never re-prompts itself. */
-export function confirmAdminPassword(currentPassword: string): Promise<unknown> {
+export function confirmAdminPassword(currentPassword: string): Promise<{ valid_for_seconds?: number }> {
   return performRequest('/admin/reauth', {method: 'POST', body: JSON.stringify({current_password: currentPassword})}, true);
 }
 async function performRequest<T>(path: string, options?: RequestInit, steppedUp = false): Promise<T> {
@@ -345,8 +346,9 @@ async function performRequest<T>(path: string, options?: RequestInit, steppedUp 
     const errorBody = await res.text();
     // Sensitive decisions need a fresh password: ask once, then retry once.
     if (!steppedUp && typeof window !== "undefined" && isReauthRequired(res.status, errorBody)) {
+      clearStepUpExpiry();
       if (await confirmStepUp()) return performRequest<T>(path, options, true);
-      throw new Error("Password confirmation was cancelled; nothing was changed.");
+      throw new Error(tr('stepUp.cancelled'));
     }
     throw new Error(`API Error [${res.status}]: ${errorBody}`);
   }
@@ -354,6 +356,7 @@ async function performRequest<T>(path: string, options?: RequestInit, steppedUp 
   const json: ApiResponse<T> = await res.json();
   return json.data;
 }
+
 
 // Admin API Methods
 export async function getAdminOverview(): Promise<AdminOverview> {

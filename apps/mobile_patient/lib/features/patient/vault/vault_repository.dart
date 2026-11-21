@@ -1,3 +1,4 @@
+import '../../../core/cache/offline_documents.dart';
 import '../../../core/cache/patient_cache_store.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/client_error_reporter.dart';
@@ -8,10 +9,20 @@ import 'vault_models.dart';
 /// resolving a real, short-lived download URL for one document via the
 /// pre-existing `GET /appointments/:id/documents/:document_id`.
 class VaultRepository {
-  VaultRepository(this.api, {this.cache, this.connectivity});
+  VaultRepository(this.api,
+      {this.cache, this.connectivity, OfflineDocumentStore? offline})
+      : _offline = offline;
   final ApiClient api;
   final PatientCacheStore? cache;
   final ConnectivityService? connectivity;
+  final OfflineDocumentStore? _offline;
+
+  /// Encrypted on-device copies for offline Health Records; the app-wide
+  /// store unless a test injects one.
+  OfflineDocumentStore? get offline => _offline ?? OfflineDocuments.store;
+
+  /// At most this many documents are downloaded in the background per load.
+  static const prefetchLimit = 40;
 
   bool get isOffline => connectivity?.isOffline == true;
 
@@ -100,15 +111,69 @@ class VaultRepository {
   /// in-memory — never via `launchUrl`/an external application. The grant is
   /// one-time (server-side `GETDEL`), so this must be called again for every
   /// retry rather than reusing a previously-resolved URL.
+  ///
+  /// Offline Health Records: every fetched document is kept as an encrypted
+  /// copy ([OfflineDocumentStore]); without a connection the saved copy is
+  /// returned instead.
   Future<TypedBytes> fetchDocumentBytes(
       String appointmentId, String documentId) async {
-    final url = await resolveDownloadUrl(appointmentId, documentId);
+    final saved = offline;
+    if (isOffline) {
+      final copy = await saved?.get(documentId);
+      if (copy != null) return copy;
+      throw const ApiException(null,
+          'This document is not saved on this phone yet. Open it once while online.');
+    }
     try {
-      return await api.getBytesWithType(url.toString());
+      final url = await resolveDownloadUrl(appointmentId, documentId);
+      final result = await api.getBytesWithType(url.toString());
+      try {
+        await saved?.put(documentId, result);
+      } catch (_) {/* saving for offline is best-effort */}
+      return result;
+    } on ApiException catch (error, stack) {
+      // A lost connection mid-way: fall back to the saved copy.
+      if (error.status == null) {
+        final copy = await saved?.get(documentId);
+        if (copy != null) return copy;
+      }
+      ClientErrorReporter.observe(error, stack,
+          screen: 'HealthVault', operation: 'fetch_document_bytes');
+      rethrow;
     } catch (error, stack) {
       ClientErrorReporter.observe(error, stack,
           screen: 'HealthVault', operation: 'fetch_document_bytes');
       rethrow;
     }
+  }
+
+  /// Ids of the documents saved on this phone.
+  Future<Set<String>> savedDocumentIds() async {
+    try {
+      return await offline?.savedIds() ?? <String>{};
+    } catch (_) {
+      return <String>{};
+    }
+  }
+
+  /// Downloads documents not yet saved on this phone, newest first, one at a
+  /// time, so the Health Vault opens offline later. Stops when the phone goes
+  /// offline; a document that fails is simply retried on the next load.
+  Future<Set<String>> saveForOffline(List<PatientDocumentDto> documents) async {
+    final saved = await savedDocumentIds();
+    if (offline == null) return saved;
+    final newestFirst = [...documents]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    var fetched = 0;
+    for (final doc in newestFirst) {
+      if (fetched >= prefetchLimit || isOffline) break;
+      if (saved.contains(doc.id)) continue;
+      fetched++;
+      try {
+        await fetchDocumentBytes(doc.appointmentId, doc.id);
+        saved.add(doc.id);
+      } catch (_) {}
+    }
+    return saved;
   }
 }

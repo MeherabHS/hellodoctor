@@ -136,6 +136,7 @@ pub async fn adjudicate_warn(
     Json(payload): Json<AdjudicateRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::AdjudicateGrievance)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let audit_notes = crate::domain::validation::validate_admin_text_field(
         &payload.audit_notes,
         "Audit notes",
@@ -250,6 +251,7 @@ pub async fn record_appeal(
     Json(payload): Json<RecordAppealRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::AdjudicateGrievance)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let reason = appeal_text(&payload.reason, "Appeal reason")?;
     let appeal = GrievanceService::record_appeal(&state, &ctx, id, ctx.user_id, reason).await?;
     Ok((
@@ -295,6 +297,7 @@ pub async fn adjudicate_dismiss(
     Json(payload): Json<AdjudicateRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     abac::authorize(&ctx, Action::AdjudicateGrievance)?;
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     let audit_notes = crate::domain::validation::validate_admin_text_field(
         &payload.audit_notes,
         "Audit notes",

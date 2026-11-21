@@ -17,7 +17,8 @@ use crate::repository::AppState;
 use std::time::Duration;
 
 /// How long one password confirmation unlocks sensitive actions.
-pub const STEP_UP_TTL_SECS: u64 = 600;
+/// Product owner, 2026-11-21: two minutes, shown as a countdown in Admin Web.
+pub const STEP_UP_TTL_SECS: u64 = 120;
 
 /// After 5 wrong passwords in 15 minutes further checks are refused (correct
 /// ones never count).
@@ -25,8 +26,17 @@ const REAUTH_MAX_FAILURES: u32 = 5;
 const REAUTH_WINDOW_SECS: u64 = 900;
 const REDIS_DEADLINE: Duration = Duration::from_millis(250);
 
-fn grant_key(session_id: uuid::Uuid) -> String {
-    format!("admin-stepup:{session_id}")
+/// One grant per sign-in (token family): the silent access-token refresh
+/// replaces the session row but keeps its family, so a refresh does not
+/// throw away a password the Admin just confirmed.
+async fn grant_key(state: &AppState, session_id: uuid::Uuid) -> Result<String, AppError> {
+    let family: Option<uuid::Uuid> =
+        sqlx::query_scalar("SELECT token_family_id FROM auth_sessions WHERE id = $1")
+            .bind(session_id)
+            .fetch_optional(&state.auth_db)
+            .await?;
+    let family = family.ok_or(AppError::ReauthRequired)?;
+    Ok(format!("admin-stepup:{family}"))
 }
 
 fn store_unavailable(detail: impl std::fmt::Display) -> AppError {
@@ -95,10 +105,11 @@ pub async fn confirm_and_grant(
 ) -> Result<(), AppError> {
     let session_id = ctx.session_id.ok_or(AppError::ReauthRequired)?;
     confirm_password(state, ctx, password, "ADMIN_STEP_UP").await?;
+    let key = grant_key(state, session_id).await?;
     let write = async {
         let mut conn = state.redis.get().await.map_err(store_unavailable)?;
         let stored: Result<(), _> = deadpool_redis::redis::cmd("SET")
-            .arg(grant_key(session_id))
+            .arg(&key)
             .arg(1)
             .arg("EX")
             .arg(STEP_UP_TTL_SECS)
@@ -131,10 +142,11 @@ pub async fn require(state: &AppState, ctx: &AuthContext) -> Result<(), AppError
         return Ok(());
     }
     let session_id = ctx.session_id.ok_or(AppError::ReauthRequired)?;
+    let key = grant_key(state, session_id).await?;
     let read = async {
         let mut conn = state.redis.get().await.map_err(store_unavailable)?;
         let exists: Result<bool, _> = deadpool_redis::redis::cmd("EXISTS")
-            .arg(grant_key(session_id))
+            .arg(&key)
             .query_async(&mut conn)
             .await;
         exists.map_err(store_unavailable)

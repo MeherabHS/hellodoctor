@@ -1,4 +1,5 @@
 'use client';
+import { tr } from '@/lib/i18n';
 import {useEffect,useMemo,useState} from 'react';
 import {CheckCircle2,Gavel,Hourglass,MessageSquareWarning,RotateCcw,Scale,X} from 'lucide-react';
 import type {GrievanceItem} from '../../data/adminStore';
@@ -15,11 +16,11 @@ import {Card,Chip,EmptyState,PageHead,Pagination,SearchField,StatTile,Tabs,eatDa
 type TabId='all'|'queue'|'resolved'|'appeals';
 const PAGE=20;
 const STATUS:Record<GrievanceItem['status'],{tone:ChipTone;label:string}>={
-  PENDING_REVIEW:{tone:'warn',label:'Pending review'},UNDER_INVESTIGATION:{tone:'purple',label:'Under adjudication'},
-  REFUND_APPROVED:{tone:'info',label:'Refund approved'},REFUNDED:{tone:'success',label:'Refunded'},WARNED:{tone:'danger',label:'Doctor warned'},DISMISSED:{tone:'neutral',label:'Dismissed'},
+  PENDING_REVIEW:{tone:'warn',get label(){return tr('ui.pendingReview')}},UNDER_INVESTIGATION:{tone:'purple',get label(){return tr('ui.underAdjudication')}},
+  REFUND_APPROVED:{tone:'info',get label(){return tr('ui.refundApproved')}},REFUNDED:{tone:'success',get label(){return tr('ui.refunded')}},WARNED:{tone:'danger',get label(){return tr('ui.doctorWarned')}},DISMISSED:{tone:'neutral',get label(){return tr('ui.dismissed')}},
 };
-const APPEAL:Record<GrievanceAppeal['status'],{tone:ChipTone;label:string}>={OPEN:{tone:'warn',label:'Open'},UPHELD:{tone:'neutral',label:'Upheld'},OVERTURNED:{tone:'info',label:'Overturned'}};
-const ACTION_LABEL:Record<string,string>={WARNING:'Doctor warned',DISMISS:'Dismissed',REFUND:'Refund approved'};
+const APPEAL:Record<GrievanceAppeal['status'],{tone:ChipTone;label:string}>={OPEN:{tone:'warn',get label(){return tr('ui.open')}},UPHELD:{tone:'neutral',get label(){return tr('ui.upheld')}},OVERTURNED:{tone:'info',get label(){return tr('ui.overturned')}}};
+const ACTION_LABEL:Record<string,string>={get WARNING(){return tr('ui2.doctorWarned')},get DISMISS(){return tr('ui2.dismissed')},get REFUND(){return tr('ui2.refundApproved')}};
 const pending=(g:GrievanceItem)=>g.status==='PENDING_REVIEW'||g.status==='UNDER_INVESTIGATION';
 const appealable=(g:GrievanceItem)=>g.status==='WARNED'||g.status==='DISMISSED';
 
@@ -42,59 +43,59 @@ export function GrievancesPage({grievances,onOpen,onChanged}:{grievances:Grievan
   async function after(){setRecordFor(null);setDecideFor(null);setRevision(v=>v+1);await onChanged();}
 
   return <div className="afya-stack">
-    <PageHead title="Consultation Grievances" subtitle="Manage patient complaints, adjudicate them, and record and decide appeals."/>
+    <PageHead title={tr('ui.consultationGrievances')} subtitle={tr('ui4.managePatientComplaintsAdjudicateThemAnd')}/>
     <div className="afya-stat-grid">
-      <StatTile icon={MessageSquareWarning} tone="blue" value={grievances.length} label="Total complaints"/>
-      <StatTile icon={Hourglass} tone="amber" value={queue} label="Awaiting adjudication"/>
-      <StatTile icon={CheckCircle2} tone="green" value={resolved} label="Resolved" note={grievances.length?`${Math.round(resolved/grievances.length*100)}% of all complaints`:undefined}/>
-      <StatTile icon={Scale} tone="purple" value={appeals?openAppeals:'—'} label="Open appeals"/>
+      <StatTile icon={MessageSquareWarning} tone="blue" value={grievances.length} label={tr('ui.totalComplaints')}/>
+      <StatTile icon={Hourglass} tone="amber" value={queue} label={tr('ui.awaitingAdjudication')}/>
+      <StatTile icon={CheckCircle2} tone="green" value={resolved} label={tr('ui.resolved')} note={grievances.length?`${Math.round(resolved/grievances.length*100)}% of all complaints`:undefined}/>
+      <StatTile icon={Scale} tone="purple" value={appeals?openAppeals:'—'} label={tr('ui.openAppeals')}/>
     </div>
     <Card>
-      <Tabs label="Grievances" value={tab} onChange={v=>{setTab(v);setOffset(0);}} items={[{id:'all',label:'Complaints',count:grievances.length},{id:'queue',label:'Adjudication queue',count:queue},{id:'resolved',label:'Resolved',count:resolved},{id:'appeals',label:'Appeals',count:appeals?.length}]}/>
+      <Tabs label={tr('ui.grievances')} value={tab} onChange={v=>{setTab(v);setOffset(0);}} items={[{id:'all',label:tr('ui.complaints'),count:grievances.length},{id:'queue',label:tr('ui.adjudicationQueue'),count:queue},{id:'resolved',label:tr('ui.resolved'),count:resolved},{id:'appeals',label:tr('ui.appeals'),count:appeals?.length}]}/>
       {tab==='appeals'?<>
-        {appealError&&<div className="afya-login-error" role="alert" style={{marginBottom:12}}>Appeals could not be loaded. <button type="button" className="afya-btn-secondary" onClick={()=>setRevision(v=>v+1)}>Retry</button></div>}
+        {appealError&&<div className="afya-login-error" role="alert" style={{marginBottom:12}}>{tr('ui.appealsCouldNotBeLoaded')} <button type="button" className="afya-btn-secondary" onClick={()=>setRevision(v=>v+1)}>{tr('ui.retry')}</button></div>}
         <div className="afya-table-wrap"><table className="admin-table">
-          <thead><tr><th>Grievance</th><th>Appealed decision</th><th>Reason</th><th>Recorded</th><th>Status</th><th style={{textAlign:'right'}}>Actions</th></tr></thead>
+          <thead><tr><th>{tr('ui.grievance')}</th><th>{tr('ui.appealedDecision')}</th><th>{tr('ui.reason')}</th><th>{tr('ui.recorded')}</th><th>{tr('ui.status')}</th><th style={{textAlign:'right'}}>{tr('ui.actions')}</th></tr></thead>
           <tbody>{(appeals??[]).map(a=><tr key={a.id}>
-            <td><div style={{fontWeight:700}}>{a.grievance_number}</div><div className="afya-stat-note">{a.category} · {a.target==='DOCTOR'?'Doctor':'System'}</div></td>
+            <td><div style={{fontWeight:700}}>{a.grievance_number}</div><div className="afya-stat-note">{a.category} · {a.target==='DOCTOR'?tr('ui2.doctor'):tr('ui2.system')}</div></td>
             <td>{ACTION_LABEL[a.appealed_action]??a.appealed_action}<div className="afya-stat-note">{eatDate(a.appealed_at)}</div></td>
-            <td style={{maxWidth:340}}>{a.reason}{a.decision_note&&<div className="afya-stat-note">Decision: {a.decision_note}</div>}</td>
+            <td style={{maxWidth:340}}>{a.reason}{a.decision_note&&<div className="afya-stat-note">{tr('mix.decisionPrefix')}{a.decision_note}</div>}</td>
             <td style={{whiteSpace:'nowrap'}}>{eatDate(a.recorded_at)}</td>
             <td><Chip tone={APPEAL[a.status].tone}>{APPEAL[a.status].label}</Chip>{a.decided_at&&<div className="afya-stat-note">{eatDate(a.decided_at)}</div>}</td>
             <td style={{textAlign:'right',whiteSpace:'nowrap'}}>{a.status==='OPEN'&&<>
-              <button type="button" className="afya-btn-secondary" onClick={()=>setDecideFor({appeal:a,decision:'UPHOLD'})}>Uphold</button>
-              <button type="button" className="afya-btn-primary" style={{marginLeft:8}} onClick={()=>setDecideFor({appeal:a,decision:'OVERTURN'})}><RotateCcw size={15} aria-hidden/>Overturn</button>
+              <button type="button" className="afya-btn-secondary" onClick={()=>setDecideFor({appeal:a,decision:'UPHOLD'})}>{tr('ui.uphold')}</button>
+              <button type="button" className="afya-btn-primary" style={{marginLeft:8}} onClick={()=>setDecideFor({appeal:a,decision:'OVERTURN'})}><RotateCcw size={15} aria-hidden/>{tr('ui.overturn')}</button>
             </>}</td>
           </tr>)}</tbody>
-        </table>{appeals&&!appeals.length&&<EmptyState title="No appeals recorded">Record an appeal from a warned or dismissed complaint when the patient contests the decision.</EmptyState>}</div>
+        </table>{appeals&&!appeals.length&&<EmptyState title={tr('ui.noAppealsRecorded')}>{tr('ui.recordAnAppealFromAWarned')}</EmptyState>}</div>
       </>:<>
         <div className="afya-filter-bar">
-          <SearchField label="Search complaints" placeholder="Search by complaint ID, patient, doctor, KMPDC number or category…" maxLength={150} value={search} onChange={v=>{setSearch(v);setOffset(0);}}/>
-          <select className="afya-select" aria-label="Target" value={target} onChange={e=>{setTarget(e.target.value);setOffset(0);}}><option value="ALL">All targets</option><option value="DOCTOR">Against a doctor</option><option value="SYSTEM">Against the system</option></select>
+          <SearchField label={tr('ui.searchComplaints')} placeholder={tr('ui.searchByComplaintIdPatientDoctor')} maxLength={150} value={search} onChange={v=>{setSearch(v);setOffset(0);}}/>
+          <select className="afya-select" aria-label={tr('ui.target')} value={target} onChange={e=>{setTarget(e.target.value);setOffset(0);}}><option value="ALL">{tr('ui.allTargets')}</option><option value="DOCTOR">{tr('ui.againstADoctor')}</option><option value="SYSTEM">{tr('ui.againstTheSystem')}</option></select>
         </div>
         <div className="afya-table-wrap"><table className="admin-table">
-          <thead><tr><th>ID</th><th>Patient</th><th>Complaint</th><th>Doctor</th><th>Target</th><th>Status</th><th style={{textAlign:'right'}}>Actions</th></tr></thead>
+          <thead><tr><th>ID</th><th>{tr('ui.patient')}</th><th>{tr('ui.complaint')}</th><th>{tr('ui.doctor')}</th><th>{tr('ui.target')}</th><th>{tr('ui.status')}</th><th style={{textAlign:'right'}}>{tr('ui.actions')}</th></tr></thead>
           <tbody>{rows.slice(offset,offset+PAGE).map(g=>{const s=STATUS[g.status]??{tone:'neutral' as ChipTone,label:g.status};return <tr key={g.id} className="admin-clickable-row" onClick={()=>onOpen(g.id)}>
             <td><div style={{fontWeight:700}}>{g.id}</div><div className="afya-stat-note">{g.relativeTime}</div></td>
             <td style={{fontWeight:650}}>{g.patient.name}</td>
             <td style={{maxWidth:320}}><div style={{fontWeight:650}}>{g.category}</div><div className="afya-stat-note" style={{whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{g.claimSummary}</div></td>
             <td>{g.doctor.name}<div className="afya-stat-note">{g.doctor.registrationNumber}</div></td>
-            <td><Chip tone={g.target==='DOCTOR'?'danger':'info'}>{g.target==='DOCTOR'?'Doctor':'System'}</Chip></td>
-            <td><Chip tone={s.tone}>{s.label}</Chip>{openAppealFor.has(g.backendId??'')&&<div style={{marginTop:4}}><Chip tone="warn">Appeal open</Chip></div>}</td>
+            <td><Chip tone={g.target==='DOCTOR'?'danger':'info'}>{g.target==='DOCTOR'?tr('ui2.doctor'):tr('ui2.system')}</Chip></td>
+            <td><Chip tone={s.tone}>{s.label}</Chip>{openAppealFor.has(g.backendId??'')&&<div style={{marginTop:4}}><Chip tone="warn">{tr('ui.appealOpen')}</Chip></div>}</td>
             <td style={{textAlign:'right',whiteSpace:'nowrap'}}>
-              {appealable(g)&&g.backendId&&!openAppealFor.has(g.backendId)&&<button type="button" className="afya-btn-secondary" onClick={e=>{e.stopPropagation();setRecordFor(g);}}><Scale size={15} aria-hidden/>Record appeal</button>}
-              <button type="button" className={pending(g)?'afya-btn-primary':'afya-btn-secondary'} style={{marginLeft:8}} onClick={e=>{e.stopPropagation();onOpen(g.id);}}>{pending(g)?<><Gavel size={15} aria-hidden/>Adjudicate</>:'View'}</button>
+              {appealable(g)&&g.backendId&&!openAppealFor.has(g.backendId)&&<button type="button" className="afya-btn-secondary" onClick={e=>{e.stopPropagation();setRecordFor(g);}}><Scale size={15} aria-hidden/>{tr('ui.recordAppeal')}</button>}
+              <button type="button" className={pending(g)?'afya-btn-primary':'afya-btn-secondary'} style={{marginLeft:8}} onClick={e=>{e.stopPropagation();onOpen(g.id);}}>{pending(g)?<><Gavel size={15} aria-hidden/>{tr('ui.adjudicate')}</>:tr('ui2.view')}</button>
             </td>
           </tr>;})}</tbody>
-        </table>{!rows.length&&<EmptyState title={grievances.length?'No complaints match these filters':'No complaints filed'}>{grievances.length?'Try another tab, target or search.':'Complaints patients file about a consultation appear here.'}</EmptyState>}</div>
+        </table>{!rows.length&&<EmptyState title={grievances.length?tr('ui2.noComplaintsMatchTheseFilters'):tr('ui2.noComplaintsFiled')}>{grievances.length?tr('ui2.tryAnotherTabTargetOrSearch'):tr('ui2.complaintsPatientsFileAboutAConsultation')}</EmptyState>}</div>
         <Pagination offset={offset} pageSize={PAGE} total={rows.length} onChange={setOffset}/>
       </>}
     </Card>
-    {recordFor&&<TextDialog title={`Record appeal · ${recordFor.id}`} sub={`Against the decision "${STATUS[recordFor.status]?.label}". Recorded on the patient's behalf.`} label="Patient's reason for appealing" confirm="Record appeal"
+    {recordFor&&<TextDialog title={tr('tpl.recordAppeal', { id: recordFor.id })} sub={tr('tpl.againstDecision', { decision: STATUS[recordFor.status]?.label ?? '' })} label={tr('ui.patientSReasonForAppealing')} confirm={tr('ui4.recordAppeal')}
       onClose={()=>setRecordFor(null)} onSubmit={async text=>{await recordAppeal(recordFor.backendId!,text);await after();}}/>}
-    {decideFor&&<TextDialog title={decideFor.decision==='OVERTURN'?`Overturn decision · ${decideFor.appeal.grievance_number}`:`Uphold decision · ${decideFor.appeal.grievance_number}`}
-      sub={decideFor.decision==='OVERTURN'?'The decision is kept as history and the complaint returns to the adjudication queue to be decided again.':'The original decision stands.'}
-      label="Decision note" confirm={decideFor.decision==='OVERTURN'?'Overturn':'Uphold'} danger={decideFor.decision==='OVERTURN'}
+    {decideFor&&<TextDialog title={decideFor.decision==='OVERTURN'?tr('tpl.overturnDecision', { id: decideFor.appeal.grievance_number }):tr('tpl.upholdDecision', { id: decideFor.appeal.grievance_number })}
+      sub={decideFor.decision==='OVERTURN'?tr('ui2.theDecisionIsKeptAsHistory'):tr('ui2.theOriginalDecisionStands')}
+      label={tr('ui.decisionNote')} confirm={decideFor.decision==='OVERTURN'?tr('ui2.overturn'):tr('ui2.uphold')} danger={decideFor.decision==='OVERTURN'}
       onClose={()=>setDecideFor(null)} onSubmit={async text=>{await decideAppeal(decideFor.appeal.id,decideFor.decision,text);await after();}}/>}
   </div>;
 }
@@ -102,23 +103,23 @@ export function GrievancesPage({grievances,onOpen,onChanged}:{grievances:Grievan
 function TextDialog({title,sub,label,confirm,danger,onClose,onSubmit}:{title:string;sub:string;label:string;confirm:string;danger?:boolean;onClose:()=>void;onSubmit:(text:string)=>Promise<void>}){
   const [text,setText]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   async function submit(){
-    const value=text.trim();if(value.length<8){setError('Write at least 8 characters.');return;}
+    const value=text.trim();if(value.length<8){setError(tr('ui.writeAtLeast8Characters'));return;}
     setBusy(true);setError('');
-    try{await onSubmit(value);}catch(e){const m=e instanceof Error?e.message:'';setError(m.includes('[409]')?'This changed in the meantime. Close and reload the list.':'This could not be saved. Try again.');setBusy(false);}
+    try{await onSubmit(value);}catch(e){const m=e instanceof Error?e.message:'';setError(m.includes('[409]')?tr('ui2.thisChangedInTheMeantimeClose'):tr('ui2.thisCouldNotBeSavedTry'));setBusy(false);}
   }
   return <div className="admin-modal-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={e=>{if(e.target===e.currentTarget&&!busy)onClose();}}>
     <div className="admin-modal-card" style={{maxWidth:560}}>
       <div className="afya-modal-head"><div><div className="afya-modal-title">{title}</div><div className="afya-modal-sub">{sub}</div></div>
-        <button type="button" className="afya-icon-btn" aria-label="Close" disabled={busy} onClick={onClose}><X size={18}/></button></div>
+        <button type="button" className="afya-icon-btn" aria-label={tr('ui.close')} disabled={busy} onClick={onClose}><X size={18}/></button></div>
       <div className="afya-form" style={{padding:'16px 22px'}}>
         <label htmlFor="dialog-text">{label} *</label>
         <textarea id="dialog-text" rows={4} maxLength={2000} value={text} onChange={e=>setText(e.target.value)}/>
-        <span className="afya-stat-note">8–2000 characters. Saved to the audit trail.</span>
+        <span className="afya-stat-note">{tr('ui.n82000CharactersSavedToThe')}</span>
         {error&&<div className="afya-login-error" role="alert">{error}</div>}
       </div>
       <div className="afya-modal-foot">
-        <button type="button" className="afya-btn-secondary" disabled={busy} onClick={onClose}>Cancel</button>
-        <button type="button" className={danger?'afya-btn-danger':'afya-btn-primary'} disabled={busy} onClick={()=>void submit()}>{busy?'Saving…':confirm}</button>
+        <button type="button" className="afya-btn-secondary" disabled={busy} onClick={onClose}>{tr('ui.cancel')}</button>
+        <button type="button" className={danger?'afya-btn-danger':'afya-btn-primary'} disabled={busy} onClick={()=>void submit()}>{busy?tr('ui2.saving'):confirm}</button>
       </div>
     </div>
   </div>;

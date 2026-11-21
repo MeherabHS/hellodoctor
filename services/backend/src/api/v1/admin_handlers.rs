@@ -1514,6 +1514,7 @@ pub async fn verify_doctor_professional_registration(
     Path(id): Path<Uuid>,
     Json(payload): Json<ProfessionalReviewRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    crate::services::admin_step_up::require(&state, &ctx).await?;
     review_doctor_professional_registration(
         state,
         ctx,

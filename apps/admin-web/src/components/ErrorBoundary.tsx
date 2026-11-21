@@ -1,4 +1,5 @@
 'use client';
+import { tr } from '@/lib/i18n';
 // Mirrors apps/doctor-web/src/components/DoctorApplication.tsx's `Boundary`
 // class + its window-level error/unhandledrejection hooks — the one
 // client-crash-reporting pattern already established in this codebase,
@@ -15,9 +16,9 @@ class Boundary extends React.Component<{ children: React.ReactNode }, { failed: 
     return (
       <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8FAFC' }}>
         <div style={{ textAlign: 'center', padding: '32px', background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', maxWidth: '360px' }}>
-          <p style={{ color: '#334155', fontSize: '14px', marginBottom: '16px' }}>This screen could not be rendered. Reload to restore your session.</p>
+          <p style={{ color: '#334155', fontSize: '14px', marginBottom: '16px' }}>{tr('ui.thisScreenCouldNotBeRendered')}</p>
           <button onClick={() => location.reload()} style={{ padding: '8px 20px', fontSize: '12px', background: '#0F172A', color: '#fff', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>
-            Reload
+            {tr('ui.reload')}
           </button>
         </div>
       </main>

@@ -23,14 +23,16 @@ class NotificationSounds {
 /// docs/DOCTOR_NOTIFICATION_DELIVERY_ARCHITECTURE.md.
 ///
 /// A channel's sound and importance are fixed by Android once the channel
-/// exists, so the forced-sound channels (2026-11-17) use new `_V2` ids and
-/// [legacyIds] are deleted at start-up. The backend names these same ids in
-/// its pushes (`notification_transport.rs::android_channel_id`).
+/// exists. The forced-sound channels (2026-11-17) became `_V2`; on
+/// 2026-11-20 every channel was raised to max importance (product-owner
+/// instruction), hence the `_V3` ids. [legacyIds] are deleted at start-up.
+/// The backend names these same ids in its pushes
+/// (`notification_transport.rs::android_channel_id`).
 class NotificationChannels {
   const NotificationChannels._();
 
   static const consultationReminders = AndroidNotificationChannel(
-    'CONSULTATION_REMINDERS_V2',
+    'CONSULTATION_REMINDERS_V3',
     'Consultation reminders',
     description: 'Reminders shortly before a scheduled consultation starts.',
     importance: Importance.max,
@@ -40,46 +42,59 @@ class NotificationChannels {
     enableVibration: true,
   );
   static const dailySchedule = AndroidNotificationChannel(
-    'DAILY_SCHEDULE_V2',
+    'DAILY_SCHEDULE_V3',
     'Daily schedule summary',
     description: 'Your consultation count at the start of each day.',
-    importance: Importance.high,
+    importance: Importance.max,
     playSound: true,
     sound: NotificationSounds.quick,
     enableVibration: true,
   );
   static const messages = AndroidNotificationChannel(
-    'MESSAGES_V2',
+    'MESSAGES_V3',
     'Messages',
     description: 'New consultation chat messages.',
-    importance: Importance.high,
+    importance: Importance.max,
     playSound: true,
     sound: NotificationSounds.quick,
     enableVibration: true,
   );
   static const account = AndroidNotificationChannel(
-    'ACCOUNT_V2',
+    'ACCOUNT_V3',
     'Account',
     description: 'Registration and verification updates.',
-    importance: Importance.high,
+    importance: Importance.max,
     playSound: true,
     sound: NotificationSounds.quick,
     enableVibration: true,
   );
   static const financial = AndroidNotificationChannel(
-    'FINANCIAL_V2',
+    'FINANCIAL_V3',
     'Earnings & payouts',
     description: 'Earning credited and payout confirmations.',
-    importance: Importance.high,
+    importance: Importance.max,
     playSound: true,
     sound: NotificationSounds.quick,
     enableVibration: true,
   );
   static const general = AndroidNotificationChannel(
-    'GENERAL_V2',
+    'GENERAL_V3',
     'General',
     description: 'Other account and app notifications.',
-    importance: Importance.high,
+    importance: Importance.max,
+    playSound: true,
+    sound: NotificationSounds.quick,
+    enableVibration: true,
+  );
+
+  /// Admin-published announcements (ADMIN_CAMPAIGN), always at maximum
+  /// importance (product owner, 2026-11-21). The backend names this id in
+  /// its pushes for every role (`notification_transport.rs`).
+  static const announcements = AndroidNotificationChannel(
+    'ANNOUNCEMENTS_V3',
+    'Announcements',
+    description: 'Messages from the AfyaMkononi team.',
+    importance: Importance.max,
     playSound: true,
     sound: NotificationSounds.quick,
     enableVibration: true,
@@ -92,11 +107,18 @@ class NotificationChannels {
     account,
     financial,
     general,
+    announcements,
   ];
 
   /// Channels replaced by the forced-sound set; deleted at start-up so they
   /// no longer show in the phone's notification settings.
   static const legacyIds = [
+    'CONSULTATION_REMINDERS_V2',
+    'DAILY_SCHEDULE_V2',
+    'MESSAGES_V2',
+    'ACCOUNT_V2',
+    'FINANCIAL_V2',
+    'GENERAL_V2',
     'CONSULTATION_REMINDERS',
     'DAILY_SCHEDULE',
     'MESSAGES',
@@ -127,6 +149,8 @@ class NotificationChannels {
       case 'EARNING_CREDITED':
       case 'PAYOUT_PAID':
         return financial;
+      case 'ADMIN_CAMPAIGN':
+        return announcements;
       default:
         return general;
     }
@@ -236,9 +260,7 @@ class LocalNotificationService {
           channel.name,
           channelDescription: channel.description,
           importance: channel.importance,
-          priority: channel.importance == Importance.max
-              ? Priority.max
-              : Priority.high,
+          priority: Priority.max,
           playSound: true,
           sound: channel.sound,
           audioAttributesUsage: channel.audioAttributesUsage,

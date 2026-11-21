@@ -92,7 +92,7 @@ async fn sensitive_admin_actions_need_a_fresh_password(pool: PgPool) {
     // The right password unlocks this sign-in session.
     let (status, body) = reauth(&app, &admin, SEED_ADMIN_PASSWORD).await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(body["data"]["valid_for_seconds"], 600);
+    assert_eq!(body["data"]["valid_for_seconds"], 120);
     let (status, body) = trace(&app, &admin).await;
     assert_ne!(error_code(&body), "REAUTH_REQUIRED", "{status} {body}");
     assert_ne!(status, StatusCode::FORBIDDEN, "{body}");

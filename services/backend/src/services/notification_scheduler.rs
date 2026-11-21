@@ -100,6 +100,10 @@ pub fn start(state: AppState) {
             if let Err(error) = run_intake_removal_cleanup(&state).await {
                 tracing::error!(error = ?error, "removed intake-upload cleanup failed");
             }
+            // Approved security-data retention (expired codes, ended sessions).
+            if let Err(error) = crate::services::security_retention::run_if_due(&state).await {
+                tracing::error!(error = ?error, "security retention purge failed");
+            }
             if let Err(error) = run_consultation_presence_sweep(&state).await {
                 tracing::error!(error = ?error, "consultation presence grace sweep failed");
             }
@@ -1223,9 +1227,13 @@ pub async fn ensure_hold_created_notification(
     state: &AppState,
     appointment_id: Uuid,
 ) -> Result<(), sqlx::Error> {
+    // The two flags complete HoldNotificationTarget. Without them every
+    // booking failed with ColumnNotFound and the notice waited for the
+    // scheduler. The insert's dedup key still makes a repeat a no-op.
     let target: Option<HoldNotificationTarget> = sqlx::query_as(
         "SELECT a.id AS appointment_id, COALESCE(p.user_id, g.user_id) AS user_id, \
-                COALESCE(a.hold_expires_at, a.created_at + make_interval(secs => 600)) AS hold_expires_at \
+                COALESCE(a.hold_expires_at, a.created_at + make_interval(secs => 600)) AS hold_expires_at, \
+                TRUE AS needs_hold_created_notification, TRUE AS needs_one_minute_notification \
            FROM appointments a \
            JOIN patient_profiles p ON p.id=a.patient_id \
            LEFT JOIN patient_profiles g ON g.id=p.guardian_patient_id \

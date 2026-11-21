@@ -26,3 +26,18 @@ test('concurrent sensitive actions share one password dialog', async () => {
   unregister();
   assert.equal(await confirmStepUp(), false);
 });
+
+test('a confirmation starts the 2-minute countdown and a new request clears it', async () => {
+  const {setStepUpExpiry, clearStepUpExpiry, subscribeStepUpExpiry} = await import('../src/lib/stepUp.mjs');
+  let expiry: number | null = null;
+  const stop = subscribeStepUpExpiry((value: number | null) => { expiry = value; });
+  try {
+    const before = Date.now();
+    setStepUpExpiry(120);
+    assert.ok(expiry !== null && expiry >= before + 120_000 && expiry <= Date.now() + 120_000);
+    clearStepUpExpiry();
+    assert.equal(expiry, null);
+  } finally {
+    stop();
+  }
+});

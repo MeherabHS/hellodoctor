@@ -1,4 +1,5 @@
 'use client';
+import { tr } from '@/lib/i18n';
 import {useEffect,useRef,useState} from 'react';
 import {ArrowLeft,ExternalLink} from 'lucide-react';
 import type {AdminArticle,ArticleCategory,ArticleContent} from '../../lib/blogContent';
@@ -15,17 +16,17 @@ import {PublishCard} from './PublishCard';
 /** The YouTube cover for a video id, as a file ready to upload as the cover. */
 export async function fetchYouTubeCover(videoId:string):Promise<File>{
   const res=await fetch(`/api/youtube-thumbnail/${encodeURIComponent(videoId)}`,{credentials:'include',cache:'no-store'});
-  if(!res.ok||res.headers.get('content-type')!=='image/jpeg')throw new Error('No YouTube cover found. Upload an image instead.');
+  if(!res.ok||res.headers.get('content-type')!=='image/jpeg')throw new Error(tr('ui2.noYoutubeCoverFoundUploadAn'));
   return new File([await res.blob()],`youtube-${videoId}.jpg`,{type:'image/jpeg'});
 }
 
 export function videoProblems(c:ArticleContent):string[]{
   const problems:string[]=[];
-  if(!c.title_en.trim())problems.push('Add a header.');
-  if(!c.body_en.trim())problems.push('Add a sub header.');
-  if(!c.video_url.trim())problems.push('Add the YouTube link.');
-  else if(!isYouTubeLink(c.video_url))problems.push('The link must be a YouTube video (youtube.com or youtu.be).');
-  if(Boolean(c.title_sw.trim())!==Boolean(c.body_sw.trim()))problems.push('Fill both Kiswahili fields, or leave both empty.');
+  if(!c.title_en.trim())problems.push(tr('ui2.addAHeader'));
+  if(!c.body_en.trim())problems.push(tr('ui2.addASubHeader'));
+  if(!c.video_url.trim())problems.push(tr('ui2.addTheYoutubeLink'));
+  else if(!isYouTubeLink(c.video_url))problems.push(tr('ui2.theLinkMustBeAYoutube'));
+  if(Boolean(c.title_sw.trim())!==Boolean(c.body_sw.trim()))problems.push(tr('ui2.fillBothKiswahiliFieldsOrLeave'));
   return problems;
 }
 
@@ -67,46 +68,46 @@ export function VideoEditor({initial,categories,onSaved,onClose}:{initial:AdminA
   async function run(work:()=>Promise<void>,failure=''){
     setBusy(true);setError('');setNotice('');
     try{await work();}
-    catch(e){if(e instanceof CoverError){settle(e.saved);setError(`Video saved, but the cover was not: ${blogErrorMessage(e.cause)}`);}else setError(`${failure}${blogErrorMessage(e)}`);}
+    catch(e){if(e instanceof CoverError){settle(e.saved);setError(tr('tpl.videoSavedCoverNot', { error: blogErrorMessage(e.cause) }));}else setError(`${failure}${blogErrorMessage(e)}`);}
     finally{setBusy(false);onSaved();}
   }
-  const save=()=>run(async()=>{await persist();setNotice('Draft saved. Patients cannot see it until you publish.');});
-  const publish=()=>run(async()=>{const saved=await persist();if(isUnpublished(saved.status))await publishEntry(saved);onClose(`Published “${saved.title_en}”.`);},'Not published: ');
-  const schedule=(when:string)=>run(async()=>{const at=nairobiSchedule(when);const saved=await persist();await publishEntry(saved,'schedule',at);onClose(`Scheduled “${saved.title_en}”.`);});
-  const action=(name:'unpublish'|'archive')=>run(async()=>{if(!article)return;settle(await transitionArticle(article.id,article.version,name));setNotice(name==='unpublish'?'Unpublished. It is a draft again.':'Archived.');});
+  const save=()=>run(async()=>{await persist();setNotice(tr('ui.draftSavedPatientsCannotSeeIt'));});
+  const publish=()=>run(async()=>{const saved=await persist();if(isUnpublished(saved.status))await publishEntry(saved);onClose(tr('tpl.published', { title: saved.title_en }));},tr('tpl.notPublished'));
+  const schedule=(when:string)=>run(async()=>{const at=nairobiSchedule(when);const saved=await persist();await publishEntry(saved,'schedule',at);onClose(tr('tpl.scheduled', { title: saved.title_en }));});
+  const action=(name:'unpublish'|'archive')=>run(async()=>{if(!article)return;settle(await transitionArticle(article.id,article.version,name));setNotice(name==='unpublish'?tr('ui2.unpublishedItIsADraftAgain'):tr('ui2.archived'));});
   async function reload(){setBusy(true);try{settle(await getArticle(id));setCover(null);setError('');}catch(e){setError(blogErrorMessage(e));}finally{setBusy(false);}}
   const savedCover=article?.cover_image_id?`/api/article-media/${article.id}?v=${article.version}`:'';
 
   return <div className="afya-stack">
     <div className="afya-page-head">
       <div style={{display:'flex',alignItems:'center',gap:12}}>
-        <button type="button" className="afya-icon-btn" aria-label="Back to videos" onClick={()=>requestNavigation(()=>onClose())}><ArrowLeft size={20}/></button>
-        <div><h2>{article?'Edit video':'New video'}</h2><p>{dirty?'Unsaved changes':article?'All changes saved':'Not saved yet'}</p></div>
+        <button type="button" className="afya-icon-btn" aria-label={tr('ui.backToVideos')} onClick={()=>requestNavigation(()=>onClose())}><ArrowLeft size={20}/></button>
+        <div><h2>{article?tr('ui2.editVideo'):tr('ui2.newVideo')}</h2><p>{dirty?tr('ui2.unsavedChanges'):article?tr('ui2.allChangesSaved'):tr('ui2.notSavedYet')}</p></div>
       </div>
     </div>
-    {error&&<div role="alert" className="afya-login-error">{error} {article&&<button type="button" className="afya-btn-secondary" onClick={reload}>Reload saved video</button>}</div>}
+    {error&&<div role="alert" className="afya-login-error">{error} {article&&<button type="button" className="afya-btn-secondary" onClick={reload}>{tr('ui.reloadSavedVideo')}</button>}</div>}
     {notice&&<p role="status" className="afya-notice info" style={{margin:0}}>{notice}</p>}
     <div className="afya-two-col">
       <section className="admin-card">
         <fieldset disabled={busy||archived} className="afya-form" style={{border:0,margin:0,padding:0}}>
           <CoverPicker savedSrc={savedCover} file={cover} onFile={f=>{setCover(f);setCoverSource(f?'upload':null);}} onError={setError}
-            note={coverState==='loading'?'Fetching the YouTube cover…':coverState==='failed'?'Could not fetch the YouTube cover. Upload an image instead.':coverSource==='youtube'?'Cover taken from YouTube. Upload an image to use your own.':'Added automatically from the YouTube link, or upload your own.'}/>
-          <label htmlFor="video-title">Header *</label>
-          <input id="video-title" value={content.title_en} maxLength={160} placeholder="e.g. How PrEP works" onChange={e=>change('title_en',e.target.value)}/>
-          <label htmlFor="video-sub">Sub header *</label>
-          <textarea id="video-sub" value={content.body_en} maxLength={600} rows={3} placeholder="One or two sentences about the video" onChange={e=>change('body_en',e.target.value)}/>
-          <label htmlFor="video-link">YouTube link *</label>
+            note={coverState==='loading'?tr('ui2.fetchingTheYoutubeCover'):coverState==='failed'?tr('ui2.couldNotFetchTheYoutubeCover'):coverSource==='youtube'?tr('ui2.coverTakenFromYoutubeUploadAn'):tr('ui2.addedAutomaticallyFromTheYoutubeLink')}/>
+          <label htmlFor="video-title">{tr('ui.header')}</label>
+          <input id="video-title" value={content.title_en} maxLength={160} placeholder={tr('ui.eGHowPrepWorks')} onChange={e=>change('title_en',e.target.value)}/>
+          <label htmlFor="video-sub">{tr('ui.subHeader')}</label>
+          <textarea id="video-sub" value={content.body_en} maxLength={600} rows={3} placeholder={tr('ui.oneOrTwoSentencesAboutThe')} onChange={e=>change('body_en',e.target.value)}/>
+          <label htmlFor="video-link">{tr('ui.youtubeLink')}</label>
           <div style={{display:'flex',gap:8}}>
             <input id="video-link" type="url" inputMode="url" value={content.video_url} maxLength={200} placeholder="https://www.youtube.com/watch?v=…" onChange={e=>change('video_url',e.target.value)} style={{flex:1}}/>
-            {videoId&&<a className="afya-btn-secondary" href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden/> Open</a>}
+            {videoId&&<a className="afya-btn-secondary" href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} aria-hidden/> {tr('ui.open')}</a>}
           </div>
           <details className="cms-later" style={{marginTop:14}} open={Boolean(content.title_sw||content.body_sw)}>
-            <summary>Kiswahili (optional)</summary>
-            <label htmlFor="video-title-sw">Header (Kiswahili)</label>
+            <summary>{tr('ui.kiswahiliOptional')}</summary>
+            <label htmlFor="video-title-sw">{tr('ui.headerKiswahili')}</label>
             <input id="video-title-sw" value={content.title_sw} maxLength={160} onChange={e=>change('title_sw',e.target.value)}/>
-            <label htmlFor="video-sub-sw">Sub header (Kiswahili)</label>
+            <label htmlFor="video-sub-sw">{tr('ui.subHeaderKiswahili')}</label>
             <textarea id="video-sub-sw" value={content.body_sw} maxLength={600} rows={3} onChange={e=>change('body_sw',e.target.value)}/>
-            <span className="afya-stat-note">Leave empty and patients see the English text.</span>
+            <span className="afya-stat-note">{tr('ui.leaveEmptyAndPatientsSeeThe')}</span>
           </details>
         </fieldset>
       </section>

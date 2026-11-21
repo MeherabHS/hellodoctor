@@ -47,16 +47,24 @@ pub struct PushOptions {
 /// fixes a channel's sound once created, so new ids were needed); see
 /// [`notification_sound`].
 pub fn android_channel_id(notification_type: &str, recipient_role: &str) -> &'static str {
+    // Admin-published announcements: one max-importance channel in both apps,
+    // whatever the recipient's role (product owner, 2026-11-21).
+    if notification_type == "ADMIN_CAMPAIGN" {
+        return "ANNOUNCEMENTS_V3";
+    }
     match recipient_role {
-        "DOCTOR" => match notification_type {
-            "CONSULTATION_REMINDER_15M" => "CONSULTATION_REMINDERS_V2",
-            "DAILY_CONSULTATION_SUMMARY" => "DAILY_SCHEDULE_V2",
-            "NEW_CHAT_MESSAGE" => "MESSAGES_V2",
+        // The Care app (Doctors and Peer Navigators). 2026-11-20: every Care
+        // channel is max importance (product-owner instruction), and Android
+        // fixes importance once a channel exists, so they are new `_V3` ids.
+        "DOCTOR" | "PEER_NAVIGATOR" => match notification_type {
+            "CONSULTATION_REMINDER_15M" => "CONSULTATION_REMINDERS_V3",
+            "DAILY_CONSULTATION_SUMMARY" => "DAILY_SCHEDULE_V3",
+            "NEW_CHAT_MESSAGE" => "MESSAGES_V3",
             "REGISTRATION_VERIFIED" | "REGISTRATION_REJECTED" | "ARTICLE_STATUS_CHANGED" => {
-                "ACCOUNT_V2"
+                "ACCOUNT_V3"
             }
-            "EARNING_CREDITED" | "PAYOUT_PAID" => "FINANCIAL_V2",
-            _ => "GENERAL_V2",
+            "EARNING_CREDITED" | "PAYOUT_PAID" => "FINANCIAL_V3",
+            _ => "GENERAL_V3",
         },
         // Patient and any other/unrecognized role share the Patient app's
         // channel set — "GENERAL_V2" always exists there too, so an
@@ -423,22 +431,25 @@ mod m8_g13_channel_routing_tests {
     #[test]
     fn doctor_channel_mapping_matches_dart_source() {
         let cases = [
-            ("CONSULTATION_REMINDER_15M", "CONSULTATION_REMINDERS_V2"),
-            ("DAILY_CONSULTATION_SUMMARY", "DAILY_SCHEDULE_V2"),
-            ("NEW_CHAT_MESSAGE", "MESSAGES_V2"),
-            ("REGISTRATION_VERIFIED", "ACCOUNT_V2"),
-            ("REGISTRATION_REJECTED", "ACCOUNT_V2"),
-            ("ARTICLE_STATUS_CHANGED", "ACCOUNT_V2"),
-            ("EARNING_CREDITED", "FINANCIAL_V2"),
-            ("PAYOUT_PAID", "FINANCIAL_V2"),
-            ("SOME_UNMAPPED_FUTURE_TYPE", "GENERAL_V2"),
+            ("CONSULTATION_REMINDER_15M", "CONSULTATION_REMINDERS_V3"),
+            ("DAILY_CONSULTATION_SUMMARY", "DAILY_SCHEDULE_V3"),
+            ("NEW_CHAT_MESSAGE", "MESSAGES_V3"),
+            ("REGISTRATION_VERIFIED", "ACCOUNT_V3"),
+            ("REGISTRATION_REJECTED", "ACCOUNT_V3"),
+            ("ARTICLE_STATUS_CHANGED", "ACCOUNT_V3"),
+            ("EARNING_CREDITED", "FINANCIAL_V3"),
+            ("PAYOUT_PAID", "FINANCIAL_V3"),
+            ("SOME_UNMAPPED_FUTURE_TYPE", "GENERAL_V3"),
         ];
-        for (notification_type, expected_channel) in cases {
-            assert_eq!(
-                android_channel_id(notification_type, "DOCTOR"),
-                expected_channel,
-                "DOCTOR/{notification_type}"
-            );
+        // Doctors and Peer Navigators both use the Care app's channels.
+        for role in ["DOCTOR", "PEER_NAVIGATOR"] {
+            for (notification_type, expected_channel) in cases {
+                assert_eq!(
+                    android_channel_id(notification_type, role),
+                    expected_channel,
+                    "{role}/{notification_type}"
+                );
+            }
         }
     }
 
@@ -477,6 +488,32 @@ mod m8_g13_channel_routing_tests {
     /// (`GENERAL`, present in both apps) rather than panicking or producing
     /// an empty string — defensive, since `recipient_role` ultimately comes
     /// from a database read, not a closed Rust enum.
+    /// Admin-published announcements always use the max-importance
+    /// ANNOUNCEMENTS_V3 channel, in both apps, at the highest FCM priority.
+    #[test]
+    fn admin_campaigns_use_the_announcements_channel_for_every_role() {
+        for role in ["PATIENT", "DOCTOR", "PEER_NAVIGATOR", "PLATFORM_ADMIN"] {
+            assert_eq!(
+                android_channel_id("ADMIN_CAMPAIGN", role),
+                "ANNOUNCEMENTS_V3",
+                "{role}"
+            );
+        }
+        let message = build_fcm_message(
+            "fake-push-token",
+            "Announcement",
+            "A message from AfyaMkononi.",
+            &options("ADMIN_CAMPAIGN", "PATIENT"),
+        );
+        let android = &message["message"]["android"];
+        assert_eq!(android["notification"]["channel_id"], "ANNOUNCEMENTS_V3");
+        assert_eq!(android["priority"], "high");
+        assert_eq!(
+            android["notification"]["notification_priority"],
+            "PRIORITY_MAX"
+        );
+    }
+
     #[test]
     fn unknown_role_falls_back_to_general_channel_set() {
         assert_eq!(
@@ -503,7 +540,7 @@ mod m8_g13_channel_routing_tests {
         );
         assert_eq!(
             message["message"]["android"]["notification"]["channel_id"],
-            "CONSULTATION_REMINDERS_V2"
+            "CONSULTATION_REMINDERS_V3"
         );
         assert_eq!(message["message"]["token"], "fake-push-token");
         assert_eq!(

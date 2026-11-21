@@ -3,34 +3,49 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hellodoctor_mobile/core/notifications/battery_optimization.dart';
 
-/// The once-per-install battery-optimisation guidance (2026-11-18).
+/// Two taps (product owner, 2026-11-20): Android's notification dialog,
+/// then Android's battery dialog, back to back. Nothing of the app's own,
+/// and never a redirect to a Settings page.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  final opened = <String>[];
-  var ignoring = false;
-  var manufacturer = 'TECNO';
+  final calls = <String>[];
+  late Map<String, Object?> state;
+  var permissionRequests = 0;
+  var clock = DateTime.utc(2026, 11, 20, 9);
 
   setUp(() {
-    opened.clear();
-    ignoring = false;
-    manufacturer = 'TECNO';
+    calls.clear();
+    permissionRequests = 0;
+    clock = DateTime.utc(2026, 11, 20, 9);
+    BatteryOptimization.now = () => clock;
+    state = {
+      'ignoring': false,
+      'manufacturer': 'TECNO',
+      'notificationsEnabled': false,
+      'permissionGranted': false,
+      'showRationale': false,
+      'disabledChannels': <String>[],
+      'sdk': 34,
+    };
     FlutterSecureStorage.setMockInitialValues({});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(BatteryOptimization.channel, (call) async {
-      switch (call.method) {
-        case 'status':
-          return {'ignoring': ignoring, 'manufacturer': manufacturer};
-        case 'openSettings':
-          opened.add('settings');
-          return true;
-      }
-      return null;
+      if (call.method == 'status') return state;
+      calls.add(call.method);
+      return true;
     });
   });
 
   tearDown(() => TestDefaultBinaryMessengerBinding
       .instance.defaultBinaryMessenger
       .setMockMethodCallHandler(BatteryOptimization.channel, null));
+
+  Future<bool> grant() async {
+    permissionRequests++;
+    state['notificationsEnabled'] = true;
+    state['permissionGranted'] = true;
+    return true;
+  }
 
   Future<BuildContext> host(WidgetTester tester) async {
     late BuildContext context;
@@ -41,60 +56,67 @@ void main() {
     return context;
   }
 
-  test('phone brands map to their own steps', () {
+  test('phone brands are recognised', () {
     expect(phoneMakerOf('TECNO'), PhoneMaker.transsion);
     expect(phoneMakerOf('INFINIX MOBILITY LIMITED'), PhoneMaker.transsion);
-    expect(phoneMakerOf('itel'), PhoneMaker.transsion);
     expect(phoneMakerOf('Xiaomi'), PhoneMaker.xiaomi);
     expect(phoneMakerOf('samsung'), PhoneMaker.samsung);
-    expect(phoneMakerOf('OPPO'), PhoneMaker.oppo);
-    expect(phoneMakerOf('realme'), PhoneMaker.oppo);
-    expect(phoneMakerOf('vivo'), PhoneMaker.vivo);
-    expect(phoneMakerOf('HONOR'), PhoneMaker.huawei);
     expect(phoneMakerOf('Google'), PhoneMaker.other);
-    for (final maker in PhoneMaker.values) {
-      expect(batteryStepsFor(null, maker), contains('Open settings'));
-    }
   });
 
-  testWidgets('a restricted phone sees the guidance once, with its brand steps',
+  testWidgets('two system dialogs back to back, nothing of the app own',
       (tester) async {
     final context = await host(tester);
-    final first = BatteryOptimization.maybePrompt(context);
+    final flow =
+        BatteryOptimization.ensureReady(context, requestPermission: grant);
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('battery-optimization-dialog')),
-        findsOneWidget);
-    expect(find.textContaining('Phone Master'), findsOneWidget);
-    await tester.tap(find.text('Open settings'));
-    await tester.pumpAndSettle();
-    await first;
-    expect(opened, ['settings']);
-
-    // Never again on this install, whatever the user chose.
-    final again = BatteryOptimization.maybePrompt(context);
-    await tester.pumpAndSettle();
-    await again;
-    expect(find.byKey(const ValueKey('battery-optimization-dialog')),
-        findsNothing);
+    await flow;
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(permissionRequests, 1);
+    // Only the in-place battery dialog; no Settings page.
+    expect(calls, ['requestIgnore']);
   });
 
-  testWidgets('Not now closes it without opening settings', (tester) async {
+  testWidgets('asked again only after the interval', (tester) async {
     final context = await host(tester);
-    final prompt = BatteryOptimization.maybePrompt(context);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Not now'));
-    await tester.pumpAndSettle();
-    await prompt;
-    expect(opened, isEmpty);
+    Future<bool> refuse() async {
+      permissionRequests++;
+      state['showRationale'] = true; // refused once: Android asks again
+      return false;
+    }
+
+    await BatteryOptimization.ensureReady(context, requestPermission: refuse);
+    expect((permissionRequests, calls.length), (1, 1));
+
+    clock = clock.add(const Duration(hours: 3));
+    await BatteryOptimization.ensureReady(context, requestPermission: refuse);
+    expect((permissionRequests, calls.length), (1, 1));
+
+    clock = clock.add(const Duration(hours: 20));
+    await BatteryOptimization.ensureReady(context, requestPermission: refuse);
+    expect((permissionRequests, calls.length), (2, 2));
   });
 
-  testWidgets('an unrestricted phone is never asked', (tester) async {
-    ignoring = true;
+  testWidgets(
+      'once Android stops showing its notification dialog, only the battery '
+      'dialog runs and nothing redirects to Settings', (tester) async {
+    FlutterSecureStorage.setMockInitialValues(
+        {BatteryOptimization.permissionAskedKey: '1'});
     final context = await host(tester);
-    final prompt = BatteryOptimization.maybePrompt(context);
-    await tester.pumpAndSettle();
-    await prompt;
-    expect(find.byKey(const ValueKey('battery-optimization-dialog')),
-        findsNothing);
+    await BatteryOptimization.ensureReady(context, requestPermission: grant);
+    expect(permissionRequests, 0);
+    expect(calls, ['requestIgnore']);
+  });
+
+  testWidgets('a ready phone is never asked', (tester) async {
+    state
+      ..['ignoring'] = true
+      ..['notificationsEnabled'] = true
+      ..['permissionGranted'] = true;
+    final context = await host(tester);
+    await BatteryOptimization.ensureReady(context, requestPermission: grant);
+    expect(permissionRequests, 0);
+    expect(calls, isEmpty);
   });
 }

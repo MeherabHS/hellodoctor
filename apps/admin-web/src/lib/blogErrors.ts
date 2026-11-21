@@ -1,3 +1,6 @@
+import { currentLocale, tr } from './i18n/core.ts';
+import { apiErrorMessage } from './i18n/apiErrors.ts';
+
 export const independentApprovalMessage = 'Approval required from another Admin.';
 
 /** Translate the existing API helper's errors only for CMS screens. Authorization stays server-side. */
@@ -16,14 +19,14 @@ export function blogErrorMessage(error: unknown): string {
       message = '';
     }
   }
-  if (/approval by another admin|approval required from another admin/i.test(message)) return independentApprovalMessage;
-  if (message === 'Article media storage is not configured.') {
-    return 'Cover upload deferred — awaiting Azure Blob integration. No cover was uploaded.';
-  }
-  if (status === 403) return 'You do not have permission to perform this action.';
-  if (status === 401) return 'Your session expired. Please sign in again.';
-  if (status && status >= 500) return 'The server is temporarily unavailable. Please retry.';
-  if (status && !message) return 'The request could not be completed. Please retry.';
-  if (error instanceof TypeError) return 'Unable to reach the server. Check your connection and retry.';
-  return message || 'The action could not be completed. Please retry.';
+  if (/approval by another admin|approval required from another admin/i.test(message)) return tr('lib.independentApproval');
+  if (message === 'Article media storage is not configured.') return tr('lib.coverUploadDeferred');
+  if (status === 403) return tr('errors.FORBIDDEN');
+  if (status === 401) return tr('errors.UNAUTHORIZED');
+  if (status && status >= 500) return tr('errors.SERVICE_UNAVAILABLE');
+  if (status && !message) return tr('lib.requestNotCompleted');
+  if (error instanceof TypeError) return tr('errors.network');
+  // Swahili: the error code's sentence plus the server's own detail.
+  if (envelope && currentLocale() === 'sw') return apiErrorMessage(error, tr('lib.actionNotCompleted'));
+  return message || tr('lib.actionNotCompleted');
 }

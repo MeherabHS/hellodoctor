@@ -68,3 +68,10 @@ The following items were clarified by reverse-engineering `index.html` and need 
 - **Reminders:** stay on the device only (encrypted local storage, no server copy); they do not survive a reinstall or a new phone. Accepted as is.
 - **Doctor Web earnings note:** Doctor Web's Earnings page and Statement intentionally do not render the "Total calculation is based including the platform charge 20%" note; the Doctor Web dashboard, Doctor mobile and Admin Web still do.
 - **Book Consultation wording:** "Book a Video Consultation" (slot-booked) instead of the reference's "Start Video Call" is correct.
+
+### Q-NEW-6: Product decisions recorded 2026-11-20 (product owner)
+- **Chat consultation window:** a CHAT consultation can be messaged only until its booked slot ends; afterwards the history stays readable to both parties but nobody can send, and every surface shows "Expired". A VIDEO consultation keeps its 24-hour follow-up chat. Backend `AppointmentService::chat_window_end`; existing chats moved by migration `20261222000015`. Patient copy no longer calls chat consultations "24h".
+- **In-call chat:** the Patient and Care apps have a chat button on the video call (beside mute, camera and switch camera) that opens the consultation chat over the running call, as Doctor Web already did. Peer support calls open the session chat the same way.
+- **Chat screens:** the conversation lists use the Peer Navigator list design; inside a chat, the existing message, paperclip and message-bar design stays, with an Active / Expired pill.
+- **Offline Health Records:** documents are saved on the phone AES-256-GCM encrypted (key in secure storage), opened offline, and wiped with the key at sign-out or session expiry (`core/cache/offline_documents.dart`, 60 MB cap).
+- **Incident log:** every error response, including refused 4xx requests, is recorded on the Admin incident log (category `CLIENT_REQUEST` for 4xx), grouped by route and code with ids stripped (`api/middleware/incident_reporting.rs`).

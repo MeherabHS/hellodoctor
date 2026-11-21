@@ -105,6 +105,8 @@ mod push_notification_delivery;
 mod qna_audit;
 #[path = "cases/remediation_a.rs"]
 mod remediation_a;
+#[path = "cases/security_retention.rs"]
+mod security_retention;
 
 #[path = "cases/remediation_d.rs"]
 mod remediation_d;
@@ -5461,6 +5463,48 @@ async fn test_admin_create_doctor_issues_temporary_password(pool: PgPool) {
     assert_eq!(login.status(), StatusCode::OK);
 }
 
+/// Product owner, 2026-11-21: a video consultation's chat closes 1 hour after
+/// the booked slot ends, and once completed, 1 hour after completion.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_video_chat_closes_one_hour_after_completion(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let (apt_id, _) = book_and_confirm(&app, &patient).await;
+    let modality: String =
+        sqlx::query_scalar("SELECT modality::text FROM appointments WHERE id=$1")
+            .bind(apt_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(modality, "VIDEO");
+    let (expires, slot_end): (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
+        sqlx::query_as("SELECT c.expires_at, s.end_time FROM chat_conversations c JOIN appointments a ON a.id=c.appointment_id JOIN doctor_schedule_slots s ON s.id=a.slot_id WHERE a.id=$1")
+            .bind(apt_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(expires, slot_end + chrono::Duration::hours(1));
+
+    sqlx::query("UPDATE doctor_schedule_slots SET start_time=NOW()+INTERVAL '5 minutes',end_time=NOW()+INTERVAL '15 minutes' WHERE id=(SELECT slot_id FROM appointments WHERE id=$1)")
+        .bind(apt_id).execute(&pool).await.unwrap();
+    let res = post(
+        &app,
+        &format!("/api/v1/consultations/{apt_id}/complete-no-rx"),
+        Some(&doctor),
+        &serde_json::json!({ "reason": "Follow-up advice given; no prescription needed" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let (expires, completed): (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
+        sqlx::query_as("SELECT c.expires_at, a.completed_at FROM chat_conversations c JOIN appointments a ON a.id=c.appointment_id WHERE a.id=$1")
+            .bind(apt_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(expires, completed + chrono::Duration::hours(1));
+}
+
 #[sqlx::test(migrations = "./migrations")]
 async fn test_complete_consultation_without_prescription(pool: PgPool) {
     let (app, pool) = test_app(pool).await;
@@ -6870,14 +6914,99 @@ async fn test_normal_rejections_do_not_create_system_error_logs(pool: PgPool) {
     assert_eq!(res2.status(), StatusCode::CONFLICT);
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(
         count, 0,
-        "none of 401/403/404/409 should ever create a system_error_logs row"
+        "none of 401/403/404/409 is a server failure (refused requests are          recorded separately under CLIENT_REQUEST)"
     );
+}
+
+/// Product owner, 2026-11-20: every error incident reaches the Admin incident
+/// log. Refused requests (4xx) are recorded under CLIENT_REQUEST, grouped by
+/// method + normalized route + code, with ids stripped from the route.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_refused_requests_are_recorded_on_the_incident_log(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    // 401 from auth, twice: one incident with two occurrences.
+    for _ in 0..2 {
+        assert_eq!(
+            get(&app, "/api/v1/doctor/chats", None).await.status(),
+            StatusCode::UNAUTHORIZED
+        );
+    }
+    // 404 from a handler, with ids in the path.
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let missing = format!(
+        "/api/v1/appointments/{}/documents/{}",
+        Uuid::new_v4(),
+        Uuid::new_v4()
+    );
+    let status = get(&app, &missing, Some(&patient)).await.status();
+    assert!(status.is_client_error(), "{status}");
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    type IncidentRow = (String, Option<String>, Option<i16>, i32, Option<String>);
+    let rows: Vec<IncidentRow> = sqlx::query_as(
+        "SELECT severity::text, endpoint, http_status, occurrence_count, error_code          FROM system_error_logs WHERE subsystem = 'CLIENT_REQUEST' ORDER BY endpoint",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let unauthorized = rows
+        .iter()
+        .find(|r| r.1.as_deref() == Some("GET /api/v1/doctor/chats"))
+        .expect("the 401 is recorded");
+    assert_eq!(unauthorized.0, "WARNING");
+    assert_eq!(unauthorized.2, Some(401));
+    assert_eq!(unauthorized.3, 2, "repeats group into one incident");
+    let document = rows
+        .iter()
+        .find(|r| r.1.as_deref() == Some("GET /api/v1/appointments/:id/documents/:id"))
+        .expect("the refused document link is recorded with ids stripped");
+    assert_eq!(document.2, Some(status.as_u16() as i16));
+}
+
+/// Background jobs (scheduler, email dispatch, clean-ups) only ever logged
+/// their failures. Every ERROR/WARN the backend logs now also reaches the
+/// Admin incident log, grouped per log line (product owner, 2026-11-20).
+#[sqlx::test(migrations = "./migrations")]
+async fn test_logged_background_failures_reach_the_incident_log(pool: PgPool) {
+    let (_app, pool) = test_app(pool).await;
+    for _ in 0..2 {
+        tracing::error!(
+            target: "hellodoctor_backend::services::incident_probe",
+            job = "probe",
+            "background probe job failed"
+        );
+    }
+    tracing::warn!(
+        target: "hellodoctor_backend::services::incident_probe",
+        "background probe job deferred"
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let rows: Vec<(String, String, i32, Option<String>)> = sqlx::query_as(
+        "SELECT subsystem, error_message, occurrence_count, stack_trace FROM system_error_logs          WHERE component = 'hellodoctor_backend::services::incident_probe' ORDER BY subsystem",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let error = rows
+        .iter()
+        .find(|r| r.0 == "SERVER_LOG")
+        .expect("the ERROR line is recorded");
+    assert!(
+        error.1.contains("background probe job failed"),
+        "{}",
+        error.1
+    );
+    assert_eq!(error.2, 2, "the same log line groups into one incident");
+    assert!(error.3.as_deref().unwrap_or("").contains("api_tests.rs"));
+    assert!(rows.iter().any(|r| r.0 == "SERVER_LOG_WARNING"));
 }
 
 /// A genuine handler panic — not an `AppError`, a real unwind — must still
@@ -8011,10 +8140,12 @@ async fn test_client_incident_auth_and_server_controlled_fields(pool: PgPool) {
             StatusCode::UNPROCESSABLE_ENTITY
         );
     }
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(count, 0);
     assert_eq!(
         post_idem(
@@ -8069,10 +8200,12 @@ async fn test_client_incident_concurrent_reports_group_atomically(pool: PgPool) 
         json_body(a).await["data"]["incident_id"],
         json_body(b).await["data"]["incident_id"]
     );
-    let count: i32 = sqlx::query_scalar("SELECT occurrence_count FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i32 = sqlx::query_scalar(
+        "SELECT occurrence_count FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(count, 2);
 }
 
@@ -8100,10 +8233,12 @@ async fn test_client_incident_bounds_and_context_privacy(pool: PgPool) {
             .status(),
         StatusCode::ACCEPTED
     );
-    let context: Value = sqlx::query_scalar("SELECT client_context FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let context: Value = sqlx::query_scalar(
+        "SELECT client_context FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(context["screen"], "Application");
     assert_eq!(context["operation"], "unhandled_async");
     assert_eq!(context["error_type"], "Exception");
@@ -8137,7 +8272,7 @@ async fn test_client_incident_dedup_keeps_doctors_and_builds_separate(pool: PgPo
         StatusCode::ACCEPTED
     );
     let (count, total): (i64, i64) =
-        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs")
+        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')")
             .fetch_one(&pool)
             .await
             .unwrap();
@@ -8173,7 +8308,7 @@ async fn test_client_incident_rate_limit(pool: PgPool) {
         StatusCode::TOO_MANY_REQUESTS
     );
     let (count, total): (i64, i64) =
-        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs")
+        sqlx::query_as("SELECT count(*),sum(occurrence_count)::bigint FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')")
             .fetch_one(&pool)
             .await
             .unwrap();
@@ -8196,10 +8331,12 @@ async fn test_client_incident_storage_failure_does_not_recursively_report(pool: 
         .status(),
         StatusCode::SERVICE_UNAVAILABLE
     );
-    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(count, 0);
     assert_eq!(
         get(&app, "/api/v1/doctor/profile", Some(&doctor))
@@ -13251,10 +13388,12 @@ async fn test_admin_system_error_simulation_environment_abac_and_persistence(poo
         post(&app, uri, Some(&platform), &unknown).await.status(),
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(
         count, 0,
         "denied/invalid simulations must not persist incidents"
@@ -13311,10 +13450,12 @@ async fn test_admin_system_error_simulation_environment_abac_and_persistence(poo
         .status(),
         StatusCode::CREATED
     );
-    let before: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let before: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     let mut config = (*state.config).clone();
     config.environment = "production".into();
     config.dev_simulation_enabled = false;
@@ -13329,10 +13470,12 @@ async fn test_admin_system_error_simulation_environment_abac_and_persistence(poo
             StatusCode::FORBIDDEN
         );
     }
-    let after: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM system_error_logs")
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+    let after: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM system_error_logs WHERE subsystem NOT IN ('CLIENT_REQUEST', 'SERVER_LOG_WARNING')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(
         after, before,
         "production simulation must have no persistence side effect"
@@ -20370,4 +20513,155 @@ async fn test_data_rights_unknown_patient_is_not_found(pool: PgPool) {
     )
     .await;
     assert_eq!(res.status(), StatusCode::NOT_FOUND);
+}
+
+/// Live chat nudge (2026-11-21): a committed chat message NOTIFYs `chat_live`
+/// for the recipient only, with identifiers and no message text.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_chat_message_emits_contentless_live_nudge_for_recipient(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+    let (conv_id, doctor_user): (Uuid, Uuid) = sqlx::query_as(
+        "SELECT c.id, d.user_id FROM chat_conversations c \
+         JOIN appointments a ON a.id = c.appointment_id \
+         JOIN doctor_profiles d ON d.id = a.doctor_id WHERE c.appointment_id = $1",
+    )
+    .bind(apt_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let mut listener = sqlx::postgres::PgListener::connect_with(&pool)
+        .await
+        .unwrap();
+    listener
+        .listen(hellodoctor_backend::services::chat_live::CHANNEL)
+        .await
+        .unwrap();
+
+    let res = post(
+        &app,
+        &format!("/api/v1/chat/{conv_id}/messages"),
+        Some(&patient_token),
+        &serde_json::json!({ "content": "secret symptom text" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let notification = tokio::time::timeout(std::time::Duration::from_secs(5), listener.recv())
+        .await
+        .expect("a chat_live NOTIFY after the message commits")
+        .unwrap();
+    assert!(!notification.payload().contains("secret"));
+    let signal =
+        hellodoctor_backend::services::chat_live::parse_payload(notification.payload()).unwrap();
+    assert_eq!(
+        signal,
+        hellodoctor_backend::services::chat_live::Signal::Chat {
+            user_id: doctor_user,
+            conversation_id: conv_id,
+            kind: "CHAT".into(),
+        }
+    );
+}
+
+/// The live socket sits behind the normal auth middleware.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_chat_live_socket_requires_authentication(pool: PgPool) {
+    let (app, _pool) = test_app(pool).await;
+    let anonymous = get(&app, "/api/v1/chat/live", None).await;
+    assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+    // Authenticated but not a WebSocket handshake: past auth, refused by the upgrade.
+    let token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let plain = get(&app, "/api/v1/chat/live", Some(&token)).await;
+    assert!(
+        plain.status().is_client_error() && plain.status() != StatusCode::UNAUTHORIZED,
+        "got {}",
+        plain.status()
+    );
+}
+
+/// End to end over a real socket: the recipient's live connection receives
+/// a nudge naming the conversation (no text) when the other party writes.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_chat_live_socket_delivers_nudge_end_to_end(pool: PgPool) {
+    use futures_util::StreamExt;
+    use hellodoctor_backend::services::chat_live::{parse_payload, ChatLiveHub, CHANNEL};
+    use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message};
+
+    let (app, pool) = test_app(pool).await;
+    let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+    let (conv_id, doctor_user): (Uuid, Uuid) = sqlx::query_as(
+        "SELECT c.id, d.user_id FROM chat_conversations c \
+         JOIN appointments a ON a.id = c.appointment_id \
+         JOIN doctor_profiles d ON d.id = a.doctor_id WHERE c.appointment_id = $1",
+    )
+    .bind(apt_id)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // What `chat_live::start` does in the real server, on the test database.
+    let mut listener = sqlx::postgres::PgListener::connect_with(&pool)
+        .await
+        .unwrap();
+    listener.listen(CHANNEL).await.unwrap();
+    tokio::spawn(async move {
+        while let Ok(n) = listener.recv().await {
+            if let Some(signal) = parse_payload(n.payload()) {
+                ChatLiveHub::global().publish(signal);
+            }
+        }
+    });
+
+    let server = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = server.local_addr().unwrap();
+    let router = app.clone();
+    tokio::spawn(async move {
+        axum::serve(
+            server,
+            router.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+
+    let doctor_token = make_token(doctor_user, "DOCTOR");
+    let mut request = format!("ws://{addr}/api/v1/chat/live")
+        .into_client_request()
+        .unwrap();
+    request.headers_mut().insert(
+        "Authorization",
+        format!("Bearer {doctor_token}").parse().unwrap(),
+    );
+    let (mut socket, _) = tokio_tungstenite::connect_async(request)
+        .await
+        .expect("authenticated upgrade");
+    let ready = socket.next().await.unwrap().unwrap();
+    assert_eq!(ready, Message::Text(r#"{"type":"ready"}"#.into()));
+
+    let res = post(
+        &app,
+        &format!("/api/v1/chat/{conv_id}/messages"),
+        Some(&patient_token),
+        &serde_json::json!({ "content": "secret symptom text" }),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::CREATED);
+
+    let frame = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match socket.next().await.unwrap().unwrap() {
+                Message::Text(text) => return text,
+                _ => continue,
+            }
+        }
+    })
+    .await
+    .expect("nudge on the doctor's socket");
+    assert!(frame.contains(&conv_id.to_string()), "{frame}");
+    assert!(frame.contains(r#""type":"chat""#), "{frame}");
+    assert!(!frame.contains("secret"), "{frame}");
 }

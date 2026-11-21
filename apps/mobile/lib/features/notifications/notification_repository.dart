@@ -206,6 +206,21 @@ class NotificationRepository {
     }
   }
 
+  /// Saves only the language, keeping every other preference as it is.
+  Future<void> syncLanguage(String language) async {
+    final current = await getPreferences();
+    await updatePreferences(
+      operationalEnabled: current.operationalEnabled,
+      engagementEnabled: current.engagementEnabled,
+      quietHoursEnabled: current.quietHoursEnabled,
+      quietHoursStartLocal: current.quietHoursStartLocal,
+      quietHoursEndLocal: current.quietHoursEndLocal,
+      greetingNotificationsEnabled: current.greetingNotificationsEnabled,
+      religiousGreetingsEnabled: current.religiousGreetingsEnabled,
+      language: language,
+    );
+  }
+
   static const _deviceIdKey = 'notification_device_placeholder_id';
 
   Future<String> deviceId() async {

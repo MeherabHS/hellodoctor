@@ -121,6 +121,14 @@ pub fn init_tracing() {
             .unwrap_or_else(|_| "hellodoctor_backend=info,tower_http=warn,axum=warn".into());
         tracing_subscriber::registry()
             .with(tracing_subscriber::fmt::layer().with_filter(env_filter))
+            // Every WARN/ERROR the backend logs also reaches the Admin
+            // incident log (crate::system_error::IncidentLogLayer).
+            .with(
+                crate::system_error::IncidentLogLayer.with_filter(
+                    tracing_subscriber::filter::Targets::new()
+                        .with_target("hellodoctor_backend", tracing::Level::WARN),
+                ),
+            )
             .with(
                 SqlxAcquireMetricsLayer.with_filter(
                     tracing_subscriber::filter::Targets::new()

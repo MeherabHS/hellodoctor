@@ -129,6 +129,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // same pattern as `system_error::init` above, no new broker/role.
     services::notification_scheduler::start(state.clone());
 
+    // Live chat nudges: forwards `chat_live` NOTIFYs to connected apps.
+    services::chat_live::start(state.clone());
+
     let app = create_router(state);
 
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;

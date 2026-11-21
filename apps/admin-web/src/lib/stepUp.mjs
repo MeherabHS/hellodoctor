@@ -3,7 +3,7 @@
 // doctor or peer, money movements, account erasure, identity traces and
 // revoking Admin invitations answer 403 `REAUTH_REQUIRED` until the Admin
 // confirms their password; one confirmation unlocks this sign-in session for
-// ten minutes.
+// two minutes (product owner, 2026-11-21), shown as a countdown chip.
 //
 // `request()` in api.ts detects that answer, asks the mounted
 // <StepUpDialog/> for the password and retries the action once.
@@ -52,4 +52,36 @@ export function isReauthRequired(status, body) {
   } catch {
     return false;
   }
+}
+
+/** @type {number | null} */
+let expiresAt = null;
+/** @type {((expiresAt: number | null) => void)[]} */
+let expiryListeners = [];
+
+/**
+ * Starts the countdown after a confirmation the backend accepted.
+ * @param {number} seconds how long the confirmation lasts
+ */
+export function setStepUpExpiry(seconds) {
+  expiresAt = seconds > 0 ? Date.now() + seconds * 1000 : null;
+  for (const listener of expiryListeners) listener(expiresAt);
+}
+
+/** The backend asked again: whatever the countdown said, it has lapsed. */
+export function clearStepUpExpiry() {
+  if (expiresAt === null) return;
+  expiresAt = null;
+  for (const listener of expiryListeners) listener(expiresAt);
+}
+
+/**
+ * The countdown chip subscribes here (epoch ms, or null when locked).
+ * @param {(expiresAt: number | null) => void} listener
+ * @returns {() => void}
+ */
+export function subscribeStepUpExpiry(listener) {
+  expiryListeners.push(listener);
+  listener(expiresAt);
+  return () => { expiryListeners = expiryListeners.filter((l) => l !== listener); };
 }
