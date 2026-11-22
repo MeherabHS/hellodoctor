@@ -830,3 +830,8 @@ button.admin-user-pill:focus-visible { outline: 2px solid var(--afya-green); out
 .afya-profile-error { color: var(--afya-danger-fg); font-size: 13px; font-weight: 600; margin: 10px 0 0; }
 .afya-profile-ok { display: inline-flex; align-items: center; gap: 6px; color: var(--afya-green); font-size: 13px; font-weight: 700; }
 .afya-profile-submit { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin-top: 14px; }
+.afya-trace-rule { margin-top: 8px; }
+.afya-trace-rule summary { cursor: pointer; font-weight: 700; color: var(--afya-green); font-size: 13px; }
+.afya-trace-rule dl { display: grid; gap: 10px; margin: 10px 0 0; }
+.afya-trace-rule dt { font-weight: 700; color: var(--afya-ink); font-size: 13px; }
+.afya-trace-rule dd { margin: 2px 0 0; color: var(--afya-ink-2); font-size: 13px; line-height: 1.5; }

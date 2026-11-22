@@ -1,5 +1,5 @@
 'use client';
-import { tr } from '@/lib/i18n';
+import { tr, type MessageKey } from '@/lib/i18n';
 import {useEffect,useState} from 'react';
 import {Activity,MessageSquare,Users,Video} from 'lucide-react';
 import {ConsultationTimeline} from './ConsultationTimeline';
@@ -24,6 +24,17 @@ export function timeLeft(until:string,now:number):string{
   return d?`${d} d ${h} h`:h?`${h} h ${m} min`:`${m} min`;
 }
 export const nairobiDate=(value:string)=>new Date(value).toLocaleString('en-KE',{timeZone:'Africa/Nairobi',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+
+/** The 5-day consultation trace rule, explained in full (collapsible so the table stays in view). */
+function TraceRuleNote({days}:{days:number}){
+  const items:[MessageKey,MessageKey][]=[['ops.whyWhatLabel','ops.whyWhat'],['ops.whyKeepLabel','ops.whyKeep'],['ops.whyDeleteLabel','ops.whyDelete'],['ops.whyNeverLabel','ops.whyNever'],['ops.whyHoldLabel','ops.whyHold'],['ops.whyActionLabel','ops.whyAction']];
+  return <Notice tone="info" title={tr('ops.whyTitle',{days})}>
+    <p style={{margin:'4px 0 0'}}>{tr('ops.whyIntro',{days})}</p>
+    <details className="afya-trace-rule"><summary>{tr('ops.whyMore')}</summary>
+      <dl>{items.map(([label,body])=><div key={label}><dt>{tr(label,{days})}</dt><dd>{tr(body,{days})}</dd></div>)}</dl>
+    </details>
+  </Notice>;
+}
 
 /** The trace retention cell: countdown, held by a grievance, or already deleted. */
 export function TraceTimer({stream,now}:{stream:Stream;now:number}){
@@ -57,7 +68,7 @@ export function CommandCenter({telemetry,overview,needsReviewOnly,setNeedsReview
     <Card title={tr('tpl.liveSessions', { count: telemetry?.active_streams.length??0 })} subtitle={tr('ui4.agoraSessionsInProgressAndSessions')}
       actions={<label className="afya-check"><input type="checkbox" checked={needsReviewOnly} onChange={e=>setNeedsReviewOnly(e.target.checked)}/>{tr('mix.needsReviewOnly', { count: reviewCount })}</label>}>
       <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:16}}>
-        <Notice tone="info" title={tr('ops.whyTitle',{days:retentionDays})}>{tr('ops.whyBody',{days:retentionDays})}</Notice>
+        <TraceRuleNote days={retentionDays}/>
         {anyClosed&&<Notice tone="warn" title={tr('ops.closedTitle')}>{tr('ops.closedBody')}</Notice>}
       </div>
       {!streams.length?<EmptyState title={needsReviewOnly?tr('ui2.noSessionsNeedReview'):tr('ui2.noConsultationsInProgress')}>{tr('ui.liveSessionsAppearHereAsSoon')}</EmptyState>:
