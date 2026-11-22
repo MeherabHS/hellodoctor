@@ -18,6 +18,7 @@ CONTAINER="${PG_CONTAINER:-hellodoctor-vm-postgres-1}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/hellodoctor}"
 BACKUP_KEEP="${BACKUP_KEEP:-14}"
 BACKUP_MIN_FREE_MB="${BACKUP_MIN_FREE_MB:-2048}"
+BACKUP_WAIT_SECONDS="${BACKUP_WAIT_SECONDS:-300}"
 PREFIX="hellodoctor"
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -40,8 +41,16 @@ free_mb="$(df -Pm "$BACKUP_DIR" | awk 'NR==2 {print $4}')"
 [ "${free_mb:-0}" -ge "$BACKUP_MIN_FREE_MB" ] \
   || fail "only ${free_mb} MB free in $BACKUP_DIR, need at least ${BACKUP_MIN_FREE_MB} MB"
 
-docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -qx true \
-  || fail "container $CONTAINER is not running"
+# After a reboot the timer's catch-up run can fire before Docker has started
+# the database, so wait (up to BACKUP_WAIT_SECONDS) for it to accept
+# connections instead of skipping the night.
+waited=0
+until docker exec "$CONTAINER" sh -c 'pg_isready -q -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; do
+  [ "$waited" -lt "$BACKUP_WAIT_SECONDS" ] || fail "database in $CONTAINER not ready after ${BACKUP_WAIT_SECONDS}s"
+  sleep 10
+  waited=$((waited + 10))
+done
+[ "$waited" -eq 0 ] || log "database ready after ${waited}s"
 
 stamp="$(TZ=Africa/Nairobi date +%Y-%m-%d_%H%M)"
 final="$BACKUP_DIR/${PREFIX}-${stamp}.dump"
@@ -49,7 +58,9 @@ partial="$BACKUP_DIR/.${PREFIX}-${stamp}.dump.partial"
 trap 'rm -f "$partial"' EXIT
 
 log "dumping $CONTAINER to $final"
-docker exec "$CONTAINER" sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --compress=9' > "$partial" \
+# pg_dump runs inside the database container, outside this service's own
+# limits, so lower its CPU and disk priority there: live traffic always wins.
+docker exec "$CONTAINER" sh -c 'exec nice -n 10 ionice -c 3 pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --compress=9' > "$partial" \
   || fail "pg_dump exited with an error"
 
 # A dump only counts once pg_restore can read its table of contents.

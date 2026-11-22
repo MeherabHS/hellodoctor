@@ -10,6 +10,8 @@ disk use stays bounded.
 | File | `/var/backups/hellodoctor/hellodoctor-YYYY-MM-DD_HHMM.dump` plus `.sha256` |
 | Format | `pg_dump --format=custom --compress=9` (restore all or one table with `pg_restore`) |
 | Kept | newest 14 (`BACKUP_KEEP`) |
+| Resources | nothing between runs (a oneshot service started by a systemd timer); a few seconds a night at low CPU and disk priority (`nice`, `ionice` idle class) |
+| After downtime | runs once when the VM is back, waiting up to 5 minutes for the database to start (`BACKUP_WAIT_SECONDS`) |
 | Guards | readable by root only; refuses to run with under 2 GB free; verified with `pg_restore --list` before it counts; no overlapping runs; failed runs leave no partial file |
 
 This protects against a damaged database, a bad migration or a mistaken delete. It does
