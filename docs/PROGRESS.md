@@ -94,6 +94,9 @@ Open, **PR #54** (`feat/admin-profile`):
   `hellodoctor-vm-proxy-1` restarted (`admin off` disables live reload).
 - Agora presence callbacks reach production (confirmed on the VM 2026-11-22), so
   empty-room recovery works there.
+- Incident resolves were always recorded (4 on 2026-11-22, confirmed on the VM); the Activity
+  Log showed them as "System error resolved". PR #54 now labels them as incidents and lets a
+  search for "incident" find them.
 - PR #54: 11 checks pass at the time of writing; the backend suite is still running. After
   merging it, publish new images.
 - The Play Store AAB release workflow (`.github/workflows/play-release-aab.yml`) and
@@ -103,19 +106,16 @@ Open, **PR #54** (`feat/admin-profile`):
 
 1. **Merge PR #54** once CI is green, publish images, and roll out to the VM together with
    the Caddyfile change.
-2. **Activity Log:** an Admin reported resolved incidents not appearing. The audit row is
-   written (`SYSTEM_ERROR_RESOLVED`); check the VM data to see whether automatic view entries
-   push it off the first page.
-3. **External-style penetration test** against the deployed baseline (OWASP ASVS L2 / API
+2. **External-style penetration test** against the deployed baseline (OWASP ASVS L2 / API
    Top 10, cross-role authorization, token tampering, upload attacks).
-4. **Google Play release** from the Circle Technology Ltd account: commit the AAB workflow,
+3. **Google Play release** from the Circle Technology Ltd account: commit the AAB workflow,
    privacy policy, health-app declaration, data-safety form; internal testing track first,
    then staged rollouts.
-5. **Real-device pilot** with a small group of doctors, peers and patients.
-6. Small items: a peer notification opens the inbox rather than the chat; peers have no legal
+4. **Real-device pilot** with a small group of doctors, peers and patients.
+5. Small items: a peer notification opens the inbox rather than the chat; peers have no legal
    documents of their own yet; sessions that never close (nobody joined, never completed)
    stay open in the database and are only hidden after 5 days.
-7. **Rotate secrets** that were on the workstation hit by the 2026-11-22 malware incident.
+6. **Rotate secrets** that were on the workstation hit by the 2026-11-22 malware incident.
 
 ### Open business decisions (not blocking)
 
