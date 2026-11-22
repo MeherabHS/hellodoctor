@@ -245,7 +245,7 @@ Step-by-step procedures: [Azure VM operator runbook](docs/deployment/AZURE_VM_OP
 | Video join refused | Outside the consultation's join window | Joining opens shortly before the start time; check server time, not device time |
 | No push notification | FCM not configured, permission denied, battery optimisation or app force-stopped | [FCM setup](docs/FCM_SETUP.md), "Delivery reliability"; the in-app inbox still has every notification |
 | Reminder late or silent | Exact-alarm permission off (Android 12+) | Settings, Apps, Special access, Alarms and reminders |
-| Upload rejected | Over 20 images per consultation, or a file over 10 MB before compression (images are then compressed to 600 KB each) | Business rule; see [`CLAUDE.md`](CLAUDE.md) rule 3 |
+| Upload rejected | Over 20 images per consultation, or a file over 10 MB before compression (images are then compressed to 600 KB each) | Business rule; see [`docs/SYSTEM_POLICY.md`](docs/SYSTEM_POLICY.md) §3.3 |
 | App cannot reach the API | Wrong `API_BASE_URL` or plain HTTP in a release build | Rebuild with the correct `--dart-define`; HTTPS is required |
 | Backend tests fail only in parallel | Shared Redis state | Re-run with `--test-threads=1` |
 
@@ -300,7 +300,7 @@ Admin and Doctor Web boards: [`docs/design/admin`](docs/design/admin), [`docs/de
 - Consultations can complete without a prescription (with Rx, no Rx, referred, escalated).
 - Payments are currently deferred; bookings confirm without a payment gateway.
 
-The full rules are in [`CLAUDE.md`](CLAUDE.md); the current security posture is in
+The full rules are in [`docs/SYSTEM_POLICY.md`](docs/SYSTEM_POLICY.md); the current security posture is in
 [`docs/assurance/SECURITY_STATUS.md`](docs/assurance/SECURITY_STATUS.md). Report suspected
 vulnerabilities privately to the repository owner, not in a public issue.
 

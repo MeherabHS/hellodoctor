@@ -91,3 +91,7 @@ docs/assurance/evidence/**/*.dump
 /COT.txt.txt
 /fix.py
 /update_docs*.py
+
+# Local AI-assistant instructions stay on each workstation; the project's rules live in
+# docs/SYSTEM_POLICY.md.
+CLAUDE.md
