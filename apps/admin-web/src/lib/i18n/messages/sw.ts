@@ -1518,6 +1518,11 @@ export const sw: Messages = {
     ofRegistered: "kati ya {count} waliosajiliwa",
     newCount: "{count} mapya",
   },
+  activity: {
+    incidentResolved: "Alitia alama tukio kuwa limetatuliwa",
+    incidentInvestigating: "Alitia alama tukio kuwa linachunguzwa",
+    incident: "Hitilafu ya programu / tukio",
+  },
   peerStats: {
     label: "Matokeo ya maombi",
     received: "Maombi yaliyopokelewa",

@@ -139,7 +139,8 @@ pub async fn list_activity(
          FROM audit_events \
          WHERE ($1::timestamptz IS NULL OR created_at < $1) \
            AND (cardinality($2::text[]) = 0 OR resource_type = ANY($2)) \
-           AND ($3 = '%%' OR action ILIKE $3) \
+           AND ($3 = '%%' OR action ILIKE $3 \
+                OR ($6 AND resource_type IN ('SYSTEM_ERROR', 'SYSTEM_ERROR_LOG'))) \
            AND ($4::uuid IS NULL OR actor_id = $4) \
          ORDER BY created_at DESC, id DESC LIMIT $5",
     )
@@ -152,6 +153,9 @@ pub async fn list_activity(
         q.actor_id
     })
     .bind(limit)
+    // The Admin screens call system errors "incidents"; searching for that
+    // word finds their resolve/acknowledge entries too.
+    .bind(search.to_ascii_lowercase().contains("incident"))
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;

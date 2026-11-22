@@ -7210,6 +7210,26 @@ async fn test_system_errors_admin_api_access_control_and_lifecycle(pool: PgPool)
     .await;
     assert_eq!(res.status(), StatusCode::OK);
 
+    // The resolve is in the Activity Log, and searching for "incident" (the
+    // word the Admin screens use) finds it.
+    let res = get(
+        &app,
+        "/api/v1/admin/activity?search=incident",
+        Some(&admin_token),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let activity = json_body(res).await;
+    assert!(
+        activity["data"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["action"] == "SYSTEM_ERROR_RESOLVED"
+                && i["resource_id"] == error_id.to_string()),
+        "{activity}"
+    );
+
     let (status, note): (String, Option<String>) =
         sqlx::query_as("SELECT status, resolution_note FROM system_error_logs WHERE id = $1")
             .bind(error_id)

@@ -1519,6 +1519,11 @@ export const en = {
     ofRegistered: "of {count} registered",
     newCount: "{count} new",
   },
+  activity: {
+    incidentResolved: "Marked an incident resolved",
+    incidentInvestigating: "Marked an incident as investigating",
+    incident: "App error / incident",
+  },
   peerStats: {
     label: "Request outcomes",
     received: "Requests received",
