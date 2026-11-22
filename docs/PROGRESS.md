@@ -1,81 +1,121 @@
 # AfyaMkononi (HelloDoctor) — Progress
 
-## Current status — 2026-11-20
+## Current status — 2026-11-22
 
-This section replaces the milestone table further down (dated 2026-10-04), which still
-marked M4–M18 as pending long after they shipped. Everything below the
-"Engineering Progress & Milestone Tracker" heading is kept as history.
+This section replaces the 2026-11-20 status and the milestone table further down (dated
+2026-10-04). Everything below the "Engineering Progress & Milestone Tracker" heading is kept
+as history.
 
-**Summary.** The product is built. All five surfaces work end to end against the Rust
-backend, CI is green on `main` (`0f4a32c`, PR #48), ARM64 images are published to GHCR and
-internal-test APKs build from `main`. The system is running in production on the ARM64 VM.
-What remains is small changes, an external penetration test, the Google Play release and a
-wider real-device pilot.
+**Summary.** The product is built and running in production on the ARM64 VM. `main` is at
+`bdc020b` (PR #53) with CI green, including the Security Scan, which runs again since PR #51.
+ARM64 images from that code are published to GHCR. PR #54 (Admin profile, the 5-day
+consultation and peer tracking dashboard) is open. What remains is rolling out to the VM, the
+external penetration test, the Google Play release and a wider real-device pilot.
 
 | Surface | Path | State |
 |---|---|---|
-| Rust backend (Axum, SQLx, PostgreSQL 16, Redis) | `services/backend` | Complete for the current scope; 132 reversible migrations; full suite runs in CI on every PR |
-| Patient app (Flutter) | `apps/mobile_patient` | Complete; matches the 11-panel reference |
-| Care app — Doctor and Peer Navigator (Flutter) | `apps/mobile` | Complete; Doctor matches the 11/14-panel reference; Peer Navigator role added 2026-11-15 |
+| Rust backend (Axum, SQLx, PostgreSQL 16, Redis) | `services/backend` | Complete for the current scope; 137 reversible migrations on `main` (newest `20261222000019`), 2 more in PR #54; full suite runs in CI on every PR |
+| Patient app (Flutter) | `apps/mobile_patient` | Complete; matches the 11-panel reference; onboarding and offline Health Records added 2026-11-21 |
+| Care app — Doctor and Peer Navigator (Flutter) | `apps/mobile` | Complete; Doctor matches the 11/14-panel reference; Peer Navigator role since 2026-11-15; in-call chat 2026-11-21 |
 | Doctor Web (Next.js) | `apps/doctor-web` | Complete; redesigned 2026-11-14 |
-| Admin Web (Next.js) | `apps/admin-web` | Complete; redesigned 2026-11-13; Articles, Videos and Quizzes split 2026-11-16 |
+| Admin Web (Next.js) | `apps/admin-web` | Complete; redesigned 2026-11-13; profile page and 5-day tracking dashboard in PR #54 |
 | Public website (afyamkononi.app) | `apps/afyamkononi-website` | Built; privacy, terms and Peer Navigator terms pages |
 
 ### Roadmap milestones
 
 | Milestone | Status | Notes |
 |---|---|---|
-| M0–M3 Architecture, security model, database v2, auth | **Complete** | Ed25519 JWT, Argon2id, five capability roles, FORCE RLS |
+| M0–M3 Architecture, security model, database v2, auth | **Complete** | Ed25519 JWT with key rotation (`kid`), Argon2id, five capability roles, FORCE RLS |
 | M4 Agora setup | **Complete** | Agora RTC in both Flutter apps and Doctor Web; server-minted tokens, join window enforced server-side |
 | M5 Specialist discovery (no star ratings) | **Complete** | KMPDC registration, experience and affiliations only |
 | M6 Patient Home | **Complete** | Per the 2026-11-12/13/17 decisions: no emergency banner or search on Home; Upcoming Consultation card from 15 minutes before start |
 | M7 Atomic booking and payment hold | **Complete, payments deferred** | Row-locked booking; production runs `FINANCIAL_MODULE_MODE=deferred` (no gateway) |
-| M8 Prescription uploads | **Complete** | 1–20 images per consultation, 600 KB each (was 40 KB until 2026-11-18); phones resize to 2000 px |
+| M8 Prescription uploads | **Complete** | 1–20 images per consultation, 600 KB each; phones resize to 2000 px |
 | M9 Waiting room | **Complete** | |
-| M10 Video and telemetry | **Complete** | |
-| M11 Clinical chat | **Complete** | HTTP polling with adaptive intervals and read receipts (2026-11-18) |
-| M12 Prescription photos and health vault | **Complete** | Encrypted object storage; integrity hashes |
+| M10 Video and telemetry | **Complete** | In-call chat added 2026-11-21 |
+| M11 Clinical chat | **Complete** | HTTP polling with adaptive intervals and read receipts |
+| M12 Prescription photos and health vault | **Complete** | Encrypted object storage; integrity hashes; offline Health Records |
 | M13 Doctor wallet and 20% settlement | **Complete, dormant** | Built; inactive while finance is deferred |
-| M14 Grievance redressal | **Complete** | |
-| M15 Admin consoles and dossiers | **Complete** | Patient medical conditions are never shown in Admin |
+| M14 Grievance redressal | **Complete** | Grievance filing places a preservation hold on the 5-day consultation trace |
+| M15 Admin consoles and dossiers | **Complete** | Patient medical conditions are never shown in Admin; peer topics and chat content never reach Admin |
 | M16 English and Swahili | **Complete** | Kenya only |
 | M17 Offline guards | **Complete** | |
-| M-SECURITY | **Core complete; external pentest not yet run** | See [assurance/SECURITY_STATUS.md](assurance/SECURITY_STATUS.md): 3 fixed, 5 partial, 3 open, 2 deferred; none critical |
+| M-SECURITY | **Core complete; external pentest not yet run** | Security Scan (cargo-audit, OSV, secret scanning) green again since PR #51; Admin password step-up and JWT key rotation shipped; see [assurance/SECURITY_STATUS.md](assurance/SECURITY_STATUS.md) |
 | M18 Production sign-off | **Deployed; sign-off open** | Running on the ARM64 VM; external pentest and Play release still to do |
 
 Features added beyond the original roadmap: Peer Navigator (patients book peers; chat and
 calls; peer approval in Admin), FCM push notifications with forced sounds, booking emails
 for every role and a nightly error digest, Admin CMS (articles, videos, quizzes),
-on-device patient reminders, and saved profile photos everywhere (2026-11-19, PR #48:
-own photo in the Doctor and Peer headers, the other person's photo in Doctor↔Patient and
-Peer↔Patient chats and on incoming peer requests; peers can now set a photo).
+on-device patient reminders, saved profile photos everywhere (PR #48), onboarding, in-call
+chat and offline Health Records (PR #50).
 
-### Delivery state on 2026-11-20
+### Changes since 2026-11-20
 
-- `main` at `0f4a32c`; CI green (backend suite, both Flutter apps, both web apps).
-- ARM64 GHCR images published from `0f4a32c` (run 44557139554): backend, admin-web,
-  doctor-web. Roll these out on the VM for the photo fix; migration `20261222000014`
-  (counterpart photos) applies when the new backend starts.
-- Internal-test APKs (Patient and Care) built from `0f4a32c` (run 44558068186).
+Merged to `main`:
+- **PR #49** — progress and checkpoint docs.
+- **PR #50** — onboarding, in-call chat, offline Health Records, incident logging,
+  notification delivery; JWT key rotation, Admin password step-up and security-data
+  retention purge.
+- **PR #51** — the Security Scan workflow starts again (OSV workflow permissions).
+- **PR #52** — loose design exports, PDF text dumps and scratch scripts removed from the
+  repository root.
+- **PR #53** — the proxy answers non-API paths on the API host (`/`, scanner probes such as
+  `/.env`) with a bare 404, so internet noise never reaches the backend or the Admin incident
+  log; `url` 2.5.9 for RUSTSEC-2026-0592.
+
+Open, **PR #54** (`feat/admin-profile`):
+- **Admin profile:** the top-bar account pill opens My profile: email, masked phone and
+  Admin-since date (read-only), profile photo (upload, replace, remove) and password change.
+  New `admin_profile_pictures` table with own-row RLS (migration `20261222000020`),
+  `GET /admin/me`, `GET/POST/DELETE /admin/me/photo`.
+- **Wrong current password no longer signs users out:** `POST /auth/change-password` returns
+  403 instead of 401; both web BFFs treat a 401 as an expired session.
+- **Dashboard fixes:** "Consultations completed today" counts every consultation completed
+  on the Nairobi day (it used to read 0); a room past its join window with nobody in it shows
+  as "Room closed" and is no longer counted as live.
+- **5-day consultation tracking:** the main dashboard lists every consultation that started
+  and whose consultation trace still exists, plus anything awaiting a recovery decision. Each
+  row shows a "Trace kept" countdown and drops off when the trace is deleted; a grievance hold
+  keeps it. A collapsible note explains the 5-day trace rule (what is recorded, why 5 days,
+  why it is deleted, what is never deleted, grievance holds). Each consultation's Timeline
+  shows the same trace as the grievance investigation, and opening it is audited.
+- **Peer tracking:** peer chat and call sessions are tracked on the same dashboard with a
+  Doctor / Peer filter, a Chat / Call filter, an "Ongoing peer sessions" tile and a
+  per-session timeline (who acted and when). New SECURITY DEFINER functions (migration
+  `20261222000021`) return times, statuses and counts only, never the topic or message text.
+  A peer's record shows request outcomes: received, accepted, declined, cancelled, completed.
+
+### Delivery state on 2026-11-22
+
+- `main` at `bdc020b`; CI green, Security Scan green.
+- ARM64 GHCR images (backend, admin-web, doctor-web) published from `382c97e`, identical code
+  to `bdc020b` (run 45040101534). Not yet rolled out on the VM.
+- The proxy change from PR #53 needs the VM's Caddyfile updated and
+  `hellodoctor-vm-proxy-1` restarted (`admin off` disables live reload).
+- Agora presence callbacks reach production (confirmed on the VM 2026-11-22), so
+  empty-room recovery works there.
+- Incident resolves were always recorded (4 on 2026-11-22, confirmed on the VM); the Activity
+  Log showed them as "System error resolved". PR #54 now labels them as incidents and lets a
+  search for "incident" find them.
+- PR #54: 11 checks pass at the time of writing; the backend suite is still running. After
+  merging it, publish new images.
 - The Play Store AAB release workflow (`.github/workflows/play-release-aab.yml`) and
-  release-signing changes are drafted on a workstation but not committed.
+  release-signing changes are on a workstation, not committed.
 
 ### What remains, in order
 
-1. **Keep the VM current:** roll out the `0f4a32c` images. The system already runs in
-   production on the ARM64 VM.
-2. **Fix the Security Scan CI workflow**, which has failed to start on every run since
-   2026-11-11 (cargo-audit, OSV and secret scanning are not running).
-3. **External-style penetration test** against the deployed baseline (OWASP ASVS L2 / API
-   Top 10, cross-role authorization, token tampering, upload attacks). Close beforehand:
-   JWT key rotation (`kid`), a route inventory check, and password step-up for finance and
-   doctor-verification actions.
-4. **Google Play release** from the Circle Technology Ltd account: commit the AAB workflow,
+1. **Merge PR #54** once CI is green, publish images, and roll out to the VM together with
+   the Caddyfile change.
+2. **External-style penetration test** against the deployed baseline (OWASP ASVS L2 / API
+   Top 10, cross-role authorization, token tampering, upload attacks).
+3. **Google Play release** from the Circle Technology Ltd account: commit the AAB workflow,
    privacy policy, health-app declaration, data-safety form; internal testing track first,
    then staged rollouts.
-5. **Real-device pilot** with a small group of doctors, peers and patients.
-6. Small items: a peer notification opens the inbox rather than the chat; peers have no
-   legal documents of their own yet.
+4. **Real-device pilot** with a small group of doctors, peers and patients.
+5. Small items: a peer notification opens the inbox rather than the chat; peers have no legal
+   documents of their own yet; sessions that never close (nobody joined, never completed)
+   stay open in the database and are only hidden after 5 days.
+6. **Rotate secrets** that were on the workstation hit by the 2026-11-22 malware incident.
 
 ### Open business decisions (not blocking)
 
@@ -254,7 +294,7 @@ A genuine, minimal, additive backend defect was found and fixed in this pass: `l
 The Doctor Flutter app must replicate the canonical source file `prototype/index.html` in every visual and interaction detail. This is a hard rule for all future work: every screen or component change must be checked back and forth between the prototype and the rendered Flutter screen. The required loop is inspect HTML/CSS/JS, render Flutter, compare, correct discrepancies, and compare again. Code inspection, analyzer success, and widget tests do not replace rendered comparison evidence. The app remains `DOCTOR_FLUTTER_NOT_VERIFIED` until every required screen passes this gate.
 # HelloDoctor â€” Engineering Progress & Milestone Tracker
 
-> **History.** The tracker below is dated 2026-10-04 and is superseded by "Current status — 2026-11-20" at the top of this file. Its milestone table is kept as a record and is not current.
+> **History.** The tracker below is dated 2026-10-04 and is superseded by "Current status — 2026-11-22" at the top of this file. Its milestone table is kept as a record and is not current.
 
 
 > **Document Version:** 1.2.0

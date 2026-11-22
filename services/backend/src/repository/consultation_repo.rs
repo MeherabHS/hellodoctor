@@ -73,15 +73,29 @@ pub async fn list_active<'e, E: PgExecutor<'e>>(
 /// hidden just because the RTC channel is no longer active.
 pub async fn list_monitoring<'e, E: PgExecutor<'e>>(
     executor: E,
+    trace_retention_days: i32,
 ) -> Result<Vec<ConsultationSession>, sqlx::Error> {
+    // The Admin dashboard's consultation tracking: every consultation that has
+    // started and whose consultation trace still exists (the 5-day rule), plus
+    // any session awaiting a recovery decision. A row drops off by itself when
+    // its trace is deleted; a grievance hold keeps it. Booked-but-not-started
+    // sessions (no started_at) are not consultations yet.
     sqlx::query_as::<_, ConsultationSession>(
-        "SELECT id, appointment_id, agora_channel_name, started_at, ended_at, created_at, status, recovery_state, empty_room_deadline, patient_present, doctor_present, patient_presence_sequence, doctor_presence_sequence
-         FROM consultation_sessions
-         WHERE status IN ('ACTIVE', 'INITIALIZED', 'PREMATURE_TERMINATION')
-            OR recovery_state = 'NEEDS_REVIEW'
-         ORDER BY (recovery_state = 'NEEDS_REVIEW') DESC, COALESCE(ended_at, started_at, created_at) DESC
+        "SELECT cs.id, cs.appointment_id, cs.agora_channel_name, cs.started_at, cs.ended_at, cs.created_at, cs.status, cs.recovery_state, cs.empty_room_deadline, cs.patient_present, cs.doctor_present, cs.patient_presence_sequence, cs.doctor_presence_sequence
+         FROM consultation_sessions cs
+         WHERE cs.recovery_state = 'NEEDS_REVIEW'
+            OR (cs.started_at IS NOT NULL AND (
+                   cs.started_at > clock_timestamp() - make_interval(days => $1)
+                OR EXISTS (SELECT 1 FROM consultation_trace_events t
+                            WHERE t.appointment_id = cs.appointment_id AND t.expires_at > clock_timestamp())
+                OR EXISTS (SELECT 1 FROM consultation_trace_holds h
+                            WHERE h.appointment_id = cs.appointment_id AND h.release_at IS NULL)))
+         ORDER BY (cs.recovery_state = 'NEEDS_REVIEW') DESC,
+                  (cs.status IN ('ACTIVE', 'INITIALIZED')) DESC,
+                  COALESCE(cs.started_at, cs.created_at) DESC
          LIMIT 200",
     )
+    .bind(trace_retention_days)
     .fetch_all(executor)
     .await
 }

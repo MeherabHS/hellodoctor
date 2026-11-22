@@ -1801,3 +1801,103 @@ async fn peer_photo_and_request_counterpart_photos(pool: PgPool) {
         StatusCode::NOT_FOUND
     );
 }
+
+/// Admin dashboard peer tracking: an accepted peer session appears in the
+/// telemetry with counts only, and its timeline shows who acted and when,
+/// never the topic or message text.
+#[sqlx::test(migrations = "./migrations")]
+async fn admin_dashboard_tracks_peer_sessions_without_content(pool: PgPool) {
+    let (app, _pool) = test_app(pool).await;
+    let (peer, _peer_id, slots) =
+        approved_peer_with_slots(&app, &_pool, PEER_EMAIL, "+254711220201", 1).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let request = json_body(request_slot(&app, &patient, &slots[0]).await).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Not tracked before the peer accepts: it is not a session yet.
+    let body = json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    assert!(
+        body["data"]["peer_sessions"].as_array().unwrap().is_empty(),
+        "{body}"
+    );
+
+    post(
+        &app,
+        &format!("/api/v1/peer/requests/{request}/accept"),
+        Some(&peer),
+        &serde_json::json!({}),
+    )
+    .await;
+    let mine = json_body(get(&app, "/api/v1/peer-requests", Some(&patient)).await).await;
+    let chat = mine["data"][0]["conversation_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let sent = send(
+        &app,
+        "POST",
+        &format!("/api/v1/peer-chats/{chat}/messages"),
+        Some(&patient),
+        Some(&serde_json::json!({"content": "A private message the Admin must never see."})),
+        Some("track-1"),
+    )
+    .await;
+    assert_eq!(sent.status(), StatusCode::CREATED);
+
+    let body = json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    let rows = body["data"]["peer_sessions"].as_array().unwrap();
+    let row = rows
+        .iter()
+        .find(|r| r["request_id"] == request.as_str())
+        .expect("tracked");
+    assert_eq!(row["messages"], 1);
+    assert!(row["tracked_until"].is_string());
+    let text = body.to_string();
+    assert!(
+        !text.contains("private message"),
+        "no message text on the dashboard"
+    );
+
+    let timeline = get(
+        &app,
+        &format!("/api/v1/admin/peer-sessions/{request}/timeline"),
+        Some(&admin),
+    )
+    .await;
+    assert_eq!(timeline.status(), StatusCode::OK);
+    let timeline = json_body(timeline).await;
+    let events: Vec<String> = timeline["data"]["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| {
+            format!(
+                "{}:{}",
+                e["actor"].as_str().unwrap(),
+                e["event"].as_str().unwrap()
+            )
+        })
+        .collect();
+    for expected in ["PATIENT:REQUESTED", "PEER:ACCEPTED", "PATIENT:MESSAGE_SENT"] {
+        assert!(
+            events.iter().any(|e| e == expected),
+            "{expected} in {events:?}"
+        );
+    }
+    assert!(!timeline.to_string().contains("private message"));
+
+    // Only Admins.
+    assert_eq!(
+        get(
+            &app,
+            &format!("/api/v1/admin/peer-sessions/{request}/timeline"),
+            Some(&peer)
+        )
+        .await
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+}

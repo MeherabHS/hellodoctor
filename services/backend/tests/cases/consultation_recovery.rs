@@ -1122,3 +1122,110 @@ async fn test_consultation_ready_pass_excludes_out_of_window_and_chat_appointmen
         "an appointment far outside the join window must not be announced ready"
     );
 }
+
+/// A session still marked open after its join window closed, with nobody in
+/// the room, is shown as an unclosed room: not "Active", not counted as live.
+/// Each row carries the consultation trace's retention clock.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_admin_monitor_marks_rooms_past_their_join_window_as_closed(pool: PgPool) {
+    let (app, pool, _state) = test_app_and_state(pool).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let (appointment_id, _) = book_and_confirm(&app, &patient).await;
+    let session_id: Uuid =
+        sqlx::query_scalar("SELECT id FROM consultation_sessions WHERE appointment_id=$1")
+            .bind(appointment_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    sqlx::query("UPDATE consultation_sessions SET status='ACTIVE', started_at=clock_timestamp() WHERE id=$1")
+        .bind(session_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let row = |body: &Value| {
+        body["data"]["active_streams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["session_id"] == session_id.to_string())
+            .cloned()
+            .expect("the open session is listed")
+    };
+
+    // Join window still open: a live session.
+    let body: Value =
+        json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    let live = row(&body);
+    assert_eq!(live["room_closed"], false, "{live}");
+    assert_eq!(body["data"]["active_sessions_count"], 1);
+    assert_eq!(live["trace_retention_days"], 5);
+    assert!(live["trace_expires_at"].is_string());
+
+    // Move the appointment's slot two days into the past: the window closed.
+    sqlx::query(
+        "UPDATE doctor_schedule_slots SET start_time=start_time-interval '2 days', end_time=end_time-interval '2 days'
+          WHERE id=(SELECT slot_id FROM appointments WHERE id=$1)",
+    )
+    .bind(appointment_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let body: Value =
+        json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    let closed = row(&body);
+    assert_eq!(closed["room_closed"], true, "{closed}");
+    assert_eq!(body["data"]["active_sessions_count"], 0);
+
+    let timeline: Value = json_body(
+        get(
+            &app,
+            &format!("/api/v1/admin/consultations/{session_id}/timeline"),
+            Some(&admin),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(timeline["data"]["trace_retention_days"], 5, "{timeline}");
+    assert!(timeline["data"]["trace_expires_at"].is_string());
+    assert_eq!(timeline["data"]["trace_on_hold"], false);
+    assert!(timeline["data"]["trace_events"].is_array(), "{timeline}");
+
+    // A finished consultation stays in the tracking list (not ongoing) while
+    // its trace exists...
+    sqlx::query("UPDATE consultation_sessions SET status='COMPLETED', ended_at=clock_timestamp() WHERE id=$1")
+        .bind(session_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let body: Value =
+        json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    let done = row(&body);
+    assert_eq!(done["ongoing"], false, "{done}");
+    assert_eq!(done["room_closed"], false, "{done}");
+
+    // ...and drops off once it is older than the retention window with no
+    // trace left.
+    sqlx::query("DELETE FROM consultation_trace_events WHERE appointment_id=$1")
+        .bind(appointment_id)
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("UPDATE consultation_sessions SET started_at=clock_timestamp()-interval '6 days' WHERE id=$1")
+        .bind(session_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let body: Value =
+        json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    assert!(
+        !body["data"]["active_streams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["session_id"] == session_id.to_string()),
+        "a consultation past the {}-day trace window is no longer tracked",
+        5
+    );
+}

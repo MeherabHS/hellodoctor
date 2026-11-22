@@ -1,7 +1,7 @@
 'use client';
 import { tr } from '@/lib/i18n';
 import {useEffect,useMemo,useState,type ReactNode} from 'react';
-import {Activity,ArrowLeft,Eye,MapPin,MessageSquare,Phone,UserCheck,Users} from 'lucide-react';
+import {Activity,ArrowLeft,CheckCircle2,Eye,Inbox,MapPin,MessageSquare,Phone,UserCheck,UserX,Users,XCircle} from 'lucide-react';
 import {getAdminPeerDirectory,getAdminPeerHistory,type AdminPeerDirectoryRow,type AdminPeerHistory,type AdminPeerSession,type PeerApprovalStatus} from '../../lib/api';
 import {buildSearchIndex,searchIndex} from '../../lib/searchIndex';
 import {Card,Chip,EmptyState,PageHead,Pagination,SearchField,StatTile,Tabs,eatDate,type ChipTone} from '../ui/afya';
@@ -93,6 +93,22 @@ export function PeerDirectory({onOpenPatient}:{onOpenPatient?:(patientId:string)
   </div>;
 }
 
+/** What happened to the requests a peer received, like a doctor's consultation history. */
+export function requestOutcomes(sessions:AdminPeerSession[]){
+  const count=(f:(s:AdminPeerSession)=>boolean)=>sessions.filter(f).length;
+  return {
+    received:sessions.length,
+    // Accepted at some point: still accepted, completed, or cancelled by the patient after acceptance.
+    accepted:count(s=>s.status==='ACCEPTED'||s.status==='COMPLETED'||(s.status==='CANCELLED'&&!!s.decided_at)),
+    declined:count(s=>s.status==='DECLINED'),
+    cancelled:count(s=>s.status==='CANCELLED'),
+    completed:count(s=>s.status==='COMPLETED'),
+    waiting:count(s=>s.status==='PENDING'),
+    chat:count(s=>s.support_type==='CHAT'&&s.status!=='DECLINED'&&s.status!=='PENDING'),
+    call:count(s=>s.support_type==='CALL'&&s.status!=='DECLINED'&&s.status!=='PENDING'),
+  };
+}
+
 type Tab='sessions'|'patients'|'timeline';
 
 export function PeerRecord({peer,onBack,onOpenPatient,load=getAdminPeerHistory}:{peer:AdminPeerDirectoryRow;onBack:()=>void;onOpenPatient?:(patientId:string)=>void;load?:(id:string)=>Promise<AdminPeerHistory>}){
@@ -101,6 +117,7 @@ export function PeerRecord({peer,onBack,onOpenPatient,load=getAdminPeerHistory}:
   useEffect(()=>{let active=true;load(peer.id).then(h=>{if(active){setHistory(h);setError(false);}}).catch(()=>{if(active)setError(true);});return()=>{active=false;};},[peer.id,load,revision]);
   const sessions=useMemo(()=>history?.sessions??[],[history]);
   const patients=useMemo(()=>supportedPatients(sessions),[sessions]);
+  const outcomes=useMemo(()=>requestOutcomes(sessions),[sessions]);
   const summary:[string,ReactNode][]=[
     ['County',peer.county],['Organisation',peer.organization||'—'],['Email',peer.email||'—'],['Phone',peer.phone_number],
     ['Signed up',eatDate(peer.created_at)],['Last reviewed',peer.reviewed_at?eatDate(peer.reviewed_at):tr('ui2.notYetReviewed')],
@@ -121,6 +138,13 @@ export function PeerRecord({peer,onBack,onOpenPatient,load=getAdminPeerHistory}:
         <div className="afya-profile-meta"><span>{tr('ui.peerNavigator')}</span><span><MapPin size={14} aria-hidden/>{peer.county}</span><span>{tr('mix.lastSession', { date: eatDate(peer.last_session_at) })}</span></div>
       </div>
     </section>
+    <div className="afya-stat-grid" aria-label={tr('peerStats.label')}>
+      <StatTile icon={Inbox} tone="blue" value={history?outcomes.received:'—'} label={tr('peerStats.received')} note={history&&outcomes.waiting?tr('peerStats.waiting',{count:outcomes.waiting}):undefined}/>
+      <StatTile icon={UserCheck} tone="green" value={history?outcomes.accepted:'—'} label={tr('peerStats.accepted')} note={history?tr('peerStats.chatCall',{chat:outcomes.chat,call:outcomes.call}):undefined}/>
+      <StatTile icon={UserX} tone="red" value={history?outcomes.declined:'—'} label={tr('peerStats.declined')}/>
+      <StatTile icon={XCircle} tone="amber" value={history?outcomes.cancelled:'—'} label={tr('peerStats.cancelled')}/>
+      <StatTile icon={CheckCircle2} tone="purple" value={history?outcomes.completed:'—'} label={tr('peerStats.completed')}/>
+    </div>
     <div className="afya-two-col" style={{gridTemplateColumns:'minmax(260px,320px) minmax(0,1fr)'}}>
       <Card title={tr('ui.peerSummary')}>
         <dl className="afya-dl">{summary.map(([k,v])=><div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>

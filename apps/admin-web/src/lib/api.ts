@@ -171,6 +171,17 @@ export interface CommandTelemetry {
     needs_review?: boolean;
     payment_status?: string | null;
     timeline_url?: string;
+    /** Join window closed and nobody in the room: not live, left unclosed. */
+    room_closed?: boolean;
+    /** Still running: open, not awaiting review, join window not over. */
+    ongoing?: boolean;
+    join_window_closes_at?: string | null;
+    /** The consultation trace is deleted this many days after each event. */
+    trace_retention_days?: number;
+    trace_event_count?: number;
+    trace_expires_at?: string;
+    /** A grievance holds the trace past its normal deletion. */
+    trace_on_hold?: boolean;
     provider_presence_summary?: {
       source: string;
       patient_present: boolean;
@@ -180,6 +191,21 @@ export interface CommandTelemetry {
     };
   }>;
   needs_review_count?: number;
+  /** Peer chat/call sessions running now. */
+  peer_ongoing_count?: number;
+  /** Peer sessions with activity in the tracking window (times, statuses and counts only). */
+  peer_sessions?: PeerTrackingRow[];
+}
+
+export interface PeerTrackingRow {
+  request_id: string; peer_id: string; peer_name: string; patient_name: string;
+  support_type: 'CHAT' | 'CALL'; status: string;
+  start_time: string; end_time: string; requested_at: string;
+  decided_at: string | null; completed_at: string | null; cancelled_at: string | null;
+  messages: number; last_message_at: string | null;
+  call_status: string | null; call_started_at: string | null; call_ended_at: string | null;
+  patient_present: boolean; peer_present: boolean;
+  ongoing: boolean; last_activity_at: string; tracked_until: string; timeline_url: string;
 }
 
 export interface AdminSlot {

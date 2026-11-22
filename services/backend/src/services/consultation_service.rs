@@ -462,6 +462,53 @@ impl ConsultationService {
         .fetch_optional(&mut *tx)
         .await?;
 
+        // The consultation trace's retention clock (see the dashboard's
+        // "Trace kept" column): events are deleted N days after they are
+        // written unless a grievance holds them.
+        let (trace_event_count, trace_last_expiry, trace_on_hold): (i64, Option<DateTime<Utc>>, bool) =
+            sqlx::query_as(
+                "SELECT (SELECT count(*) FROM consultation_trace_events WHERE appointment_id=$1),
+                        (SELECT max(expires_at) FROM consultation_trace_events WHERE appointment_id=$1),
+                        EXISTS(SELECT 1 FROM consultation_trace_holds WHERE appointment_id=$1 AND release_at IS NULL)",
+            )
+            .bind(session.appointment_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        // The consultation trace itself (the same ledger the grievance
+        // investigation shows): who joined or left, Rx and document uploads,
+        // chat access, reschedules, completion. Rows past their expiry are
+        // already gone or about to be deleted, so they are not shown.
+        let trace_events: Vec<serde_json::Value> = sqlx::query_scalar(
+            "SELECT jsonb_build_object(
+                'id', e.id, 'event_type', e.event_type, 'event_time_server', e.event_time_server,
+                'actor_role', e.actor_role, 'result', e.result, 'reason_code', e.reason_code,
+                'resource_type', e.resource_type, 'client_type', e.client_type, 'expires_at', e.expires_at)
+             FROM consultation_trace_events e
+             WHERE e.appointment_id = $1
+               AND (e.expires_at > clock_timestamp()
+                    OR EXISTS (SELECT 1 FROM consultation_trace_holds h
+                                WHERE h.appointment_id = e.appointment_id AND h.release_at IS NULL))
+             ORDER BY e.event_time_server, e.id
+             LIMIT 500",
+        )
+        .bind(session.appointment_id)
+        .fetch_all(&mut *tx)
+        .await?;
+        // Opening a consultation's trace is recorded like opening it from a
+        // grievance.
+        crate::services::consultation_trace::admin_read(
+            &mut tx,
+            ctx,
+            "ADMIN_CONSULTATION_HISTORY_VIEWED",
+            "APPOINTMENT",
+            session.appointment_id,
+        )
+        .await?;
+        let trace_retention_days = i64::from(state.config.consultation_trace_retention_days);
+        let trace_expires_at = trace_last_expiry.unwrap_or_else(|| {
+            session.started_at.unwrap_or(session.created_at) + Duration::days(trace_retention_days)
+        });
+
         let mut participant_user_ids = Vec::new();
         if let Some(p) = patient_repo::find_by_id(&mut *tx, apt.patient_id).await? {
             match p.user_id {
@@ -512,6 +559,11 @@ impl ConsultationService {
             "patient_presence_sequence": session.patient_presence_sequence,
             "doctor_presence_sequence": session.doctor_presence_sequence,
             "provider_presence_events": provider_presence_events,
+            "trace_events": trace_events,
+            "trace_retention_days": trace_retention_days,
+            "trace_event_count": trace_event_count,
+            "trace_expires_at": trace_expires_at,
+            "trace_on_hold": trace_on_hold,
             "provider_presence_semantics": "Signed Agora provider callbacks are authoritative for presence. Client telemetry and reconnect_windows below are supplementary and cannot change recovery state.",
             "recovery_resolution": recovery_resolution,
             "events": events,

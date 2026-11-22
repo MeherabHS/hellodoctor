@@ -373,7 +373,7 @@ async fn change_password_rejects_wrong_current_password_and_sends_nothing(pool: 
         }),
     )
     .await;
-    assert_eq!(change.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(change.status(), StatusCode::FORBIDDEN);
 
     let row = outbox_row_for(
         &pool,

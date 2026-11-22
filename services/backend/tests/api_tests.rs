@@ -51,6 +51,8 @@ mod admin_campaigns;
 mod admin_content_sanitization;
 #[path = "cases/admin_invitations.rs"]
 mod admin_invitations;
+#[path = "cases/admin_profile.rs"]
+mod admin_profile;
 #[path = "cases/admin_query_g20_investigation.rs"]
 mod admin_query_g20_investigation;
 #[path = "cases/admin_quizzes.rs"]
@@ -6757,6 +6759,13 @@ async fn test_admin_dashboard_endpoints_resolve_names_correctly(pool: PgPool) {
     // doesn't error even when nothing is active.
     let res_telemetry = get(&app, "/api/v1/admin/command/telemetry", Some(&admin_token)).await;
     assert_eq!(res_telemetry.status(), StatusCode::OK);
+    // The consultation completed above counts as completed today, although
+    // its session is no longer open (the old count only looked at open ones).
+    let telemetry_json = json_body(res_telemetry).await;
+    assert!(
+        telemetry_json["data"]["completed_today"].as_i64().unwrap() >= 1,
+        "{telemetry_json}"
+    );
 
     // list_admin_grievances: patient/doctor names must resolve correctly
     // through the session -> appointment -> doctor chain.
@@ -7200,6 +7209,26 @@ async fn test_system_errors_admin_api_access_control_and_lifecycle(pool: PgPool)
     )
     .await;
     assert_eq!(res.status(), StatusCode::OK);
+
+    // The resolve is in the Activity Log, and searching for "incident" (the
+    // word the Admin screens use) finds it.
+    let res = get(
+        &app,
+        "/api/v1/admin/activity?search=incident",
+        Some(&admin_token),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let activity = json_body(res).await;
+    assert!(
+        activity["data"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|i| i["action"] == "SYSTEM_ERROR_RESOLVED"
+                && i["resource_id"] == error_id.to_string()),
+        "{activity}"
+    );
 
     let (status, note): (String, Option<String>) =
         sqlx::query_as("SELECT status, resolution_note FROM system_error_logs WHERE id = $1")

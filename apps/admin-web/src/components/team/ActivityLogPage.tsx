@@ -35,6 +35,13 @@ const ACTION_LABEL: Record<string, string> = {
   get ADMIN_INVITATION_RESENT(){return tr('ui2.resentAnAdminInvitation')},
   get ADMIN_INVITATION_REVOKED(){return tr('ui2.revokedAnAdminInvitation')},
   get ADMIN_INVITATION_ACCEPTED(){return tr('ui2.acceptedAnAdminInvitation')},
+  get SYSTEM_ERROR_RESOLVED(){return tr('activity.incidentResolved')},
+  get SYSTEM_ERROR_ACKNOWLEDGED(){return tr('activity.incidentInvestigating')},
+};
+/** Plain-language names for record types, matching the screen that owns them. */
+const RESOURCE_LABEL: Record<string, string> = {
+  get SYSTEM_ERROR_LOG(){return tr('activity.incident')},
+  get SYSTEM_ERROR(){return tr('activity.incident')},
 };
 const RESULT_TONE: Record<string, ChipTone> = {SUCCESS: 'success', FAILURE: 'danger', DENIED: 'danger'};
 
@@ -135,7 +142,7 @@ export function ActivityLogPage(){
             {i.actor_email&&<Chip tone="outlined">{tr('ui.admin')}</Chip>}
           </div></td>
           <td>{ACTION_LABEL[i.action]??humanize(i.action)}</td>
-          <td><div>{humanize(i.resource_type)}</div>{i.resource_id&&<div className="afya-stat-note afya-mono" title={i.resource_id}>{i.resource_id.slice(0,8)}</div>}</td>
+          <td><div>{RESOURCE_LABEL[i.resource_type]??humanize(i.resource_type)}</div>{i.resource_id&&<div className="afya-stat-note afya-mono" title={i.resource_id}>{i.resource_id.slice(0,8)}</div>}</td>
           <td><Chip tone={RESULT_TONE[i.result]??'neutral'}>{humanize(i.result)}</Chip></td>
         </tr>)}</tbody>
       </table>

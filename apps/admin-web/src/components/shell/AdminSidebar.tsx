@@ -25,7 +25,9 @@ export type AdminPageId =
   | 'topics'
   | 'team'
   | 'activity'
-  | 'settings';
+  | 'settings'
+  /** The signed-in Admin's own profile; opened from the top-bar account pill, not the sidebar. */
+  | 'profile';
 
 export type NavBadgeTone = 'amber' | 'blue' | 'red' | 'green' | 'muted';
 export interface NavBadge { label: string; tone: NavBadgeTone; title?: string }

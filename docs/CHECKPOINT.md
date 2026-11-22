@@ -1,24 +1,32 @@
 # HelloDoctor - Current Project Checkpoint
 
-**Checkpoint — 2026-11-20 (resume from here):** The product is feature-complete for its
+**Checkpoint — 2026-11-22 (resume from here):** The product is feature-complete for its
 current scope and running in production on the ARM64 VM. Full status, milestone table and the
-ordered list of what remains: [PROGRESS.md](PROGRESS.md#current-status--2026-11-20).
+ordered list of what remains: [PROGRESS.md](PROGRESS.md#current-status--2026-11-22).
 
-- **Code:** `main` at `0f4a32c` (PR #48, saved profile photos in headers, chats and peer
-  requests). CI green: backend suite against a fresh PostgreSQL, both Flutter apps, Doctor
-  Web and Admin Web. 132 reversible migrations; the newest is `20261222000014`.
-- **Images:** ARM64 backend, admin-web and doctor-web published to GHCR from `0f4a32c`
-  (run 44557139554). To be rolled out on the VM for the photo fix.
-- **APKs:** Patient and Care internal-test APKs built from `0f4a32c` (run 44558068186).
+- **Code:** `main` at `bdc020b` (PR #53: API-host edge 404 and `url` 2.5.9). CI green,
+  including the Security Scan (running again since PR #51). 137 reversible migrations on
+  `main`; the newest is `20261222000019`.
+- **Open PR #54** (`feat/admin-profile`): Admin profile page (photo, password change);
+  change-password answers a wrong current password with 403 so web users are not signed out;
+  "completed today" fix; 5-day consultation tracking dashboard with trace countdown, rule
+  note and full trace in each Timeline; peer chat/call tracking with filters and per-session
+  timeline; peer request outcomes. Migrations `20261222000020` and `20261222000021`.
+- **Images:** ARM64 backend, admin-web and doctor-web published to GHCR from `382c97e`
+  (same code as `bdc020b`, run 45040101534). Not yet rolled out; the VM also needs the PR #53
+  Caddyfile and a proxy restart.
 - **Uncommitted on the workstation:** the Play Store AAB workflow
   (`.github/workflows/play-release-aab.yml`), Android release-signing changes in both
   `build.gradle.kts` files and their `.gitignore` entries.
-- **Next:** (1) roll out the `0f4a32c` images; (2) fix the Security Scan workflow (failing
-  to start since 2026-11-11); (3) external penetration test; (4) Google Play
-  internal-testing release from Circle Technology Ltd; (5) wider real-device pilot.
-- **Decisions in force since the October entries below:** payments deferred
-  (`FINANCIAL_MODULE_MODE=deferred`); no SMS; 600 KB per clinical image, 40 KB per profile
-  photo; Admins publish directly; Kenya only, English and Swahili.
+- **Next:** (1) merge PR #54, publish images, roll out with the Caddyfile; (2) external penetration
+  test; (3) Google Play internal-testing release from Circle Technology Ltd; (4) wider
+  real-device pilot; (5) rotate secrets from the 2026-11-22 workstation incident. Incident
+  resolves are recorded in the Activity Log (now labelled as incidents). Agora presence callbacks are
+  confirmed reaching production.
+- **Decisions in force:** payments deferred (`FINANCIAL_MODULE_MODE=deferred`); no SMS;
+  600 KB per clinical image, 40 KB per profile photo; Admins publish directly; Kenya only,
+  English and Swahili; consultation trace kept 5 days (3–5 configurable) unless a grievance
+  holds it; Admin never sees patient medical conditions, peer topics or chat content.
 
 The entries below are a dated history, newest first; their "next step" and "still open"
 lines describe the state on their own dates.

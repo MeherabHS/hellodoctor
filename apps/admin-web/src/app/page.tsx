@@ -9,6 +9,8 @@ import { BlogManager } from '@/components/blogs/BlogManager';
 import { TopicsPage } from '@/components/blogs/CategoryManager';
 import { AdminTeamPage } from '@/components/team/AdminTeamPage';
 import { ActivityLogPage } from '@/components/team/ActivityLogPage';
+import { AdminProfilePage, initialsOf } from '@/components/team/AdminProfilePage';
+import { getMe, getMyPhoto } from '@/lib/profileApi';
 import { NotificationCenter } from '@/components/shell/NotificationCenter';
 import { StepUpDialog, StepUpTimer } from '@/components/shell/StepUpDialog';
 import { PatientsDirectory } from '@/components/people/PatientsDirectory';
@@ -91,6 +93,20 @@ function AdminPortalContent() {
   useT(); // re-render this screen when the language changes
   // Navigation State
   const [activeAdminPage, setActiveAdminPage] = useState<AdminPageId>('command');
+  // The signed-in Admin's email and photo for the top-bar account pill.
+  const [myEmail, setMyEmail] = useState<string | null>(null);
+  const [myPhoto, setMyPhoto] = useState<string | null>(null);
+  const [photoRevision, setPhotoRevision] = useState(0);
+  useEffect(() => {
+    let active = true;
+    getMe().then(me => { if (active) setMyEmail(me.email); }).catch(() => { /* the pill keeps its generic label */ });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    getMyPhoto().then(photo => { if (active) setMyPhoto(photo); }).catch(() => { /* initials stay */ });
+    return () => { active = false; };
+  }, [photoRevision]);
   const {requestNavigation}=useAdminNavigation();
   function navigateAdmin(page:AdminPageId){if(page!==activeAdminPage)requestNavigation(()=>setActiveAdminPage(page));}
 
@@ -314,6 +330,7 @@ function AdminPortalContent() {
     finance: { title: tr('ui.allPaymentsEscrow'), breadcrumb: tr('ui.financePaymentsEscrowAndThe20') },
     doctors: { title: tr('ui.settlementsPayouts'), breadcrumb: tr('ui.financePhysicianEarnings20PlatformCharge') },
     settings: { title: tr('ui.paymentSettings'), breadcrumb: tr('ui.financeCollectionMethodsAndSettlementCon') },
+    profile: { title: tr('profile.title'), breadcrumb: tr('profile.subtitle') },
   };
 
   // Real client-side export: errorLogs is already the full currently-loaded
@@ -848,13 +865,23 @@ function AdminPortalContent() {
 
             <NotificationCenter pendingApplications={verificationQueue.length} onOpen={(page) => navigateAdmin(page)} />
 
-            <div className="admin-user-pill">
-              <div className="admin-avatar">AD</div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span className="admin-user-name">{tr('ui.adminAccount')}</span>
+            <button
+              type="button"
+              className="admin-user-pill"
+              title={tr('profile.open')}
+              aria-label={tr('profile.open')}
+              aria-current={activeAdminPage === 'profile' ? 'page' : undefined}
+              onClick={() => navigateAdmin('profile')}
+            >
+              <div className="admin-avatar" aria-hidden>
+                {/* eslint-disable-next-line @next/next/no-img-element -- a same-origin data: URL */}
+                {myPhoto ? <img src={myPhoto} alt="" /> : initialsOf(myEmail)}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span className="admin-user-name">{myEmail ?? tr('ui.adminAccount')}</span>
                 <span className="admin-user-role">{tr('ui.administrator')}</span>
               </div>
-            </div>
+            </button>
 
             <button
               type="button"
@@ -1210,6 +1237,7 @@ function AdminPortalContent() {
           {activeAdminPage === 'peers' && <div className="admin-page-view active" id="adminPage_peers"><PeerNavigators /></div>}
           {activeAdminPage === 'peerDirectory' && <div className="admin-page-view active" id="adminPage_peerDirectory"><PeerDirectory onOpenPatient={(id) => requestNavigation(() => { setSelectedPatientKey(id); setActiveAdminPage('patients'); })} /></div>}
           {activeAdminPage === 'activity' && <div className="admin-page-view active" id="adminPage_activity"><ActivityLogPage /></div>}
+          {activeAdminPage === 'profile' && <div className="admin-page-view active" id="adminPage_profile"><AdminProfilePage email={myEmail} photo={myPhoto} onPhotoChanged={() => setPhotoRevision(v => v + 1)} /></div>}
           {activeAdminPage === 'campaigns' && (
             <div className="admin-page-view active" id="adminPage_campaigns">
               <CampaignManager />

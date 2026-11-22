@@ -460,6 +460,101 @@ impl ProfilePictureService {
         Self::photo_from_meta(state, row.key, row.hash, row.mime).await
     }
 
+    // ---- Admin (self only) ----
+
+    /// The caller's own photo reference, if any. `admin_profile_pictures` RLS
+    /// limits every read and write to the Admin's own row.
+    async fn find_admin_photo(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        user_id: Uuid,
+    ) -> Result<Option<(String, String, String)>, AppError> {
+        Ok(sqlx::query_as(
+            "SELECT object_key, content_hash, mime_type FROM admin_profile_pictures WHERE user_id=$1",
+        )
+        .bind(user_id)
+        .fetch_optional(&mut **tx)
+        .await?)
+    }
+
+    pub async fn upload_admin_photo(
+        state: &AppState,
+        ctx: &AuthContext,
+        mime_type: String,
+        bytes: Vec<u8>,
+    ) -> Result<(), AppError> {
+        validate_profile_photo_mime(&mime_type)?;
+        let user_id = ctx.user_id.into_inner();
+        // PHASE A — no transaction held across this CPU-bound work.
+        let sanitized =
+            UploadSecurityService::sanitize_profile_picture_async(bytes, mime_type.clone()).await?;
+        let hash = format!("{:x}", Sha256::digest(&sanitized));
+        let object_key = format!("avatars/admin/{}/{}.bin", user_id, Uuid::now_v7());
+
+        // PHASE B
+        let mut tx = state.begin_authed(ctx).await?;
+        lock_profile_picture(&mut *tx, user_id).await?;
+        let existing = Self::find_admin_photo(&mut tx, user_id).await?;
+
+        DocumentStorageService::put(state, &object_key, &sanitized).await?;
+        let saved = sqlx::query(
+            "INSERT INTO admin_profile_pictures (user_id, object_key, bucket, content_hash, mime_type, size_bytes, updated_at)              VALUES ($1,$2,$3,$4,$5,$6,$7)              ON CONFLICT (user_id) DO UPDATE SET object_key=EXCLUDED.object_key, bucket=EXCLUDED.bucket,              content_hash=EXCLUDED.content_hash, mime_type=EXCLUDED.mime_type, size_bytes=EXCLUDED.size_bytes,              updated_at=EXCLUDED.updated_at",
+        )
+        .bind(user_id)
+        .bind(&object_key)
+        .bind(&state.config.storage_bucket)
+        .bind(&hash)
+        .bind(&mime_type)
+        .bind(sanitized.len() as i32)
+        .bind(Utc::now())
+        .execute(&mut *tx)
+        .await;
+        if let Err(error) = saved {
+            DocumentStorageService::delete(state, &object_key).await;
+            return Err(error.into());
+        }
+        if let Err(error) = tx.commit().await {
+            DocumentStorageService::delete(state, &object_key).await;
+            return Err(error.into());
+        }
+        if let Some((old_key, _, _)) = existing {
+            if old_key != object_key {
+                DocumentStorageService::delete(state, &old_key).await;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn remove_admin_photo(state: &AppState, ctx: &AuthContext) -> Result<(), AppError> {
+        let user_id = ctx.user_id.into_inner();
+        let mut tx = state.begin_authed(ctx).await?;
+        lock_profile_picture(&mut *tx, user_id).await?;
+        let existing = Self::find_admin_photo(&mut tx, user_id).await?;
+        sqlx::query("DELETE FROM admin_profile_pictures WHERE user_id=$1")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        if let Some((old_key, _, _)) = existing {
+            DocumentStorageService::delete(state, &old_key).await;
+        }
+        Ok(())
+    }
+
+    pub async fn get_admin_photo(
+        state: &AppState,
+        ctx: &AuthContext,
+    ) -> Result<StoredProfilePicture, AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        let meta = Self::find_admin_photo(&mut tx, ctx.user_id.into_inner()).await?;
+        tx.commit().await?;
+        match meta {
+            Some((key, hash, mime)) => {
+                Self::photo_from_meta(state, Some(key), Some(hash), Some(mime)).await
+            }
+            None => Err(AppError::NotFound("No profile picture is set.".into())),
+        }
+    }
+
     async fn photo_from_meta(
         state: &AppState,
         object_key: Option<String>,
