@@ -26,6 +26,10 @@ BACKUP_ALERT_WEBHOOK_URL="${BACKUP_ALERT_WEBHOOK_URL:-}"
 # Small status files (no data, no secrets) that Admin Web shows on the
 # App Errors & Incidents page. Mounted read-only into the backend.
 BACKUP_STATUS_DIR="${BACKUP_STATUS_DIR:-/var/lib/hellodoctor-backup-status}"
+# Optional dead man's switch outside the VM (for example a Healthchecks.io
+# check URL). Pinged at start, on success, and with /fail on failure. If
+# the VM is down no ping arrives, and the outside service alerts you.
+BACKUP_HEALTHCHECK_URL="${BACKUP_HEALTHCHECK_URL:-}"
 PREFIX="hellodoctor"
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -47,8 +51,19 @@ write_status() {
   printf '%s\n' "$body" > "$BACKUP_STATUS_DIR/.$name.tmp" && chmod 644 "$BACKUP_STATUS_DIR/.$name.tmp" \
     && mv -f "$BACKUP_STATUS_DIR/.$name.tmp" "$BACKUP_STATUS_DIR/$name.json" || true
 }
+# Pings the outside watcher; never lets a network problem fail the backup.
+ping_watcher() {
+  [ -n "$BACKUP_HEALTHCHECK_URL" ] || return 0
+  local url="${BACKUP_HEALTHCHECK_URL%/}$1"
+  if [ -n "${2:-}" ]; then
+    curl -fsS -m 10 --retry 3 --data-raw "$2" "$url" >/dev/null 2>&1 || log "could not reach the outside watcher"
+  else
+    curl -fsS -m 10 --retry 3 "$url" >/dev/null 2>&1 || log "could not reach the outside watcher"
+  fi
+}
 fail() {
   log "FAILED: $*"
+  ping_watcher /fail "FAILED: $*"
   write_status last_run "{\"at\":$(json_str "$(now_utc)"),\"result\":\"failed\",\"message\":$(json_str "$*")}"
   alert "FAILED: $*"
   exit 1
@@ -60,6 +75,8 @@ case "$BACKUP_KEEP" in ''|*[!0-9]*) fail "BACKUP_KEEP must be a whole number, go
 umask 077
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
+
+ping_watcher /start
 
 # One run at a time.
 exec 9>"$BACKUP_DIR/.lock"
@@ -148,3 +165,4 @@ log "kept $kept dump(s), $(du -sh "$BACKUP_DIR" | cut -f1) in total"
 done_at="$(now_utc)"
 write_status last_success "{\"at\":$(json_str "$done_at"),\"file\":$(json_str "$(basename "$final")"),\"size_bytes\":${size_bytes:-0},\"dumps_kept\":${kept:-0},\"total_bytes\":${total_bytes:-0},\"keep\":$BACKUP_KEEP}"
 write_status last_run "{\"at\":$(json_str "$done_at"),\"result\":\"ok\",\"message\":\"\"}"
+ping_watcher "" "ok: $(basename "$final"), $(du -h "$final" | cut -f1), $kept kept"
