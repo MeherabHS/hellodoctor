@@ -29,8 +29,17 @@
 
 {$API_HOST} {
     import api_security_headers
-    reverse_proxy backend:8080 {
-        import forwarding
+    # Only the backend's real paths go through. Everything else (`/`, scanner
+    # probes such as /wp-login.php or /.env) is answered here with a bare 404,
+    # so internet noise never reaches the backend or the Admin incident log.
+    @backend path /api/v1/* /healthz /metrics
+    handle @backend {
+        reverse_proxy backend:8080 {
+            import forwarding
+        }
+    }
+    handle {
+        respond 404
     }
 }
 
