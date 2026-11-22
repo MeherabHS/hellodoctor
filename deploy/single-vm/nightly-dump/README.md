@@ -33,6 +33,17 @@ How it is wired: after every run the script writes small JSON files (no data, no
 backend at `/run/backup-status`, and `GET /api/v1/admin/system/backup-status` reads it. After pulling this change,
 recreate the backend once so it gets the mount: `sudo docker compose ... up -d backend` with your usual files.
 
+## Get alerted even when the VM is down
+
+Everything above runs on the VM, so a dead VM cannot report itself. Use watchers that live outside it:
+
+1. **Backups:** create a free check at Healthchecks.io (schedule: daily, 03:00, time zone Africa/Nairobi, grace 1 hour)
+   and put its URL in `/etc/default/hellodoctor-db-dump` as `BACKUP_HEALTHCHECK_URL=https://hc-ping.com/<your-uuid>`.
+   The script pings it on start, on success and at `/fail` with the reason; a missing ping raises the alarm.
+2. **Site up:** add an HTTP monitor (UptimeRobot or Better Stack) for `https://<API host>/healthz`, every 1 to 5 minutes.
+3. **Where alerts go:** connect both to Telegram (free, instant) and, for "site down", a phone call or urgent push.
+   WhatsApp is possible through paid integrations; check the provider's current plans.
+
 ## Install (once, on the VM)
 
 ```bash
@@ -57,6 +68,7 @@ BACKUP_KEEP=30
 PG_CONTAINER=hellodoctor-vm-postgres-1
 BACKUP_RESTORE_TEST_DAY=Sun
 BACKUP_ALERT_WEBHOOK_URL=https://hooks.example.invalid/your-webhook
+BACKUP_HEALTHCHECK_URL=https://hc-ping.com/your-check-uuid
 ```
 
 ## Check a dump
