@@ -38,11 +38,14 @@ RETURNS TABLE (
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
     SELECT * FROM (
-        SELECT r.id, r.peer_id, pp.full_name, pt.full_name, r.support_type, r.status,
-               s.start_time, s.end_time, r.created_at, r.decided_at, r.completed_at, r.cancelled_at,
-               COALESCE(m.n, 0)::bigint, m.last_at,
-               cs.status, cs.started_at, cs.ended_at,
-               COALESCE(cs.patient_present, false), COALESCE(cs.peer_present, false),
+        SELECT r.id AS request_id, r.peer_id AS peer_id, pp.full_name AS peer_name,
+               pt.full_name AS patient_name, r.support_type AS support_type, r.status AS status,
+               s.start_time AS start_time, s.end_time AS end_time, r.created_at AS requested_at,
+               r.decided_at AS decided_at, r.completed_at AS completed_at, r.cancelled_at AS cancelled_at,
+               COALESCE(m.n, 0)::bigint AS messages, m.last_at AS last_message_at,
+               cs.status AS call_status, cs.started_at AS call_started_at, cs.ended_at AS call_ended_at,
+               COALESCE(cs.patient_present, false) AS patient_present,
+               COALESCE(cs.peer_present, false) AS peer_present,
                GREATEST(r.created_at, r.decided_at, r.completed_at, r.cancelled_at, m.last_at,
                         cs.started_at, cs.ended_at,
                         CASE WHEN s.end_time <= clock_timestamp() THEN s.end_time END) AS last_activity_at
