@@ -1,0 +1,9 @@
+[Unit]
+Description=Check every morning at 09:00 Nairobi time that the nightly backup ran
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 Africa/Nairobi
+Persistent=true
+
+[Install]
+WantedBy=timers.target

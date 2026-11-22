@@ -26,10 +26,14 @@ BACKUP_ALERT_WEBHOOK_URL="${BACKUP_ALERT_WEBHOOK_URL:-}"
 # Small status files (no data, no secrets) that Admin Web shows on the
 # App Errors & Incidents page. Mounted read-only into the backend.
 BACKUP_STATUS_DIR="${BACKUP_STATUS_DIR:-/var/lib/hellodoctor-backup-status}"
-# Optional dead man's switch outside the VM (for example a Healthchecks.io
-# check URL). Pinged at start, on success, and with /fail on failure. If
-# the VM is down no ping arrives, and the outside service alerts you.
-BACKUP_HEALTHCHECK_URL="${BACKUP_HEALTHCHECK_URL:-}"
+# Optional Telegram alerts: failures and overdue backups are sent with
+# sound; the nightly "ok" is sent silently (BACKUP_TELEGRAM_ON_SUCCESS=off
+# to skip it). A dead VM is reported by .github/workflows/uptime-watch.yml.
+TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
+TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
+BACKUP_TELEGRAM_ON_SUCCESS="${BACKUP_TELEGRAM_ON_SUCCESS:-silent}"
+# The daily --check run alerts when the newest success is older than this.
+BACKUP_OVERDUE_HOURS="${BACKUP_OVERDUE_HOURS:-26}"
 PREFIX="hellodoctor"
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -51,19 +55,21 @@ write_status() {
   printf '%s\n' "$body" > "$BACKUP_STATUS_DIR/.$name.tmp" && chmod 644 "$BACKUP_STATUS_DIR/.$name.tmp" \
     && mv -f "$BACKUP_STATUS_DIR/.$name.tmp" "$BACKUP_STATUS_DIR/$name.json" || true
 }
-# Pings the outside watcher; never lets a network problem fail the backup.
-ping_watcher() {
-  [ -n "$BACKUP_HEALTHCHECK_URL" ] || return 0
-  local url="${BACKUP_HEALTHCHECK_URL%/}$1"
-  if [ -n "${2:-}" ]; then
-    curl -fsS -m 10 --retry 3 --data-raw "$2" "$url" >/dev/null 2>&1 || log "could not reach the outside watcher"
-  else
-    curl -fsS -m 10 --retry 3 "$url" >/dev/null 2>&1 || log "could not reach the outside watcher"
-  fi
+# Sends a Telegram message; "loud" rings the phone, "silent" does not.
+# Never lets a network problem fail the backup itself.
+telegram() {
+  [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ] || return 0
+  local quiet=false; [ "$1" = "silent" ] && quiet=true
+  curl -fsS -m 10 --retry 3 -o /dev/null \
+    --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+    --data-urlencode "text=$2" \
+    --data-urlencode "disable_notification=$quiet" \
+    "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" 2>/dev/null \
+    || log "could not reach Telegram"
 }
 fail() {
   log "FAILED: $*"
-  ping_watcher /fail "FAILED: $*"
+  telegram loud "🚨 HelloDoctor backup FAILED on $(hostname): $*"
   write_status last_run "{\"at\":$(json_str "$(now_utc)"),\"result\":\"failed\",\"message\":$(json_str "$*")}"
   alert "FAILED: $*"
   exit 1
@@ -72,11 +78,23 @@ fail() {
 case "$BACKUP_KEEP" in ''|*[!0-9]*) fail "BACKUP_KEEP must be a whole number, got '$BACKUP_KEEP'";; esac
 [ "$BACKUP_KEEP" -ge 1 ] || fail "BACKUP_KEEP must be at least 1"
 
+if [ "${1:-}" = "--check" ]; then
+  last="$(sed -n 's/.*"at":"\([^"]*\)".*/\1/p' "$BACKUP_STATUS_DIR/last_success.json" 2>/dev/null | head -n1 || true)"
+  if [ -z "$last" ]; then
+    telegram loud "⚠️ HelloDoctor: no successful backup recorded on $(hostname). Is the nightly dump installed?"
+    log "check: no successful backup recorded"; exit 1
+  fi
+  age_h=$(( ( $(date -u +%s) - $(date -u -d "$last" +%s) ) / 3600 ))
+  if [ "$age_h" -gt "$BACKUP_OVERDUE_HOURS" ]; then
+    telegram loud "⚠️ HelloDoctor backup OVERDUE on $(hostname): last success $age_h hours ago ($last)."
+    log "check: overdue, last success $age_h h ago"; exit 1
+  fi
+  log "check: ok, last success $age_h h ago"; exit 0
+fi
+
 umask 077
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR"
-
-ping_watcher /start
 
 # One run at a time.
 exec 9>"$BACKUP_DIR/.lock"
@@ -165,4 +183,4 @@ log "kept $kept dump(s), $(du -sh "$BACKUP_DIR" | cut -f1) in total"
 done_at="$(now_utc)"
 write_status last_success "{\"at\":$(json_str "$done_at"),\"file\":$(json_str "$(basename "$final")"),\"size_bytes\":${size_bytes:-0},\"dumps_kept\":${kept:-0},\"total_bytes\":${total_bytes:-0},\"keep\":$BACKUP_KEEP}"
 write_status last_run "{\"at\":$(json_str "$done_at"),\"result\":\"ok\",\"message\":\"\"}"
-ping_watcher "" "ok: $(basename "$final"), $(du -h "$final" | cut -f1), $kept kept"
+[ "$BACKUP_TELEGRAM_ON_SUCCESS" = "off" ] || telegram silent "✅ HelloDoctor backup ok: $(basename "$final"), $(du -h "$final" | cut -f1), $kept kept"

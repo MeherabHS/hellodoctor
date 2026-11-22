@@ -33,16 +33,41 @@ How it is wired: after every run the script writes small JSON files (no data, no
 backend at `/run/backup-status`, and `GET /api/v1/admin/system/backup-status` reads it. After pulling this change,
 recreate the backend once so it gets the mount: `sudo docker compose ... up -d backend` with your usual files.
 
-## Get alerted even when the VM is down
+## Telegram alerts
 
-Everything above runs on the VM, so a dead VM cannot report itself. Use watchers that live outside it:
+All alerts go to your own Telegram bot.
 
-1. **Backups:** create a free check at Healthchecks.io (schedule: daily, 03:00, time zone Africa/Nairobi, grace 1 hour)
-   and put its URL in `/etc/default/hellodoctor-db-dump` as `BACKUP_HEALTHCHECK_URL=https://hc-ping.com/<your-uuid>`.
-   The script pings it on start, on success and at `/fail` with the reason; a missing ping raises the alarm.
-2. **Site up:** add an HTTP monitor (UptimeRobot or Better Stack) for `https://<API host>/healthz`, every 1 to 5 minutes.
-3. **Where alerts go:** connect both to Telegram (free, instant) and, for "site down", a phone call or urgent push.
-   WhatsApp is possible through paid integrations; check the provider's current plans.
+| Alert | Sent by | When | Sound |
+|---|---|---|---|
+| Backup failed | this script on the VM | the moment a run fails, with the reason | loud |
+| Backup overdue | `hellodoctor-backup-check.timer` on the VM | 09:00 Nairobi daily, if the newest success is over 26 hours old (catches a stopped timer) | loud |
+| Backup ok | this script | after each nightly success (`BACKUP_TELEGRAM_ON_SUCCESS=off` to skip) | silent |
+| Site down | `.github/workflows/uptime-watch.yml` on GitHub | every 5 minutes while `/healthz` fails; works when the whole VM is dead | loud |
+
+### Create the bot (5 minutes)
+
+1. In Telegram, open **@BotFather**, send `/newbot`, pick a name. It replies with the **bot token**.
+2. Open your new bot and press **Start**, so it is allowed to message you.
+3. Get your **chat id**: open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser after pressing Start and
+   read `"chat":{"id":...}`. For a group, add the bot to the group and send a message first.
+4. To make alerts ring loudly, set a custom notification sound for this chat in Telegram and allow it through
+   Do Not Disturb in your phone's settings. Silent "ok" messages still arrive without sound.
+
+### Connect it
+
+On the VM, in `/etc/default/hellodoctor-db-dump` (readable by root only: `sudo chmod 600`):
+
+```
+TELEGRAM_BOT_TOKEN=123456:ABC...
+TELEGRAM_CHAT_ID=123456789
+```
+
+On GitHub, under Settings, Secrets and variables, Actions: secrets `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, and
+a variable `UPTIME_URLS` with the addresses to watch separated by spaces, for example
+`https://api.example.org/healthz https://admin.example.org`. Run the workflow once by hand with **Send a test
+message** ticked to check the bot reaches you.
+
+Never put the bot token in the repository or on a personal computer.
 
 ## Install (once, on the VM)
 
@@ -53,6 +78,9 @@ sudo install -m 0644 deploy/single-vm/nightly-dump/hellodoctor-db-dump.service /
 sudo install -m 0644 deploy/single-vm/nightly-dump/hellodoctor-db-dump.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now hellodoctor-db-dump.timer
+sudo install -m 0644 deploy/single-vm/nightly-dump/hellodoctor-backup-check.service /etc/systemd/system/
+sudo install -m 0644 deploy/single-vm/nightly-dump/hellodoctor-backup-check.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now hellodoctor-backup-check.timer
 
 # Take the first dump now and check it worked
 sudo systemctl start hellodoctor-db-dump.service
@@ -68,7 +96,8 @@ BACKUP_KEEP=30
 PG_CONTAINER=hellodoctor-vm-postgres-1
 BACKUP_RESTORE_TEST_DAY=Sun
 BACKUP_ALERT_WEBHOOK_URL=https://hooks.example.invalid/your-webhook
-BACKUP_HEALTHCHECK_URL=https://hc-ping.com/your-check-uuid
+TELEGRAM_BOT_TOKEN=123456:ABC...
+TELEGRAM_CHAT_ID=123456789
 ```
 
 ## Check a dump
