@@ -62,16 +62,16 @@ export function CommandCenter({telemetry,overview,needsReviewOnly,setNeedsReview
     <div className="afya-stat-grid">
       <StatTile icon={Video} tone="green" value={telemetry?.completed_today??'—'} label={tr('ui.consultationsCompletedToday')}/>
       <StatTile icon={Users} tone="blue" value={telemetry?.active_specialists??'—'} label={tr('ui.activeSpecialists')} note={overview?tr('ui4.ofRegistered', { count: overview.total_doctors }):undefined}/>
-      <StatTile icon={MessageSquare} tone="purple" value={telemetry?.active_sessions_count??'—'} label={tr('ui.liveSessions')} note={tr('ui4.videoChat')}/>
+      <StatTile icon={MessageSquare} tone="purple" value={telemetry?.active_sessions_count??'—'} label={tr('ops.ongoing')} note={tr('ui4.videoChat')}/>
     </div>
 
-    <Card title={tr('tpl.liveSessions', { count: telemetry?.active_streams.length??0 })} subtitle={tr('ui4.agoraSessionsInProgressAndSessions')}
+    <Card title={tr('ops.trackingTitle', { days: retentionDays, count: telemetry?.active_streams.length??0 })} subtitle={tr('ops.trackingSubtitle', { days: retentionDays })}
       actions={<label className="afya-check"><input type="checkbox" checked={needsReviewOnly} onChange={e=>setNeedsReviewOnly(e.target.checked)}/>{tr('mix.needsReviewOnly', { count: reviewCount })}</label>}>
       <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:16}}>
         <TraceRuleNote days={retentionDays}/>
         {anyClosed&&<Notice tone="warn" title={tr('ops.closedTitle')}>{tr('ops.closedBody')}</Notice>}
       </div>
-      {!streams.length?<EmptyState title={needsReviewOnly?tr('ui2.noSessionsNeedReview'):tr('ui2.noConsultationsInProgress')}>{tr('ui.liveSessionsAppearHereAsSoon')}</EmptyState>:
+      {!streams.length?<EmptyState title={needsReviewOnly?tr('ui2.noSessionsNeedReview'):tr('ops.trackingEmpty', { days: retentionDays })}>{tr('ops.trackingEmptyHint', { days: retentionDays })}</EmptyState>:
       <div className="afya-table-wrap"><table className="admin-table">
         <thead><tr><th>{tr('ui.session')}</th><th>{tr('ui.doctorPatient')}</th><th>{tr('ui.presence')}</th><th>{tr('ui.connection')}</th><th>{tr('ui.status')}</th><th>{tr('ops.traceKept')}</th><th style={{textAlign:'right'}}>{tr('ui.actions')}</th></tr></thead>
         <tbody>{streams.map((s:Stream)=><tr key={s.session_id}>
@@ -80,7 +80,7 @@ export function CommandCenter({telemetry,overview,needsReviewOnly,setNeedsReview
           <td><div style={{fontWeight:700}}>{s.doctor_name}</div><div className="afya-stat-note">{tr('mix.patientPrefix')}{s.patient_name}</div></td>
           <td><div className="afya-stat-note" style={{marginTop:0}}>{tr(s.provider_presence_summary?.patient_present?'mix.patientPresent':'mix.patientAbsent')}<br/>{tr(s.provider_presence_summary?.doctor_present?'mix.doctorPresent':'mix.doctorAbsent')}</div></td>
           <td>{s.rtt_ms==null?<Chip tone="neutral">{tr('ui.notMeasured')}</Chip>:<Chip tone={s.rtt_ms<150?'success':'warn'}>{s.rtt_ms} ms</Chip>}<div className="afya-stat-note">{s.connection_state}</div></td>
-          <td>{s.room_closed?<><Chip tone="neutral">{tr('ops.roomClosed')}</Chip>{s.join_window_closes_at&&<div className="afya-stat-note">{tr('ops.roomClosedNote',{date:nairobiDate(s.join_window_closes_at)})}</div>}</>:s.needs_review?<Chip tone="warn">{tr('ui.needsReview')}</Chip>:<Chip tone="success">{s.session_status?s.session_status.charAt(0)+s.session_status.slice(1).toLowerCase():tr('ui2.active')}</Chip>}
+          <td>{s.room_closed?<><Chip tone="neutral">{tr('ops.roomClosed')}</Chip>{s.join_window_closes_at&&<div className="afya-stat-note">{tr('ops.roomClosedNote',{date:nairobiDate(s.join_window_closes_at)})}</div>}</>:s.needs_review?<Chip tone="warn">{tr('ui.needsReview')}</Chip>:s.ongoing?<Chip tone="success">{tr('ops.statusOngoing')}</Chip>:<Chip tone="neutral">{s.session_status?s.session_status.charAt(0)+s.session_status.slice(1).toLowerCase().replaceAll('_',' '):tr('ui2.active')}</Chip>}
             {s.needs_review&&<div className="afya-stat-note">{tr('mix.paymentStatus', { status: s.payment_status??tr('mix.unknown') })}</div>}</td>
           <td><TraceTimer stream={s} now={now}/></td>
           <td style={{textAlign:'right',whiteSpace:'nowrap'}}>

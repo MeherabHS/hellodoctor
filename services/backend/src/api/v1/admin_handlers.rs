@@ -1068,7 +1068,11 @@ pub async fn get_command_telemetry(
     let doc_name_by_id: HashMap<DoctorProfileId, String> =
         docs.iter().map(|d| (d.id, d.full_name.clone())).collect();
 
-    let sessions = consultation_repo::list_monitoring(&mut *tx).await?;
+    let sessions = consultation_repo::list_monitoring(
+        &mut *tx,
+        state.config.consultation_trace_retention_days as i32,
+    )
+    .await?;
     // Scoped to just the (typically small) set of appointments/patients/
     // telemetry rows behind *active* sessions, not a whole-table fetch —
     // this is an "active now" dashboard, and its cost must scale with how
@@ -1160,7 +1164,12 @@ pub async fn get_command_telemetry(
         // unclosed (for example the doctor never completed it, or Agora's
         // join/leave callbacks never arrived). Shown as such, never counted
         // as a live session.
+        let still_open = matches!(
+            session.status,
+            SessionStatus::Active | SessionStatus::Initialized
+        );
         let room_closed = !needs_review
+            && still_open
             && !session.patient_present
             && !session.doctor_present
             && join_window_closes_at.is_some_and(|closes| closes <= now);
@@ -1176,6 +1185,7 @@ pub async fn get_command_telemetry(
 
         active_streams.push(serde_json::json!({
             "room_closed": room_closed,
+            "ongoing": still_open && !needs_review && !room_closed,
             "join_window_closes_at": join_window_closes_at,
             "trace_retention_days": retention_days,
             "trace_event_count": trace_events,
@@ -1225,7 +1235,7 @@ pub async fn get_command_telemetry(
     .await?;
     let active_count = active_streams
         .iter()
-        .filter(|stream| stream["needs_review"] != true && stream["room_closed"] != true)
+        .filter(|stream| stream["ongoing"] == true)
         .count();
     tx.commit().await?;
 

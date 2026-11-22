@@ -173,6 +173,8 @@ export interface CommandTelemetry {
     timeline_url?: string;
     /** Join window closed and nobody in the room: not live, left unclosed. */
     room_closed?: boolean;
+    /** Still running: open, not awaiting review, join window not over. */
+    ongoing?: boolean;
     join_window_closes_at?: string | null;
     /** The consultation trace is deleted this many days after each event. */
     trace_retention_days?: number;

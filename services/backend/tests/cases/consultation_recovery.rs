@@ -1190,4 +1190,42 @@ async fn test_admin_monitor_marks_rooms_past_their_join_window_as_closed(pool: P
     assert_eq!(timeline["data"]["trace_retention_days"], 5, "{timeline}");
     assert!(timeline["data"]["trace_expires_at"].is_string());
     assert_eq!(timeline["data"]["trace_on_hold"], false);
+    assert!(timeline["data"]["trace_events"].is_array(), "{timeline}");
+
+    // A finished consultation stays in the tracking list (not ongoing) while
+    // its trace exists...
+    sqlx::query("UPDATE consultation_sessions SET status='COMPLETED', ended_at=clock_timestamp() WHERE id=$1")
+        .bind(session_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let body: Value =
+        json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    let done = row(&body);
+    assert_eq!(done["ongoing"], false, "{done}");
+    assert_eq!(done["room_closed"], false, "{done}");
+
+    // ...and drops off once it is older than the retention window with no
+    // trace left.
+    sqlx::query("DELETE FROM consultation_trace_events WHERE appointment_id=$1")
+        .bind(appointment_id)
+        .execute(&pool)
+        .await
+        .ok();
+    sqlx::query("UPDATE consultation_sessions SET started_at=clock_timestamp()-interval '6 days' WHERE id=$1")
+        .bind(session_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let body: Value =
+        json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    assert!(
+        !body["data"]["active_streams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["session_id"] == session_id.to_string()),
+        "a consultation past the {}-day trace window is no longer tracked",
+        5
+    );
 }

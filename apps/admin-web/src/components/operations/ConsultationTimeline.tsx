@@ -9,10 +9,12 @@ import {nairobiDate,timeLeft} from './CommandCenter';
 
 /** What `GET /admin/consultations/:id/timeline` returns (only the fields shown here). */
 type TimelineEvent={event_type?:string;occurred_at?:string;created_at?:string;participant_role?:string;provider_event_at?:string;received_at?:string};
+/** One consultation trace event (the 5-day ledger the grievance investigation shows). */
+type TraceEvent={id:string;event_type:string;event_time_server:string;actor_role?:string|null;result?:string|null;reason_code?:string|null;resource_type?:string|null};
 export type ConsultationTimelineData={
   session_id:string;status:string;recovery_state:string;started_at:string|null;ended_at:string|null;
   patient_present:boolean;doctor_present:boolean;interruption_reason:string|null;
-  events:TimelineEvent[];provider_presence_events:TimelineEvent[];
+  events:TimelineEvent[];provider_presence_events:TimelineEvent[];trace_events?:TraceEvent[];
   reconnect_windows:unknown[];related_grievances:unknown[];related_system_errors:unknown[];
   recovery_resolution:{outcome?:string;reason?:string;created_at?:string}|null;
   trace_retention_days?:number;trace_event_count?:number;trace_expires_at?:string;trace_on_hold?:boolean;
@@ -31,11 +33,14 @@ export function traceLine(data:ConsultationTimelineData,now:number):string|null{
 const words=(code:string|undefined)=>(code??'event').toLowerCase().replaceAll('_',' ').replace(/^\w/,c=>c.toUpperCase());
 const at=(value:string|null|undefined)=>value?new Date(value).toLocaleString('en-KE',{timeZone:'Africa/Nairobi',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
 
-/** One merged, time-ordered list: app events and signed Agora presence events. */
+/** One merged, time-ordered list: consultation trace, app events and signed Agora presence events. */
 export function timelineRows(data:ConsultationTimelineData){
   const rows=[
     ...data.events.map(e=>({time:e.occurred_at??e.created_at??'',label:words(e.event_type),source:tr('ui2.app')})),
     ...data.provider_presence_events.map(e=>({time:e.provider_event_at??e.received_at??'',label:`${words(e.participant_role)} · ${words(e.event_type)}`,source:'Agora'})),
+    ...(data.trace_events??[]).map(e=>({time:e.event_time_server,
+      label:[e.actor_role?words(e.actor_role):null,words(e.event_type),e.result&&e.result!=='SUCCESS'?words(e.result)+(e.reason_code?` (${words(e.reason_code)})`:''):null].filter(Boolean).join(' · '),
+      source:tr('ops.traceSource')})),
   ];
   return rows.sort((a,b)=>a.time.localeCompare(b.time));
 }
@@ -68,8 +73,9 @@ export function ConsultationTimeline({path,onClose}:{path:string;onClose:()=>voi
           {trace&&<div style={{gridColumn:'1 / -1'}}><dt>{tr('ops.timelineTrace')}</dt><dd>{trace}</dd></div>}
         </dl>
         <h3 className="afya-timeline-heading">{tr('ui.events')}</h3>
-        {rows.length?<ol className="afya-timeline-list">{rows.map((r,i)=><li key={i}><span className="afya-timeline-time">{at(r.time)}</span><span>{r.label}</span><Chip tone={r.source==='Agora'?'topic':'outlined'}>{r.source}</Chip></li>)}</ol>
-          :<p className="afya-stat-note">{data.provider_presence_events.length?tr('ui.noEventsYetNobodyHasJoined'):tr('ops.noPresence')}</p>}
+        {rows.length?<ol className="afya-timeline-list">{rows.map((r,i)=><li key={i}><span className="afya-timeline-time">{at(r.time)}</span><span>{r.label}</span><Chip tone={r.source==='Agora'?'topic':r.source===tr('ops.traceSource')?'info':'outlined'}>{r.source}</Chip></li>)}</ol>
+          :<p className="afya-stat-note">{tr('ops.noEvents')}</p>}
+        {!!rows.length&&!data.provider_presence_events.length&&<p className="afya-stat-note">{tr('ops.noPresence')}</p>}
       </>}
     </section>
   </div>;
