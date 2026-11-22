@@ -1237,6 +1237,18 @@ pub async fn get_command_telemetry(
         .iter()
         .filter(|stream| stream["ongoing"] == true)
         .count();
+    // Peer chat and call sessions over the same window (times, statuses and
+    // counts only; never the topic or message text).
+    let peer_sessions = crate::api::v1::peer_handlers::admin_peer_tracking(
+        &mut tx,
+        state.config.consultation_trace_retention_days as i32,
+        now,
+    )
+    .await?;
+    let peer_ongoing = peer_sessions
+        .iter()
+        .filter(|row| row["ongoing"] == true)
+        .count();
     tx.commit().await?;
 
     Ok(Json(ApiResponse {
@@ -1247,6 +1259,8 @@ pub async fn get_command_telemetry(
             "active_sessions_count": active_count,
             "needs_review_count": active_streams.iter().filter(|s| s["needs_review"] == true).count(),
             "active_streams": active_streams,
+            "peer_ongoing_count": peer_ongoing,
+            "peer_sessions": peer_sessions,
         }),
     }))
 }

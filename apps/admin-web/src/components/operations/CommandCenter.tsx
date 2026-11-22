@@ -1,10 +1,11 @@
 'use client';
 import { tr, type MessageKey } from '@/lib/i18n';
 import {useEffect,useState} from 'react';
-import {Activity,MessageSquare,Users,Video} from 'lucide-react';
+import {Activity,HeartHandshake,MessageSquare,Users,Video} from 'lucide-react';
 import {ConsultationTimeline} from './ConsultationTimeline';
-import type {AdminOverview,CommandTelemetry} from '../../lib/api';
-import {Card,Chip,EmptyState,Notice,PageHead,StatTile} from '../ui/afya';
+import {PeerSessionTimeline} from './PeerSessionTimeline';
+import type {AdminOverview,CommandTelemetry,PeerTrackingRow} from '../../lib/api';
+import {Card,Chip,EmptyState,Notice,PageHead,StatTile,Tabs} from '../ui/afya';
 
 /**
  * Dashboard → Operations & Live Command Center (Operations board, panel 1).
@@ -49,11 +50,16 @@ export function TraceTimer({stream,now}:{stream:Stream;now:number}){
 
 export function CommandCenter({telemetry,overview,needsReviewOnly,setNeedsReviewOnly,busyId,onRecordDecision,apiBase}:{telemetry:CommandTelemetry|null;overview:AdminOverview|null;needsReviewOnly:boolean;setNeedsReviewOnly:(v:boolean)=>void;busyId:string|null;onRecordDecision:(sessionId:string)=>void;apiBase:string}){
   const [timeline,setTimeline]=useState<string|null>(null);
+  const [peerTimeline,setPeerTimeline]=useState<string|null>(null);
+  // Which sessions to show: doctor consultations, peer sessions, or both.
+  const [kind,setKind]=useState<'all'|'doctor'|'peer'>('all');
+  const [peerType,setPeerType]=useState<'all'|'CHAT'|'CALL'>('all');
+  const peerRows=(telemetry?.peer_sessions??[]).filter(p=>peerType==='all'||p.support_type===peerType);
   const streams=(telemetry?.active_streams??[]).filter(s=>!needsReviewOnly||s.needs_review);
   const reviewCount=telemetry?.needs_review_count??0;
   // The countdowns tick once a minute.
   const [now,setNow]=useState(()=>Date.now());
-  useEffect(()=>{const id=window.setInterval(()=>setNow(Date.now()),60_000);return()=>window.clearInterval(id);},[]);
+  useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),60_000);return()=>clearInterval(id);},[]);
   const retentionDays=telemetry?.active_streams.find(s=>s.trace_retention_days)?.trace_retention_days??5;
   const anyClosed=streams.some(s=>s.room_closed);
 
@@ -63,9 +69,15 @@ export function CommandCenter({telemetry,overview,needsReviewOnly,setNeedsReview
       <StatTile icon={Video} tone="green" value={telemetry?.completed_today??'—'} label={tr('ui.consultationsCompletedToday')}/>
       <StatTile icon={Users} tone="blue" value={telemetry?.active_specialists??'—'} label={tr('ui.activeSpecialists')} note={overview?tr('ui4.ofRegistered', { count: overview.total_doctors }):undefined}/>
       <StatTile icon={MessageSquare} tone="purple" value={telemetry?.active_sessions_count??'—'} label={tr('ops.ongoing')} note={tr('ui4.videoChat')}/>
+      <StatTile icon={HeartHandshake} tone="amber" value={telemetry?.peer_ongoing_count??'—'} label={tr('ops.peerOngoing')} note={tr('ops.peerChatCall')}/>
     </div>
 
-    <Card title={tr('ops.trackingTitle', { days: retentionDays, count: telemetry?.active_streams.length??0 })} subtitle={tr('ops.trackingSubtitle', { days: retentionDays })}
+    <Tabs label={tr('ops.showSessions')} value={kind} onChange={setKind} items={[
+      {id:'all',label:tr('ops.kindAll')},
+      {id:'doctor',label:tr('ops.kindDoctor'),count:telemetry?.active_streams.length},
+      {id:'peer',label:tr('ops.kindPeer'),count:telemetry?.peer_sessions?.length}]}/>
+
+    {kind!=='peer'&&<Card title={tr('ops.trackingTitle', { days: retentionDays, count: telemetry?.active_streams.length??0 })} subtitle={tr('ops.trackingSubtitle', { days: retentionDays })}
       actions={<label className="afya-check"><input type="checkbox" checked={needsReviewOnly} onChange={e=>setNeedsReviewOnly(e.target.checked)}/>{tr('mix.needsReviewOnly', { count: reviewCount })}</label>}>
       <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:16}}>
         <TraceRuleNote days={retentionDays}/>
@@ -89,7 +101,25 @@ export function CommandCenter({telemetry,overview,needsReviewOnly,setNeedsReview
           </td>
         </tr>)}</tbody>
       </table></div>}
-    </Card>
+    </Card>}
+
+    {kind!=='doctor'&&<Card title={tr('ops.peerTitle',{days:retentionDays,count:telemetry?.peer_sessions?.length??0})} subtitle={tr('ops.peerSubtitle',{days:retentionDays})}
+      actions={<Tabs label={tr('ops.peerType')} value={peerType} onChange={setPeerType} items={[{id:'all',label:tr('ops.kindAll')},{id:'CHAT',label:tr('ops.peerChat')},{id:'CALL',label:tr('ops.peerCall')}]}/>}>
+      {!peerRows.length?<EmptyState title={tr('ops.peerEmpty',{days:retentionDays})}>{tr('ops.peerEmptyHint',{days:retentionDays})}</EmptyState>:
+      <div className="afya-table-wrap"><table className="admin-table">
+        <thead><tr><th>{tr('ops.peerColSession')}</th><th>{tr('ops.peerColPeople')}</th><th>{tr('ops.peerColActivity')}</th><th>{tr('ui.status')}</th><th>{tr('ops.traceKept')}</th><th style={{textAlign:'right'}}>{tr('ui.actions')}</th></tr></thead>
+        <tbody>{peerRows.map((p:PeerTrackingRow)=><tr key={p.request_id}>
+          <td><Chip tone={p.support_type==='CALL'?'purple':'info'}>{p.support_type==='CALL'?tr('ops.peerCall'):tr('ops.peerChat')}</Chip><div className="afya-stat-note">{nairobiDate(p.start_time)}</div></td>
+          <td><div style={{fontWeight:700}}>{p.peer_name}</div><div className="afya-stat-note">{tr('mix.patientPrefix')}{p.patient_name}</div></td>
+          <td><div className="afya-stat-note" style={{marginTop:0}}>{tr('ops.peerMessages',{count:p.messages})}
+            {p.support_type==='CALL'&&<><br/>{p.call_started_at?(p.call_ended_at?tr('ops.peerCallEnded',{date:nairobiDate(p.call_ended_at)}):tr('ops.peerCallLive',{patient:tr(p.patient_present?'mix.patientPresent':'mix.patientAbsent'),peer:p.peer_present?tr('ops.peerPresent'):tr('ops.peerAbsent')})):tr('ops.peerCallNotStarted')}</>}</div></td>
+          <td>{p.ongoing?<Chip tone="success">{tr('ops.statusOngoing')}</Chip>:<Chip tone="neutral">{p.status.charAt(0)+p.status.slice(1).toLowerCase()}</Chip>}</td>
+          <td>{new Date(p.tracked_until).getTime()>now?<Chip tone={new Date(p.tracked_until).getTime()-now<24*3600_000?'danger':'warn'}>{tr('ops.traceLeft',{time:timeLeft(p.tracked_until,now)})}</Chip>:<Chip tone="neutral">{tr('ops.traceDeleted',{date:nairobiDate(p.tracked_until)})}</Chip>}</td>
+          <td style={{textAlign:'right'}}><button type="button" className="afya-btn-secondary" onClick={()=>setPeerTimeline(p.timeline_url)}>{tr('ui.timeline')}</button></td>
+        </tr>)}</tbody>
+      </table></div>}
+    </Card>}
     {timeline&&<ConsultationTimeline path={timeline} onClose={()=>setTimeline(null)}/>}
+    {peerTimeline&&<PeerSessionTimeline path={peerTimeline} onClose={()=>setPeerTimeline(null)}/>}
   </div>;
 }

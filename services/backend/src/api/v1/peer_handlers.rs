@@ -1384,3 +1384,115 @@ pub async fn care_verify_otp(
     .await?;
     Ok(ok(response))
 }
+
+#[derive(sqlx::FromRow)]
+struct PeerTrackingRow {
+    request_id: Uuid,
+    peer_id: Uuid,
+    peer_name: String,
+    patient_name: String,
+    support_type: String,
+    status: String,
+    start_time: DateTime<Utc>,
+    end_time: DateTime<Utc>,
+    requested_at: DateTime<Utc>,
+    decided_at: Option<DateTime<Utc>>,
+    completed_at: Option<DateTime<Utc>>,
+    cancelled_at: Option<DateTime<Utc>>,
+    messages: i64,
+    last_message_at: Option<DateTime<Utc>>,
+    call_status: Option<String>,
+    call_started_at: Option<DateTime<Utc>>,
+    call_ended_at: Option<DateTime<Utc>>,
+    patient_present: bool,
+    peer_present: bool,
+    last_activity_at: DateTime<Utc>,
+}
+
+/// Peer sessions for the Admin dashboard's tracking list: every session with
+/// activity in the last `days` days. A row is tracked until `days` after its
+/// last activity (the same window as the consultation trace).
+pub async fn admin_peer_tracking(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    days: i32,
+    now: DateTime<Utc>,
+) -> Result<Vec<serde_json::Value>, AppError> {
+    let rows: Vec<PeerTrackingRow> = sqlx::query_as("SELECT * FROM fn_admin_peer_tracking($1)")
+        .bind(days)
+        .fetch_all(&mut **tx)
+        .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            let in_slot = r.start_time <= now && now < r.end_time;
+            let ongoing =
+                r.call_status.as_deref() == Some("ACTIVE") || (r.status == "ACCEPTED" && in_slot);
+            json!({
+                "request_id": r.request_id,
+                "peer_id": r.peer_id,
+                "peer_name": r.peer_name,
+                "patient_name": r.patient_name,
+                "support_type": r.support_type,
+                "status": r.status,
+                "start_time": r.start_time,
+                "end_time": r.end_time,
+                "requested_at": r.requested_at,
+                "decided_at": r.decided_at,
+                "completed_at": r.completed_at,
+                "cancelled_at": r.cancelled_at,
+                "messages": r.messages,
+                "last_message_at": r.last_message_at,
+                "call_status": r.call_status,
+                "call_started_at": r.call_started_at,
+                "call_ended_at": r.call_ended_at,
+                "patient_present": r.patient_present,
+                "peer_present": r.peer_present,
+                "ongoing": ongoing,
+                "last_activity_at": r.last_activity_at,
+                "tracked_until": r.last_activity_at + chrono::Duration::days(i64::from(days)),
+                "timeline_url": format!("/admin/peer-sessions/{}/timeline", r.request_id),
+            })
+        })
+        .collect())
+}
+
+/// `GET /admin/peer-sessions/:request_id/timeline` — one peer session's
+/// events: who acted (patient, peer or system) and when. Never the topic or
+/// any message text. Viewing is audited.
+pub async fn admin_peer_session_timeline(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(request_id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::ManagePeerNavigators)?;
+    let mut tx = state.begin_authed(&ctx).await?;
+    let events: Vec<(DateTime<Utc>, String, String)> =
+        sqlx::query_as("SELECT at, event, actor FROM fn_admin_peer_session_timeline($1)")
+            .bind(request_id)
+            .fetch_all(&mut *tx)
+            .await?;
+    if events.is_empty() {
+        return Err(AppError::NotFound("Peer session not found.".into()));
+    }
+    AuditService::log_in_tx(
+        &mut *tx,
+        AuditLogEntry::new(
+            Some(ctx.user_id),
+            ctx.role,
+            "ADMIN_PEER_SESSION_VIEWED",
+            "PEER_REQUEST",
+            Some(request_id),
+            "SUCCESS",
+        ),
+    )
+    .await?;
+    tx.commit().await?;
+    Ok(ok(json!({
+        "request_id": request_id,
+        "retention_days": state.config.consultation_trace_retention_days,
+        "events": events
+            .into_iter()
+            .map(|(at, event, actor)| json!({"at": at, "event": event, "actor": actor}))
+            .collect::<Vec<_>>(),
+    })))
+}

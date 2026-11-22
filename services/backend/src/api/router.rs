@@ -794,6 +794,7 @@ fn protected_routes() -> Router<AppState> {
         .route("/admin/peer-directory", get(crate::api::v1::peer_handlers::admin_directory))
         .route("/admin/patients/:id/peer-sessions", get(crate::api::v1::peer_handlers::admin_patient_sessions))
         .route("/admin/peers/:peer_id/history", get(crate::api::v1::peer_handlers::admin_history))
+        .route("/admin/peer-sessions/:request_id/timeline", get(crate::api::v1::peer_handlers::admin_peer_session_timeline))
         .route("/admin/peers/:peer_id/:action", axum::routing::post(crate::api::v1::peer_handlers::admin_decide))
         .route(
             "/admin/doctors",

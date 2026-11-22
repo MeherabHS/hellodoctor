@@ -2,7 +2,7 @@ import React from 'react';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {act,create,type ReactTestRenderer} from 'react-test-renderer';
-import {PeerDirectory,PeerRecord,supportedPatients,patientCode} from '../src/components/people/PeerDirectory';
+import {PeerDirectory,PeerRecord,requestOutcomes,supportedPatients,patientCode} from '../src/components/people/PeerDirectory';
 import {clearSoftReads,type AdminPeerDirectoryRow,type AdminPeerHistory,type AdminPeerSession} from '../src/lib/api';
 
 const peer=(id:string,status:AdminPeerDirectoryRow['approval_status'],name:string,extra:Partial<AdminPeerDirectoryRow>={}):AdminPeerDirectoryRow=>({id,full_name:name,email:`${id}@example.test`,phone_number:'+254700000000',county:'Nairobi',organization:'Youth Centre',approval_status:status,approval_note:null,reviewed_at:null,created_at:'2026-11-01T08:00:00Z',...extra});
@@ -22,6 +22,18 @@ test('supported patients are counted once, from accepted or completed sessions o
   ]);
   assert.deepEqual(list.map(p=>[p.name,p.sessions,p.completed]),[['Amina Otieno',2,1],['Cate Wairimu',1,1]]);
   assert.equal(patientCode('aaaaa111-0000'),'#PT-AAAAA');
+});
+
+test('request outcomes count accepted, declined, cancelled and completed like a consultation history',()=>{
+  const o=requestOutcomes([
+    session('r1','a','A','COMPLETED','2026-11-10T07:00:00Z',{decided_at:'2026-11-09T07:00:00Z'}),
+    session('r2','a','A','ACCEPTED','2026-11-14T07:00:00Z',{decided_at:'2026-11-13T07:00:00Z',support_type:'CALL'}),
+    session('r3','b','B','DECLINED','2026-11-12T07:00:00Z',{decided_at:'2026-11-11T07:00:00Z'}),
+    session('r4','c','C','CANCELLED','2026-11-11T07:00:00Z',{decided_at:'2026-11-10T07:00:00Z'}),
+    session('r5','d','D','CANCELLED','2026-11-11T07:00:00Z'),
+    session('r6','e','E','PENDING','2026-11-20T07:00:00Z'),
+  ]);
+  assert.deepEqual(o,{received:6,accepted:3,declined:1,cancelled:2,completed:1,waiting:1,chat:3,call:1});
 });
 
 test('the directory lists every peer with activity and opens a record',async()=>{
