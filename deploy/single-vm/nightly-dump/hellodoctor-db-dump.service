@@ -1,0 +1,12 @@
+[Unit]
+Description=HelloDoctor nightly PostgreSQL dump
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Optional overrides: PG_CONTAINER, BACKUP_DIR, BACKUP_KEEP, BACKUP_MIN_FREE_MB.
+EnvironmentFile=-/etc/default/hellodoctor-db-dump
+ExecStart=/usr/local/bin/hellodoctor-nightly-db-dump.sh
+Nice=10
+IOSchedulingClass=idle
