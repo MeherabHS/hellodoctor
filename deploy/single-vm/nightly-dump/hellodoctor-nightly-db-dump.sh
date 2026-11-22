@@ -19,10 +19,22 @@ BACKUP_DIR="${BACKUP_DIR:-/var/backups/hellodoctor}"
 BACKUP_KEEP="${BACKUP_KEEP:-14}"
 BACKUP_MIN_FREE_MB="${BACKUP_MIN_FREE_MB:-2048}"
 BACKUP_WAIT_SECONDS="${BACKUP_WAIT_SECONDS:-300}"
+# Day of the week for the full test restore (Mon..Sun), "always" or "never".
+BACKUP_RESTORE_TEST_DAY="${BACKUP_RESTORE_TEST_DAY:-Sun}"
+# Optional: a Slack/Teams/Discord-style webhook that receives failures.
+BACKUP_ALERT_WEBHOOK_URL="${BACKUP_ALERT_WEBHOOK_URL:-}"
 PREFIX="hellodoctor"
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
-fail() { log "FAILED: $*"; exit 1; }
+alert() {
+  [ -n "$BACKUP_ALERT_WEBHOOK_URL" ] || return 0
+  local text="HelloDoctor nightly DB dump on $(hostname): $1"
+  text="${text//\\/\\\\}"; text="${text//\"/\\\"}"
+  curl -fsS -m 10 -H 'Content-Type: application/json' \
+    -d "{\"text\":\"$text\",\"content\":\"$text\"}" "$BACKUP_ALERT_WEBHOOK_URL" >/dev/null 2>&1 \
+    || log "could not reach the alert webhook"
+}
+fail() { log "FAILED: $*"; alert "FAILED: $*"; exit 1; }
 
 case "$BACKUP_KEEP" in ''|*[!0-9]*) fail "BACKUP_KEEP must be a whole number, got '$BACKUP_KEEP'";; esac
 [ "$BACKUP_KEEP" -ge 1 ] || fail "BACKUP_KEEP must be at least 1"
@@ -54,6 +66,7 @@ done
 
 stamp="$(TZ=Africa/Nairobi date +%Y-%m-%d_%H%M)"
 final="$BACKUP_DIR/${PREFIX}-${stamp}.dump"
+globals="$BACKUP_DIR/${PREFIX}-${stamp}.globals.sql"
 partial="$BACKUP_DIR/.${PREFIX}-${stamp}.dump.partial"
 trap 'rm -f "$partial"' EXIT
 
@@ -69,14 +82,41 @@ entries="$(docker exec -i "$CONTAINER" pg_restore --list < "$partial" | grep -c 
 
 mv "$partial" "$final"
 trap - EXIT
-( cd "$BACKUP_DIR" && sha256sum "$(basename "$final")" > "$(basename "$final").sha256" )
-log "ok: $(du -h "$final" | cut -f1), $entries catalogue entries"
+
+# Roles live outside the database, so pg_dump never includes them. Without
+# them, a restore onto a NEW server fails on every GRANT and RLS policy that
+# names hellodoctor_api and the other capability roles. Passwords are left
+# out: the backend sets them from its environment at start-up.
+docker exec "$CONTAINER" sh -c 'pg_dumpall -U "$POSTGRES_USER" --globals-only --no-role-passwords' > "$globals" \
+  || fail "could not dump database roles"
+( cd "$BACKUP_DIR" && sha256sum "$(basename "$final")" "$(basename "$globals")" > "$(basename "$final").sha256" )
+log "ok: $(du -h "$final" | cut -f1), $entries catalogue entries, roles saved"
+
+# Weekly proof that the dump really restores: load it into a throwaway
+# database, count real rows, drop it. Reading the table of contents alone
+# only proves the file opens.
+today="$(TZ=Africa/Nairobi date +%a)"
+if [ "$BACKUP_RESTORE_TEST_DAY" = "always" ] || [ "$BACKUP_RESTORE_TEST_DAY" = "$today" ]; then
+  scratch="restore_check_$(date +%s)"
+  log "test restore into scratch database $scratch"
+  docker exec "$CONTAINER" sh -c "createdb -U \"\$POSTGRES_USER\" $scratch" \
+    || fail "could not create the scratch database for the test restore"
+  if docker exec -i "$CONTAINER" sh -c "exec nice -n 10 ionice -c 3 pg_restore -U \"\$POSTGRES_USER\" -d $scratch --no-owner --exit-on-error" < "$final" >/dev/null 2>&1; then
+    rows="$(docker exec "$CONTAINER" sh -c "psql -U \"\$POSTGRES_USER\" -d $scratch -Atc 'select count(*) from _sqlx_migrations'" 2>/dev/null || echo 0)"
+    docker exec "$CONTAINER" sh -c "dropdb -U \"\$POSTGRES_USER\" $scratch" || log "could not drop $scratch; drop it by hand"
+    [ "${rows:-0}" -gt 0 ] || fail "test restore produced an empty database"
+    log "test restore ok: $rows migrations present"
+  else
+    docker exec "$CONTAINER" sh -c "dropdb -U \"\$POSTGRES_USER\" --if-exists $scratch" >/dev/null 2>&1 || true
+    fail "test restore of $(basename "$final") failed"
+  fi
+fi
 
 # Keep the newest BACKUP_KEEP dumps; delete older ones and their checksums.
 removed=0
 while IFS= read -r old; do
   [ -n "$old" ] || continue
-  rm -f -- "$old" "$old.sha256"
+  rm -f -- "$old" "$old.sha256" "${old%.dump}.globals.sql"
   removed=$((removed + 1))
 done < <(ls -1t "$BACKUP_DIR/${PREFIX}"-*.dump 2>/dev/null | tail -n +"$((BACKUP_KEEP + 1))")
 [ "$removed" -eq 0 ] || log "removed $removed dump(s) older than the newest $BACKUP_KEEP"
