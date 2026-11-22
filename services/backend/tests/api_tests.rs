@@ -51,6 +51,8 @@ mod admin_campaigns;
 mod admin_content_sanitization;
 #[path = "cases/admin_invitations.rs"]
 mod admin_invitations;
+#[path = "cases/admin_profile.rs"]
+mod admin_profile;
 #[path = "cases/admin_query_g20_investigation.rs"]
 mod admin_query_g20_investigation;
 #[path = "cases/admin_quizzes.rs"]

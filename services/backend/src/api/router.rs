@@ -765,6 +765,11 @@ fn protected_routes() -> Router<AppState> {
         .route("/admin/audit/views", axum::routing::post(activity_handlers::record_view))
         // Admin Team: invite other Admins by email.
         .route("/admin/team", get(admin_team_handlers::team))
+        // The signed-in Admin's own profile page.
+        .route("/admin/me", get(admin_profile_handlers::me))
+        .route("/admin/me/photo", get(admin_profile_handlers::get_photo)
+            .post(admin_profile_handlers::upload_photo)
+            .delete(admin_profile_handlers::delete_photo))
         .route("/admin/reauth", axum::routing::post(admin_team_handlers::reauth).layer(axum::extract::DefaultBodyLimit::max(1024)))
         .route("/admin/team/invitations", axum::routing::post(admin_team_handlers::invite))
         .route("/admin/team/invitations/:id/resend", axum::routing::post(admin_team_handlers::resend))

@@ -28,6 +28,7 @@ pub mod webhook_handlers;
 pub mod data_rights_handlers;
 
 pub mod admin_article_handlers;
+pub mod admin_profile_handlers;
 pub mod admin_quiz_handlers;
 pub mod patient_quiz_handlers;
 pub mod trace_handlers;

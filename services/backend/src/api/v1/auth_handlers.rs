@@ -841,8 +841,11 @@ pub async fn change_password(
             "Password changes are not available for this account.".into(),
         ));
     };
+    // 403, not 401: the caller IS authenticated. Web clients treat a 401 as
+    // an expired session and sign the user out, so a mistyped current password
+    // must not look like one (same choice as `admin_step_up::confirm_password`).
     if !crypto::verify_password_async(payload.current_password.clone(), current_hash).await? {
-        return Err(AppError::Unauthorized(
+        return Err(AppError::Forbidden(
             "The current password is incorrect.".into(),
         ));
     }
