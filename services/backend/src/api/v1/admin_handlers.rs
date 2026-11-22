@@ -1111,6 +1111,34 @@ pub async fn get_command_telemetry(
         .collect()
     };
 
+    // Per appointment: when its join window closes (slot end + the token
+    // window after it), and the consultation trace's retention clock. Trace
+    // events are deleted `consultation_trace_retention_days` after they are
+    // written unless a grievance holds them.
+    #[allow(clippy::type_complexity)]
+    let room_facts: HashMap<Uuid, (DateTime<Utc>, i64, Option<DateTime<Utc>>, bool)> =
+        if session_appointment_ids.is_empty() {
+            HashMap::new()
+        } else {
+            sqlx::query_as::<_, (Uuid, DateTime<Utc>, i64, Option<DateTime<Utc>>, bool)>(
+                "SELECT a.id, s.end_time,
+                        (SELECT count(*) FROM consultation_trace_events t WHERE t.appointment_id=a.id),
+                        (SELECT max(t.expires_at) FROM consultation_trace_events t WHERE t.appointment_id=a.id),
+                        EXISTS(SELECT 1 FROM consultation_trace_holds h WHERE h.appointment_id=a.id AND h.release_at IS NULL)
+                   FROM appointments a JOIN doctor_schedule_slots s ON s.id=a.slot_id
+                  WHERE a.id = ANY($1)",
+            )
+            .bind(&session_appointment_ids)
+            .fetch_all(&mut *tx)
+            .await?
+            .into_iter()
+            .map(|(id, end, count, expires, held)| (id, (end, count, expires, held)))
+            .collect()
+        };
+    let now = Utc::now();
+    let retention_days = i64::from(state.config.consultation_trace_retention_days);
+    let window_after = chrono::Duration::minutes(state.config.agora_token_window_after_mins);
+
     let mut active_streams = Vec::new();
     for session in &sessions {
         let appt = appt_by_id.get(&session.appointment_id);
@@ -1125,8 +1153,34 @@ pub async fn get_command_telemetry(
         let telemetry = telemetry_by_session.get(&session.id);
         let needs_review = session.recovery_state == "NEEDS_REVIEW"
             || matches!(session.status, SessionStatus::PrematureTermination);
+        let facts = room_facts.get(&session.appointment_id);
+        let join_window_closes_at = facts.map(|f| f.0 + window_after);
+        // Nobody can join once the join window has closed, so a session still
+        // marked open with nobody in the room is not live: the room was left
+        // unclosed (for example the doctor never completed it, or Agora's
+        // join/leave callbacks never arrived). Shown as such, never counted
+        // as a live session.
+        let room_closed = !needs_review
+            && !session.patient_present
+            && !session.doctor_present
+            && join_window_closes_at.is_some_and(|closes| closes <= now);
+        let trace_events = facts.map(|f| f.1).unwrap_or(0);
+        let trace_on_hold = facts.is_some_and(|f| f.3);
+        // With events: the last one's expiry. Without: when events written at
+        // the session's start would have expired, so an old session reads as
+        // "trace deleted", not "nothing happened".
+        let trace_expires_at = facts.and_then(|f| f.2).unwrap_or_else(|| {
+            session.started_at.unwrap_or(session.created_at)
+                + chrono::Duration::days(retention_days)
+        });
 
         active_streams.push(serde_json::json!({
+            "room_closed": room_closed,
+            "join_window_closes_at": join_window_closes_at,
+            "trace_retention_days": retention_days,
+            "trace_event_count": trace_events,
+            "trace_expires_at": trace_expires_at,
+            "trace_on_hold": trace_on_hold,
             "session_id": session.id,
             "appointment_id": session.appointment_id,
             "channel_name": session.agora_channel_name,
@@ -1158,13 +1212,20 @@ pub async fn get_command_telemetry(
         }));
     }
 
-    let completed_today = appts
-        .iter()
-        .filter(|a| a.status == AppointmentStatus::Completed)
-        .count();
+    // Every consultation completed today (Nairobi calendar day), not only the
+    // ones behind still-open sessions: a completed consultation's session is
+    // no longer open, so the old count was almost always 0.
+    let completed_today: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM appointments
+          WHERE status = 'COMPLETED'::appointment_status_enum
+            AND (completed_at AT TIME ZONE 'Africa/Nairobi')::date
+                = (clock_timestamp() AT TIME ZONE 'Africa/Nairobi')::date",
+    )
+    .fetch_one(&mut *tx)
+    .await?;
     let active_count = active_streams
         .iter()
-        .filter(|stream| stream["needs_review"] != true)
+        .filter(|stream| stream["needs_review"] != true && stream["room_closed"] != true)
         .count();
     tx.commit().await?;
 

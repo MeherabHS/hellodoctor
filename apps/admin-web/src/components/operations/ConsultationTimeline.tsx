@@ -5,6 +5,7 @@ import {useEffect,useState} from 'react';
 import {X} from 'lucide-react';
 import {request} from '../../lib/api';
 import {Chip} from '../ui/afya';
+import {nairobiDate,timeLeft} from './CommandCenter';
 
 /** What `GET /admin/consultations/:id/timeline` returns (only the fields shown here). */
 type TimelineEvent={event_type?:string;occurred_at?:string;created_at?:string;participant_role?:string;provider_event_at?:string;received_at?:string};
@@ -14,7 +15,18 @@ export type ConsultationTimelineData={
   events:TimelineEvent[];provider_presence_events:TimelineEvent[];
   reconnect_windows:unknown[];related_grievances:unknown[];related_system_errors:unknown[];
   recovery_resolution:{outcome?:string;reason?:string;created_at?:string}|null;
+  trace_retention_days?:number;trace_event_count?:number;trace_expires_at?:string;trace_on_hold?:boolean;
 };
+
+/** The consultation trace's retention line: kept until / held / deleted (never "nothing happened"). */
+export function traceLine(data:ConsultationTimelineData,now:number):string|null{
+  if(!data.trace_expires_at)return null;
+  const count=data.trace_event_count??0;const days=data.trace_retention_days??5;
+  if(data.trace_on_hold)return tr('ops.timelineTraceHeld',{count});
+  if(new Date(data.trace_expires_at).getTime()<=now)return tr('ops.timelineTraceDeleted',{date:nairobiDate(data.trace_expires_at),days});
+  if(!count)return tr('ops.timelineTraceEmpty',{date:nairobiDate(data.trace_expires_at)});
+  return tr('ops.timelineTraceKept',{count,date:nairobiDate(data.trace_expires_at),time:timeLeft(data.trace_expires_at,now)});
+}
 
 const words=(code:string|undefined)=>(code??'event').toLowerCase().replaceAll('_',' ').replace(/^\w/,c=>c.toUpperCase());
 const at=(value:string|null|undefined)=>value?new Date(value).toLocaleString('en-KE',{timeZone:'Africa/Nairobi',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
@@ -34,6 +46,9 @@ export function ConsultationTimeline({path,onClose}:{path:string;onClose:()=>voi
   useEffect(()=>{let active=true;request<ConsultationTimelineData>(path).then(d=>{if(active)setData(d);}).catch(e=>{if(active)setError(apiErrorMessage(e, tr('ui.unableToLoadTheTimeline')));});return()=>{active=false;};},[path]);
   useEffect(()=>{const key=(e:KeyboardEvent)=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[onClose]);
   const rows=data?timelineRows(data):[];
+  // Read once when the panel opens; the panel is short-lived.
+  const [openedAt]=useState(()=>Date.now());
+  const trace=data?traceLine(data,openedAt):null;
   return <div className="admin-modal-backdrop" role="presentation" onClick={onClose}>
     <section role="dialog" aria-modal="true" aria-labelledby="timeline-title" className="admin-modal-card afya-timeline-panel" onClick={e=>e.stopPropagation()}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12}}>
@@ -50,10 +65,11 @@ export function ConsultationTimeline({path,onClose}:{path:string;onClose:()=>voi
           <div><dt>{tr('ui.inTheRoomNow')}</dt><dd>{[data.patient_present&&tr('ui2.patient'),data.doctor_present&&tr('ui2.doctor')].filter(Boolean).join(' and ')||tr('ui2.nobody')}</dd></div>
           <div><dt>{tr('ui.recovery')}</dt><dd>{words(data.recovery_state)}{data.recovery_resolution?.outcome?` · ${words(data.recovery_resolution.outcome)}`:''}</dd></div>
           <div><dt>{tr('ui.reconnectsGrievancesAppErrors')}</dt><dd>{data.reconnect_windows.length} · {data.related_grievances.length} · {data.related_system_errors.length}</dd></div>
+          {trace&&<div style={{gridColumn:'1 / -1'}}><dt>{tr('ops.timelineTrace')}</dt><dd>{trace}</dd></div>}
         </dl>
         <h3 className="afya-timeline-heading">{tr('ui.events')}</h3>
         {rows.length?<ol className="afya-timeline-list">{rows.map((r,i)=><li key={i}><span className="afya-timeline-time">{at(r.time)}</span><span>{r.label}</span><Chip tone={r.source==='Agora'?'topic':'outlined'}>{r.source}</Chip></li>)}</ol>
-          :<p className="afya-stat-note">{tr('ui.noEventsYetNobodyHasJoined')}</p>}
+          :<p className="afya-stat-note">{data.provider_presence_events.length?tr('ui.noEventsYetNobodyHasJoined'):tr('ops.noPresence')}</p>}
       </>}
     </section>
   </div>;

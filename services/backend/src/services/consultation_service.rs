@@ -462,6 +462,23 @@ impl ConsultationService {
         .fetch_optional(&mut *tx)
         .await?;
 
+        // The consultation trace's retention clock (see the dashboard's
+        // "Trace kept" column): events are deleted N days after they are
+        // written unless a grievance holds them.
+        let (trace_event_count, trace_last_expiry, trace_on_hold): (i64, Option<DateTime<Utc>>, bool) =
+            sqlx::query_as(
+                "SELECT (SELECT count(*) FROM consultation_trace_events WHERE appointment_id=$1),
+                        (SELECT max(expires_at) FROM consultation_trace_events WHERE appointment_id=$1),
+                        EXISTS(SELECT 1 FROM consultation_trace_holds WHERE appointment_id=$1 AND release_at IS NULL)",
+            )
+            .bind(session.appointment_id)
+            .fetch_one(&mut *tx)
+            .await?;
+        let trace_retention_days = i64::from(state.config.consultation_trace_retention_days);
+        let trace_expires_at = trace_last_expiry.unwrap_or_else(|| {
+            session.started_at.unwrap_or(session.created_at) + Duration::days(trace_retention_days)
+        });
+
         let mut participant_user_ids = Vec::new();
         if let Some(p) = patient_repo::find_by_id(&mut *tx, apt.patient_id).await? {
             match p.user_id {
@@ -512,6 +529,10 @@ impl ConsultationService {
             "patient_presence_sequence": session.patient_presence_sequence,
             "doctor_presence_sequence": session.doctor_presence_sequence,
             "provider_presence_events": provider_presence_events,
+            "trace_retention_days": trace_retention_days,
+            "trace_event_count": trace_event_count,
+            "trace_expires_at": trace_expires_at,
+            "trace_on_hold": trace_on_hold,
             "provider_presence_semantics": "Signed Agora provider callbacks are authoritative for presence. Client telemetry and reconnect_windows below are supplementary and cannot change recovery state.",
             "recovery_resolution": recovery_resolution,
             "events": events,

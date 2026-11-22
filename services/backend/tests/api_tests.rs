@@ -6759,6 +6759,13 @@ async fn test_admin_dashboard_endpoints_resolve_names_correctly(pool: PgPool) {
     // doesn't error even when nothing is active.
     let res_telemetry = get(&app, "/api/v1/admin/command/telemetry", Some(&admin_token)).await;
     assert_eq!(res_telemetry.status(), StatusCode::OK);
+    // The consultation completed above counts as completed today, although
+    // its session is no longer open (the old count only looked at open ones).
+    let telemetry_json = json_body(res_telemetry).await;
+    assert!(
+        telemetry_json["data"]["completed_today"].as_i64().unwrap() >= 1,
+        "{telemetry_json}"
+    );
 
     // list_admin_grievances: patient/doctor names must resolve correctly
     // through the session -> appointment -> doctor chain.

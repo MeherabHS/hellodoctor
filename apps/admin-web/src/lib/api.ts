@@ -171,6 +171,15 @@ export interface CommandTelemetry {
     needs_review?: boolean;
     payment_status?: string | null;
     timeline_url?: string;
+    /** Join window closed and nobody in the room: not live, left unclosed. */
+    room_closed?: boolean;
+    join_window_closes_at?: string | null;
+    /** The consultation trace is deleted this many days after each event. */
+    trace_retention_days?: number;
+    trace_event_count?: number;
+    trace_expires_at?: string;
+    /** A grievance holds the trace past its normal deletion. */
+    trace_on_hold?: boolean;
     provider_presence_summary?: {
       source: string;
       patient_present: boolean;
