@@ -1552,6 +1552,7 @@ export const en = {
     photoType: "Choose a JPEG, PNG or WebP photo.",
     photoTooLarge: "Choose a photo smaller than 10 MB.",
     photoFailed: "Your photo could not be updated. Try again.",
+    accountReadOnly: "These details cannot be changed. Only your password and photo can.",
     account: "Account",
     email: "Email",
     phone: "Phone",

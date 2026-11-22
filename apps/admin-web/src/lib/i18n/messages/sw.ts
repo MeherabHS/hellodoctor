@@ -1551,6 +1551,7 @@ export const sw: Messages = {
     photoType: "Chagua picha ya JPEG, PNG au WebP.",
     photoTooLarge: "Chagua picha iliyo chini ya MB 10.",
     photoFailed: "Picha yako haikuweza kusasishwa. Jaribu tena.",
+    accountReadOnly: "Taarifa hizi haziwezi kubadilishwa. Ni nenosiri na picha yako tu vinavyoweza kubadilishwa.",
     account: "Akaunti",
     email: "Barua pepe",
     phone: "Simu",

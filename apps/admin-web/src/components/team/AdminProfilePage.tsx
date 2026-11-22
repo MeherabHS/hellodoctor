@@ -38,7 +38,7 @@ export function AdminProfilePage({email, photo, onPhotoChanged}: {email: string 
     <div className="afya-profile-grid">
       <div className="afya-stack">
         <PhotoCard email={me?.email ?? email} photo={photo} onPhotoChanged={onPhotoChanged}/>
-        <Card title={tr('profile.account')}>
+        <Card title={tr('profile.account')} subtitle={tr('profile.accountReadOnly')}>
           <dl className="afya-profile-facts">
             <dt>{tr('profile.email')}</dt><dd>{me ? me.email ?? '—' : '…'}</dd>
             <dt>{tr('profile.phone')}</dt><dd>{me ? me.phone : '…'}</dd>
