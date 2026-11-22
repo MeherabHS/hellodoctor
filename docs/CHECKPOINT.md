@@ -18,11 +18,11 @@ ordered list of what remains: [PROGRESS.md](PROGRESS.md#current-status--2026-11-
 - **Uncommitted on the workstation:** the Play Store AAB workflow
   (`.github/workflows/play-release-aab.yml`), Android release-signing changes in both
   `build.gradle.kts` files and their `.gitignore` entries.
-- **Next:** (1) merge PR #54, publish images, roll out with the Caddyfile; (2) confirm Agora
-  presence callbacks reach production (timelines show none); (3) check why resolved incidents
-  were not seen in the Activity Log; (4) external penetration test; (5) Google Play
-  internal-testing release from Circle Technology Ltd; (6) wider real-device pilot;
-  (7) rotate secrets from the 2026-11-22 workstation incident.
+- **Next:** (1) merge PR #54, publish images, roll out with the Caddyfile; (2) check why resolved
+  incidents were not seen in the Activity Log; (3) external penetration test; (4) Google Play
+  internal-testing release from Circle Technology Ltd; (5) wider real-device pilot;
+  (6) rotate secrets from the 2026-11-22 workstation incident. Agora presence callbacks are
+  confirmed reaching production.
 - **Decisions in force:** payments deferred (`FINANCIAL_MODULE_MODE=deferred`); no SMS;
   600 KB per clinical image, 40 KB per profile photo; Admins publish directly; Kenya only,
   English and Swahili; consultation trace kept 5 days (3–5 configurable) unless a grievance

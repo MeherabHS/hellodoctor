@@ -92,6 +92,8 @@ Open, **PR #54** (`feat/admin-profile`):
   to `bdc020b` (run 45040101534). Not yet rolled out on the VM.
 - The proxy change from PR #53 needs the VM's Caddyfile updated and
   `hellodoctor-vm-proxy-1` restarted (`admin off` disables live reload).
+- Agora presence callbacks reach production (confirmed on the VM 2026-11-22), so
+  empty-room recovery works there.
 - PR #54: 11 checks pass at the time of writing; the backend suite is still running. After
   merging it, publish new images.
 - The Play Store AAB release workflow (`.github/workflows/play-release-aab.yml`) and
@@ -101,23 +103,19 @@ Open, **PR #54** (`feat/admin-profile`):
 
 1. **Merge PR #54** once CI is green, publish images, and roll out to the VM together with
    the Caddyfile change.
-2. **Check Agora presence callbacks in production.** Consultation timelines on the VM show no
-   join/leave events from Agora; count `consultation_provider_presence_events` on the VM. If
-   it is 0, configure Agora's notification callbacks for production. Empty-room recovery
-   depends on them.
-3. **Activity Log:** an Admin reported resolved incidents not appearing. The audit row is
+2. **Activity Log:** an Admin reported resolved incidents not appearing. The audit row is
    written (`SYSTEM_ERROR_RESOLVED`); check the VM data to see whether automatic view entries
    push it off the first page.
-4. **External-style penetration test** against the deployed baseline (OWASP ASVS L2 / API
+3. **External-style penetration test** against the deployed baseline (OWASP ASVS L2 / API
    Top 10, cross-role authorization, token tampering, upload attacks).
-5. **Google Play release** from the Circle Technology Ltd account: commit the AAB workflow,
+4. **Google Play release** from the Circle Technology Ltd account: commit the AAB workflow,
    privacy policy, health-app declaration, data-safety form; internal testing track first,
    then staged rollouts.
-6. **Real-device pilot** with a small group of doctors, peers and patients.
-7. Small items: a peer notification opens the inbox rather than the chat; peers have no legal
+5. **Real-device pilot** with a small group of doctors, peers and patients.
+6. Small items: a peer notification opens the inbox rather than the chat; peers have no legal
    documents of their own yet; sessions that never close (nobody joined, never completed)
    stay open in the database and are only hidden after 5 days.
-8. **Rotate secrets** that were on the workstation hit by the 2026-11-22 malware incident.
+7. **Rotate secrets** that were on the workstation hit by the 2026-11-22 malware incident.
 
 ### Open business decisions (not blocking)
 
