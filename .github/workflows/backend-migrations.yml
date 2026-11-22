@@ -107,7 +107,7 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: cargo clippy -- -D warnings
-        # CLAUDE.md documents this as the project's lint gate, but nothing
+        # docs/SYSTEM_POLICY.md documents this as the project's lint gate, but nothing
         # in CI actually ran it before this — a plain cargo build/test only
         # ever treats lint-level issues (including the rust_2024_compatibility
         # lints that would have caught this session's dropped-Result-value
