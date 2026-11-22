@@ -2,6 +2,8 @@
 
 # Phase 1 — Complete Prototype Inventory
 
+> **Update 2026-11-22:** the original design exports (`Hello Doctor [B].fig`, `Hello Doctor [B].pdf`, `Hello Doctor [B] (1)–(15).pdf`) and the PDF text dumps (`all_pdf_texts.txt`, `pdf_summary*.txt`) listed below were removed from the public repository and are kept locally only (git-ignored). The rows are kept as a historical inventory.
+
 > **Document Version:** 1.0.0  
 > **Source Baseline:** Repository Root `c:\Users\CUBE\Desktop\helodoc old site`  
 > **Target Audience:** Claude Code Autonomous Implementation Agent
