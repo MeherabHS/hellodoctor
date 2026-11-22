@@ -21,6 +21,18 @@ This protects against a damaged database, a bad migration or a mistaken delete. 
 **not** protect against losing the VM's disk, because the dumps live on the same VM. The full
 off-VM backup design (pgBackRest to Azure) is in `../compose.backup.yml` and is not enabled.
 
+## See it in Admin Web
+
+Admin Web shows a **Database backups** card at the top of **Operations & Safety → App Errors & Incidents**:
+**Healthy**, **Failed** (with the reason), **Overdue** (no successful backup for 26 hours, which also catches a timer
+that stopped), **Never run** or **Not set up**, with the last backup's time and size, copies kept and the last Sunday
+test restore. It is admin-only on purpose: backup timing is useful to an attacker, so it is never on a public page.
+
+How it is wired: after every run the script writes small JSON files (no data, no secrets) to
+`/var/lib/hellodoctor-backup-status` (`BACKUP_STATUS_DIR`). `../compose.yml` mounts that folder read-only into the
+backend at `/run/backup-status`, and `GET /api/v1/admin/system/backup-status` reads it. After pulling this change,
+recreate the backend once so it gets the mount: `sudo docker compose ... up -d backend` with your usual files.
+
 ## Install (once, on the VM)
 
 ```bash

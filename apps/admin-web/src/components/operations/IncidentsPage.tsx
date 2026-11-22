@@ -2,6 +2,7 @@
 import {useState} from 'react';
 import {AlertTriangle,CheckCircle2,Check,Download,Eye,Flame,Layers,RefreshCw} from 'lucide-react';
 import type {AppErrorLogItem} from '../../data/adminStore';
+import {BackupStatusCard} from './BackupStatusCard';
 import {Card,Chip,EmptyState,PageHead,Pagination,SearchField,StatTile,Tabs,type ChipTone} from '../ui/afya';
 
 /**
@@ -37,6 +38,7 @@ export function IncidentsPage(props:{
         <button type="button" className="afya-btn-secondary" onClick={props.onExport}><Download size={16} aria-hidden/>Export (JSON)</button>
         <button type="button" className="afya-btn-primary" onClick={props.onRefresh}><RefreshCw size={16} aria-hidden/>Refresh</button>
       </>}/>
+    <BackupStatusCard/>
     <div className="afya-stat-grid">
       <StatTile icon={AlertTriangle} tone="red" value={open} label="Open incidents"/>
       <StatTile icon={Flame} tone="amber" value={severe} label="Critical or error, open"/>

@@ -23,6 +23,9 @@ BACKUP_WAIT_SECONDS="${BACKUP_WAIT_SECONDS:-300}"
 BACKUP_RESTORE_TEST_DAY="${BACKUP_RESTORE_TEST_DAY:-Sun}"
 # Optional: a Slack/Teams/Discord-style webhook that receives failures.
 BACKUP_ALERT_WEBHOOK_URL="${BACKUP_ALERT_WEBHOOK_URL:-}"
+# Small status files (no data, no secrets) that Admin Web shows on the
+# App Errors & Incidents page. Mounted read-only into the backend.
+BACKUP_STATUS_DIR="${BACKUP_STATUS_DIR:-/var/lib/hellodoctor-backup-status}"
 PREFIX="hellodoctor"
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -34,7 +37,22 @@ alert() {
     -d "{\"text\":\"$text\",\"content\":\"$text\"}" "$BACKUP_ALERT_WEBHOOK_URL" >/dev/null 2>&1 \
     || log "could not reach the alert webhook"
 }
-fail() { log "FAILED: $*"; alert "FAILED: $*"; exit 1; }
+# JSON string escaping for the few values the status files carry.
+json_str() { local v="$1"; v="${v//\\/\\\\}"; v="${v//\"/\\\"}"; v="${v//$'\n'/ }"; printf '"%s"' "$v"; }
+now_utc() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+# Writes one status file atomically: readers never see a half-written file.
+write_status() {
+  local name="$1" body="$2"
+  mkdir -p "$BACKUP_STATUS_DIR" 2>/dev/null && chmod 755 "$BACKUP_STATUS_DIR" 2>/dev/null || return 0
+  printf '%s\n' "$body" > "$BACKUP_STATUS_DIR/.$name.tmp" && chmod 644 "$BACKUP_STATUS_DIR/.$name.tmp" \
+    && mv -f "$BACKUP_STATUS_DIR/.$name.tmp" "$BACKUP_STATUS_DIR/$name.json" || true
+}
+fail() {
+  log "FAILED: $*"
+  write_status last_run "{\"at\":$(json_str "$(now_utc)"),\"result\":\"failed\",\"message\":$(json_str "$*")}"
+  alert "FAILED: $*"
+  exit 1
+}
 
 case "$BACKUP_KEEP" in ''|*[!0-9]*) fail "BACKUP_KEEP must be a whole number, got '$BACKUP_KEEP'";; esac
 [ "$BACKUP_KEEP" -ge 1 ] || fail "BACKUP_KEEP must be at least 1"
@@ -106,8 +124,10 @@ if [ "$BACKUP_RESTORE_TEST_DAY" = "always" ] || [ "$BACKUP_RESTORE_TEST_DAY" = "
     docker exec "$CONTAINER" sh -c "dropdb -U \"\$POSTGRES_USER\" $scratch" || log "could not drop $scratch; drop it by hand"
     [ "${rows:-0}" -gt 0 ] || fail "test restore produced an empty database"
     log "test restore ok: $rows migrations present"
+    write_status last_restore_test "{\"at\":$(json_str "$(now_utc)"),\"result\":\"ok\",\"file\":$(json_str "$(basename "$final")"),\"migrations\":$rows}"
   else
     docker exec "$CONTAINER" sh -c "dropdb -U \"\$POSTGRES_USER\" --if-exists $scratch" >/dev/null 2>&1 || true
+    write_status last_restore_test "{\"at\":$(json_str "$(now_utc)"),\"result\":\"failed\",\"file\":$(json_str "$(basename "$final")")}"
     fail "test restore of $(basename "$final") failed"
   fi
 fi
@@ -121,4 +141,10 @@ while IFS= read -r old; do
 done < <(ls -1t "$BACKUP_DIR/${PREFIX}"-*.dump 2>/dev/null | tail -n +"$((BACKUP_KEEP + 1))")
 [ "$removed" -eq 0 ] || log "removed $removed dump(s) older than the newest $BACKUP_KEEP"
 
-log "kept $(ls -1 "$BACKUP_DIR/${PREFIX}"-*.dump 2>/dev/null | wc -l) dump(s), $(du -sh "$BACKUP_DIR" | cut -f1) in total"
+kept="$(ls -1 "$BACKUP_DIR/${PREFIX}"-*.dump 2>/dev/null | wc -l | tr -d ' ')"
+total_bytes="$(du -sb "$BACKUP_DIR" 2>/dev/null | cut -f1 || echo 0)"
+size_bytes="$(wc -c < "$final" | tr -d ' ')"
+log "kept $kept dump(s), $(du -sh "$BACKUP_DIR" | cut -f1) in total"
+done_at="$(now_utc)"
+write_status last_success "{\"at\":$(json_str "$done_at"),\"file\":$(json_str "$(basename "$final")"),\"size_bytes\":${size_bytes:-0},\"dumps_kept\":${kept:-0},\"total_bytes\":${total_bytes:-0},\"keep\":$BACKUP_KEEP}"
+write_status last_run "{\"at\":$(json_str "$done_at"),\"result\":\"ok\",\"message\":\"\"}"
