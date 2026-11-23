@@ -127,6 +127,26 @@ class Reminder {
     }
   }
 
+  /// The date and time the edit form starts from. A start date before
+  /// today (a reminder made on an earlier day) moves to the reminder's next
+  /// alert, so the form and its calendar open on a current date instead of
+  /// the day it was created. For repeating reminders this changes nothing
+  /// about when they ring: the time of day, chosen weekdays, hour interval
+  /// and day of the month all stay the same. A one-time reminder whose time
+  /// has gone by starts from the next time its clock time comes round.
+  DateTime formStart(DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
+    if (!at.isBefore(today)) return at;
+    final next = nextAlert(now);
+    if (next != null) return next;
+    var start = DateTime(now.year, now.month, now.day, at.hour, at.minute);
+    if (!start.isAfter(now)) {
+      start = DateTime(
+          start.year, start.month, start.day + 1, start.hour, start.minute);
+    }
+    return start;
+  }
+
   /// The first ring of each native alarm this reminder needs, after [now]
   /// and not before [at]. One entry for once/daily/monthly, one per chosen
   /// day for weekly, one per daily ring time for hourly.
