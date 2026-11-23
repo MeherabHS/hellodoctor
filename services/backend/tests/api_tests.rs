@@ -6957,6 +6957,36 @@ async fn test_refused_requests_are_recorded_on_the_incident_log(pool: PgPool) {
     );
     let status = get(&app, &missing, Some(&patient)).await.status();
     assert!(status.is_client_error(), "{status}");
+    // Expected noise, not incidents (2026-11-23): a genuine but expired
+    // access token, which every app refreshes and retries on, and a browser
+    // or scanner asking the API address for /favicon.ico.
+    let past = Utc::now().timestamp() as usize - 600;
+    let expired = encode(
+        &Header::new(Algorithm::EdDSA),
+        &Claims {
+            sub: PATIENT_USER_ID.to_string(),
+            user_id: PATIENT_USER_ID.to_string(),
+            sid: PATIENT_USER_ID.to_string(),
+            role: "PATIENT".into(),
+            permissions: vec![],
+            iss: "hellodoctor-backend".into(),
+            aud: "hellodoctor-mobile".into(),
+            exp: past,
+            iat: past - 900,
+        },
+        &EncodingKey::from_ed_der(&STANDARD.decode(TEST_JWT_PRIVATE_KEY_B64).unwrap()),
+    )
+    .unwrap();
+    assert_eq!(
+        get(&app, "/api/v1/patients/me", Some(&expired))
+            .await
+            .status(),
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        get(&app, "/favicon.ico", None).await.status(),
+        StatusCode::NOT_FOUND
+    );
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
 
     type IncidentRow = (String, Option<String>, Option<i16>, i32, Option<String>);
@@ -6978,6 +7008,18 @@ async fn test_refused_requests_are_recorded_on_the_incident_log(pool: PgPool) {
         .find(|r| r.1.as_deref() == Some("GET /api/v1/appointments/:id/documents/:id"))
         .expect("the refused document link is recorded with ids stripped");
     assert_eq!(document.2, Some(status.as_u16() as i16));
+    assert!(
+        !rows
+            .iter()
+            .any(|r| r.1.as_deref() == Some("GET /api/v1/patients/me")),
+        "an expired token is routine, not an incident: {rows:?}"
+    );
+    assert!(
+        !rows
+            .iter()
+            .any(|r| r.1.as_deref() == Some("GET /favicon.ico")),
+        "a 404 outside the API is not an incident: {rows:?}"
+    );
 }
 
 /// Background jobs (scheduler, email dispatch, clean-ups) only ever logged

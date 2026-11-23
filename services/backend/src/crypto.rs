@@ -7,6 +7,13 @@ use argon2::password_hash::{
 use argon2::Argon2;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+
+/// The exact message for an access token that is genuine but past its
+/// 15-minute lifetime. Clients refresh and retry on it, so the incident log
+/// skips it (`api/middleware/incident_reporting.rs`); a forged, tampered or
+/// malformed token keeps the "Invalid or expired access token" message and
+/// is still recorded.
+pub const EXPIRED_ACCESS_TOKEN: &str = "Access token expired.";
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
@@ -536,7 +543,14 @@ fn verify_with_single_key(token: &str, public_key_der_b64: &str) -> Result<Claim
 
     decode::<Claims>(token, &key, &validation)
         .map(|data| data.claims)
-        .map_err(|e| AppError::Unauthorized(format!("Invalid or expired access token: {e}")))
+        .map_err(|e| match e.kind() {
+            // Signature, issuer and audience were already checked before
+            // expiry, so this is a genuine token that simply aged out.
+            jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
+                AppError::Unauthorized(EXPIRED_ACCESS_TOKEN.into())
+            }
+            _ => AppError::Unauthorized(format!("Invalid or expired access token: {e}")),
+        })
 }
 
 #[cfg(test)]
@@ -596,6 +610,45 @@ mod jwt_key_rotation_tests {
             verify_access_token(&token(&stranger_private), &public),
             Err(AppError::Unauthorized(_))
         ));
+    }
+
+    /// Only a genuine token past its lifetime gets the "expired" message
+    /// that the incident log skips. A forged token that is also expired must
+    /// still read as invalid, so it stays on the incident log.
+    #[test]
+    fn only_genuine_expired_tokens_are_reported_as_expired() {
+        let (private, public) = keypair(1);
+        let (forger_private, _) = keypair(7);
+        let past = chrono::Utc::now().timestamp() as usize - 600;
+        let expired_claims = Claims {
+            sub: "u".into(),
+            user_id: uuid::Uuid::new_v4().to_string(),
+            sid: uuid::Uuid::new_v4().to_string(),
+            role: "PATIENT".into(),
+            permissions: vec![],
+            iss: JWT_ISSUER.into(),
+            aud: JWT_AUDIENCE.into(),
+            exp: past,
+            iat: past - 900,
+        };
+        let sign = |private: &str| {
+            let key = EncodingKey::from_ed_der(&STANDARD.decode(private).unwrap());
+            encode(&Header::new(Algorithm::EdDSA), &expired_claims, &key).unwrap()
+        };
+        match verify_access_token(&sign(&private), &public) {
+            Err(AppError::Unauthorized(message)) => assert_eq!(message, EXPIRED_ACCESS_TOKEN),
+            other => panic!("expected the expired message, got {other:?}"),
+        }
+        match verify_access_token(&sign(&forger_private), &public) {
+            Err(AppError::Unauthorized(message)) => {
+                assert_ne!(message, EXPIRED_ACCESS_TOKEN);
+                assert!(
+                    message.starts_with("Invalid or expired access token"),
+                    "{message}"
+                );
+            }
+            other => panic!("a forged token must be refused as invalid, got {other:?}"),
+        }
     }
 
     #[test]

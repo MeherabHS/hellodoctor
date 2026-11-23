@@ -16,6 +16,16 @@
 //! refusal is one incident with an occurrence count, not thousands of rows.
 //! Only the server's own fixed message text is stored, redacted, never request
 //! bodies.
+//!
+//! Two kinds of response are expected noise, not incidents, and are skipped
+//! ([`is_expected_noise`], product owner, 2026-11-23):
+//! - a 401 for a genuine access token that has simply expired: every app
+//!   refreshes and retries on it, so after 15 minutes away each one used to
+//!   add rows. Missing, forged, tampered or malformed tokens are still
+//!   recorded.
+//! - a 404 outside `/api/v1/` (`/`, `/favicon.ico`, `/wp-login.php`): a
+//!   browser or a scanner opening the API address. The edge proxy answers
+//!   these itself; this is the fallback when it does not.
 
 use crate::domain::models::ErrorSeverity;
 use crate::error::ErrorResponseInfo;
@@ -46,6 +56,9 @@ pub async fn middleware(request: Request, next: Next) -> Response {
             status.canonical_reason().unwrap_or("Error").to_string(),
         ),
     };
+    if is_expected_noise(status.as_u16(), code, &message, &route) {
+        return response;
+    }
     let endpoint = format!("{method} {route}");
     let (subsystem, severity) = if status.is_server_error() {
         ("HTTP", ErrorSeverity::Error)
@@ -74,6 +87,15 @@ pub async fn middleware(request: Request, next: Next) -> Response {
     event.consultation_evidence = None;
     system_error::report(event);
     response
+}
+
+/// Responses that are part of normal operation and would only bury real
+/// incidents. See the module comment.
+pub fn is_expected_noise(status: u16, code: &str, message: &str, path: &str) -> bool {
+    let expired_token =
+        status == 401 && code == "UNAUTHORIZED" && message == crate::crypto::EXPIRED_ACCESS_TOKEN;
+    let not_an_api_path = status == 404 && !path.starts_with("/api/v1/");
+    expired_token || not_an_api_path
 }
 
 static UUID: LazyLock<Regex> = LazyLock::new(|| {
@@ -147,6 +169,65 @@ mod tests {
             normalize_path("/api/v1/doctor/chats"),
             "/api/v1/doctor/chats"
         );
+    }
+
+    #[test]
+    fn expected_noise_is_skipped_and_real_refusals_are_kept() {
+        let expired = crate::crypto::EXPIRED_ACCESS_TOKEN;
+        // Skipped: an expired token, and 404s outside the API.
+        assert!(is_expected_noise(
+            401,
+            "UNAUTHORIZED",
+            expired,
+            "/api/v1/patients/me"
+        ));
+        assert!(is_expected_noise(
+            404,
+            "NOT_FOUND",
+            "Not Found",
+            "/favicon.ico"
+        ));
+        assert!(is_expected_noise(404, "NOT_FOUND", "Not Found", "/"));
+        assert!(is_expected_noise(
+            404,
+            "NOT_FOUND",
+            "Not Found",
+            "/wp-login.php"
+        ));
+        // Kept: forged or malformed tokens, missing tokens, other 401s.
+        let forged = "Invalid or expired access token: InvalidSignature";
+        assert!(!is_expected_noise(
+            401,
+            "UNAUTHORIZED",
+            forged,
+            "/api/v1/patients/me"
+        ));
+        assert!(!is_expected_noise(
+            401,
+            "UNAUTHORIZED",
+            "Missing bearer token.",
+            "/api/v1/doctor/chats"
+        ));
+        assert!(!is_expected_noise(
+            401,
+            "UNAUTHORIZED",
+            "Invalid or expired verification code.",
+            "/api/v1/auth/password-reset/verify-otp"
+        ));
+        // Kept: every 404 inside the API, and other statuses outside it.
+        assert!(!is_expected_noise(
+            404,
+            "RESOURCE_NOT_FOUND",
+            "Document not found.",
+            "/api/v1/appointments/:id/documents/:id"
+        ));
+        assert!(!is_expected_noise(403, "FORBIDDEN", "Forbidden", "/"));
+        assert!(!is_expected_noise(
+            500,
+            "INTERNAL_SERVER_ERROR",
+            "boom",
+            "/favicon.ico"
+        ));
     }
 
     #[test]
