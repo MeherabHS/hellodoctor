@@ -25,11 +25,14 @@ chown -R postgres:postgres /var/lib/pgbackrest/repo1
 source /usr/local/bin/pgbackrest-conf-common.sh
 generate_pgbackrest_conf "${PGBACKREST_STANZA}" /etc/pgbackrest/pgbackrest.conf
 
+# cron fields are: minute hour day-of-month month day-of-week user command.
+# BACKUP_DIFF_SCHEDULE is the minute field only (e.g. */15 = every 15 min);
+# BACKUP_FULL_SCHEDULE is HH:MM in UTC (03:15 -> minute 15, hour 03).
 cat > /etc/cron.d/hellodoctor-pgbackrest <<EOF
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-${BACKUP_DIFF_SCHEDULE} * postgres /usr/local/bin/backup-runner.sh diff >>/var/log/pgbackrest/scheduler.log 2>&1
-${BACKUP_FULL_SCHEDULE%:*} ${BACKUP_FULL_SCHEDULE#*:} * * * postgres /usr/local/bin/backup-runner.sh full >>/var/log/pgbackrest/scheduler.log 2>&1
+${BACKUP_DIFF_SCHEDULE} * * * * postgres /usr/local/bin/backup-runner.sh diff >>/var/log/pgbackrest/scheduler.log 2>&1
+${BACKUP_FULL_SCHEDULE#*:} ${BACKUP_FULL_SCHEDULE%:*} * * * postgres /usr/local/bin/backup-runner.sh full >>/var/log/pgbackrest/scheduler.log 2>&1
 ${BACKUP_MONITOR_SCHEDULE} * * * * postgres /usr/local/bin/backup-monitor.sh >>/var/log/pgbackrest/monitor.log 2>&1
 EOF
 chmod 0644 /etc/cron.d/hellodoctor-pgbackrest
