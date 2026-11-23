@@ -1,0 +1,17 @@
+[Unit]
+Description=HelloDoctor nightly PostgreSQL dump
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+# Optional overrides: PG_CONTAINER, BACKUP_DIR, BACKUP_KEEP, BACKUP_MIN_FREE_MB,
+# BACKUP_WAIT_SECONDS.
+EnvironmentFile=-/etc/default/hellodoctor-db-dump
+ExecStart=/usr/local/bin/hellodoctor-nightly-db-dump.sh
+Nice=10
+IOSchedulingClass=idle
+# Caps the script and the docker CLI; pg_dump itself is lowered with nice and
+# ionice inside the container. Never reached in normal use.
+MemoryMax=256M
+TimeoutStartSec=30min

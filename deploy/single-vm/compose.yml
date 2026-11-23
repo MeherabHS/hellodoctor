@@ -85,7 +85,12 @@ services:
       # Exact ingress/BFF socket peers, never an entire subnet.
       TRUSTED_PROXY_IPS: 172.30.84.10,172.30.84.11,172.30.84.12
       EXTERNAL_ERASURE_JOURNAL_PATH: /var/lib/hellodoctor/erasure/erasure.journal
-    volumes: ["${ERASURE_JOURNAL_DIR:?set pre-provisioned persistent journal directory}:/var/lib/hellodoctor/erasure"]
+      # Nightly dump status for the Admin Web incidents page (read-only; see
+      # deploy/single-vm/nightly-dump). Empty until the dump timer runs.
+      BACKUP_STATUS_DIR: /run/backup-status
+    volumes:
+      - "${ERASURE_JOURNAL_DIR:?set pre-provisioned persistent journal directory}:/var/lib/hellodoctor/erasure"
+      - "${BACKUP_STATUS_HOST_DIR:-/var/lib/hellodoctor-backup-status}:/run/backup-status:ro"
     read_only: true
     cap_drop: [ALL]
     tmpfs: ["/tmp:size=32m,mode=1777"]

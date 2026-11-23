@@ -136,3 +136,29 @@ async fn admin_can_change_own_password(pool: PgPool) {
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
 }
+
+/// The nightly dump's status card: admin-only, and "not configured" until
+/// the VM mounts the status directory (BACKUP_STATUS_DIR is unset in tests).
+#[sqlx::test(migrations = "./migrations")]
+async fn backup_status_is_admin_only_and_reports_not_configured(pool: PgPool) {
+    let (app, _pool) = test_app(pool).await;
+    let (status, body) = body_of(
+        get(
+            &app,
+            "/api/v1/admin/system/backup-status",
+            Some(&admin_token()),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["data"]["state"], "NOT_CONFIGURED");
+    assert_eq!(body["data"]["overdue_after_hours"], 26);
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    assert_eq!(
+        get(&app, "/api/v1/admin/system/backup-status", Some(&doctor))
+            .await
+            .status(),
+        StatusCode::FORBIDDEN
+    );
+}

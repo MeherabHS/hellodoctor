@@ -896,6 +896,10 @@ fn protected_routes() -> Router<AppState> {
             axum::routing::post(admin_handlers::acknowledge_system_error),
         )
         .route(
+            "/admin/system/backup-status",
+            get(crate::api::v1::backup_status_handlers::backup_status),
+        )
+        .route(
             "/admin/system-errors/:id/resolve",
             axum::routing::post(admin_handlers::resolve_system_error),
         )

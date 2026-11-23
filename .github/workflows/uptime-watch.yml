@@ -1,0 +1,79 @@
+name: Uptime watch (Telegram)
+
+# Runs outside the VM, so it can report a VM that is completely down, which
+# nothing on the VM itself can do. Every 5 minutes it checks each address in
+# the repository variable UPTIME_URLS and, if any fails three times in a row,
+# sends a loud Telegram message. Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID.
+#
+# Notes: GitHub can start scheduled runs several minutes late under load, and
+# pauses schedules in repositories with no activity for 60 days.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+    inputs:
+      test_message:
+        description: Send a test message to check the bot reaches you
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: uptime-watch
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check the production addresses
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check and alert
+        env:
+          UPTIME_URLS: ${{ vars.UPTIME_URLS }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TEST_MESSAGE: ${{ inputs.test_message || false }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          send() {
+            curl -fsS -m 15 --retry 3 -o /dev/null \
+              --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+              --data-urlencode "text=$1" \
+              --data-urlencode "disable_notification=$2" \
+              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              || echo "::warning::Could not reach Telegram"
+          }
+          if [ -z "${TELEGRAM_BOT_TOKEN}" ] || [ -z "${TELEGRAM_CHAT_ID}" ]; then
+            echo "::notice::TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is not set; nothing to send."
+            exit 0
+          fi
+          if [ "${TEST_MESSAGE}" = "true" ]; then
+            send "✅ HelloDoctor uptime watch: test message. Alerts will arrive here." false
+          fi
+          if [ -z "${UPTIME_URLS}" ]; then
+            echo "::notice::The UPTIME_URLS variable is empty; nothing to check."
+            exit 0
+          fi
+          down=""
+          for url in ${UPTIME_URLS}; do
+            ok=false
+            for attempt in 1 2 3; do
+              code="$(curl -s -o /dev/null -m 15 -w '%{http_code}' "$url" || true)"
+              if [ "${code}" -ge 200 ] 2>/dev/null && [ "${code}" -lt 400 ]; then ok=true; break; fi
+              sleep 20
+            done
+            if [ "${ok}" = true ]; then
+              echo "up: ${url}"
+            else
+              echo "::error::down: ${url} (last HTTP status ${code:-none})"
+              down="${down}${url} (HTTP ${code:-none})"$'\n'
+            fi
+          done
+          if [ -n "${down}" ]; then
+            send "🚨 HelloDoctor is DOWN. These addresses failed 3 checks in a row:"$'\n'"${down}Checked from GitHub at $(date -u '+%H:%M UTC'). You will be pinged every 5 minutes until it is back." false
+            exit 1
+          fi

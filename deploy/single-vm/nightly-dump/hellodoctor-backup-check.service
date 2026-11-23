@@ -1,0 +1,7 @@
+[Unit]
+Description=HelloDoctor daily check that last night's backup succeeded
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/hellodoctor-db-dump
+ExecStart=/usr/local/bin/hellodoctor-nightly-db-dump.sh --check
