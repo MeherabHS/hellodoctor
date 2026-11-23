@@ -248,6 +248,38 @@ void main() {
         expect(find.text('Add reminder'), findsOneWidget);
       });
 
+      testWidgets(
+          'editing an older reminder opens on today, not its old date, at $size',
+          (tester) async {
+        final store = MemoryReminderStore();
+        final cubit = RemindersCubit(
+            userId: 'user-a',
+            store: store,
+            scheduler: FakeScheduler(),
+            text: _text,
+            clock: () => now);
+        addTearDown(cubit.close);
+        await cubit.load();
+        final old =
+            reminder('old', DateTime(2026, 11, 8, 18), ReminderRepeat.daily);
+        await cubit.add(old);
+        await pump(
+            tester, size, CreateReminderPage(cubit: cubit, existing: old));
+        expect(tester.takeException(), isNull);
+        expect(find.text('Fri, 13 Nov 2026'), findsOneWidget);
+        expect(find.text('Sun, 8 Nov 2026'), findsNothing);
+        // The calendar opens without the before-first-date assertion.
+        // Bring the date button to the middle of the screen, clear of the
+        // fixed Save bar on small phones.
+        await tester.ensureVisible(find.text('Fri, 13 Nov 2026'));
+        await tester.drag(find.byType(ListView), const Offset(0, -120));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.event_outlined));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.byType(DatePickerDialog), findsOneWidget);
+      });
+
       testWidgets('the create form fits and saves at $size', (tester) async {
         final store = MemoryReminderStore();
         final scheduler = FakeScheduler();
@@ -285,6 +317,56 @@ void main() {
         expect(scheduler.scheduled, [saved.id]);
       });
     }
+  });
+
+  group('edit form start date (2026-11-23)', () {
+    // now: Friday 13 Nov 2026, 10:00. Reminders made on 8 Nov.
+    final made = DateTime(2026, 11, 8, 18);
+    test('a start date today or later is kept as it is', () {
+      final later = DateTime(2026, 11, 20, 9);
+      expect(reminder('a', later).formStart(now), later);
+      final today = DateTime(2026, 11, 13, 7);
+      expect(reminder('b', today).formStart(now), today);
+    });
+    test('daily: an old start date moves to the next ring, same time', () {
+      final r = reminder('d', made, ReminderRepeat.daily);
+      expect(r.formStart(now), DateTime(2026, 11, 13, 18));
+      // Saving it from there rings exactly as before.
+      expect(r.copyWith(at: r.formStart(now)).nextAlert(now), r.nextAlert(now));
+    });
+    test('weekly keeps its weekdays and monthly keeps its day of month', () {
+      final weekly = Reminder(
+          id: 'w',
+          category: ReminderCategory.art,
+          title: 't',
+          at: made,
+          repeat: ReminderRepeat.weekly,
+          weekdays: const {1, 3});
+      final start = weekly.formStart(now);
+      expect(start.isAfter(now), isTrue);
+      expect(weekly.copyWith(at: start).firstRings(now)..sort(),
+          weekly.firstRings(now)..sort());
+      final monthly = reminder('m', made, ReminderRepeat.monthly);
+      expect(monthly.formStart(now), DateTime(2026, 12, 8, 18));
+    });
+    test('hourly keeps the same ring times of day', () {
+      final hourly = Reminder(
+          id: 'h',
+          category: ReminderCategory.art,
+          title: 't',
+          at: DateTime(2026, 11, 8, 8),
+          repeat: ReminderRepeat.hourly,
+          everyHours: 8);
+      final moved = hourly.copyWith(at: hourly.formStart(now));
+      expect(moved.ringMinutesOfDay.toSet(), hourly.ringMinutesOfDay.toSet());
+    });
+    test(
+        'a past one-time reminder starts from its clock time, today or tomorrow',
+        () {
+      expect(reminder('o', made).formStart(now), DateTime(2026, 11, 13, 18));
+      final morning = reminder('p', DateTime(2026, 11, 8, 7));
+      expect(morning.formStart(now), DateTime(2026, 11, 14, 7));
+    });
   });
 
   group('edit and switch off', () {

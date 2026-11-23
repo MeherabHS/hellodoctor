@@ -435,7 +435,10 @@ class _CreateReminderPageState extends State<CreateReminderPage> {
       widget.existing?.category ?? widget.initialCategory;
   late ReminderRepeat _repeat =
       widget.existing?.repeat ?? _defaultRepeat(_category);
-  late DateTime _at = widget.existing?.at ?? _defaultTime();
+  // An existing reminder made on an earlier day opens on its next alert,
+  // not on the day it was created (2026-11-23).
+  late DateTime _at =
+      widget.existing?.formStart(widget.cubit.now) ?? _defaultTime();
 
   /// Chosen ring days for "Selected days" (1 = Monday). Starts from the
   /// saved days, or the start date's weekday.
@@ -521,7 +524,10 @@ class _CreateReminderPageState extends State<CreateReminderPage> {
     final now = widget.cubit.now;
     final picked = await showDatePicker(
         context: context,
-        initialDate: _at,
+        // The calendar cannot open before its first allowed day.
+        initialDate: _at.isBefore(DateTime(now.year, now.month, now.day))
+            ? DateTime(now.year, now.month, now.day)
+            : _at,
         firstDate: DateTime(now.year, now.month, now.day),
         lastDate: DateTime(now.year + 5));
     if (picked != null) {
