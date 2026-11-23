@@ -21,6 +21,10 @@ on:
     paths:
       - "services/backend/**"
       - ".github/workflows/backend-migrations.yml"
+  # Manual run on any commit, e.g. a main commit that only changed the apps:
+  # the image publish requires this check on the exact commit it builds,
+  # and the path filter above skips such commits.
+  workflow_dispatch:
 
 permissions:
   contents: read
