@@ -1,8 +1,106 @@
 # AfyaMkononi (HelloDoctor) — Progress
 
-## Current status — 2026-11-22
+## Current status — 2026-11-25
 
-This section replaces the 2026-11-20 status and the milestone table further down (dated
+This section replaces the 2026-11-22 status below, which is kept as history.
+
+**How the product is used today.** Internal use only. The system runs in production on the
+ARM64 VM, but neither app has been submitted to Google Play and no outside patients, doctors
+or peers use it yet; there has been no pilot. Payments stay deferred
+(`FINANCIAL_MODULE_MODE=deferred`), so consultations are booked without a payment step.
+Production database backups are off by the product owner's decision (the nightly dump from
+PR #57 is in the repository but not installed). Secrets from the 2026-11-22 workstation
+incident have been rotated and the workstation is clean (confirmed 2026-11-24).
+
+**Code.** `main` is at `1cc550c` (PR #60). ARM64 images from it are published to GHCR
+(backend `sha256:9595f9f7…5aa5982`, admin-web `sha256:8caffc79…b2f94`, doctor-web
+`sha256:ed88be5f…806b3`); rolling them out on the VM is the owner's step and is not confirmed
+here. PR #61 is open with the Smart Rx and security work below; 140 migrations on the branch
+(newest `20261222000022`).
+
+### Merged since 2026-11-22
+
+- **PR #54** — Admin profile page; 5-day consultation and peer tracking dashboard; Activity
+  Log incident labels.
+- **PR #55** — `CLAUDE.md` replaced by [SYSTEM_POLICY.md](SYSTEM_POLICY.md).
+- **PR #56 / #57** — pgBackRest cron fix; nightly compressed database dump at 03:00 Nairobi
+  with Telegram alerts and an Admin backup-status card (not installed, see above).
+- **PR #58** — the incident log skips expired-token 401s and non-API 404s.
+- **PR #59** — patient reminders: editing an older reminder opens on today.
+- **PR #60** — the backend suite can be run by hand in CI.
+
+### Open: PR #61 (`feat/doctor-smart-rx-redesign`)
+
+**Smart Rx (Care app, Doctor Web, backend).**
+- Redesigned to the dispatch-flow board. The list shows completed consultations only:
+  "Awaiting Rx" (24-hour window, hours left) and "Locked" (decided; a sent prescription takes
+  a correction note).
+- One rule, decided by the server and shown by every app: a prescription only once the
+  consultation has started (video: someone joined, or both apps reported joining; chat:
+  window open and both doctor and patient have written) or within 24 hours after it ended
+  with no decision yet. Page uploads and "complete with prescription" answer 409 otherwise.
+- The doctor queue carries the decision (`rx`: allowed, reason, message, closes_at); the
+  apps use the server clock (HTTP `Date` header), never the device clock.
+- `RX_WINDOW_CLOSING` reminder to the doctor 4 hours before the window closes; Admin
+  dashboard "Prescription follow-ups" (window closed without decision; join signal missing),
+  consultation number and doctor only.
+- Correction notes (a sent prescription stays final): 7 days, at most 5, append-only; the
+  patient sees them in Health Records and is notified (`PRESCRIPTION_CORRECTED`).
+- Refer and escalate outcomes removed from both doctor apps.
+- `DOCTOR_APP_MIN_BUILD` + `GET /config/app-version`: older Care app builds are asked to
+  update (default 0 = off).
+- Fixed on the way: Doctor Web's Rx list was always empty (it loaded the "upcoming" view).
+
+**Security.**
+- Cross-account sweep in the backend suite: reads all 226 routes from `router.rs` and calls
+  each with one patient's real ids as nobody, a garbage token, another patient, an unrelated
+  doctor, a peer and Admin; fails on a 401 gap, a leaked name or clinical text, a 500 or a
+  changed record.
+- Semgrep and Trivy added to the Security Scan (Trivy installed by checksum after the March
+  2026 trivy-action tag hijack); their first findings fixed or recorded as scoped exceptions.
+- Pentest workflow (`pentest.yml`, label `run-pentest` or by hand): builds a disposable stack
+  on GitHub's runner and runs the attack suite, ZAP, ffuf, sqlmap and MobSF. Plan:
+  [assurance/PENTEST_PLAN.md](assurance/PENTEST_PLAN.md). Heavy testing runs on GitHub only,
+  not on the workstation (product owner, 2026-11-25).
+- Found and fixed (2026-11-24): **Admin could read consultation chat text and open chat
+  images** (found by the sweep); **Admin could open patients' prescription and intake
+  photos** from Patient record (now: Admin sees that a document exists, never its contents);
+  correction notes answered strangers with an empty 200 (now 404).
+- Local hands-on pass on 2026-11-24 (50 checks: cross-account access, forged tokens, mass
+  assignment, hostile uploads, path tricks, a booking race, CORS, prescription rules): all
+  held apart from the Admin findings above.
+
+### What remains, in order
+
+1. **PR #61:** wait for the backend suite and the first GitHub pentest run; review ZAP,
+   ffuf, sqlmap and MobSF results; merge; publish images; roll out with migration
+   `20261222000022`.
+2. **Google Play internal testing** from Circle Technology Ltd (AAB workflow and signing are
+   still uncommitted on the workstation); then set `DOCTOR_APP_MIN_BUILD` to the released
+   build.
+3. **Pilot** with a small group of doctors, peers and patients.
+4. Optional: Strix AI pentest once Anthropic's Cyber Verification Program is approved (or an
+   OpenRouter key); a reliable outside uptime watcher (UptimeRobot or a Cloudflare Worker),
+   because GitHub's scheduled runs are best-effort.
+5. Small items from 2026-11-22 still open: a peer notification opens the inbox rather than
+   the chat; peers have no legal documents of their own; sessions nobody joined stay open in
+   the database and are hidden after 5 days.
+
+### Decisions recorded 2026-11-23 to 2026-11-25
+
+- Smart Rx lists completed consultations only; server time (Kenya) decides; no referral or
+  escalation; corrections by note, never by changing a sent prescription; no typed or
+  QR-verifiable prescriptions.
+- Admin never reads consultation chat text and never opens clinical documents (prescriptions,
+  intake photos, chat images); it may see that they exist.
+- Patient reminders use the phone's own clock (they live only on the phone).
+- Backups stay off for now (owner's decision).
+
+---
+
+## Status — 2026-11-22 (history)
+
+This section replaced the 2026-11-20 status and the milestone table further down (dated
 2026-10-04). Everything below the "Engineering Progress & Milestone Tracker" heading is kept
 as history.
 
