@@ -186,6 +186,8 @@ async fn doctor_document_access_ends_20_days_after_consultation(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
+    // A prescription needs a started consultation (2026-11-24).
+    start_consultation(&pool, appointment).await;
     let rx = post(
         &app,
         &format!("/api/v1/consultations/{appointment}/prescription"),

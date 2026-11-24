@@ -4046,12 +4046,16 @@ async fn test_doctor_rx_only_after_the_consultation_has_started(pool: PgPool) {
         .unwrap();
     assert_eq!(status, "CONFIRMED", "a refused completion changes nothing");
 
-    // A chat whose window has not opened yet: refused.
+    // A chat booked weeks ahead, window not open: refused. (Far enough out
+    // not to overlap the doctor's seeded slots.)
     set("UPDATE appointments SET modality='CHAT' WHERE id=$1").await;
-    set("UPDATE doctor_schedule_slots SET start_time=NOW()+INTERVAL '3 hours',end_time=NOW()+INTERVAL '3 hours 10 minutes' WHERE id=(SELECT slot_id FROM appointments WHERE id=$1)").await;
-    assert_eq!(
-        post(&app, &uri, Some(&doctor), &page).await.status(),
-        StatusCode::CONFLICT
+    set("UPDATE doctor_schedule_slots SET start_time=NOW()+INTERVAL '40 days',end_time=NOW()+INTERVAL '40 days 10 minutes' WHERE id=(SELECT slot_id FROM appointments WHERE id=$1)").await;
+    // The doctor's clinical access window (opens 15 minutes before the slot,
+    // 403) refuses before the prescription rule (409) would; refused either way.
+    let early_chat = post(&app, &uri, Some(&doctor), &page).await.status();
+    assert!(
+        matches!(early_chat, StatusCode::FORBIDDEN | StatusCode::CONFLICT),
+        "{early_chat}"
     );
 
     // The same chat once its window is open, but only the doctor has
@@ -4380,9 +4384,12 @@ async fn test_doctor_rx_late_window_is_24_hours_after_completion(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
-    assert_eq!(
-        post(&app, &uri, Some(&doctor), &page).await.status(),
-        StatusCode::CONFLICT
+    // Refused: the doctor's 24-hour clinical access window (403) closes at
+    // the same instant as the prescription window (409), and answers first.
+    let late = post(&app, &uri, Some(&doctor), &page).await.status();
+    assert!(
+        matches!(late, StatusCode::FORBIDDEN | StatusCode::CONFLICT),
+        "{late}"
     );
 
     sqlx::query("UPDATE appointments SET completed_at=NOW()-INTERVAL '2 hours' WHERE id=$1")
@@ -9351,9 +9358,11 @@ async fn test_consultation_wallet_failure_rolls_back_and_failed_payment_cannot_c
     );
     let state: (String,String) = sqlx::query_as("SELECT a.status::text,t.payment_status::text FROM appointments a JOIN transactions t ON t.appointment_id=a.id WHERE a.id=$1")
         .bind(appointment).fetch_one(&pool).await.unwrap();
+    // The rollback restores the state before completion: the call had
+    // started (IN_CONSULTATION), nothing was settled.
     assert_eq!(
         state,
-        ("CONFIRMED".into(), "PAYMENT_HELD".into()),
+        ("IN_CONSULTATION".into(), "PAYMENT_HELD".into()),
         "wallet failure must roll back clinical completion and settlement"
     );
     sqlx::query("DROP TRIGGER audit_reject_wallet_write ON doctor_wallets")

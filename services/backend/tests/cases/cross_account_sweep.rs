@@ -546,3 +546,59 @@ async fn no_account_reaches_another_accounts_records_on_any_route(pool: PgPool) 
         failures.join("\n")
     );
 }
+
+/// Found by the sweep (2026-11-24): the consultation chat endpoints accepted
+/// any signed-in role, and row-level security lets the ADMIN role see chat
+/// rows (the Admin trace needs their metadata), so Admin could read the chat
+/// text and open its clinical images. Only the consultation's doctor and
+/// patient may now; Admin gets 403 on both.
+#[sqlx::test(migrations = "./migrations")]
+async fn admin_cannot_read_consultation_chat_text_or_images(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let (appointment, _) = book_and_confirm(&app, &patient).await;
+    sqlx::query(
+        "INSERT INTO chat_conversations(appointment_id,patient_id,doctor_id,expires_at) \
+         SELECT id,patient_id,doctor_id,NOW()+INTERVAL '1 day' FROM appointments WHERE id=$1 \
+         ON CONFLICT (appointment_id) DO NOTHING",
+    )
+    .bind(appointment)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let conversation: Uuid =
+        sqlx::query_scalar("SELECT id FROM chat_conversations WHERE appointment_id=$1")
+            .bind(appointment)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let message: Uuid = sqlx::query_scalar(
+        "INSERT INTO chat_messages(conversation_id,sender_id,content,attachment_bucket,attachment_object_key,attachment_mime,attachment_size,attachment_hash) \
+         VALUES($1,$2,$3,'b','chat/x.jpg','image/jpeg',10,'h') RETURNING id",
+    )
+    .bind(conversation)
+    .bind(uid(PATIENT_USER_ID))
+    .bind(format!("{CLINICAL_MARKER} chat"))
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    let messages = format!("/api/v1/chat/{conversation}/messages");
+    let read = get(&app, &messages, Some(&admin)).await;
+    assert_eq!(read.status(), StatusCode::FORBIDDEN);
+    let body = axum::body::to_bytes(read.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&body).contains(CLINICAL_MARKER));
+    let image = get(
+        &app,
+        &format!("/api/v1/chat/{conversation}/messages/{message}/attachment"),
+        Some(&admin),
+    )
+    .await;
+    assert_eq!(image.status(), StatusCode::FORBIDDEN);
+    // The patient still reads their own chat.
+    let own = json_body(get(&app, &messages, Some(&patient)).await).await;
+    assert!(own.to_string().contains(CLINICAL_MARKER), "{own}");
+}

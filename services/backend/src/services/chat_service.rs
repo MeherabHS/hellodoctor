@@ -238,6 +238,16 @@ impl ChatService {
         before: Option<(DateTime<Utc>, Uuid)>,
         after: Option<(DateTime<Utc>, Uuid)>,
     ) -> Result<(Vec<ChatMessage>, Option<DateTime<Utc>>), AppError> {
+        // Only the consultation's patient (or guardian) and doctor read the
+        // chat. Admin never reads clinical chat text (product owner); the
+        // Admin consultation trace shows message metadata only, from its own
+        // query. Row-level security still lets the ADMIN role see the rows,
+        // which that trace needs, so the refusal lives here.
+        if !matches!(ctx.role, UserRole::Doctor | UserRole::Patient) {
+            return Err(AppError::Forbidden(
+                "Only the consultation's doctor and patient can read this chat.".into(),
+            ));
+        }
         if ctx.role == UserRole::Doctor {
             ctx.verified_doctor_profile_id(state).await?;
         }
