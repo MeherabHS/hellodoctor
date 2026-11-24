@@ -10,6 +10,9 @@ COPY migrations ./migrations
 COPY examples ./examples
 RUN cargo build --release --example capacity_test --example web_workload --example auth_stress_test
 
+# Root on purpose (reviewed 2026-11-24): test tooling that is never deployed,
+# writing results into a host bind mount (../../docs/assurance/evidence),
+# which a fixed non-root uid cannot write on every Linux perf host.
 FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates libssl3 && \

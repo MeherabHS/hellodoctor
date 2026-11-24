@@ -108,10 +108,15 @@ jobs:
           fi
 
       - name: Report selection
+        # Values reach the shell as environment variables (no shell injection).
+        env:
+          BUILD_PATIENT: ${{ inputs.build_patient }}
+          BUILD_DOCTOR: ${{ inputs.build_doctor }}
+          MATRIX: ${{ steps.set-matrix.outputs.matrix }}
         run: |
-          echo "Patient selected: ${{ inputs.build_patient }}"
-          echo "Doctor selected: ${{ inputs.build_doctor }}"
-          echo "Computed matrix: ${{ steps.set-matrix.outputs.matrix }}"
+          echo "Patient selected: ${BUILD_PATIENT}"
+          echo "Doctor selected: ${BUILD_DOCTOR}"
+          echo "Computed matrix: ${MATRIX}"
 
   build:
     name: Build ${{ matrix.label }} internal-test APK
