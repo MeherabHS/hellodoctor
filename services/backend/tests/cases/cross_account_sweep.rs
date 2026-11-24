@@ -602,3 +602,57 @@ async fn admin_cannot_read_consultation_chat_text_or_images(pool: PgPool) {
     let own = json_body(get(&app, &messages, Some(&patient)).await).await;
     assert!(own.to_string().contains(CLINICAL_MARKER), "{own}");
 }
+
+/// Product owner, 2026-11-24 (found in the local pentest): Admin may see that
+/// a patient's documents exist, but never open them. Neither a prescription
+/// page nor an intake photo can be opened by Admin; the patient still can.
+#[sqlx::test(migrations = "./migrations")]
+async fn admin_cannot_open_prescriptions_or_intake_photos(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let (appointment, _) = book_and_confirm(&app, &patient).await;
+    open_clinical_window(&pool, appointment).await;
+    start_consultation(&pool, appointment).await;
+    let page = post(
+        &app,
+        &format!("/api/v1/consultations/{appointment}/prescription"),
+        Some(&doctor),
+        &json!({"base64_photo": minimal_jpeg_base64()}),
+    )
+    .await;
+    assert_eq!(page.status(), StatusCode::CREATED);
+    let rx = json_body(page).await["data"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let uri = format!("/api/v1/appointments/{appointment}/documents/{rx}");
+    assert_eq!(
+        get(&app, &uri, Some(&admin)).await.status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        get(&app, &uri, Some(&patient)).await.status(),
+        StatusCode::OK
+    );
+    let intake: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM prescription_intake_documents WHERE appointment_id=$1 LIMIT 1",
+    )
+    .bind(appointment)
+    .fetch_optional(&pool)
+    .await
+    .unwrap();
+    if let Some(intake) = intake {
+        assert_eq!(
+            get(
+                &app,
+                &format!("/api/v1/appointments/{appointment}/documents/{intake}"),
+                Some(&admin)
+            )
+            .await
+            .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+}

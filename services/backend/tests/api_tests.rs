@@ -4562,6 +4562,8 @@ async fn test_doctor_rx_pages_encrypted_download_retry_and_expired_grant(pool: P
         get(&app, &document_uri, Some(&foreign)).await.status(),
         StatusCode::NOT_FOUND
     );
+    // Admin may see that the document exists but never open it (product
+    // owner, 2026-11-24): no grant, no download.
     assert_eq!(
         get(
             &app,
@@ -4570,7 +4572,7 @@ async fn test_doctor_rx_pages_encrypted_download_retry_and_expired_grant(pool: P
         )
         .await
         .status(),
-        StatusCode::OK
+        StatusCode::FORBIDDEN
     );
     sqlx::query("UPDATE appointments SET status='COMPLETED' WHERE id=$1")
         .bind(appointment)

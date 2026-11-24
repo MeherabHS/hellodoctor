@@ -1459,6 +1459,7 @@ export const en = {
     messagesCount: " · {count} messages",
     withName: "With {name}",
     uploadedOn: "Uploaded {date}",
+    uploadedNotViewable: "Uploaded · only the patient and their doctor can open it",
     lastSession: "Last session {date}",
     reviewNote: "Review note: ",
     requestedOn: "Requested {date}",

@@ -1458,6 +1458,7 @@ export const sw: Messages = {
     messagesCount: " · jumbe {count}",
     withName: "Na {name}",
     uploadedOn: "Ilipakiwa {date}",
+    uploadedNotViewable: "Imepakiwa · ni mgonjwa na daktari wake pekee wanaoweza kuifungua",
     lastSession: "Kikao cha mwisho {date}",
     reviewNote: "Dokezo la ukaguzi: ",
     requestedOn: "Iliombwa {date}",

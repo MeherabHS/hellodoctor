@@ -323,10 +323,11 @@ async fn authorized_document(
     appointment_id: Uuid,
     document_id: Uuid,
 ) -> Result<DocumentLocation, AppError> {
-    if !matches!(
-        ctx.role,
-        UserRole::Doctor | UserRole::Patient | UserRole::Admin
-    ) {
+    // The consultation's doctor and patient only. Admin may see that a
+    // document exists (Patient record lists date, size and status) but never
+    // its contents: no grant, no download, no preview (product owner,
+    // 2026-11-24; found in the local pentest).
+    if !matches!(ctx.role, UserRole::Doctor | UserRole::Patient) {
         return Err(AppError::Forbidden(
             "This role cannot access clinical documents.".into(),
         ));

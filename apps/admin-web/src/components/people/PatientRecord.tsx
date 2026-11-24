@@ -91,7 +91,8 @@ export function PatientRecord({patient,onBack,onExport,onErase,busy,loadPeerSess
           <FileText size={22} aria-hidden color="var(--afya-danger-fg)"/>
           <div style={{flex:1,minWidth:0}}><div style={{fontWeight:700}}>{d.mimeType==='application/pdf'?tr('ui2.pdfDocument'):tr('ui2.image')} · {(d.fileSizeBytes/1024).toFixed(0)} KB</div>
             <div className="afya-stat-note">{tr('mix.uploadedOn', { date: eatDate(d.createdAt) })}</div></div>
-          {d.securityStatus==='CLEAN'?<button type="button" className="afya-btn-secondary" onClick={()=>window.open(`/api/documents/download?appointment_id=${encodeURIComponent(d.appointmentId)}&document_id=${encodeURIComponent(d.id)}`,'_blank')}>{tr('ui.view')}</button>:<Chip tone="danger">{tr('ui.notClearedForViewing')}</Chip>}
+          {/* Admin sees that a document exists, never its contents (product owner, 2026-11-24). */}
+          {d.securityStatus==='CLEAN'?<Chip tone="neutral">{tr('mix.uploadedNotViewable')}</Chip>:<Chip tone="danger">{tr('ui.notClearedForViewing')}</Chip>}
         </div>)}</div>:<EmptyState title={tr('ui.noDocuments')}>{tr('ui.prescriptionOrLabPhotosThePatient')}</EmptyState>)}
       </section>
     </div>
