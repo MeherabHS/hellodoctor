@@ -269,6 +269,7 @@ fn test_config() -> AppConfig {
         // config.rs; `test_agora_token_time_gate_rejects_outside_window`
         // overrides this deliberately to exercise the real gate.
         agora_token_window_before_mins: 1440,
+        doctor_app_min_build: 0,
         agora_token_window_after_mins: 1440,
         consultation_live_reservation_max_secs: 21_600,
         webhook_hmac_secret: TEST_WEBHOOK_SECRET.into(),
@@ -4051,8 +4052,29 @@ async fn test_doctor_rx_only_after_the_consultation_has_started(pool: PgPool) {
         StatusCode::CONFLICT
     );
 
-    // The same chat once its window is open: accepted.
+    // The same chat once its window is open, but only the doctor has
+    // written (the patient never turned up): still refused.
     open_clinical_window(&pool, appointment).await;
+    set("INSERT INTO chat_conversations(appointment_id,patient_id,doctor_id,expires_at) SELECT id,patient_id,doctor_id,NOW()+INTERVAL '1 hour' FROM appointments WHERE id=$1 ON CONFLICT (appointment_id) DO NOTHING").await;
+    let message = |sender: &'static str| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query("INSERT INTO chat_messages(conversation_id,sender_id,content) SELECT c.id,$2,'Hello' FROM chat_conversations c WHERE c.appointment_id=$1")
+                .bind(appointment)
+                .bind(uid(sender))
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+    };
+    message(DOCTOR1_USER_ID).await;
+    assert_eq!(
+        post(&app, &uri, Some(&doctor), &page).await.status(),
+        StatusCode::CONFLICT
+    );
+
+    // Both have written: the chat has started, accepted.
+    message(PATIENT_USER_ID).await;
     assert_eq!(
         post(&app, &uri, Some(&doctor), &page).await.status(),
         StatusCode::CREATED
@@ -4064,6 +4086,278 @@ async fn test_doctor_rx_only_after_the_consultation_has_started(pool: PgPool) {
             .await
             .unwrap();
     assert_eq!(pages, 1);
+}
+
+/// A lost Agora presence callback does not block the prescription: when both
+/// apps reported joining the call, the video consultation counts as started
+/// even though it is still CONFIRMED. A doctor cannot report the patient's
+/// join (the reporter's side comes from the caller's identity), and the
+/// doctor queue shows the server's decision.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_doctor_rx_video_started_when_both_apps_joined(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let (appointment, _) = book_and_confirm(&app, &patient).await;
+    open_clinical_window(&pool, appointment).await;
+    let uri = format!("/api/v1/consultations/{appointment}/prescription");
+    let events = format!("/api/v1/consultations/{appointment}/telemetry/events");
+    let page = serde_json::json!({"base64_photo": minimal_jpeg_base64()});
+    let joined = |kind: &str| serde_json::json!({"events": [{"event_type": kind}]});
+    let queue_rx = || async {
+        let body =
+            json_body(get(&app, "/api/v1/doctor/appointments?view=all", Some(&doctor)).await).await;
+        body["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["id"] == appointment.to_string())
+            .unwrap()["rx"]
+            .clone()
+    };
+    assert_eq!(queue_rx().await["reason"], "NOT_STARTED");
+
+    // The doctor joined and also tried to report the patient's join.
+    assert!(post(&app, &events, Some(&doctor), &joined("DOCTOR_JOINED"))
+        .await
+        .status()
+        .is_success());
+    assert!(
+        post(&app, &events, Some(&doctor), &joined("PATIENT_JOINED"))
+            .await
+            .status()
+            .is_success()
+    );
+    assert_eq!(
+        post(&app, &uri, Some(&doctor), &page).await.status(),
+        StatusCode::CONFLICT,
+        "the doctor cannot report the patient's join"
+    );
+
+    // The patient's own app reports joining: started.
+    assert!(
+        post(&app, &events, Some(&patient), &joined("PATIENT_JOINED"))
+            .await
+            .status()
+            .is_success()
+    );
+    let rx = queue_rx().await;
+    assert_eq!(rx["allowed"], true, "{rx}");
+    assert_eq!(rx["reason"], "OK");
+    assert_eq!(
+        post(&app, &uri, Some(&doctor), &page).await.status(),
+        StatusCode::CREATED
+    );
+    let status: String = sqlx::query_scalar("SELECT status::text FROM appointments WHERE id=$1")
+        .bind(appointment)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "CONFIRMED");
+}
+
+/// A dispatched prescription stays final; the doctor corrects it with a note
+/// the patient sees in Health Records and is notified about. Not before
+/// dispatch, not by another doctor, never readable by Admin.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_prescription_correction_note_reaches_the_patient_only(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let other_doctor = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let (appointment, _) = book_and_confirm(&app, &patient).await;
+    open_clinical_window(&pool, appointment).await;
+    start_consultation(&pool, appointment).await;
+    let notes = format!("/api/v1/consultations/{appointment}/prescription/corrections");
+    let note = serde_json::json!({"note": "Take the tablets twice a day, not three times."});
+
+    let page = post(
+        &app,
+        &format!("/api/v1/consultations/{appointment}/prescription"),
+        Some(&doctor),
+        &serde_json::json!({"base64_photo": minimal_jpeg_base64()}),
+    )
+    .await;
+    assert_eq!(page.status(), StatusCode::CREATED);
+    // Not before the prescription is dispatched.
+    assert_eq!(
+        post(&app, &notes, Some(&doctor), &note).await.status(),
+        StatusCode::CONFLICT
+    );
+    let complete = post(
+        &app,
+        &format!("/api/v1/consultations/{appointment}/complete"),
+        Some(&doctor),
+        &serde_json::json!({"outcome": "COMPLETED_WITH_RX"}),
+    )
+    .await;
+    assert_eq!(complete.status(), StatusCode::OK);
+
+    // Another doctor cannot add one; the assigned doctor can.
+    assert_ne!(
+        post(&app, &notes, Some(&other_doctor), &note)
+            .await
+            .status(),
+        StatusCode::CREATED
+    );
+    assert_eq!(
+        post(
+            &app,
+            &notes,
+            Some(&doctor),
+            &serde_json::json!({"note": "  "})
+        )
+        .await
+        .status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        post(&app, &notes, Some(&doctor), &note).await.status(),
+        StatusCode::CREATED
+    );
+
+    // The patient reads it, in the list and in Health Records.
+    let read = json_body(get(&app, &notes, Some(&patient)).await).await;
+    assert_eq!(read["data"][0]["note"], note["note"]);
+    let records = json_body(get(&app, "/api/v1/patients/me/documents", Some(&patient)).await).await;
+    let rx = records["data"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|d| d["kind"] == "PRESCRIPTION")
+        .unwrap()
+        .clone();
+    assert_eq!(rx["corrections"][0]["note"], note["note"], "{rx}");
+    let notified: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM notifications WHERE type='PRESCRIPTION_CORRECTED' AND related_entity_id=$1",
+    )
+    .bind(appointment)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(notified, 1);
+
+    // Admin never reads clinical text; another doctor sees nothing.
+    assert_eq!(
+        get(&app, &notes, Some(&admin)).await.status(),
+        StatusCode::FORBIDDEN
+    );
+    let other = json_body(get(&app, &notes, Some(&other_doctor)).await).await;
+    assert_eq!(other["data"].as_array().map(Vec::len), Some(0));
+    // Exactly the one note is stored (append-only: no edit or delete API).
+    let stored: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM prescription_corrections WHERE appointment_id=$1")
+            .bind(appointment)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stored, 1);
+}
+
+/// The doctor is reminded once, 4 hours before a completed consultation's
+/// prescription window closes with no decision; after it closes, Admin's
+/// dashboard lists it for follow-up (number and doctor only).
+#[sqlx::test(migrations = "./migrations")]
+async fn test_rx_window_reminder_once_then_admin_follow_up(pool: PgPool) {
+    let (app, pool, state) = test_app_and_state(pool).await;
+    use hellodoctor_backend::services::notification_scheduler::run_rx_window_closing_pass;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let admin = make_token(uid(ADMIN_USER_ID), "ADMIN");
+    let (appointment, _) = book_and_confirm(&app, &patient).await;
+    open_clinical_window(&pool, appointment).await;
+    start_consultation(&pool, appointment).await;
+    let complete_at = |hours: i32| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query("UPDATE appointments SET status='COMPLETED', clinical_outcome='REFERRED', completed_at=NOW()-make_interval(hours => $2) WHERE id=$1")
+                .bind(appointment)
+                .bind(hours)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+    };
+    let reminders = || {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "SELECT COUNT(*) FROM notifications WHERE type='RX_WINDOW_CLOSING' AND related_entity_id=$1 AND user_id=$2",
+            )
+            .bind(appointment)
+            .bind(uid(DOCTOR1_USER_ID))
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+
+    // 10 hours after the end: too early for a reminder.
+    complete_at(10).await;
+    run_rx_window_closing_pass(&state, Utc::now())
+        .await
+        .unwrap();
+    assert_eq!(reminders().await, 0);
+
+    // 21 hours after: reminded, once, however often the pass runs.
+    complete_at(21).await;
+    run_rx_window_closing_pass(&state, Utc::now())
+        .await
+        .unwrap();
+    run_rx_window_closing_pass(&state, Utc::now())
+        .await
+        .unwrap();
+    assert_eq!(reminders().await, 1);
+
+    // Closed with no decision: on the Admin dashboard for follow-up.
+    complete_at(25).await;
+    let dashboard =
+        json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    let rows = dashboard["data"]["rx_follow_ups"]
+        .as_array()
+        .unwrap()
+        .clone();
+    let row = rows
+        .iter()
+        .find(|r| r["appointment_id"] == appointment.to_string())
+        .expect("the closed window is listed");
+    assert_eq!(row["kind"], "WINDOW_CLOSED_NO_DECISION");
+    assert!(
+        row.get("patient_name").is_none(),
+        "no patient details for Admin"
+    );
+
+    // A decided consultation is not a follow-up.
+    sqlx::query("UPDATE appointments SET clinical_outcome='COMPLETED_NO_RX' WHERE id=$1")
+        .bind(appointment)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let dashboard =
+        json_body(get(&app, "/api/v1/admin/command/telemetry", Some(&admin)).await).await;
+    assert!(!dashboard["data"]["rx_follow_ups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|r| r["appointment_id"] == appointment.to_string()));
+}
+
+/// The Care app reads the oldest supported build; 0 (the default) means no
+/// minimum. Signed-in callers only.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_app_version_policy_is_served_to_signed_in_callers(pool: PgPool) {
+    let config = AppConfig {
+        doctor_app_min_build: 42,
+        ..test_config()
+    };
+    let (app, _pool, _state) = test_app_and_state_with_config(pool, config).await;
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let body = json_body(get(&app, "/api/v1/config/app-version", Some(&doctor)).await).await;
+    assert_eq!(body["data"]["doctor_app_min_build"], 42);
+    assert_eq!(
+        get(&app, "/api/v1/config/app-version", None).await.status(),
+        StatusCode::UNAUTHORIZED
+    );
 }
 
 /// The late path keeps working: a consultation completed (referred) 2 hours

@@ -971,6 +971,19 @@ class DoctorRepository {
     }
   }
 
+  /// Adds a correction note to a sent prescription; the patient sees it.
+  Future<void> addPrescriptionCorrection(String id, String note) async {
+    try {
+      requireOnline();
+      await api.post('/consultations/$id/prescription/corrections',
+          data: {'note': note});
+    } catch (error, stack) {
+      ClientErrorReporter.observe(error, stack,
+          screen: 'SmartRx', operation: 'prescription_correction');
+      rethrow;
+    }
+  }
+
   Future<String> documentUrl(String appointmentId, String documentId,
       {String? currentAppointmentId}) async {
     try {

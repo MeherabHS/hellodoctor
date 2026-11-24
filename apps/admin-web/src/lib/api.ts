@@ -195,6 +195,19 @@ export interface CommandTelemetry {
   peer_ongoing_count?: number;
   /** Peer sessions with activity in the tracking window (times, statuses and counts only). */
   peer_sessions?: PeerTrackingRow[];
+  /** Prescriptions to follow up (no clinical content). */
+  rx_follow_ups?: RxFollowUpRow[];
+}
+
+export interface RxFollowUpRow {
+  kind: 'WINDOW_CLOSED_NO_DECISION' | 'JOIN_SIGNAL_MISSING';
+  appointment_id: string;
+  appointment_number: string;
+  doctor_name: string;
+  modality: string;
+  ended_at: string | null;
+  closed_at: string | null;
+  slot_start: string;
 }
 
 export interface PeerTrackingRow {

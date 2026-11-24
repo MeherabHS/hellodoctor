@@ -426,6 +426,35 @@ class _DocumentTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                       fontSize: 11.5, color: PatientTokens.textSub)),
+              // The doctor's correction notes, once per prescription (on
+              // its first page).
+              if (isRx && (doc.pageNumber ?? 1) == 1)
+                for (final c in doc.corrections)
+                  Container(
+                    margin: const EdgeInsets.only(top: 6),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                        color: PatientTokens.primaryLight,
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                              AppLocalizations.of(context).vaultDoctorNote(
+                                  c.createdAt == null
+                                      ? ''
+                                      : MaterialLocalizations.of(context)
+                                          .formatShortDate(c.createdAt!)),
+                              style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: PatientTokens.primaryDark)),
+                          const SizedBox(height: 2),
+                          Text(c.note,
+                              style: const TextStyle(
+                                  fontSize: 12.5, color: PatientTokens.text)),
+                        ]),
+                  ),
               if (saved)
                 Padding(
                   padding: const EdgeInsets.only(top: 3),

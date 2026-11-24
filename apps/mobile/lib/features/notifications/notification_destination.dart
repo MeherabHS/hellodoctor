@@ -50,6 +50,7 @@ class NotificationDestination {
       'CONSULTATION_NEEDS_REVIEW',
       'CONSULTATION_RECOVERY_RESOLVED',
       'PRESCRIPTION_AVAILABLE',
+      'RX_WINDOW_CLOSING',
     };
     if (notice.relatedEntityType == 'APPOINTMENT' &&
         appointments.contains(notice.type)) {

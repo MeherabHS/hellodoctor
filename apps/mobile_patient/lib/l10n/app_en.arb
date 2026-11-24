@@ -2676,6 +2676,11 @@
   "@callOpenChat": {
     "description": "In-call button that opens the consultation chat over the video call"
   },
+  "vaultDoctorNote": "Note from your doctor, {date}",
+  "@vaultDoctorNote": {
+    "description": "Health Records: a correction note the doctor added to a sent prescription",
+    "placeholders": {"date": {"type": "String"}}
+  },
   "vaultSavedOffline": "Saved on this phone",
   "@vaultSavedOffline": {
     "description": "Health Records: this document opens without internet"

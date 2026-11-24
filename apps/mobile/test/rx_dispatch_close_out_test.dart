@@ -178,13 +178,10 @@ void main() {
     expect(find.byType(CallCloseOutPage), findsNothing);
   });
 
-  testWidgets('Refer or escalate records the outcome', (tester) async {
-    final repo = await _pump(tester, CallCloseOutPage(appointment: _apt()));
-    await tester.tap(find.text('Refer or escalate'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Refer patient'));
-    await tester.pumpAndSettle();
-    expect(repo.completed['a1'], 'REFERRED');
-    expect(find.byType(CallCloseOutPage), findsNothing);
+  testWidgets('there is no refer or escalate outcome', (tester) async {
+    await _pump(tester, CallCloseOutPage(appointment: _apt()));
+    expect(find.text('Refer or escalate'), findsNothing);
+    expect(find.text('Dispatch prescription'), findsOneWidget);
+    expect(find.text('No prescription needed'), findsOneWidget);
   });
 }

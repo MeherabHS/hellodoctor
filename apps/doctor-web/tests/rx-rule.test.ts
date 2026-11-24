@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rxBlockedReason, rxCandidates, rxDispatchAllowed, rxHoursLeft } from '../src/lib/contracts.ts';
+import { rxBlockedReason, rxCandidates, rxClosingSoon, rxCorrectable, rxDispatchAllowed, rxHoursLeft } from '../src/lib/contracts.ts';
+import { observeServerDate, serverNow, setServerClockOffset } from '../src/lib/server-clock.ts';
 import type { Appointment } from '../src/lib/contracts.ts';
 
 // Product owner, 2026-11-24: a prescription only once the consultation has
@@ -44,4 +45,33 @@ test('the Rx list holds completed consultations awaiting a prescription', () => 
   assert.deepEqual(rxCandidates(rows, rows[0], now).map(a => a.id), ['live', 'older', 'recent']);
   // ...but never a consultation that has not started.
   assert.deepEqual(rxCandidates(rows, rows[1], now).map(a => a.id), ['older', 'recent']);
+});
+
+test('the server decision wins over the local rule', () => {
+  // A video both apps joined: still CONFIRMED, but started.
+  assert.equal(rxDispatchAllowed(apt('v', 'CONFIRMED', { rx: { allowed: true, reason: 'OK' } }), now), true);
+  // A chat inside its window that the patient never wrote in: not started.
+  const chat = apt('c', 'CONFIRMED', { modality: 'CHAT', start_time: iso(0.1), rx: { allowed: false, reason: 'NOT_STARTED', message: 'Not started yet.' } });
+  assert.equal(rxDispatchAllowed(chat, now), false);
+  assert.equal(rxBlockedReason(chat, now), 'Not started yet.');
+  // The server's deadline, not one computed from the completion time.
+  const done = apt('d', 'COMPLETED', { completed_at: iso(-2), rx: { allowed: true, reason: 'OK', closes_at: iso(0.5) } });
+  assert.equal(rxHoursLeft(done, now), 1);
+  assert.equal(rxClosingSoon(done, now), true);
+  assert.equal(rxDispatchAllowed(done, now + 3600000), false);
+});
+
+test('deadlines follow the server clock from the Date header', () => {
+  const received = Date.parse('2026-11-24T10:00:00Z');
+  observeServerDate('Tue, 24 Nov 2026 12:00:00 GMT', received);
+  assert.ok(Math.abs(serverNow() - Date.now() - 2 * 3600000) < 1000);
+  observeServerDate('garbage');
+  assert.ok(Math.abs(serverNow() - Date.now() - 2 * 3600000) < 1000, 'a malformed header changes nothing');
+  setServerClockOffset(0);
+});
+
+test('a sent prescription takes correction notes for 7 days', () => {
+  assert.equal(rxCorrectable(apt('a', 'COMPLETED', { clinical_outcome: 'COMPLETED_WITH_RX', completed_at: iso(-30) }), now), true);
+  assert.equal(rxCorrectable(apt('b', 'COMPLETED', { clinical_outcome: 'COMPLETED_WITH_RX', completed_at: iso(-24 * 8) }), now), false);
+  assert.equal(rxCorrectable(apt('c', 'COMPLETED', { clinical_outcome: 'COMPLETED_NO_RX', completed_at: iso(-2) }), now), false);
 });

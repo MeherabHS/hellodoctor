@@ -21,6 +21,27 @@ pub struct BookingPolicy {
     pub payment_required: bool,
 }
 
+#[derive(Debug, Serialize)]
+pub struct AppVersionPolicy {
+    /// Oldest Care (doctor) app build still supported; 0 = no minimum.
+    pub doctor_app_min_build: i64,
+}
+
+/// `GET /config/app-version` — the Care app asks the doctor to update when
+/// its build is older than this (`DOCTOR_APP_MIN_BUILD`).
+pub async fn app_version(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+) -> Result<impl IntoResponse, crate::error::AppError> {
+    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    Ok(Json(ApiResponse {
+        success: true,
+        data: AppVersionPolicy {
+            doctor_app_min_build: state.config.doctor_app_min_build.max(0),
+        },
+    }))
+}
+
 /// `GET /config/booking-policy` — the one place every client (Patient,
 /// Doctor Flutter, Doctor Web, Admin Web) checks before deciding whether to
 /// show payment UI, require a payment method at booking, or show Earnings &

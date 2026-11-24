@@ -16,6 +16,7 @@ import '../../core/network/chat_live.dart';
 import '../../core/network/screen_refresh.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/time/kenya_time.dart';
+import '../../core/time/server_clock.dart';
 import '../../core/validation/kenya_phone.dart';
 import '../../core/widgets/doctor_widgets.dart';
 import '../../core/widgets/afya_auth_widgets.dart' show AfyaLogoMark;
@@ -267,9 +268,16 @@ class _ConsultationHistoryState extends State<ConsultationHistoryPage> {
 /// offered only inside that window; the server still decides.
 bool rxWindowOpen(AppointmentDto a, [DateTime? now]) {
   if (a.status != 'COMPLETED' || a.rxDecided) return false;
+  final rx = a.rx;
+  if (rx != null) {
+    // The server's decision and deadline, against the server's clock.
+    final closes = rx.closesAt;
+    return rx.allowed &&
+        (closes == null || (now ?? ServerClock.now()).toUtc().isBefore(closes));
+  }
   final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
   if (ended == null) return false;
-  return (now ?? DateTime.now())
+  return (now ?? ServerClock.now())
       .toUtc()
       .isBefore(ended.toUtc().add(const Duration(hours: 24)));
 }
@@ -4159,9 +4167,15 @@ const _maxRxPages = 5;
 bool rxDispatchAllowed(AppointmentDto a, [DateTime? now]) =>
     rxConsultationStarted(a, now) || rxWindowOpen(a, now);
 
-/// A video call someone has joined (IN_CONSULTATION), or a chat whose
-/// consultation window has opened (chats stay CONFIRMED until completed).
+/// The consultation has started, as the server decides it: a video call
+/// both apps joined (or IN_CONSULTATION), or a chat in which both the doctor
+/// and the patient have written. Without the server's decision (older
+/// backend): IN_CONSULTATION, or a chat whose window has opened.
 bool rxConsultationStarted(AppointmentDto a, [DateTime? now]) {
+  final rx = a.rx;
+  if (rx != null) {
+    return a.status != 'COMPLETED' && rx.allowed;
+  }
   if (a.status == 'IN_CONSULTATION') return true;
   if (!a.isChat || !const ['CONFIRMED', 'WAITING'].contains(a.status)) {
     return false;
@@ -4169,18 +4183,111 @@ bool rxConsultationStarted(AppointmentDto a, [DateTime? now]) {
   final opens =
       a.join?.joinOpenAt ?? a.start?.subtract(const Duration(minutes: 15));
   return opens != null &&
-      !(now ?? DateTime.now()).toUtc().isBefore(opens.toUtc());
+      !(now ?? ServerClock.now()).toUtc().isBefore(opens.toUtc());
 }
 
 /// Hours left in a completed consultation's 24-hour prescription window.
 int? rxHoursLeft(AppointmentDto a, [DateTime? now]) {
-  final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
-  if (ended == null) return null;
-  final left = ended
-      .toUtc()
-      .add(const Duration(hours: 24))
-      .difference((now ?? DateTime.now()).toUtc());
+  final left = rxTimeLeft(a, now);
+  if (left == null) return null;
   return left.isNegative ? 0 : (left.inMinutes / 60).ceil();
+}
+
+/// Time left in a completed consultation's 24-hour prescription window, by
+/// the server's deadline and clock.
+Duration? rxTimeLeft(AppointmentDto a, [DateTime? now]) {
+  final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
+  final closes =
+      a.rx?.closesAt ?? ended?.toUtc().add(const Duration(hours: 24));
+  if (closes == null) return null;
+  return closes.difference((now ?? ServerClock.now()).toUtc());
+}
+
+/// A completed consultation with under an hour left in its window.
+bool rxClosingSoon(AppointmentDto a, [DateTime? now]) {
+  if (a.status != 'COMPLETED') return false;
+  final left = rxTimeLeft(a, now);
+  return left != null && !left.isNegative && left < const Duration(hours: 1);
+}
+
+/// A sent prescription is final; the doctor adds a correction note that the
+/// patient sees in Health Records (product owner, 2026-11-24).
+Future<void> addRxCorrection(BuildContext context, AppointmentDto a) async {
+  final note = await showDialog<String>(
+      context: context,
+      builder: (_) => _RxCorrectionDialog(patient: a.patientName));
+  if (note == null || !context.mounted) return;
+  try {
+    await context
+        .read<DoctorCubit>()
+        .repo
+        .addPrescriptionCorrection(a.id, note);
+    if (context.mounted) {
+      showMessage(context, 'Note sent to the patient.');
+    }
+  } catch (e) {
+    if (context.mounted) showError(context, e);
+  }
+}
+
+class _RxCorrectionDialog extends StatefulWidget {
+  const _RxCorrectionDialog({this.patient});
+  final String? patient;
+  @override
+  State<_RxCorrectionDialog> createState() => _RxCorrectionDialogState();
+}
+
+class _RxCorrectionDialogState extends State<_RxCorrectionDialog> {
+  final controller = TextEditingController();
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+          title: const Text('Add a correction note'),
+          content: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(
+                'The prescription for ${widget.patient ?? 'this patient'} cannot be changed. Your note is shown to the patient with it and they are notified.',
+                style: const TextStyle(color: DoctorTokens.textSub)),
+            const SizedBox(height: 12),
+            TextField(
+                controller: controller,
+                autofocus: true,
+                maxLength: 1000,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                    hintText:
+                        'For example: take the tablets twice a day, not three times.',
+                    border: OutlineInputBorder())),
+          ])),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () {
+                  final text = controller.text.trim();
+                  if (text.length >= 3) Navigator.pop(context, text);
+                },
+                child: const Text('Send note')),
+          ]);
+}
+
+/// Why [a] cannot take a prescription now, in words.
+String rxBlockedReason(AppointmentDto a) {
+  final message = a.rx?.message ?? '';
+  if (message.isNotEmpty) return message;
+  final who = a.patientName ?? 'this consultation';
+  return a.rxDecided
+      ? 'The prescription decision for $who is already recorded and cannot be changed.'
+      : a.status == 'COMPLETED'
+          ? 'The 24-hour prescription window for $who has closed.'
+          : 'A prescription for $who can be sent once the consultation has started.';
 }
 
 class ScannerPage extends StatefulWidget {
@@ -4195,7 +4302,7 @@ class ScannerPage extends StatefulWidget {
   State<ScannerPage> createState() => _ScannerState();
 }
 
-class _ScannerState extends State<ScannerPage> {
+class _ScannerState extends State<ScannerPage> with WidgetsBindingObserver {
   final List<_RxPage> pages = [];
   final notes = TextEditingController();
   AppointmentDto? appointment;
@@ -4214,19 +4321,35 @@ class _ScannerState extends State<ScannerPage> {
     final initial = widget.initialAppointment;
     if (initial != null && !rxDispatchAllowed(initial)) {
       decidedNotice = true;
-      final who = initial.patientName ?? 'this consultation';
-      _ineligibleReason = initial.rxDecided
-          ? 'The prescription decision for $who is already recorded and cannot be changed.'
-          : initial.status == 'COMPLETED'
-              ? 'The 24-hour prescription window for $who has closed.'
-              : 'A prescription for $who can be sent once the consultation has started.';
+      _ineligibleReason = rxBlockedReason(initial);
     } else {
       appointment = initial;
+    }
+    WidgetsBinding.instance.addObserver(this);
+    // The list keeps itself current: deadlines tick, and consultations that
+    // finish or whose window closes come and go without a manual refresh.
+    _tick = Timer.periodic(const Duration(minutes: 1), (_) => _refresh());
+  }
+
+  Timer? _tick;
+
+  void _refresh() {
+    if (!mounted) return;
+    setState(() {});
+    if (appointment == null && !dispatching) {
+      context.read<DoctorCubit>().loadQueue();
     }
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  @override
   void dispose() {
+    _tick?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     // This screen's `pages` list is purely ephemeral in-memory state (never
     // persisted), so once this widget is torn down — whether by navigating
     // away or by the session ending at logout — any not-yet-uploaded page's
@@ -4514,11 +4637,10 @@ class _ScannerState extends State<ScannerPage> {
   // ------------------------------------------------------------- picker
 
   List<(AppointmentDto, _RxKind)> _pickerItems(List<AppointmentDto> queue) {
-    final now = DateTime.now();
     final items = <(AppointmentDto, _RxKind)>[];
     for (final a in queue) {
       if (_dispatched.contains(a.id) && !a.rxDecided) continue;
-      final kind = _rxKindOf(a, now);
+      final kind = _rxKindOf(a);
       if (kind != null) items.add((a, kind));
     }
     // Live first (soonest), then late Rx, then locked (most recent first).
@@ -4613,7 +4735,9 @@ class _ScannerState extends State<ScannerPage> {
                   selected: _candidateId == e.$1.id,
                   api: c.read<DoctorCubit>().repo.api,
                   onTap: e.$2 == _RxKind.locked
-                      ? null
+                      ? (e.$1.clinicalOutcome == 'COMPLETED_WITH_RX'
+                          ? () => addRxCorrection(c, e.$1)
+                          : null)
                       : () => setState(() => _candidateId = e.$1.id)),
               const SizedBox(height: 10),
             ],
@@ -4622,7 +4746,17 @@ class _ScannerState extends State<ScannerPage> {
               icon: Icons.info_outline,
               tone: _RxNoteTone.neutral,
               text:
-                  'Completed consultations awaiting a prescription are shown for 24 hours. An ongoing consultation is prescribed from the consultation itself.'),
+                  'Completed consultations awaiting a prescription are shown for 24 hours. An ongoing consultation is prescribed from the consultation itself. Tap a sent prescription to add a correction note.'),
+          const SizedBox(height: 6),
+          Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                  onPressed: () => Navigator.push(
+                      c,
+                      MaterialPageRoute(
+                          builder: (_) => const ConsultationHistoryPage())),
+                  icon: const Icon(Icons.history, size: 18),
+                  label: const Text('Past prescriptions'))),
         ]);
   }
 
@@ -4684,6 +4818,16 @@ class _ScannerState extends State<ScannerPage> {
                   children: [
                     if (offline) ...[
                       const _RxOfflineBanner(),
+                      const SizedBox(height: 10),
+                    ],
+                    // The last hour: pages that reach the server after the
+                    // deadline are refused, so send everything now.
+                    if (rxClosingSoon(a)) ...[
+                      _RxNote(
+                          icon: Icons.timer_outlined,
+                          tone: _RxNoteTone.warning,
+                          text:
+                              'Less than an hour left. Send all pages now: the server refuses pages after ${_rxClock(kenyaTime(a.rx?.closesAt ?? ServerClock.now()))}.'),
                       const SizedBox(height: 10),
                     ],
                     _RxPatientCard(
@@ -4893,8 +5037,8 @@ String? rxKindName(AppointmentDto a, [DateTime? now]) =>
     _rxKindOf(a, now)?.name;
 
 _RxKind? _rxKindOf(AppointmentDto a, [DateTime? now]) {
-  final at = now ?? DateTime.now();
-  if (rxWindowOpen(a, at)) return _RxKind.awaiting;
+  final at = now ?? ServerClock.now();
+  if (rxWindowOpen(a, now)) return _RxKind.awaiting;
   if (a.rxDecided) {
     final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
     if (ended != null &&
@@ -5245,16 +5389,18 @@ class _RxConsultationTile extends StatelessWidget {
                           ])),
                       const SizedBox(width: 8),
                       if (locked)
-                        const SizedBox(
+                        SizedBox(
                             width: 112,
                             child: Row(children: [
-                              Icon(Icons.lock_outline,
+                              const Icon(Icons.lock_outline,
                                   size: 18, color: DoctorTokens.slate),
-                              SizedBox(width: 6),
+                              const SizedBox(width: 6),
                               Expanded(
                                   child: Text(
-                                      'Already recorded and cannot be changed.',
-                                      style: TextStyle(
+                                      a.clinicalOutcome == 'COMPLETED_WITH_RX'
+                                          ? 'Sent. Tap to add a correction note.'
+                                          : 'Already recorded and cannot be changed.',
+                                      style: const TextStyle(
                                           fontSize: 11.5,
                                           color: DoctorTokens.slate))),
                             ]))
@@ -6413,13 +6559,8 @@ class _ConsultationState extends State<ConsultationPage> {
                 content:
                     const Text('Choose the outcome recorded by the server.'),
                 actions: [
-                  TextButton(
-                      onPressed: () =>
-                          Navigator.pop(dialogContext, 'ESCALATED'),
-                      child: const Text('Escalate')),
-                  TextButton(
-                      onPressed: () => Navigator.pop(dialogContext, 'REFERRED'),
-                      child: const Text('Refer patient')),
+                  // No referral or escalation (product owner, 2026-11-24):
+                  // every consultation ends with or without a prescription.
                   TextButton(
                       onPressed: () =>
                           Navigator.pop(dialogContext, 'COMPLETED_NO_RX'),

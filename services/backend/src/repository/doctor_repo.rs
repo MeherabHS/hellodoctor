@@ -434,7 +434,7 @@ pub async fn list_appointments_as_of<'e, E: PgExecutor<'e>>(
     offset: i64,
     as_of: chrono::DateTime<chrono::Utc>,
 ) -> Result<Vec<sqlx::postgres::PgRow>, sqlx::Error> {
-    sqlx::query(r#"
+    sqlx::query(&format!(r#"
       WITH encounters AS (
         SELECT a.id,a.appointment_number,a.patient_id,a.doctor_id,a.slot_id,
           a.modality::text AS modality,a.status::text AS status,a.consultation_fee,
@@ -442,7 +442,7 @@ pub async fn list_appointments_as_of<'e, E: PgExecutor<'e>>(
           a.clinical_outcome,a.completed_at,a.created_at,a.updated_at,
           s.start_time,s.end_time,c.id AS conversation_id,c.is_locked AS chat_locked,c.expires_at AS chat_expires_at,
           cs.status::text AS consultation_session_status,cs.recovery_state AS consultation_recovery_state,
-          cs.empty_room_deadline,cs.patient_present,cs.doctor_present,
+          cs.empty_room_deadline,cs.patient_present,cs.doctor_present,cs.ended_at AS session_ended_at,
           s.start_time-INTERVAL '15 minutes' AS history_access_from,
           CASE WHEN a.status='COMPLETED' THEN COALESCE(cs.ended_at,a.completed_at)+INTERVAL '24 hours' END AS history_access_until,
           CASE WHEN a.status='COMPLETED' AND (COALESCE(cs.ended_at,a.completed_at) IS NULL OR $7::timestamptz>=COALESCE(cs.ended_at,a.completed_at)+INTERVAL '24 hours') THEN 'DONE' ELSE a.status::text END AS doctor_lifecycle,
@@ -476,9 +476,11 @@ pub async fn list_appointments_as_of<'e, E: PgExecutor<'e>>(
         -- Age and sex come only from the RLS-visible patient row (the same row that
         -- supplies the name); outside that visibility they are NULL, never inferred.
         date_part('year',age(($7::timestamptz AT TIME ZONE 'Africa/Nairobi')::date,p.date_of_birth))::int AS patient_age,
-        p.gender::text AS patient_sex
+        p.gender::text AS patient_sex,
+        -- Prescription rule facts (prescription_service::rx_facts_columns).
+        {rx_facts}
       FROM paginated LEFT JOIN patient_profiles p ON p.id=paginated.patient_id
-    "#)
+    "#, rx_facts = crate::services::prescription_service::rx_facts_columns("paginated.id", "$5")))
         .bind(doctor_profile_id)
         .bind(limit)
         .bind(offset)

@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, authorizedDocument, errorText, post, runtimeGeneration, useResource } from '../lib/client';
-import { Appointment, RecordDto, consultationAction, consultationActionLabel, money, rxDispatchAllowed } from '../lib/contracts';
+import { Appointment, RecordDto, consultationAction, consultationActionLabel, money, rxCorrectable, rxDispatchAllowed } from '../lib/contracts';
 import { Avatar, Badge, Modal, State, appointmentStatus, demographics, outcomeLabel } from './Common';
 import { Icon } from './Icons';
 import { ModalityBadge, PLATFORM_NOTE } from './Dashboard';
@@ -60,6 +60,7 @@ export function Summary({ appointment: a, history, documents, complete, action, 
     <div className="am-row" style={{ paddingTop: 6, borderTop: '1px solid var(--am-line-soft)' }}>
       {primary && <button className="am-btn primary" onClick={() => action(primary, a)}><Icon name={primary === 'chat' ? 'chat' : 'video'} size={16}/>{consultationActionLabel(a)}</button>}
       {rxDispatchAllowed(a) && <button className="am-btn soft" onClick={() => action('rx', a)}><Icon name="rx" size={16}/>Write prescription</button>}
+      {rxCorrectable(a) && <button className="am-btn ghost" onClick={() => action('rx', a)}><Icon name="pen" size={16}/>Add correction note</button>}
       <button className="am-btn ghost" onClick={history}><Icon name="history" size={16}/>Patient history</button>
       <button className="am-btn ghost" onClick={documents}><Icon name="file" size={16}/>All documents</button>
       <button className="am-btn ghost" onClick={() => action('chat', a)}><Icon name="chat" size={16}/>Messages</button>
@@ -71,8 +72,7 @@ export function Summary({ appointment: a, history, documents, complete, action, 
 const outcomes: [string, string, string][] = [
   ['COMPLETED_WITH_RX', 'Completed with prescription', 'A prescription has been, or will be, uploaded.'],
   ['COMPLETED_NO_RX', 'Completed without prescription', 'Advice given; no medicine prescribed.'],
-  ['REFERRED', 'Referred', 'The patient needs to see another provider or facility.'],
-  ['ESCALATED', 'Escalated', 'The case needs urgent or specialist attention.'],
+  // No referral or escalation outcomes (product owner, 2026-11-24).
 ];
 export function Completion({ appointment: a, onCompleted, onClose, onView }: { appointment: Appointment; onCompleted: () => void; onClose: () => void; onView: () => void }) {
   const [outcome, setOutcome] = useState('COMPLETED_WITH_RX'); const [reason, setReason] = useState(''); const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [confirmed, setConfirmed] = useState(false);

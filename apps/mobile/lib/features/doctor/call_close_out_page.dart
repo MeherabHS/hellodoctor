@@ -74,33 +74,6 @@ class _CallCloseOutPageState extends State<CallCloseOutPage> {
         'Consultation completed — no prescription needed.');
   }
 
-  Future<void> _referOrEscalate() async {
-    final outcome = await showDialog<String>(
-        context: context,
-        builder: (d) => AlertDialog(
-                title: const Text('Refer or escalate'),
-                content: const Text(
-                    'Choose the outcome to record for this consultation.'),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(d),
-                      child: const Text('Cancel')),
-                  TextButton(
-                      onPressed: () => Navigator.pop(d, 'ESCALATED'),
-                      child: const Text('Escalate')),
-                  FilledButton(
-                      onPressed: () => Navigator.pop(d, 'REFERRED'),
-                      child: const Text('Refer patient')),
-                ]));
-    if (outcome == null || !mounted) return;
-    final repo = context.read<DoctorCubit>().repo;
-    await _record(
-        () => repo.complete(a.id, outcome),
-        outcome == 'REFERRED'
-            ? 'Consultation completed — patient referred.'
-            : 'Consultation completed — escalated.');
-  }
-
   void _rejoin() => Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -161,11 +134,6 @@ class _CallCloseOutPageState extends State<CallCloseOutPage> {
                   onPressed: busy ? null : _noRx,
                   icon: const Icon(Icons.do_not_disturb_alt_outlined),
                   label: const Text('No prescription needed')),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                  onPressed: busy ? null : _referOrEscalate,
-                  icon: const Icon(Icons.forward_outlined),
-                  label: const Text('Refer or escalate')),
               const SizedBox(height: 18),
               if (busy)
                 const Center(child: CircularProgressIndicator())

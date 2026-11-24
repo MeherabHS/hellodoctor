@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hellodoctor_mobile/core/network/api_client.dart';
+import 'package:hellodoctor_mobile/core/time/server_clock.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_cubit.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_models.dart';
 import 'package:hellodoctor_mobile/features/doctor/doctor_pages.dart';
@@ -154,16 +155,19 @@ void main() {
     }
     expect(find.text('Sarah Nditiru'), findsOneWidget);
     expect(find.text('22 h left'), findsOneWidget);
-    expect(
-        find.text('Already recorded and cannot be changed.'), findsOneWidget);
+    expect(find.text('Sent. Tap to add a correction note.'), findsOneWidget);
 
     FilledButton continueButton() => tester
         .widget<FilledButton>(find.widgetWithText(FilledButton, 'Continue'));
     expect(continueButton().onPressed, isNull, reason: 'nothing picked yet');
 
-    // A locked consultation cannot be picked.
+    // A sent prescription cannot be picked again; tapping it offers a
+    // correction note instead.
     await tester.tap(find.text('David Kimani'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('Add a correction note'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
     expect(continueButton().onPressed, isNull);
 
     // Filters narrow the list.
@@ -229,6 +233,66 @@ void main() {
     await tester.tap(find.byTooltip('Back'));
     await tester.pumpAndSettle();
     expect(find.text('origin'), findsOneWidget);
+  });
+
+  group('the server decides', () {
+    AppointmentDto withRx(AppointmentDto a, Map<String, dynamic> rx) =>
+        AppointmentDto(
+            id: a.id,
+            number: a.number,
+            status: a.status,
+            lifecycle: a.lifecycle,
+            patientName: a.patientName,
+            modality: a.modality,
+            clinicalOutcome: a.clinicalOutcome,
+            completedAt: a.completedAt,
+            end: a.end,
+            start: a.start,
+            rx: RxEligibility.tryParse(rx));
+    tearDown(() => ServerClock.set(Duration.zero));
+
+    test('a video both apps joined counts as started while CONFIRMED', () {
+      final a = withRx(_queue[2], {'allowed': true, 'reason': 'OK'});
+      expect(rxDispatchAllowed(a), isTrue);
+    });
+
+    test('a chat with an open window but no patient message is refused', () {
+      final a = withRx(_apt('c', 'Chat', 'CONFIRMED', chat: true), {
+        'allowed': false,
+        'reason': 'NOT_STARTED',
+        'message':
+            'A prescription can be sent once the consultation has started.'
+      });
+      expect(rxDispatchAllowed(a), isFalse);
+      expect(rxBlockedReason(a), contains('has started'));
+    });
+
+    test('deadlines follow the server clock, not the phone', () {
+      final closes = DateTime.now().toUtc().add(const Duration(hours: 3));
+      final a = withRx(_queue[3], {
+        'allowed': true,
+        'reason': 'OK',
+        'closes_at': closes.toIso8601String()
+      });
+      expect(rxWindowOpen(a), isTrue);
+      expect(rxHoursLeft(a), 3);
+      // The phone is 4 hours behind the server: the window has closed.
+      ServerClock.set(const Duration(hours: 4));
+      expect(rxWindowOpen(a), isFalse);
+      // 2.5 hours ahead: under an hour left, so the capture step warns.
+      ServerClock.set(const Duration(minutes: 150));
+      expect(rxClosingSoon(a), isTrue);
+    });
+
+    test('the server clock is read from the Date header', () {
+      final received = DateTime.utc(2026, 11, 24, 10);
+      ServerClock.observe('Tue, 24 Nov 2026 12:00:00 GMT',
+          receivedAt: received);
+      final now = ServerClock.now();
+      expect(now.difference(DateTime.now().toUtc()).inMinutes, closeTo(120, 1));
+      ServerClock.observe('not a date');
+      expect(ServerClock.now().difference(now).inSeconds.abs(), lessThan(5));
+    });
   });
 
   testWidgets('opened for a consultation that has not started, it explains why',

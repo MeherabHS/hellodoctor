@@ -1030,6 +1030,7 @@
   "reminderDurationDays": "siku {days} saa {hours}",
   "remindersExactAlarmsAllow": "Ruhusu kengele na vikumbusho",
   "callOpenChat": "Gumzo",
+  "vaultDoctorNote": "Maelezo kutoka kwa daktari wako, {date}",
   "vaultSavedOffline": "Imehifadhiwa kwenye simu hii",
   "vaultNotSavedOffline": "Hati hii bado haijahifadhiwa kwenye simu hii. Fungua Rekodi za Afya ukiwa mtandaoni ili kuihifadhi.",
   "chatStatusActive": "Inaendelea",

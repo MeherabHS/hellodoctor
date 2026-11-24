@@ -775,6 +775,95 @@ impl NotificationService {
         Ok(())
     }
 
+    /// `RX_WINDOW_CLOSING` — the doctor is reminded once, 4 hours before a
+    /// completed consultation's 24-hour prescription window closes with no
+    /// decision (`notification_scheduler::run_rx_window_closing_pass`). The
+    /// text names the consultation number only, never the patient, because
+    /// it shows on a lock screen.
+    pub async fn notify_rx_window_closing(
+        conn: &mut sqlx::PgConnection,
+        appointment_id: Uuid,
+        appointment_number: &str,
+        ttl_seconds: i32,
+    ) -> Result<(), sqlx::Error> {
+        let Some((doctor, _patient)) =
+            Self::system_appointment_recipients(conn, appointment_id).await?
+        else {
+            tracing::warn!(appointment_id = %appointment_id, "RX_WINDOW_CLOSING: appointment recipients unresolved, skipping");
+            return Ok(());
+        };
+        let fallback_body = format!(
+            "4 hours left to send the prescription for consultation {appointment_number}, or record that none is needed."
+        );
+        let (title, body) = Self::render(
+            &mut *conn,
+            "rx_window_closing",
+            &doctor.language,
+            &[("appointment_number", appointment_number)],
+            "Prescription window closing",
+            &fallback_body,
+        )
+        .await?;
+        notification_repo::insert_if_new_with_ttl(
+            &mut *conn,
+            Uuid::new_v4(),
+            doctor.user_id,
+            "RX_WINDOW_CLOSING",
+            &title,
+            &body,
+            Some("APPOINTMENT"),
+            Some(appointment_id),
+            None,
+            &format!("rx-window-closing:{appointment_id}"),
+            None,
+            Some(ttl_seconds),
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// `PRESCRIPTION_CORRECTED` — the patient (or guardian) is told the
+    /// doctor added a correction note to a dispatched prescription. Fired in
+    /// the same transaction as the note, once per note.
+    pub async fn notify_prescription_corrected(
+        conn: &mut sqlx::PgConnection,
+        appointment_id: Uuid,
+        correction_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        let Some((_doctor, patient)) =
+            Self::appointment_recipients(&mut *conn, appointment_id).await?
+        else {
+            tracing::warn!(appointment_id = %appointment_id, "PRESCRIPTION_CORRECTED: appointment recipients unresolved, skipping");
+            return Ok(());
+        };
+        if let Some(patient) = patient {
+            let (title, body) = Self::render(
+                &mut *conn,
+                "prescription_corrected",
+                &patient.language,
+                &[],
+                "Note on your prescription",
+                "Your doctor added a note to your prescription. Open Health Records to read it.",
+            )
+            .await?;
+            notification_repo::insert_if_new(
+                &mut *conn,
+                Uuid::new_v4(),
+                patient.user_id,
+                "PRESCRIPTION_CORRECTED",
+                &title,
+                &body,
+                Some("APPOINTMENT"),
+                Some(appointment_id),
+                None,
+                &format!("prescription-corrected:{correction_id}"),
+                None,
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
     /// `REFUND_APPROVED` — fired from the same Finance-worker transaction as
     /// `GrievanceService::adjudicate_refund`'s status transition. Explicitly
     /// worded as approved-pending-execution, never "paid" — approval alone

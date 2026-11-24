@@ -119,6 +119,9 @@ pub fn start(state: AppState) {
             if let Err(e) = run_consultation_ready_pass(&state, now).await {
                 tracing::error!(error = ?e, "notification scheduler: consultation-ready pass failed");
             }
+            if let Err(e) = run_rx_window_closing_pass(&state, now).await {
+                tracing::error!(error = ?e, "notification scheduler: prescription-window reminder pass failed");
+            }
             if let Err(e) = run_greeting_pass(&state, now).await {
                 tracing::error!(error = ?e, "notification scheduler: good-morning greeting pass failed");
             }
@@ -1608,6 +1611,42 @@ pub async fn run_consultation_ready_pass(
         crate::services::NotificationService::notify_consultation_ready(
             &mut conn,
             appointment_id,
+            ttl_seconds,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+/// Reminds the doctor once, 4 hours before a completed consultation's
+/// 24-hour prescription window closes while no decision is recorded
+/// (product owner, 2026-11-24). The window counts from the same instant as
+/// `prescription_service::doctor_rx_decision`.
+pub async fn run_rx_window_closing_pass(
+    state: &AppState,
+    now: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
+    let due: Vec<(Uuid, String, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT a.id, a.appointment_number, COALESCE(cs.ended_at, a.completed_at) + INTERVAL '24 hours' \
+           FROM appointments a \
+           LEFT JOIN consultation_sessions cs ON cs.appointment_id = a.id \
+          WHERE a.status = 'COMPLETED' \
+            AND a.clinical_outcome IS DISTINCT FROM 'COMPLETED_WITH_RX' \
+            AND a.clinical_outcome IS DISTINCT FROM 'COMPLETED_NO_RX' \
+            AND a.completed_at > $1 - INTERVAL '2 days' \
+            AND COALESCE(cs.ended_at, a.completed_at) + INTERVAL '20 hours' <= $1 \
+            AND COALESCE(cs.ended_at, a.completed_at) + INTERVAL '24 hours' > $1",
+    )
+    .bind(now)
+    .fetch_all(&state.system_db)
+    .await?;
+    for (appointment_id, number, closes_at) in due {
+        let ttl_seconds = (closes_at - now).num_seconds().clamp(1, 4 * 3600) as i32;
+        let mut conn = state.system_db.acquire().await?;
+        crate::services::NotificationService::notify_rx_window_closing(
+            &mut conn,
+            appointment_id,
+            &number,
             ttl_seconds,
         )
         .await?;

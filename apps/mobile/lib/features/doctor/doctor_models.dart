@@ -42,8 +42,13 @@ class AppointmentDto {
       this.doctorPresent,
       this.join,
       this.clinicalOutcome,
+      this.rx,
       this.queueActionable = true});
   final bool queueActionable;
+
+  /// The server's prescription decision for this consultation (`rx` on the
+  /// doctor queue); `null` from an older backend.
+  final RxEligibility? rx;
 
   /// Server-recorded outcome once completed (COMPLETED_WITH_RX,
   /// COMPLETED_NO_RX, REFERRED, ESCALATED).
@@ -136,7 +141,38 @@ class AppointmentDto {
       doctorPresent: j['doctor_present'] as bool?,
       join: JoinEligibility.tryParse(j['join']),
       clinicalOutcome: optionalText(j['clinical_outcome']),
+      rx: RxEligibility.tryParse(j['rx']),
       queueActionable: j['queue_actionable'] == true);
+}
+
+/// Whether the doctor can send a prescription for a consultation, as the
+/// server decides it (`prescription_service::doctor_rx_decision`): the apps
+/// display this instead of re-deriving the rule.
+class RxEligibility {
+  const RxEligibility(
+      {required this.allowed,
+      required this.reason,
+      this.message = '',
+      this.closesAt});
+
+  /// `OK`, `NOT_STARTED`, `WINDOW_CLOSED`, `DECIDED` or `UNAVAILABLE`.
+  final String reason;
+  final bool allowed;
+
+  /// Why not, in words, when [allowed] is false.
+  final String message;
+
+  /// The deadline of a completed consultation's 24-hour window.
+  final DateTime? closesAt;
+
+  static RxEligibility? tryParse(dynamic value) {
+    if (value is! Map) return null;
+    return RxEligibility(
+        allowed: value['allowed'] == true,
+        reason: textOf(value['reason']),
+        message: textOf(value['message']),
+        closesAt: DateTime.tryParse(textOf(value['closes_at']))?.toUtc());
+  }
 }
 
 class SlotDto {

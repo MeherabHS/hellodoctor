@@ -269,7 +269,7 @@ class _NotificationTile extends StatelessWidget {
                     const Color(0xFFFFF5E5),
                     const Color(0xFFD98A00)
                   )
-                : t == 'PRESCRIPTION_AVAILABLE'
+                : t == 'PRESCRIPTION_AVAILABLE' || t == 'PRESCRIPTION_CORRECTED'
                     ? (
                         Icons.medication_outlined,
                         PatientTokens.mintCard,

@@ -1,14 +1,16 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { ApiError, errorText, runtimeGeneration, uploadPrescription } from '../lib/client';
+import { ApiError, errorText, post, runtimeGeneration, uploadPrescription } from '../lib/client';
 import { compressRxPhoto, RX_PAGE_MAX_BYTES } from '../lib/rx-compression';
 import { uploadPrescriptionPages } from '../lib/rx-upload';
-import { Appointment, Profile, RecordDto, RxPage, rxBlockedReason, rxHoursLeft } from '../lib/contracts';
+import { Appointment, Profile, RecordDto, RxPage, rxBlockedReason, rxClosesAt, rxClosingSoon, rxCorrectable, rxHoursLeft } from '../lib/contracts';
 import { Avatar, Badge, PageHeader, State, demographics } from './Common';
 import { Icon } from './Icons';
 import { ClinicalAction, date, time } from './Queue';
 
-export function Rx({profile,appointments,appointment,pages,setPages,select,action,complete,back}:{profile:Profile;appointments:Appointment[];appointment:Appointment|null;pages:RxPage[];setPages:(pages:RxPage[])=>void;select:(a:Appointment)=>void;action:ClinicalAction;complete:()=>void;back:()=>void}) {
+export function Rx({profile,appointments,appointment,pages,setPages,select,action,complete,back,history}:{profile:Profile;appointments:Appointment[];appointment:Appointment|null;pages:RxPage[];setPages:(pages:RxPage[])=>void;select:(a:Appointment)=>void;action:ClinicalAction;complete:()=>void;back:()=>void;history?:()=>void}) {
+  // Deadlines tick without a reload.
+  const [,setTick]=useState(0);useEffect(()=>{const id=window.setInterval(()=>setTick(t=>t+1),60000);return()=>window.clearInterval(id);},[]);
   const picker=useRef<HTMLInputElement>(null);const [busy,setBusy]=useState(false);const [preparing,setPreparing]=useState('');const [error,setError]=useState('');const [notes,setNotes]=useState('');const [focused,setFocused]=useState(0);const lock=useRef(false);const preparingLock=useRef(false);const pageRef=useRef(pages);pageRef.current=pages;
   const mounted=useRef(true);const contextRef=useRef(appointment?.id);contextRef.current=appointment?.id;
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
@@ -82,6 +84,9 @@ export function Rx({profile,appointments,appointment,pages,setPages,select,actio
             <label className="am-field"><span>Prescription for</span><select className="am-select" aria-label="Prescription consultation" value={appointment?.id??''} disabled={disabled} onChange={e=>{const a=appointments.find(row=>row.id===e.target.value);if(a)select(a);}}><option value="" disabled>Select a consultation</option>{appointment&&!appointments.some(a=>a.id===appointment.id)&&<option value={appointment.id} disabled>{appointment.patient_display_name} · {appointment.appointment_number}</option>}{appointments.map(a=>{const left=a.status==='COMPLETED'?rxHoursLeft(a):null;return <option key={a.id} value={a.id}>{a.patient_display_name} · {a.appointment_number}{left!=null?` · Completed, ${left<=1?'< 1':left} h left`:''}</option>;})}</select></label>
             <span className="am-faint">Completed consultations awaiting a prescription are listed for 24 hours. An ongoing consultation is prescribed from its consultation room.</span>
             {blocked&&<div className="am-callout" role="status"><Icon name="lock"/><span>{blocked}</span></div>}
+            {appointment&&rxClosingSoon(appointment)&&<div className="am-callout" role="alert"><Icon name="clock"/><span><strong>Less than an hour left.</strong> Send all pages now: the server refuses pages after {time(new Date(rxClosesAt(appointment) ?? 0).toISOString())}.</span></div>}
+            {appointment&&rxCorrectable(appointment)&&<RxCorrection appointment={appointment}/>}
+            {history&&<button className="am-btn ghost sm" onClick={history}><Icon name="history" size={15}/>Past prescriptions</button>}
             {appointment&&<div className="am-person"><Avatar name={appointment.patient_display_name}/><div><strong>{appointment.patient_display_name}</strong><span>{[demographics(appointment),`${date(appointment.start_time)}, ${time(appointment.start_time)}`].filter(Boolean).join(' · ')}</span></div></div>}
             <div className="am-row"><button className="am-btn ghost sm" disabled={!appointment} onClick={()=>appointment&&action('history',appointment)}><Icon name="history" size={15}/>History</button><button className="am-btn ghost sm" disabled={!appointment} onClick={()=>appointment&&action('documents',appointment)}><Icon name="file" size={15}/>Documents</button></div>
             <div className="am-callout" style={{padding:'10px 12px'}}><Icon name="stethoscope"/><span><strong>{profile.full_name}</strong><br/><span className="am-faint">{[profile.qualifications.join(', '),`KMPDC ${profile.license_number}`].filter(Boolean).join(' · ')}</span></span></div>
@@ -99,4 +104,22 @@ export function Rx({profile,appointments,appointment,pages,setPages,select,actio
       </div>
     </div>
   </section>;
+}
+
+/** A sent prescription is final; the doctor adds a correction note the
+ * patient sees in Health Records and is notified about (2026-11-24). */
+function RxCorrection({appointment}:{appointment:Appointment}) {
+  const [note,setNote]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');const [sent,setSent]=useState(false);
+  useEffect(()=>{setNote('');setError('');setSent(false);},[appointment.id]);
+  async function send(){
+    const text=note.trim();if(text.length<3||busy)return;setBusy(true);setError('');
+    try{await post(`consultations/${appointment.id}/prescription/corrections`,{note:text});setSent(true);setNote('');}catch(e){setError(errorText(e));}finally{setBusy(false);}
+  }
+  return <div className="am-stack" style={{gap:8}}>
+    <label className="am-field"><span>Correction note for the patient</span><textarea className="am-textarea" rows={3} maxLength={1000} value={note} disabled={busy} placeholder="For example: take the tablets twice a day, not three times." onChange={e=>setNote(e.target.value)}/></label>
+    <span className="am-faint">The prescription cannot be changed. The note is shown to the patient with it and they are notified.</span>
+    <button className="am-btn soft" disabled={busy||note.trim().length<3} onClick={()=>void send()}><Icon name="send" size={15}/>{busy?'Sending note…':'Send correction note'}</button>
+    {sent&&<div className="am-callout" role="status"><Icon name="checkCircle"/><span>Note sent to the patient.</span></div>}
+    <State error={error}/>
+  </div>;
 }

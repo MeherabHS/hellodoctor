@@ -555,7 +555,9 @@ pub async fn list_own_documents(
     let prescription_rows = sqlx::query(
         "SELECT p.id, p.appointment_id, p.rx_number, p.page_number, p.mime_type, p.created_at, \
                 d.full_name AS doctor_display_name, d.primary_specialty, \
-                a.appointment_number, a.modality::text AS modality, s.start_time AS consultation_start \
+                a.appointment_number, a.modality::text AS modality, s.start_time AS consultation_start, \
+                COALESCE((SELECT jsonb_agg(jsonb_build_object('note', c.note, 'created_at', c.created_at) ORDER BY c.created_at) \
+                            FROM prescription_corrections c WHERE c.appointment_id = p.appointment_id), '[]'::jsonb) AS corrections \
          FROM prescriptions p \
          JOIN doctor_public_directory d ON d.id = p.doctor_id \
          JOIN appointments a ON a.id = p.appointment_id \
@@ -590,6 +592,8 @@ pub async fn list_own_documents(
             created_at,
             json!({
                 "kind": "PRESCRIPTION",
+                // The doctor's correction notes on this prescription.
+                "corrections": r.get::<serde_json::Value, _>("corrections"),
                 "id": r.get::<uuid::Uuid, _>("id"),
                 "appointment_id": r.get::<uuid::Uuid, _>("appointment_id"),
                 "rx_number": r.get::<String, _>("rx_number"),
