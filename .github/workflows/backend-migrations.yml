@@ -21,6 +21,10 @@ on:
     paths:
       - "services/backend/**"
       - ".github/workflows/backend-migrations.yml"
+  # Manual run on any commit, e.g. a main commit that only changed the apps:
+  # the image publish requires this check on the exact commit it builds,
+  # and the path filter above skips such commits.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -29,7 +33,9 @@ jobs:
   migrate-and-test:
     name: Apply migrations to a fresh Postgres and run the backend test suite
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    # ~13 min to compile plus ~35 min of tests (640 tests, single-threaded);
+    # 50 minutes cancelled busy runs that would have passed.
+    timeout-minutes: 75
 
     services:
       postgres:
@@ -143,4 +149,4 @@ jobs:
         # tests/api_tests.rs: the five capability roles are cluster-wide
         # Postgres objects, so parallel test threads race on shared
         # pg_authid catalog rows across the one Postgres service container.
-        run: timeout 40m cargo test --test api_tests --locked -- --test-threads=1
+        run: timeout 55m cargo test --test api_tests --locked -- --test-threads=1
