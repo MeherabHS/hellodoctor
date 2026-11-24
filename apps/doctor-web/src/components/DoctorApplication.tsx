@@ -4,7 +4,7 @@ import { restoresSilently, type RestoreTrigger } from '../lib/sessionRestore';
 import { isProfessionallyVerified } from '../lib/professionalVerification';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, clearRuntime, diagnostic, errorText, request, runtimeGeneration, useResource, setIncidentScreen } from '../lib/client';
-import { Appointment, DoctorNotification, paymentRequiredFromPolicy, Profile, Question, RecordDto, RxPage, consultationAction } from '../lib/contracts';
+import { Appointment, DoctorNotification, paymentRequiredFromPolicy, Profile, Question, RecordDto, RxPage, consultationAction, rxCandidates } from '../lib/contracts';
 import { Modal, State, Drawer } from './Common';
 import { Icon } from './Icons';
 import { Auth } from './Auth';
@@ -115,7 +115,7 @@ function Application({ initialPage }: { initialPage: 'dashboard' | 'chat' }) {
   let view: React.ReactNode;
   if (offline || suspended) view = <div className="am-card"><State error={offline ? 'You are offline. Reconnect to load patient information.' : 'Checking your session…'} retry={() => void restore()}/></div>;
   else if (page === 'chat') view = <Chat profile={profile} appointments={queue.data} selectedAppointment={active?.id} focusAppointment={active ?? undefined} visible={dialog === null && document === null && !navOpen} action={action} gap={gap}/>;
-  else if (page === 'rx') view = <Rx profile={profile} appointments={queue.data.filter(a => ['CONFIRMED', 'WAITING', 'IN_CONSULTATION', 'COMPLETED'].includes(a.status))} appointment={chosen} pages={chosen ? rxByAppointment[chosen.id] ?? [] : []} setPages={next => { if (chosen && renderGeneration === runtimeGeneration()) setRx(previous => ({ ...previous, [chosen.id]: next })); }} select={setActive} action={action} complete={() => setDialog('completion')} back={() => go('telehealth')}/>;
+  else if (page === 'rx') view = <Rx profile={profile} appointments={rxCandidates(queue.data, active)} appointment={active} pages={active ? rxByAppointment[active.id] ?? [] : []} setPages={next => { if (active && renderGeneration === runtimeGeneration()) setRx(previous => ({ ...previous, [active.id]: next })); }} select={setActive} action={action} complete={() => setDialog('completion')} back={() => go('telehealth')}/>;
   else if (page === 'schedule') view = <Schedule key={revision} appointments={queue.data} action={action} addSlot={() => setDialog('slot')} gap={gap} initialDate={scheduleDate}/>;
   else if (page === 'wallet') view = paymentRequired ? <Wallet statement={() => setDialog('statement')} payout={() => setDialog('payout')} receipt={row => { setReceipt(row); setDialog('receipt'); }}/> : <DeferredFinancialNotice/>;
   else if (page === 'qna') view = <Qna profile={profile} onChanged={() => void openQuestions.refresh()}/>;

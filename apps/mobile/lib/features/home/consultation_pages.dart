@@ -243,8 +243,10 @@ class _PatientDetailsState extends State<PatientDetailsPage> {
                                 },
                           child: const Text('Messages')),
                     TextButton(
-                        onPressed: () =>
-                            _go(c, ScannerPage(initialAppointment: a)),
+                        // Prescribing opens once the consultation has started.
+                        onPressed: rxDispatchAllowed(a)
+                            ? () => _go(c, ScannerPage(initialAppointment: a))
+                            : null,
                         child: const Text('Prescription')),
                     TextButton(
                         onPressed: () =>

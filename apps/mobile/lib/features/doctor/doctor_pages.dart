@@ -828,7 +828,7 @@ class _ConsultationActionsState extends State<ConsultationActions> {
           TextButton(
               onPressed: busy ? null : openChat,
               child: const Text('Follow-up messages')),
-        if (a.canStart)
+        if (rxDispatchAllowed(a))
           TextButton(
               onPressed: () => Navigator.push(
                   context,
@@ -1903,10 +1903,13 @@ class _SlotConsultationActionsState extends State<_SlotConsultationActions> {
         Expanded(
             flex: 8,
             child: OutlinedButton.icon(
-                onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => ScannerPage(initialAppointment: a))),
+                // Prescribing opens once the consultation has started.
+                onPressed: rxDispatchAllowed(a)
+                    ? () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => ScannerPage(initialAppointment: a)))
+                    : null,
                 style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF0A5B35),
                     backgroundColor: const Color(0xFFF3FBF7),
@@ -4148,13 +4151,37 @@ Future<void> _clearFilePickerTempFiles() async {
 
 const _maxRxPages = 5;
 
-/// Whether a prescription can still be dispatched for [a]: a live
-/// consultation, or a completed one inside the 24-hour late-Rx window whose
-/// Rx decision is not yet recorded. Once dispatched (or "no Rx needed"),
-/// never again.
+/// Whether a prescription can be dispatched for [a] now (product owner,
+/// 2026-11-24, the same rule the server enforces): a consultation that has
+/// started, or a completed one inside the 24-hour window whose Rx decision
+/// is not yet recorded. Never before the patient is seen; once dispatched
+/// (or "no Rx needed"), never again.
 bool rxDispatchAllowed(AppointmentDto a, [DateTime? now]) =>
-    const ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].contains(a.status) ||
-    rxWindowOpen(a, now);
+    rxConsultationStarted(a, now) || rxWindowOpen(a, now);
+
+/// A video call someone has joined (IN_CONSULTATION), or a chat whose
+/// consultation window has opened (chats stay CONFIRMED until completed).
+bool rxConsultationStarted(AppointmentDto a, [DateTime? now]) {
+  if (a.status == 'IN_CONSULTATION') return true;
+  if (!a.isChat || !const ['CONFIRMED', 'WAITING'].contains(a.status)) {
+    return false;
+  }
+  final opens =
+      a.join?.joinOpenAt ?? a.start?.subtract(const Duration(minutes: 15));
+  return opens != null &&
+      !(now ?? DateTime.now()).toUtc().isBefore(opens.toUtc());
+}
+
+/// Hours left in a completed consultation's 24-hour prescription window.
+int? rxHoursLeft(AppointmentDto a, [DateTime? now]) {
+  final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
+  if (ended == null) return null;
+  final left = ended
+      .toUtc()
+      .add(const Duration(hours: 24))
+      .difference((now ?? DateTime.now()).toUtc());
+  return left.isNegative ? 0 : (left.inMinutes / 60).ceil();
+}
 
 class ScannerPage extends StatefulWidget {
   const ScannerPage(
@@ -4174,8 +4201,10 @@ class _ScannerState extends State<ScannerPage> {
   AppointmentDto? appointment;
   bool dispatching = false;
 
-  /// Opened for a consultation whose Rx decision is already final.
+  /// Opened for a consultation that cannot take a prescription now; the
+  /// picker shows [_ineligibleReason] instead.
   bool decidedNotice = false;
+  String _ineligibleReason = '';
 
   /// Consultations dispatched from this screen instance.
   final Set<String> _dispatched = {};
@@ -4185,6 +4214,12 @@ class _ScannerState extends State<ScannerPage> {
     final initial = widget.initialAppointment;
     if (initial != null && !rxDispatchAllowed(initial)) {
       decidedNotice = true;
+      final who = initial.patientName ?? 'this consultation';
+      _ineligibleReason = initial.rxDecided
+          ? 'The prescription decision for $who is already recorded and cannot be changed.'
+          : initial.status == 'COMPLETED'
+              ? 'The 24-hour prescription window for $who has closed.'
+              : 'A prescription for $who can be sent once the consultation has started.';
     } else {
       appointment = initial;
     }
@@ -4490,14 +4525,8 @@ class _ScannerState extends State<ScannerPage> {
     items.sort((x, y) {
       final byKind = x.$2.index.compareTo(y.$2.index);
       if (byKind != 0) return byKind;
-      if (x.$2 == _RxKind.live) {
-        const rank = {'IN_CONSULTATION': 0, 'WAITING': 1, 'CONFIRMED': 2};
-        final byStatus =
-            (rank[x.$1.status] ?? 3).compareTo(rank[y.$1.status] ?? 3);
-        if (byStatus != 0) return byStatus;
-      }
       final tx = x.$1.start ?? DateTime(0), ty = y.$1.start ?? DateTime(0);
-      return x.$2 == _RxKind.live ? tx.compareTo(ty) : ty.compareTo(tx);
+      return x.$2 == _RxKind.awaiting ? tx.compareTo(ty) : ty.compareTo(tx);
     });
     return items;
   }
@@ -4525,14 +4554,13 @@ class _ScannerState extends State<ScannerPage> {
               icon: Icons.description_outlined,
               tone: _RxNoteTone.brand,
               text:
-                  'Photograph your handwritten prescription pages and dispatch them to the patient to close the consultation.'),
+                  'Photograph your handwritten prescription pages and dispatch them to the patient after the consultation.'),
           if (decidedNotice) ...[
             const SizedBox(height: 10),
             _RxNote(
                 icon: Icons.lock_outline,
                 tone: _RxNoteTone.neutral,
-                text:
-                    'The prescription decision for ${widget.initialAppointment?.patientName ?? 'this consultation'} is already recorded and cannot be changed.'),
+                text: _ineligibleReason),
           ],
           const SizedBox(height: 18),
           const Text('Select Consultation',
@@ -4594,7 +4622,7 @@ class _ScannerState extends State<ScannerPage> {
               icon: Icons.info_outline,
               tone: _RxNoteTone.neutral,
               text:
-                  'Only live consultations or consultations completed within the last 24 hours without a prescription decision are shown.'),
+                  'Completed consultations awaiting a prescription are shown for 24 hours. An ongoing consultation is prescribed from the consultation itself.'),
         ]);
   }
 
@@ -4853,22 +4881,20 @@ class _ScannerState extends State<ScannerPage> {
   }
 }
 
-/// Where a consultation stands for Smart Rx.
-enum _RxKind { live, late, locked }
+/// Where a completed consultation stands for Smart Rx (product owner,
+/// 2026-11-24: the list shows completed consultations only; an ongoing one is
+/// prescribed from the consultation itself).
+enum _RxKind { awaiting, locked }
 
-/// `live`: a prescription can be sent now; `late`: completed, inside the
-/// 24-hour late-Rx window, no decision yet; `locked`: the decision is
-/// recorded (shown for today and yesterday, greyed out); `null`: not shown.
+/// `awaiting`: completed in the last 24 hours, no decision yet; `locked`:
+/// the decision is recorded (last 48 hours, greyed out); `null`: not shown.
 @visibleForTesting
 String? rxKindName(AppointmentDto a, [DateTime? now]) =>
     _rxKindOf(a, now)?.name;
 
 _RxKind? _rxKindOf(AppointmentDto a, [DateTime? now]) {
   final at = now ?? DateTime.now();
-  if (const ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].contains(a.status)) {
-    return _RxKind.live;
-  }
-  if (rxWindowOpen(a, at)) return _RxKind.late;
+  if (rxWindowOpen(a, at)) return _RxKind.awaiting;
   if (a.rxDecided) {
     final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
     if (ended != null &&
@@ -4881,8 +4907,7 @@ _RxKind? _rxKindOf(AppointmentDto a, [DateTime? now]) {
 
 enum _RxFilter {
   all('All', null),
-  live('Live', _RxKind.live),
-  late('Late Rx ≤24h', _RxKind.late),
+  awaiting('Awaiting Rx', _RxKind.awaiting),
   locked('Locked', _RxKind.locked);
 
   const _RxFilter(this.label, this.kind);
@@ -5142,22 +5167,17 @@ class _RxConsultationTile extends StatelessWidget {
   Widget build(BuildContext c) {
     final a = appointment;
     final locked = kind == _RxKind.locked;
+    final hours = rxHoursLeft(a);
     final List<Widget> chips = switch (kind) {
       _RxKind.locked => const [],
-      _RxKind.late => const [
-          _RxChip('Late Rx ≤24h', _rxPurple, _rxPurpleLight),
-          SizedBox(height: 4),
-          _RxChip('Completed', DoctorTokens.slate, DoctorTokens.surfaceSubtle),
-        ],
-      _RxKind.live => [
-          switch (a.status) {
-            'IN_CONSULTATION' => const _RxChip(
-                'In Progress', DoctorTokens.info, DoctorTokens.infoLight),
-            'WAITING' => const _RxChip(
-                'Waiting', Color(0xFFB45309), DoctorTokens.warningLight),
-            _ => const _RxChip(
-                'Confirmed', DoctorTokens.primaryDark, _rxGreenSoft),
-          }
+      _RxKind.awaiting => [
+          const _RxChip(
+              'Completed', DoctorTokens.slate, DoctorTokens.surfaceSubtle),
+          if (hours != null) ...[
+            const SizedBox(height: 4),
+            _RxChip(hours <= 1 ? '< 1 h left' : '$hours h left', _rxPurple,
+                _rxPurpleLight),
+          ],
         ],
     };
     return Opacity(
@@ -6495,11 +6515,13 @@ class _ConsultationState extends State<ConsultationPage> {
                       icon: const Icon(Icons.video_call),
                       label: Text(a.joinLockedLabel ?? 'Join video call')),
                   OutlinedButton.icon(
-                      onPressed: () => Navigator.push(
-                          c,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  ScannerPage(initialAppointment: a))),
+                      onPressed: rxDispatchAllowed(a)
+                          ? () => Navigator.push(
+                              c,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      ScannerPage(initialAppointment: a)))
+                          : null,
                       icon: const Icon(Icons.receipt_long),
                       label: const Text('Prescription'))
                 ]),

@@ -127,9 +127,9 @@ void main() {
       }
     }
 
-    // 1. Picker with John selected.
+    // 1. Picker (completed consultations only) with Sarah selected.
     await show(const ScannerPage());
-    await tester.tap(find.text('John Mwangi'));
+    await tester.tap(find.text('Sarah Nditiru'));
     await _shot(tester, key, '1-select-consultation');
 
     // 2. Capture step.

@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError, authorizedDocument, errorText, post, runtimeGeneration, useResource } from '../lib/client';
-import { Appointment, RecordDto, consultationAction, consultationActionLabel, consultationIntent, money } from '../lib/contracts';
+import { Appointment, RecordDto, consultationAction, consultationActionLabel, money, rxDispatchAllowed } from '../lib/contracts';
 import { Avatar, Badge, Modal, State, appointmentStatus, demographics, outcomeLabel } from './Common';
 import { Icon } from './Icons';
 import { ModalityBadge, PLATFORM_NOTE } from './Dashboard';
@@ -59,7 +59,7 @@ export function Summary({ appointment: a, history, documents, complete, action, 
     </>}
     <div className="am-row" style={{ paddingTop: 6, borderTop: '1px solid var(--am-line-soft)' }}>
       {primary && <button className="am-btn primary" onClick={() => action(primary, a)}><Icon name={primary === 'chat' ? 'chat' : 'video'} size={16}/>{consultationActionLabel(a)}</button>}
-      {consultationIntent(a) && <button className="am-btn soft" onClick={() => action('rx', a)}><Icon name="rx" size={16}/>Write prescription</button>}
+      {rxDispatchAllowed(a) && <button className="am-btn soft" onClick={() => action('rx', a)}><Icon name="rx" size={16}/>Write prescription</button>}
       <button className="am-btn ghost" onClick={history}><Icon name="history" size={16}/>Patient history</button>
       <button className="am-btn ghost" onClick={documents}><Icon name="file" size={16}/>All documents</button>
       <button className="am-btn ghost" onClick={() => action('chat', a)}><Icon name="chat" size={16}/>Messages</button>

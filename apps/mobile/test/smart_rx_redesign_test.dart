@@ -90,14 +90,40 @@ Future<void> _pump(WidgetTester tester, Widget home,
 }
 
 void main() {
-  test('consultations are classified the way the picker shows them', () {
+  test('the list holds completed consultations only', () {
     final now = DateTime.now();
-    expect(rxKindName(_queue[0], now), 'live');
-    expect(rxKindName(_queue[1], now), 'live');
-    expect(rxKindName(_queue[2], now), 'live');
-    expect(rxKindName(_queue[3], now), 'late');
+    // Not completed: never in the list (prescribed from the consultation).
+    expect(rxKindName(_queue[0], now), isNull);
+    expect(rxKindName(_queue[1], now), isNull);
+    expect(rxKindName(_queue[2], now), isNull);
+    expect(rxKindName(_queue[3], now), 'awaiting');
     expect(rxKindName(_queue[4], now), 'locked');
     expect(rxKindName(_queue[5], now), isNull);
+  });
+
+  test('a prescription only after the consultation has started', () {
+    final now = DateTime.now().toUtc();
+    AppointmentDto c(String status, {bool chat = false, Duration? startIn}) =>
+        _apt('x', 'X', status,
+            chat: chat, start: startIn == null ? null : now.add(startIn));
+    // Video: someone has joined (IN_CONSULTATION); nobody yet: no.
+    expect(rxDispatchAllowed(c('IN_CONSULTATION'), now), isTrue);
+    expect(rxDispatchAllowed(c('CONFIRMED'), now), isFalse);
+    expect(rxDispatchAllowed(c('WAITING'), now), isFalse);
+    // Chat: once its window opens (15 minutes before the start).
+    expect(
+        rxDispatchAllowed(
+            c('CONFIRMED', chat: true, startIn: const Duration(minutes: 10)),
+            now),
+        isTrue);
+    expect(
+        rxDispatchAllowed(
+            c('CONFIRMED', chat: true, startIn: const Duration(hours: 2)), now),
+        isFalse);
+    // Completed: within 24 hours, no decision yet.
+    expect(rxDispatchAllowed(_queue[3], now), isTrue);
+    expect(rxDispatchAllowed(_queue[4], now), isFalse);
+    expect(rxHoursLeft(_queue[3], now), 22);
   });
 
   test('times read as Today / Yesterday in Nairobi time', () {
@@ -114,11 +140,20 @@ void main() {
     await _pump(tester, const ScannerPage());
     expect(tester.takeException(), isNull);
     expect(find.text('Select Consultation'), findsOneWidget);
-    expect(find.text('All (5)'), findsOneWidget);
-    expect(find.text('Live (3)'), findsOneWidget);
-    expect(find.text('Late Rx ≤24h (1)'), findsOneWidget);
+    expect(find.text('All (2)'), findsOneWidget);
+    expect(find.text('Awaiting Rx (1)'), findsOneWidget);
     expect(find.text('Locked (1)'), findsOneWidget);
-    expect(find.text('Old Patient'), findsNothing);
+    // Completed consultations only.
+    for (final name in [
+      'John Mwangi',
+      'Amina Njeri',
+      'Peter Kariuki',
+      'Old Patient'
+    ]) {
+      expect(find.text(name), findsNothing, reason: name);
+    }
+    expect(find.text('Sarah Nditiru'), findsOneWidget);
+    expect(find.text('22 h left'), findsOneWidget);
     expect(
         find.text('Already recorded and cannot be changed.'), findsOneWidget);
 
@@ -132,33 +167,33 @@ void main() {
     expect(continueButton().onPressed, isNull);
 
     // Filters narrow the list.
-    await tester.ensureVisible(find.text('Late Rx ≤24h (1)'));
+    await tester.ensureVisible(find.text('Awaiting Rx (1)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Late Rx ≤24h (1)'));
+    await tester.tap(find.text('Awaiting Rx (1)'));
     await tester.pumpAndSettle();
     expect(find.text('Sarah Nditiru'), findsOneWidget);
-    expect(find.text('John Mwangi'), findsNothing);
-    await tester.ensureVisible(find.text('All (5)'));
+    expect(find.text('David Kimani'), findsNothing);
+    await tester.ensureVisible(find.text('All (2)'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('All (5)'));
+    await tester.tap(find.text('All (2)'));
     await tester.pumpAndSettle();
 
     // Search by name.
-    await tester.enterText(find.byType(TextField), 'amina');
+    await tester.enterText(find.byType(TextField), 'sarah');
     await tester.pumpAndSettle();
-    expect(find.text('Amina Njeri'), findsOneWidget);
-    expect(find.text('John Mwangi'), findsNothing);
+    expect(find.text('Sarah Nditiru'), findsOneWidget);
+    expect(find.text('David Kimani'), findsNothing);
     await tester.enterText(find.byType(TextField), '');
     await tester.pumpAndSettle();
 
-    // Pick a live consultation and continue to the capture step.
-    await tester.tap(find.text('John Mwangi'));
+    // Pick the completed consultation and continue to the capture step.
+    await tester.tap(find.text('Sarah Nditiru'));
     await tester.pump();
     expect(continueButton().onPressed, isNotNull);
     await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
     await tester.pumpAndSettle();
     expect(find.text('Capture Pages (Max 5)'), findsOneWidget);
-    expect(find.text('#AM-jm'), findsOneWidget);
+    expect(find.text('#AM-sn'), findsOneWidget);
     expect(find.text('Patient Case History'), findsOneWidget);
     expect(find.text('Add page'), findsNWidgets(5));
     expect(find.text('0/5 pages'), findsOneWidget);
@@ -196,16 +231,26 @@ void main() {
     expect(find.text('origin'), findsOneWidget);
   });
 
+  testWidgets('opened for a consultation that has not started, it explains why',
+      (tester) async {
+    await _pump(tester, ScannerPage(initialAppointment: _queue[2]));
+    expect(
+        find.text(
+            'A prescription for Peter Kariuki can be sent once the consultation has started.'),
+        findsOneWidget);
+    expect(find.text('Capture Pages (Max 5)'), findsNothing);
+  });
+
   for (final size in const [Size(320, 568), Size(412, 915)]) {
     testWidgets('both steps lay out without overflow at $size', (tester) async {
       await _pump(tester, const ScannerPage(), size: size);
       expect(tester.takeException(), isNull);
       // Centre the row (clear of the fixed Continue bar) before tapping.
       await tester.runAsync(() => Scrollable.ensureVisible(
-          tester.element(find.text('John Mwangi')),
+          tester.element(find.text('Sarah Nditiru')),
           alignment: .5));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('John Mwangi'));
+      await tester.tap(find.text('Sarah Nditiru'));
       await tester.pump();
       await tester.tap(find.widgetWithText(FilledButton, 'Continue'));
       await tester.pumpAndSettle();

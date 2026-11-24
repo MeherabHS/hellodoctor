@@ -1694,6 +1694,20 @@ async fn open_clinical_window(pool: &PgPool, appointment: Uuid) {
         .bind(appointment).execute(pool).await.unwrap();
 }
 
+/// The consultation has started: what the signed Agora presence callback
+/// does when someone joins a video call (CONFIRMED -> IN_CONSULTATION).
+/// A doctor prescription, and completing with one, needs a started
+/// consultation (product owner, 2026-11-24).
+async fn start_consultation(pool: &PgPool, appointment: Uuid) {
+    sqlx::query(
+        "UPDATE appointments SET status='IN_CONSULTATION' WHERE id=$1 AND status='CONFIRMED'",
+    )
+    .bind(appointment)
+    .execute(pool)
+    .await
+    .unwrap();
+}
+
 /// Same as `open_clinical_window`, but offset by `offset_minutes` from now
 /// instead of the fixed "+5 to +15" window. Needed wherever a test opens the
 /// clinical window for two DIFFERENT appointments belonging to the SAME
@@ -3794,6 +3808,7 @@ async fn test_doctor_discovery_and_slot_booking_lifecycle(pool: PgPool) {
         "doctor_notes": "Paracetamol 500mg 1+0+1 for 3 days after food"
     });
     open_clinical_window(&pool, apt_id).await;
+    start_consultation(&pool, apt_id).await;
     let res_rx = post_idem(
         &app,
         &format!("/api/v1/consultations/{}/prescription", apt_id),
@@ -3954,6 +3969,7 @@ async fn test_unconfigured_document_storage_does_not_confirm_upload(pool: PgPool
     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
     let (appointment, _) = book_and_confirm(&app, &patient).await;
     open_clinical_window(&pool, appointment).await;
+    start_consultation(&pool, appointment).await;
     let response = post(
         &app,
         &format!("/api/v1/consultations/{appointment}/prescription"),
@@ -3982,6 +3998,108 @@ async fn test_unconfigured_document_storage_does_not_confirm_upload(pool: PgPool
     );
 }
 
+/// Product owner, 2026-11-24: a doctor prescription (pages, and completing
+/// with one) only for a consultation that has started, or one completed in
+/// the last 24 hours. Never before the patient is seen.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_doctor_rx_only_after_the_consultation_has_started(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let (appointment, _) = book_and_confirm(&app, &patient).await;
+    open_clinical_window(&pool, appointment).await;
+    let uri = format!("/api/v1/consultations/{appointment}/prescription");
+    let page = serde_json::json!({"base64_photo": minimal_jpeg_base64()});
+    let set = |sql: &'static str| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query(sql)
+                .bind(appointment)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+    };
+
+    // A video consultation nobody has joined: refused, pages and completion.
+    let early = post(&app, &uri, Some(&doctor), &page).await;
+    assert_eq!(early.status(), StatusCode::CONFLICT);
+    assert!(json_body(early)
+        .await
+        .to_string()
+        .contains("once the consultation has started"));
+    let complete = post(
+        &app,
+        &format!("/api/v1/consultations/{appointment}/complete"),
+        Some(&doctor),
+        &serde_json::json!({"outcome": "COMPLETED_WITH_RX"}),
+    )
+    .await;
+    assert_eq!(complete.status(), StatusCode::CONFLICT);
+    let status: String = sqlx::query_scalar("SELECT status::text FROM appointments WHERE id=$1")
+        .bind(appointment)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "CONFIRMED", "a refused completion changes nothing");
+
+    // A chat whose window has not opened yet: refused.
+    set("UPDATE appointments SET modality='CHAT' WHERE id=$1").await;
+    set("UPDATE doctor_schedule_slots SET start_time=NOW()+INTERVAL '3 hours',end_time=NOW()+INTERVAL '3 hours 10 minutes' WHERE id=(SELECT slot_id FROM appointments WHERE id=$1)").await;
+    assert_eq!(
+        post(&app, &uri, Some(&doctor), &page).await.status(),
+        StatusCode::CONFLICT
+    );
+
+    // The same chat once its window is open: accepted.
+    open_clinical_window(&pool, appointment).await;
+    assert_eq!(
+        post(&app, &uri, Some(&doctor), &page).await.status(),
+        StatusCode::CREATED
+    );
+    let pages: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM prescriptions WHERE appointment_id=$1")
+            .bind(appointment)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(pages, 1);
+}
+
+/// The late path keeps working: a consultation completed (referred) 2 hours
+/// ago takes its prescription; one completed 25 hours ago no longer does.
+#[sqlx::test(migrations = "./migrations")]
+async fn test_doctor_rx_late_window_is_24_hours_after_completion(pool: PgPool) {
+    let (app, pool) = test_app(pool).await;
+    let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
+    let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
+    let (appointment, _) = book_and_confirm(&app, &patient).await;
+    open_clinical_window(&pool, appointment).await;
+    start_consultation(&pool, appointment).await;
+    let uri = format!("/api/v1/consultations/{appointment}/prescription");
+    let page = serde_json::json!({"base64_photo": minimal_jpeg_base64()});
+
+    sqlx::query("UPDATE appointments SET status='COMPLETED', clinical_outcome='REFERRED', completed_at=NOW()-INTERVAL '25 hours' WHERE id=$1")
+        .bind(appointment)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        post(&app, &uri, Some(&doctor), &page).await.status(),
+        StatusCode::CONFLICT
+    );
+
+    sqlx::query("UPDATE appointments SET completed_at=NOW()-INTERVAL '2 hours' WHERE id=$1")
+        .bind(appointment)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        post(&app, &uri, Some(&doctor), &page).await.status(),
+        StatusCode::CREATED
+    );
+}
+
 /// Product-owner rule (2026-11-13): once the Doctor dispatches the Rx, the
 /// consultation is completed as COMPLETED_WITH_RX and the server refuses any
 /// further Rx page for it. An exact retry of a page already stored still
@@ -3993,6 +4111,7 @@ async fn test_rx_dispatch_completes_and_locks_further_pages(pool: PgPool) {
     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
     let (appointment, _) = book_and_confirm(&app, &patient).await;
     open_clinical_window(&pool, appointment).await;
+    start_consultation(&pool, appointment).await;
     let uri = format!("/api/v1/consultations/{appointment}/prescription");
     let page = |shade: u8| {
         let image = image::RgbImage::from_pixel(3, 3, image::Rgb([shade, 20, 40]));
@@ -4037,6 +4156,7 @@ async fn test_doctor_rx_pages_encrypted_download_retry_and_expired_grant(pool: P
     let foreign = make_token(uid(DOCTOR2_USER_ID), "DOCTOR");
     let (appointment, _) = book_and_confirm(&app, &patient).await;
     open_clinical_window(&pool, appointment).await;
+    start_consultation(&pool, appointment).await;
     let uri = format!("/api/v1/consultations/{appointment}/prescription");
     let mut first_id = String::new();
     for page in 1..=5 {
@@ -6685,6 +6805,7 @@ async fn test_admin_dashboard_endpoints_resolve_names_correctly(pool: PgPool) {
     let admin_token = make_token(uid(ADMIN_USER_ID), "ADMIN");
 
     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+    start_consultation(&pool, apt_id).await;
     let session = consultation_repo::find_by_appointment(&pool, apt_id)
         .await
         .unwrap()
@@ -8868,6 +8989,7 @@ async fn test_wallet_credited_exactly_once_under_concurrent_completion(pool: PgP
     let patient_token = make_token(uid(PATIENT_USER_ID), "PATIENT");
     let doctor1_token = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
     let (apt_id, _) = book_and_confirm(&app, &patient_token).await;
+    start_consultation(&pool, apt_id).await;
 
     let apt = appointment_repo::find_by_id(&pool, apt_id)
         .await
@@ -8920,6 +9042,7 @@ async fn test_consultation_wallet_failure_rolls_back_and_failed_payment_cannot_c
     let patient = make_token(uid(PATIENT_USER_ID), "PATIENT");
     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
     let (appointment, _) = book_and_confirm(&app, &patient).await;
+    start_consultation(&pool, appointment).await;
     let uri = format!("/api/v1/consultations/{appointment}/complete");
     let payload = serde_json::json!({"outcome":"COMPLETED_WITH_RX"});
     sqlx::query("CREATE FUNCTION audit_reject_wallet_write() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'Injected wallet write failure'; END $$")
@@ -11925,6 +12048,7 @@ async fn test_prescription_available_notifies_once_not_per_page(pool: PgPool) {
     let doctor = make_token(uid(DOCTOR1_USER_ID), "DOCTOR");
     let (appointment, _) = book_and_confirm(&app, &patient).await;
     open_clinical_window(&pool, appointment).await;
+    start_consultation(&pool, appointment).await;
     let uri = format!("/api/v1/consultations/{appointment}/prescription");
 
     for page in 1..=3u8 {
@@ -13589,6 +13713,7 @@ async fn test_admin_compliance_alerts_abac_and_real_prescription_data(pool: PgPo
     }
     let (appointment, _) = book_and_confirm(&app, &patient).await;
     open_clinical_window(&pool, appointment).await;
+    start_consultation(&pool, appointment).await;
     let notes = "MORPHINE: synthetic controlled-substance review fixture";
     let rx_uri = format!("/api/v1/consultations/{appointment}/prescription");
     let flagged = post(
@@ -14274,7 +14399,7 @@ async fn test_security_idempotency_upload_rechecks_ownership_and_clinical_window
             .status(),
         StatusCode::UNPROCESSABLE_ENTITY
     );
-    sqlx::query("UPDATE appointments SET status='CONFIRMED' WHERE id=$1")
+    sqlx::query("UPDATE appointments SET status='IN_CONSULTATION' WHERE id=$1")
         .bind(appointment)
         .execute(&pool)
         .await
@@ -16998,6 +17123,7 @@ async fn test_patient_health_vault_lists_prescriptions_and_intake_documents(pool
     assert_eq!(res_intake.status(), StatusCode::CREATED);
 
     open_clinical_window(&pool, apt_id).await;
+    start_consultation(&pool, apt_id).await;
     let res_rx = post_idem(
         &app,
         &format!("/api/v1/consultations/{apt_id}/prescription"),
@@ -19231,8 +19357,10 @@ async fn test_milestone_same_patient_two_doctors_historical_isolation(pool: PgPo
         // fail.
         if i == 0 {
             open_clinical_window(&pool, appointment).await;
+            start_consultation(&pool, appointment).await;
         } else {
             open_clinical_window_at(&pool, appointment, 15).await;
+            start_consultation(&pool, appointment).await;
         }
         let rx = post(
             &app,

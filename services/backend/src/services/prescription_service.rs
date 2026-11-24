@@ -6,7 +6,7 @@ use crate::error::AppError;
 use crate::repository::{appointment_repo, prescription_repo, AppState};
 use crate::services::document_storage_service::DocumentStorageService;
 use crate::services::upload_security_service::UploadSecurityService;
-use chrono::Utc;
+use chrono::{DateTime, Duration, Utc};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -30,6 +30,71 @@ fn patient_intake_status_allowed(status: AppointmentStatus) -> bool {
 }
 
 pub struct PrescriptionService;
+
+/// Product owner, 2026-11-24: a doctor sends a prescription only for a
+/// consultation that has started, or one completed in the last 24 hours
+/// without a prescription decision. Never for a future, unpaid or cancelled
+/// one, which dispatching would otherwise mark "completed with prescription"
+/// before the patient was seen.
+///
+/// "Started" means: a video call someone has joined (IN_CONSULTATION, set by
+/// the signed Agora presence callback), or a chat whose consultation window
+/// has opened (chats never reach IN_CONSULTATION; they stay CONFIRMED until
+/// completed). The window opens `window_before_mins` before the slot start,
+/// the same moment the apps let doctor and patient in.
+pub(crate) fn doctor_rx_allowed(
+    status: &AppointmentStatus,
+    modality: &Modality,
+    slot_start: DateTime<Utc>,
+    completed_at: Option<DateTime<Utc>>,
+    window_before_mins: i64,
+    now: DateTime<Utc>,
+) -> bool {
+    match status {
+        AppointmentStatus::InConsultation => true,
+        AppointmentStatus::Confirmed | AppointmentStatus::Waiting => {
+            matches!(modality, Modality::Chat)
+                && now >= slot_start - Duration::minutes(window_before_mins)
+        }
+        AppointmentStatus::Completed => {
+            completed_at.is_some_and(|ended| now < ended + Duration::hours(24))
+        }
+        _ => false,
+    }
+}
+
+/// The refusal a doctor sees when [`doctor_rx_allowed`] says no.
+pub(crate) const RX_NOT_STARTED: &str =
+    "A prescription can be sent once the consultation has started, or within 24 hours after it ends.";
+
+impl PrescriptionService {
+    /// Refuses a doctor prescription (page upload or completion with Rx) for a
+    /// consultation that has not started or whose 24-hour window has closed.
+    /// Called under the per-consultation advisory lock with a fresh read.
+    pub(crate) async fn ensure_doctor_rx_allowed(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        state: &AppState,
+        apt: &Appointment,
+    ) -> Result<(), AppError> {
+        let slot_start: DateTime<Utc> =
+            sqlx::query_scalar("SELECT start_time FROM doctor_schedule_slots WHERE id=$1")
+                .bind(apt.slot_id)
+                .fetch_one(&mut **tx)
+                .await?;
+        if doctor_rx_allowed(
+            &apt.status,
+            &apt.modality,
+            slot_start,
+            apt.completed_at,
+            state.config.agora_token_window_before_mins,
+            Utc::now(),
+        ) {
+            Ok(())
+        } else {
+            Err(AppError::Conflict(RX_NOT_STARTED.into()))
+        }
+    }
+}
 
 impl PrescriptionService {
     /// Patient multi-prescription upload intake (max 20 photos per appointment)
@@ -380,6 +445,7 @@ impl PrescriptionService {
                 "The prescription for this consultation has already been dispatched.".into(),
             ));
         }
+        Self::ensure_doctor_rx_allowed(&mut tx, state, &locked).await?;
         let (count, no_rx): (i64, bool) = sqlx::query_as("SELECT COUNT(*),COALESCE(BOOL_OR(is_no_rx_required),FALSE) FROM prescriptions WHERE appointment_id=$1")
             .bind(appointment_id).fetch_one(&mut *tx).await?;
         if no_rx {
@@ -553,5 +619,101 @@ impl PrescriptionService {
         .await?;
         tx.commit().await?;
         Ok(prescription)
+    }
+}
+
+#[cfg(test)]
+mod doctor_rx_rule_tests {
+    use super::*;
+
+    fn at(h: i64) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339("2026-11-24T10:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc)
+            + Duration::hours(h)
+    }
+
+    #[test]
+    fn only_started_or_recently_completed_consultations_take_a_prescription() {
+        let now = at(0);
+        let video = Modality::Video;
+        let chat = Modality::Chat;
+        // A video call someone has joined.
+        assert!(doctor_rx_allowed(
+            &AppointmentStatus::InConsultation,
+            &video,
+            at(-1),
+            None,
+            15,
+            now
+        ));
+        // A video consultation nobody has joined: not yet.
+        assert!(!doctor_rx_allowed(
+            &AppointmentStatus::Confirmed,
+            &video,
+            at(-1),
+            None,
+            15,
+            now
+        ));
+        assert!(!doctor_rx_allowed(
+            &AppointmentStatus::Waiting,
+            &video,
+            at(-1),
+            None,
+            15,
+            now
+        ));
+        // A chat whose window has opened (15 minutes before the start)...
+        assert!(doctor_rx_allowed(
+            &AppointmentStatus::Confirmed,
+            &chat,
+            now + Duration::minutes(10),
+            None,
+            15,
+            now
+        ));
+        // ...but not a future chat.
+        assert!(!doctor_rx_allowed(
+            &AppointmentStatus::Confirmed,
+            &chat,
+            at(2),
+            None,
+            15,
+            now
+        ));
+        // Completed: within 24 hours only.
+        assert!(doctor_rx_allowed(
+            &AppointmentStatus::Completed,
+            &video,
+            at(-5),
+            Some(at(-4)),
+            15,
+            now
+        ));
+        assert!(!doctor_rx_allowed(
+            &AppointmentStatus::Completed,
+            &video,
+            at(-30),
+            Some(at(-25)),
+            15,
+            now
+        ));
+        assert!(!doctor_rx_allowed(
+            &AppointmentStatus::Completed,
+            &chat,
+            at(-5),
+            None,
+            15,
+            now
+        ));
+        // Never for unpaid, cancelled or expired consultations.
+        for status in [
+            AppointmentStatus::PendingPayment,
+            AppointmentStatus::Cancelled,
+            AppointmentStatus::Expired,
+        ] {
+            assert!(!doctor_rx_allowed(&status, &chat, at(-1), None, 15, now));
+        }
     }
 }
