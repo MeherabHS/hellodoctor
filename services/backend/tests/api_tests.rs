@@ -69,6 +69,8 @@ mod consultation_join_window;
 mod consultation_live_reservation;
 #[path = "cases/consultation_recovery.rs"]
 mod consultation_recovery;
+#[path = "cases/cross_account_sweep.rs"]
+mod cross_account_sweep;
 #[path = "cases/doctor_queue_nairobi_day.rs"]
 mod doctor_queue_nairobi_day;
 #[path = "cases/doctor_web_redesign.rs"]

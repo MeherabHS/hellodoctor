@@ -2,3 +2,7 @@
 # core.autocrlf=true rewrites them with CRLF and the backend then refuses to
 # start (VersionMismatch). Keep migrations LF on every checkout.
 services/backend/migrations/*.sql text eol=lf
+
+# Pentest scripts run on Linux; CRLF would break them.
+deploy/pentest/*.sh text eol=lf
+deploy/pentest/*.py text eol=lf

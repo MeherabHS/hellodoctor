@@ -106,6 +106,64 @@ jobs:
         --lockfile=apps/mobile/pubspec.lock
         --lockfile=apps/mobile_patient/pubspec.lock
 
+  semgrep:
+    name: Static analysis (Semgrep)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Install Semgrep (pinned)
+        run: python -m pip install --disable-pip-version-check "semgrep==1.184.0"
+      # Community rules for the languages we ship. Every finding is printed;
+      # ERROR-severity findings fail the job. Tests, generated code and build
+      # output are excluded. A deliberate exception is a `nosemgrep` comment
+      # with the reason on the same line, never a blanket ignore.
+      - name: semgrep scan
+        run: >-
+          semgrep scan --metrics=off --disable-version-check
+          --config p/rust --config p/typescript --config p/react
+          --config p/nextjs --config p/javascript --config p/dockerfile
+          --config p/secrets --config p/github-actions
+          --exclude 'services/backend/tests' --exclude '**/test/**' --exclude '**/tests/**'
+          --exclude '**/node_modules/**' --exclude '**/.next/**' --exclude '**/build/**'
+          --exclude 'apps/*/lib/l10n/app_localizations*.dart'
+          --severity ERROR --error .
+
+  trivy:
+    name: Dependency, Dockerfile and config scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Pinned by checksum, not by tag: Trivy's release tags were hijacked in
+      # March 2026 (GHSA-69fq-xp46-6x23), so a tag alone proves nothing.
+      TRIVY_VERSION: "0.76.2"
+      TRIVY_SHA256: "bc0fc726e017b8927a62b2d3531d7a84ee01769daf5c99ed866dced54089fdbf"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+      - name: Install Trivy (checksum-verified)
+        run: |
+          set -euo pipefail
+          file="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSL -o "$file" "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${file}"
+          echo "${TRIVY_SHA256}  ${file}" | sha256sum -c -
+          tar -xzf "$file" trivy
+          sudo install -m 0755 trivy /usr/local/bin/trivy
+          trivy --version
+      # Known vulnerabilities in every lockfile (Cargo, npm, pub) and
+      # misconfigurations in the Dockerfiles, compose files and workflows.
+      # HIGH and CRITICAL with a released fix fail the job; anything accepted
+      # goes in .trivyignore with a reason and a review date.
+      - name: trivy fs
+        run: >-
+          trivy fs --scanners vuln,misconfig --severity HIGH,CRITICAL
+          --ignore-unfixed --exit-code 1 --ignorefile .trivyignore
+          --skip-dirs services/backend/target --skip-dirs node_modules
+          --skip-dirs apps/admin-web/node_modules --skip-dirs apps/doctor-web/node_modules
+          .
+
   secret-scan:
     name: Secret scanning (git history + working tree)
     runs-on: ubuntu-latest
