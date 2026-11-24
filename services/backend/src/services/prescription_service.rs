@@ -883,6 +883,11 @@ impl PrescriptionService {
         appointment_id: Uuid,
     ) -> Result<Vec<serde_json::Value>, AppError> {
         let mut tx = state.begin_authed(ctx).await?;
+        // Someone who cannot see the consultation gets 404, like every other
+        // consultation route (found by the pentest: an empty 200 before).
+        appointment_repo::find_by_id(&mut *tx, appointment_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
         let rows: Vec<(Uuid, String, DateTime<Utc>)> = sqlx::query_as(
             "SELECT id, note, created_at FROM prescription_corrections WHERE appointment_id=$1 ORDER BY created_at, id",
         )

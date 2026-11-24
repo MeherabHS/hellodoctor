@@ -4249,8 +4249,11 @@ async fn test_prescription_correction_note_reaches_the_patient_only(pool: PgPool
         get(&app, &notes, Some(&admin)).await.status(),
         StatusCode::FORBIDDEN
     );
-    let other = json_body(get(&app, &notes, Some(&other_doctor)).await).await;
-    assert_eq!(other["data"].as_array().map(Vec::len), Some(0));
+    assert_eq!(
+        get(&app, &notes, Some(&other_doctor)).await.status(),
+        StatusCode::NOT_FOUND,
+        "a stranger cannot even tell the consultation exists"
+    );
     // Exactly the one note is stored (append-only: no edit or delete API).
     let stored: i64 =
         sqlx::query_scalar("SELECT COUNT(*) FROM prescription_corrections WHERE appointment_id=$1")
