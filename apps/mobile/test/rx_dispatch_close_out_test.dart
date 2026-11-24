@@ -124,8 +124,9 @@ void main() {
                     .subtract(const Duration(hours: 1)))));
     expect(find.textContaining('is already recorded and cannot be changed'),
         findsOneWidget);
-    expect(find.text('Select current consultation'), findsOneWidget,
+    expect(find.text('Select Consultation'), findsOneWidget,
         reason: 'the consultation is not preselected');
+    expect(find.text('Capture Pages (Max 5)'), findsNothing);
   });
 
   testWidgets('the close-out cannot be dismissed with back', (tester) async {
