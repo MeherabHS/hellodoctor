@@ -138,6 +138,7 @@ jobs:
           RECOVERY_MODE=false
           GLOBAL_IP_RATE_LIMIT_PER_MIN=100000
           DB_POOL_MAX_CONNECTIONS_PER_ROLE=10
+          FINANCIAL_MODULE_MODE=deferred
           EOF
           # Secrets the backend refuses to start without (config.rs require()),
           # generated fresh for this run and discarded with the runner.
@@ -177,6 +178,9 @@ jobs:
               'DEV_SIMULATION_ENABLED': 'true',
               'SEED_DEV_DATA': 'true',
               'STORAGE_PROVIDER': 'disabled',
+              # Matches production (no gateway yet). The backend defaults to
+              # `enabled`, which rejects the gateway-less synthetic bookings.
+              'FINANCIAL_MODULE_MODE': 'deferred',
           }
           bad = {k: (be.get(k), v) for k, v in expected.items() if str(be.get(k)) != v}
           if bad:
