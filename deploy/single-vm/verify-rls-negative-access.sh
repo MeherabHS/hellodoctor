@@ -127,10 +127,12 @@ patient_b="$(echo "$ids" | awk '{print $2}')"
 [ -n "$patient_a" ] && [ -n "$patient_b" ] || fail "setup insert did not return two UUIDs (got: '$ids')"
 CLEANUP_IDS=("$patient_a" "$patient_b")
 
+# current_role is a reserved word in PostgreSQL, so the GUC name must reach
+# psql double-quoted: keep the \" escapes inside these bash strings.
 visible_rows="$(psql_q -c "
   BEGIN;
   SET LOCAL ROLE hellodoctor_api;
-  SET LOCAL app."current_role" = 'PATIENT';  -- current_role is a reserved word: must be quoted
+  SET LOCAL app.\"current_role\" = 'PATIENT';
   SET LOCAL app.current_user_id = '${patient_a}';
   SELECT count(*) FROM patient_profiles WHERE user_id = '${patient_b}';
 ")"
@@ -140,7 +142,7 @@ echo "PASS: cross-patient row is invisible under hellodoctor_api + patient_profi
 own_row="$(psql_q -c "
   BEGIN;
   SET LOCAL ROLE hellodoctor_api;
-  SET LOCAL app."current_role" = 'PATIENT';  -- current_role is a reserved word: must be quoted
+  SET LOCAL app.\"current_role\" = 'PATIENT';
   SET LOCAL app.current_user_id = '${patient_a}';
   SELECT count(*) FROM patient_profiles WHERE user_id = '${patient_a}';
 ")"

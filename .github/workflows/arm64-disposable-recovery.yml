@@ -192,12 +192,14 @@ jobs:
           # Expected to fail: `|| rc=$?` keeps `set -e` from aborting the step
           # before the assertions below run.
           rc=0
-          $DC run --rm --no-deps \
+          # The service entrypoint is `sleep infinity`; override it so `-c`
+          # reaches a shell instead of being passed to sleep.
+          $DC run --rm --no-deps --entrypoint sh \
             -e PGBACKREST_STANZA="$PGBACKREST_STANZA" \
             -e PGBACKREST_REPO1_PATH=/var/lib/pgbackrest/repo1 \
             -e PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc \
             -e PGBACKREST_REPO1_CIPHER_PASS=deliberately-wrong-passphrase \
-            postgres-restore-target sh -c '
+            postgres-restore-target -c '
               cat > /etc/pgbackrest/pgbackrest.conf <<EOF
           [global]
           repo1-path=${PGBACKREST_REPO1_PATH}
@@ -223,12 +225,13 @@ jobs:
           # Expected to fail: `|| rc=$?` keeps `set -e` from aborting the step
           # before the assertions below run.
           rc=0
-          $DC run --rm --no-deps \
+          # Entrypoint is `sleep infinity`; override so `-c` reaches a shell.
+          $DC run --rm --no-deps --entrypoint sh \
             -e PGBACKREST_STANZA="$PGBACKREST_STANZA" \
             -e PGBACKREST_REPO1_PATH=/var/lib/pgbackrest/repo1-does-not-exist \
             -e PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc \
             -e PGBACKREST_REPO1_CIPHER_PASS="$PGBACKREST_REPO1_CIPHER_PASS" \
-            postgres-restore-target sh -c '
+            postgres-restore-target -c '
               cat > /etc/pgbackrest/pgbackrest.conf <<EOF
           [global]
           repo1-path=${PGBACKREST_REPO1_PATH}
@@ -252,7 +255,11 @@ jobs:
         run: |
           set -euo pipefail
           recovery_started="$(date -u +%s)"
-          $DC run --rm --no-deps \
+          # The next step starts postgres inside the *running* restore target
+          # ($DC ps -q), so keep it up (entrypoint: sleep infinity) and restore
+          # into it with exec rather than a throwaway `run --rm` container.
+          $DC up -d --no-deps postgres-restore-target
+          $DC exec -T \
             -e PGBACKREST_STANZA="$PGBACKREST_STANZA" \
             -e PGBACKREST_REPO1_PATH=/var/lib/pgbackrest/repo1 \
             -e PGBACKREST_REPO1_CIPHER_TYPE=aes-256-cbc \
