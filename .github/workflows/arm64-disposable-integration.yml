@@ -391,9 +391,16 @@ jobs:
 
           curl --fail --silent --show-error --cacert "$CA_PATH" --resolve api.localhost:58443:127.0.0.1 https://api.localhost:58443/healthz
 
+          # admin-web's middleware rejects any non-GET whose Origin header is
+          # not exactly ADMIN_WEB_ORIGIN (CSRF guard). A browser sends Origin
+          # itself; curl must send the value the running container enforces.
+          admin_origin="$(docker exec "$($DC ps -q admin-web)" printenv ADMIN_WEB_ORIGIN)"
+          test -n "$admin_origin" || { echo "::error::admin-web has no ADMIN_WEB_ORIGIN"; exit 1; }
+
           step1_headers="$(mktemp)"
           step1_body="$(curl --silent --show-error --cacert "$CA_PATH" --resolve admin.localhost:58443:127.0.0.1 \
             -D "$step1_headers" -X POST https://admin.localhost:58443/api/login \
+            -H "Origin: $admin_origin" \
             -H 'Content-Type: application/json' \
             -d '{"email":"admin@hellodoctor.health","password":"AdminPass123!"}')"
           grep -q '"success":true' <<<"$step1_body" || {
@@ -413,9 +420,15 @@ jobs:
           step2_headers="$(mktemp)"
           step2_body="$(curl --silent --show-error --cacert "$CA_PATH" --resolve admin.localhost:58443:127.0.0.1 \
             -D "$step2_headers" -c "$COOKIE_JAR" -X POST https://admin.localhost:58443/api/login/verify \
+            -H "Origin: $admin_origin" \
             -H 'Content-Type: application/json' \
             -d "{\"session_token\":\"${session_token}\",\"otp_code\":\"${otp_code}\"}")"
-          grep -q '"success":true' <<<"$step2_body" || { echo "::error::admin login step 2 (OTP verify) did not report success"; exit 1; }
+          grep -q '"success":true' <<<"$step2_body" || {
+            step2_status="$(head -1 "$step2_headers" | tr -d '\r')"
+            step2_error="$(python3 -c "import json,sys
+          try: print(json.loads(sys.argv[1]).get('error'))
+          except Exception: print('<non-JSON body, %d bytes>' % len(sys.argv[1]))" "$step2_body")"
+            echo "::error::admin login step 2 (OTP verify) did not report success ($step2_status): $step2_error"; exit 1; }
 
           grep -qi '^set-cookie:' "$step2_headers" || { echo "::error::login step 2 set no cookies at all"; exit 1; }
           for attr in HttpOnly Secure SameSite=Strict; do
@@ -459,9 +472,12 @@ jobs:
         run: docker stats --no-stream || true
       - name: Tear down disposable project
         if: always()
-        # Include the TLS overlay so `down -v` also knows (and removes) its
-        # caddydata-tls/caddyconfig-tls volumes; harmless if that step never ran.
-        run: $DC -f deploy/single-vm/compose.arm64-ci-tls.yml down -v --remove-orphans
+        # The TLS overlay swaps the proxy's /data and /config volumes, so each
+        # file set's `down -v` only removes its own: tear down with both
+        # (harmless if the TLS step never ran).
+        run: |
+          $DC -f deploy/single-vm/compose.arm64-ci-tls.yml down -v --remove-orphans
+          $DC down -v --remove-orphans
       - name: Verify no disposable integration volumes were left behind
         if: always()
         shell: bash
