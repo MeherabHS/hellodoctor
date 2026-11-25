@@ -280,6 +280,12 @@ jobs:
         # this command's exit code.
         run: |
           set -euo pipefail
+          # The harness signs its synthetic logins with the same disposable
+          # Ed25519 key the backend was started with (rendered into
+          # backend.env by "Prepare synthetic backend environment").
+          JWT_ED25519_PRIVATE_KEY_B64="$(grep '^JWT_ED25519_PRIVATE_KEY_B64=' "$BACKEND_ENV_FILE" | cut -d= -f2-)"
+          test -n "$JWT_ED25519_PRIVATE_KEY_B64" || { echo "::error::JWT_ED25519_PRIVATE_KEY_B64 missing from $BACKEND_ENV_FILE"; exit 1; }
+          export JWT_ED25519_PRIVATE_KEY_B64
           echo "BOOKING_WINDOW_STARTED=$(date -u +%FT%TZ)" >> "$GITHUB_ENV"
           CAPACITY_ISOLATED_ACTION=booking_payment cargo run --release --example capacity_test
           CAPACITY_ISOLATED_ACTION=chat cargo run --release --example capacity_test

@@ -206,17 +206,25 @@ jobs:
           repo1-cipher-type=${PGBACKREST_REPO1_CIPHER_TYPE}
           repo1-cipher-pass=${PGBACKREST_REPO1_CIPHER_PASS}
           [${PGBACKREST_STANZA}]
-          pg1-path=/var/lib/postgresql/data
+          pg1-path=/tmp/neg-restore
           EOF
-              pgbackrest --stanza="$PGBACKREST_STANZA" info' > /tmp/wrong-key.log 2>&1 || rc=$?
+              # Attempt a real restore (the operation a wrong key must block)
+              # as the postgres user - pgbackrest refuses to run as root, and
+              # `info` reports repo problems as status text with exit 0.
+              # Target is a throwaway dir, never the restore-target PGDATA.
+              install -d -o postgres -g postgres -m 700 /tmp/neg-restore
+              runuser -u postgres -- pgbackrest --stanza="$PGBACKREST_STANZA" restore' > /tmp/wrong-key.log 2>&1 || rc=$?
           cat /tmp/wrong-key.log
           if [ "$rc" -eq 0 ]; then
-            echo "::error::wrong cipher key did not produce a nonzero exit (rc=0) - pgbackrest accepted an invalid key"
+            echo "::error::restore with a wrong cipher key succeeded (rc=0) - pgbackrest accepted an invalid key"
             exit 1
           fi
-          grep -qi "cipher\|unable to\|error" /tmp/wrong-key.log || {
-            echo "::error::command failed (rc=$rc) but not with the expected cipher-mismatch error text"; exit 1; }
-          echo "PASS: wrong cipher key was rejected (rc=$rc) with the expected error text"
+          if grep -qi "must not be run as the root user" /tmp/wrong-key.log; then
+            echo "::error::pgbackrest refused to run as root (rc=$rc) - the cipher check was never exercised"; exit 1
+          fi
+          grep -Eqi "CryptoError|cipher|decrypt" /tmp/wrong-key.log || {
+            echo "::error::restore failed (rc=$rc) but not with a cipher/decryption error"; exit 1; }
+          echo "PASS: restore with a wrong cipher key was rejected (rc=$rc) with a cipher/decryption error"
 
       - name: Negative test - unavailable repository is reported, not silently ignored
         shell: bash
@@ -238,17 +246,22 @@ jobs:
           repo1-cipher-type=${PGBACKREST_REPO1_CIPHER_TYPE}
           repo1-cipher-pass=${PGBACKREST_REPO1_CIPHER_PASS}
           [${PGBACKREST_STANZA}]
-          pg1-path=/var/lib/postgresql/data
+          pg1-path=/tmp/neg-restore
           EOF
-              pgbackrest --stanza="$PGBACKREST_STANZA" info' > /tmp/missing-repo.log 2>&1 || rc=$?
+              # Real restore as postgres into a throwaway dir (see wrong-key step).
+              install -d -o postgres -g postgres -m 700 /tmp/neg-restore
+              runuser -u postgres -- pgbackrest --stanza="$PGBACKREST_STANZA" restore' > /tmp/missing-repo.log 2>&1 || rc=$?
           cat /tmp/missing-repo.log
           if [ "$rc" -eq 0 ]; then
-            echo "::error::unavailable repository did not produce a nonzero exit (rc=0)"
+            echo "::error::restore from an unavailable repository succeeded (rc=0)"
             exit 1
           fi
-          grep -qi "error\|unable to\|does not exist\|missing\|path does not exist" /tmp/missing-repo.log || {
-            echo "::error::command failed (rc=$rc) but not with an unavailable-repository error"; exit 1; }
-          echo "PASS: unavailable repository path was reported as an error (rc=$rc)"
+          if grep -qi "must not be run as the root user" /tmp/missing-repo.log; then
+            echo "::error::pgbackrest refused to run as root (rc=$rc) - the missing-repo check was never exercised"; exit 1
+          fi
+          grep -Eqi "FileMissingError|unable to load info file|missing|does not exist" /tmp/missing-repo.log || {
+            echo "::error::restore failed (rc=$rc) but not with an unavailable-repository error"; exit 1; }
+          echo "PASS: restore from an unavailable repository was reported as an error (rc=$rc)"
 
       - name: Restore into the fresh target, to the named restore point (PITR)
         shell: bash
