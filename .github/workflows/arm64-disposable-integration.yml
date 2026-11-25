@@ -286,6 +286,13 @@ jobs:
           JWT_ED25519_PRIVATE_KEY_B64="$(grep '^JWT_ED25519_PRIVATE_KEY_B64=' "$BACKEND_ENV_FILE" | cut -d= -f2-)"
           test -n "$JWT_ED25519_PRIVATE_KEY_B64" || { echo "::error::JWT_ED25519_PRIVATE_KEY_B64 missing from $BACKEND_ENV_FILE"; exit 1; }
           export JWT_ED25519_PRIVATE_KEY_B64
+          # The harness only uses seeded synthetic users (+25471 doctors,
+          # +25472 patients) and their future open slots; the disposable DB
+          # starts empty. Seed BEFORE recording the window start so the
+          # seed's historical appointments/messages are not counted below.
+          PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -q -v ON_ERROR_STOP=1 \
+            -f scripts/seed_capacity_dataset.sql
+          sleep 1
           echo "BOOKING_WINDOW_STARTED=$(date -u +%FT%TZ)" >> "$GITHUB_ENV"
           CAPACITY_ISOLATED_ACTION=booking_payment cargo run --release --example capacity_test
           CAPACITY_ISOLATED_ACTION=chat cargo run --release --example capacity_test
@@ -296,7 +303,7 @@ jobs:
           appt_count="$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -t -A -v ON_ERROR_STOP=1 \
             -c "SELECT count(*) FROM appointments WHERE created_at >= '${BOOKING_WINDOW_STARTED}'::timestamptz;")"
           chat_count="$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -t -A -v ON_ERROR_STOP=1 \
-            -c "SELECT count(*) FROM chat_messages WHERE created_at >= '${BOOKING_WINDOW_STARTED}'::timestamptz;")"
+            -c "SELECT count(*) FROM chat_messages WHERE sent_at >= '${BOOKING_WINDOW_STARTED}'::timestamptz;")"
           test "$appt_count" -gt 0 || { echo "::error::no appointments created by the synthetic booking run (count=$appt_count)"; exit 1; }
           test "$chat_count" -gt 0 || { echo "::error::no chat messages created by the synthetic chat run (count=$chat_count)"; exit 1; }
           echo "PASS: synthetic run deterministically created $appt_count appointment(s) and $chat_count chat message(s)"

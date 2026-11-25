@@ -222,9 +222,16 @@ jobs:
           if grep -qi "must not be run as the root user" /tmp/wrong-key.log; then
             echo "::error::pgbackrest refused to run as root (rc=$rc) - the cipher check was never exercised"; exit 1
           fi
-          grep -Eqi "CryptoError|cipher|decrypt" /tmp/wrong-key.log || {
-            echo "::error::restore failed (rc=$rc) but not with a cipher/decryption error"; exit 1; }
-          echo "PASS: restore with a wrong cipher key was rejected (rc=$rc) with a cipher/decryption error"
+          # aes-256-cbc has no MAC: a wrong key either fails padding
+          # (CryptoError) or yields garbage that fails to parse (FormatError).
+          # Either way backup.info must be unloadable. FileMissingError (an
+          # absent file) deliberately does not satisfy this check; the PITR
+          # restore later in this job proves the same repo decrypts with the
+          # right key.
+          grep -Eqi "unable to load info file '[^']*/backup\.info'" /tmp/wrong-key.log \
+            && grep -Eq "CryptoError|FormatError" /tmp/wrong-key.log || {
+            echo "::error::restore failed (rc=$rc) but not because backup.info could not be decrypted"; exit 1; }
+          echo "PASS: restore with a wrong cipher key was rejected (rc=$rc): backup.info could not be decrypted"
 
       - name: Negative test - unavailable repository is reported, not silently ignored
         shell: bash
