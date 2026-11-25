@@ -50,7 +50,9 @@ jobs:
     env:
       POSTGRES_USER: postgres
       POSTGRES_DB: hellodoctor
-      POSTGRES_PASSWORD: m8-arm64-ci-password
+      # Must match the DATABASE_URL that compose.local-verification.yml sets for
+      # the backend (environment: overrides the env file), or Postgres rejects it.
+      POSTGRES_PASSWORD: m8-local-password
       BACKEND_RUNTIME_IMAGE: ${{ inputs.backend_runtime_image }}
       ADMIN_WEB_IMAGE: ${{ inputs.admin_web_image }}
       DOCTOR_WEB_IMAGE: ${{ inputs.doctor_web_image }}
@@ -128,7 +130,7 @@ jobs:
           mkdir -p /tmp/hellodoctor-arm64/erasure
           cat > /tmp/hellodoctor-arm64/backend.env <<'EOF'
           ENVIRONMENT=development
-          DATABASE_URL=postgres://postgres:m8-arm64-ci-password@postgres:5432/hellodoctor
+          DATABASE_URL=postgres://postgres:m8-local-password@postgres:5432/hellodoctor
           DEV_AUTH_OTP_ENABLED=true
           DEV_SIMULATION_ENABLED=true
           SEED_DEV_DATA=true

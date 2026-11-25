@@ -327,6 +327,9 @@ jobs:
           print('latest backup timestamp (stop):', latest.get('timestamp', {}).get('stop'))
           "
 
+      - name: Container logs on failure
+        if: failure()
+        run: $DC logs --no-color --tail 200 || true
       - name: Tear down disposable recovery project
         if: always()
         run: $DC down -v --remove-orphans
