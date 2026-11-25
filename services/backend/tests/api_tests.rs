@@ -20463,12 +20463,14 @@ async fn test_milestone_text_attachment_keys_share_one_logical_message(pool: PgP
         get(&app, &view, Some(&patient)).await.status(),
         StatusCode::OK
     );
+    // Admin never opens consultation chat images (e4b8445, dd43bd7): refused
+    // before any storage read, so no view is traced for Admin.
     assert_eq!(
         get(&app, &view, Some(&admin)).await.status(),
-        StatusCode::OK
+        StatusCode::FORBIDDEN
     );
     let views:i64=sqlx::query_scalar("SELECT COUNT(*) FROM consultation_trace_events WHERE appointment_id=$1 AND resource_id=$2 AND event_type='ATTACHMENT_VIEWED'").bind(appointment).bind(uid(message)).fetch_one(&pool).await.unwrap();
-    assert_eq!(views, 2);
+    assert_eq!(views, 1);
     let session = consultation_repo::find_by_appointment(&pool, appointment)
         .await
         .unwrap()
@@ -20486,13 +20488,12 @@ async fn test_milestone_text_attachment_keys_share_one_logical_message(pool: PgP
     assert_eq!(timeline.status(), StatusCode::OK);
     let data = json_body(timeline).await;
     assert_eq!(data["data"]["facts"]["modality"], "CHAT");
-    assert!(data["data"]["audit_events"]
+    assert!(!data["data"]["audit_events"]
         .as_array()
         .unwrap()
         .iter()
         .any(|event| event["action"] == "ADMIN_ATTACHMENT_VIEWED"
-            && event["resource_id"] == message
-            && event["actor_user_id"] == ADMIN_USER_ID));
+            && event["resource_id"] == message));
     assert_eq!(
         data["data"]["trace_events"]
             .as_array()
@@ -20500,7 +20501,7 @@ async fn test_milestone_text_attachment_keys_share_one_logical_message(pool: PgP
             .iter()
             .filter(|event| event["event_type"] == "ATTACHMENT_VIEWED")
             .count(),
-        2
+        1
     );
     // Cross the expiry boundary during INSERT itself, after upload authorization.
     // The existing request timeout and concurrency controls remain unchanged.
