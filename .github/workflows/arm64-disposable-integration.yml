@@ -396,7 +396,16 @@ jobs:
             -D "$step1_headers" -X POST https://admin.localhost:58443/api/login \
             -H 'Content-Type: application/json' \
             -d '{"email":"admin@hellodoctor.health","password":"AdminPass123!"}')"
-          grep -q '"success":true' <<<"$step1_body" || { echo "::error::admin login step 1 did not report success"; exit 1; }
+          grep -q '"success":true' <<<"$step1_body" || {
+            # A failed response carries only {success:false,error}, never a
+            # token, so its status and error text are safe to print.
+            step1_status="$(head -1 "$step1_headers" | tr -d '\r')"
+            step1_error="$(python3 -c "import json,sys
+          try: print(json.loads(sys.argv[1]).get('error'))
+          except Exception: print('<non-JSON body, %d bytes>' % len(sys.argv[1]))" "$step1_body")"
+            echo "::error::admin login step 1 did not report success ($step1_status): $step1_error"
+            $DC logs --no-color --tail 40 backend admin-web | grep -iE "login|auth|error|warn" | tail -20 || true
+            exit 1; }
           otp_code="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['data'].get('debug_otp_code',''))" "$step1_body")"
           session_token="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])['data'].get('session_token',''))" "$step1_body")"
           test -n "$otp_code" || { echo "::error::no debug_otp_code in login step 1 response - DEV_AUTH_OTP_ENABLED/ENVIRONMENT bypass may not be active for admin-web"; exit 1; }
@@ -450,7 +459,9 @@ jobs:
         run: docker stats --no-stream || true
       - name: Tear down disposable project
         if: always()
-        run: $DC down -v --remove-orphans
+        # Include the TLS overlay so `down -v` also knows (and removes) its
+        # caddydata-tls/caddyconfig-tls volumes; harmless if that step never ran.
+        run: $DC -f deploy/single-vm/compose.arm64-ci-tls.yml down -v --remove-orphans
       - name: Verify no disposable integration volumes were left behind
         if: always()
         shell: bash
