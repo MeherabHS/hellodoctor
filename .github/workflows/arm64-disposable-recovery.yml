@@ -8,8 +8,9 @@ name: Disposable ARM64 pgBackRest backup and PITR recovery
 # local disposable volume, never repo1-type=azure).
 #
 # Review fix applied: every negative test below now captures the target
-# command's exit code OUTSIDE of any pipe (docker compose run ... > file 2>&1;
-# rc=$?), with `set +o pipefail` around that one command. The previous draft
+# command's exit code OUTSIDE of any pipe (rc=0; docker compose run ... > file
+# 2>&1 || rc=$?). The `|| rc=$?` form is required: a bare `rc=$?` on the next
+# line never runs under `set -e`, which aborts on the expected failure. The previous draft
 # piped the command directly into `tee | grep`, so under `pipefail` the
 # pipeline's reported status could reflect the *grep* exit code rather than
 # the pgbackrest command's - a true "rejected the wrong key" case could still
@@ -188,7 +189,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          set +o pipefail
+          # Expected to fail: `|| rc=$?` keeps `set -e` from aborting the step
+          # before the assertions below run.
+          rc=0
           $DC run --rm --no-deps \
             -e PGBACKREST_STANZA="$PGBACKREST_STANZA" \
             -e PGBACKREST_REPO1_PATH=/var/lib/pgbackrest/repo1 \
@@ -203,9 +206,7 @@ jobs:
           [${PGBACKREST_STANZA}]
           pg1-path=/var/lib/postgresql/data
           EOF
-              pgbackrest --stanza="$PGBACKREST_STANZA" info' > /tmp/wrong-key.log 2>&1
-          rc=$?
-          set -o pipefail
+              pgbackrest --stanza="$PGBACKREST_STANZA" info' > /tmp/wrong-key.log 2>&1 || rc=$?
           cat /tmp/wrong-key.log
           if [ "$rc" -eq 0 ]; then
             echo "::error::wrong cipher key did not produce a nonzero exit (rc=0) - pgbackrest accepted an invalid key"
@@ -219,7 +220,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          set +o pipefail
+          # Expected to fail: `|| rc=$?` keeps `set -e` from aborting the step
+          # before the assertions below run.
+          rc=0
           $DC run --rm --no-deps \
             -e PGBACKREST_STANZA="$PGBACKREST_STANZA" \
             -e PGBACKREST_REPO1_PATH=/var/lib/pgbackrest/repo1-does-not-exist \
@@ -234,9 +237,7 @@ jobs:
           [${PGBACKREST_STANZA}]
           pg1-path=/var/lib/postgresql/data
           EOF
-              pgbackrest --stanza="$PGBACKREST_STANZA" info' > /tmp/missing-repo.log 2>&1
-          rc=$?
-          set -o pipefail
+              pgbackrest --stanza="$PGBACKREST_STANZA" info' > /tmp/missing-repo.log 2>&1 || rc=$?
           cat /tmp/missing-repo.log
           if [ "$rc" -eq 0 ]; then
             echo "::error::unavailable repository did not produce a nonzero exit (rc=0)"
