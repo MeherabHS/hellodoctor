@@ -20492,8 +20492,9 @@ async fn test_milestone_text_attachment_keys_share_one_logical_message(pool: PgP
         .as_array()
         .unwrap()
         .iter()
-        .any(|event| event["action"] == "ADMIN_ATTACHMENT_VIEWED"
-            && event["resource_id"] == message));
+        .any(
+            |event| event["action"] == "ADMIN_ATTACHMENT_VIEWED" && event["resource_id"] == message
+        ));
     assert_eq!(
         data["data"]["trace_events"]
             .as_array()
