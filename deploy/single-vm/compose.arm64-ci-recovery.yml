@@ -39,6 +39,10 @@ services:
       PGBACKREST_REPO1_CIPHER_PASS: ${PGBACKREST_REPO1_CIPHER_PASS:?set a disposable synthetic cipher passphrase, never a real one}
     volumes:
       - pgbackrest-repo:/var/lib/pgbackrest/repo1
+      # Shared with the sidecar: pgbackrest.conf points pg1-path and
+      # pg1-socket-path at these local paths, so stanza-create, check and
+      # backup in the sidecar need the same data directory and socket.
+      - pg-socket:/var/run/postgresql
 
   # Sidecar: stanza-create + check on start, then cron for scheduled backups.
   # Shares the same repo volume and cipher passphrase as postgres above so it
@@ -57,6 +61,8 @@ services:
       BACKUP_RUN_ON_START: "false"
     volumes:
       - pgbackrest-repo:/var/lib/pgbackrest/repo1
+      - m8-final-local-pgdata:/var/lib/postgresql/data:ro
+      - pg-socket:/var/run/postgresql
     networks: [data]
     depends_on:
       postgres: {condition: service_healthy}
@@ -85,3 +91,4 @@ networks:
 volumes:
   pgbackrest-repo: {external: false, name: hellodoctor-arm64-ci-recovery-pgbackrest-repo}
   restore-target-pgdata: {external: false, name: hellodoctor-arm64-ci-recovery-restore-pgdata}
+  pg-socket: {external: false, name: hellodoctor-arm64-ci-recovery-pg-socket}
