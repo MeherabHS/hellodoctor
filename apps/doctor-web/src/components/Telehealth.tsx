@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useResource } from '../lib/client';
-import { Appointment, Conversation, Profile, RecordDto, consultationAction, consultationIntent } from '../lib/contracts';
+import { Appointment, Conversation, Profile, RecordDto, consultationAction, consultationIntent, rxDispatchAllowed } from '../lib/contracts';
 import { useAgoraCall } from '../lib/useAgoraCall';
 import { callStatusText, callStatusTone } from '../lib/call-status';
 import { joinGate, lockedMessage, formatCountdown, eatDateTime, type JoinInfo } from '../lib/join-window';
@@ -63,7 +63,7 @@ export function Telehealth({ appointment: a, appointments, select, profile, phot
   return <>
     <PageHeader title="Consultation room" subtitle={<>{a.appointment_number} · {date(a.start_time)}, {time(a.start_time)} – {time(a.end_time)}</>}>
       {appointments.length > 1 && <label><span className="am-sr">Switch consultation</span><select className="am-select" style={{ minWidth: 240 }} value={a.id} disabled={callActive} onChange={e => { const next = appointments.find(row => row.id === e.target.value); if (next) select(next); }}>{appointments.map(row => <option key={row.id} value={row.id}>{time(row.start_time)} · {row.patient_display_name}</option>)}</select></label>}
-      <button className="am-btn soft" disabled={!consultationIntent(a)} onClick={() => action('rx', a)}><Icon name="rx" size={16}/>Prescription</button>
+      <button className="am-btn soft" disabled={!rxDispatchAllowed(a)} title={rxDispatchAllowed(a) ? undefined : 'Available once the consultation has started'} onClick={() => action('rx', a)}><Icon name="rx" size={16}/>Prescription</button>
       <button className="am-btn primary" disabled={!['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].includes(a.status)} onClick={() => { call.leave(); complete(); }}><Icon name="checkCircle" size={16}/>Complete</button>
     </PageHeader>
     <div className="am-call">
@@ -110,7 +110,7 @@ export function Telehealth({ appointment: a, appointments, select, profile, phot
               {summary.data.clinical_notes ? <section><span className="am-label">Patient&apos;s intake notes</span><p className="am-pre am-muted" style={{ marginTop: 4 }}>{String(summary.data.clinical_notes)}</p></section> : null}
             </>}
             <div className="am-stack" style={{ gap: 8 }}>
-              <button className="am-btn soft block" disabled={!consultationIntent(a)} onClick={() => action('rx', a)}><Icon name="rx" size={16}/>Add prescription (Rx)</button>
+              <button className="am-btn soft block" disabled={!rxDispatchAllowed(a)} title={rxDispatchAllowed(a) ? undefined : 'Available once the consultation has started'} onClick={() => action('rx', a)}><Icon name="rx" size={16}/>Add prescription (Rx)</button>
               <button className="am-btn ghost block" onClick={() => action('history', a)}><Icon name="history" size={16}/>Full patient history</button>
               <button className="am-btn ghost block" onClick={() => action('documents', a)}><Icon name="file" size={16}/>All documents</button>
             </div>

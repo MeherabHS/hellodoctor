@@ -92,8 +92,9 @@ void main() {
     await tester.tap(find.text('Send prescription'));
     await tester.pumpAndSettle();
     expect(find.byType(ScannerPage), findsOneWidget);
-    // The scanner opens with this consultation already selected.
-    expect(find.textContaining('Gap Audit Tester · Video ·'), findsWidgets);
+    // The scanner opens on the capture step for this consultation.
+    expect(find.text('Gap Audit Tester'), findsWidgets);
+    expect(find.text('Capture Pages (Max 5)'), findsOneWidget);
   });
 
   testWidgets('an older consultation does not offer it', (tester) async {

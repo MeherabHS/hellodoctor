@@ -4,7 +4,7 @@ import { restoresSilently, type RestoreTrigger } from '../lib/sessionRestore';
 import { isProfessionallyVerified } from '../lib/professionalVerification';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { api, clearRuntime, diagnostic, errorText, request, runtimeGeneration, useResource, setIncidentScreen } from '../lib/client';
-import { Appointment, DoctorNotification, paymentRequiredFromPolicy, Profile, Question, RecordDto, RxPage, consultationAction } from '../lib/contracts';
+import { Appointment, DoctorNotification, paymentRequiredFromPolicy, Profile, Question, RecordDto, RxPage, consultationAction, rxCandidates } from '../lib/contracts';
 import { Modal, State, Drawer } from './Common';
 import { Icon } from './Icons';
 import { Auth } from './Auth';
@@ -58,7 +58,7 @@ function Application({ initialPage }: { initialPage: 'dashboard' | 'chat' }) {
   const [scheduleDate, setScheduleDate] = useState(''); const [settingsSection, setSettingsSection] = useState<SettingsSection>('profile');
   const enabled = isProfessionallyVerified(profile) && !suspended && !offline;
   const appointmentPage = ['dashboard', 'appointments', 'rx', 'patients', 'telehealth', 'schedule', 'chat'].includes(page);
-  const queue = useAppointments(enabled && appointmentPage, page === 'schedule' || page === 'patients' ? 'all' : 'upcoming', ['dashboard', 'appointments', 'telehealth'].includes(page) && dialog === null && document === null);
+  const queue = useAppointments(enabled && appointmentPage, page === 'schedule' || page === 'patients' || page === 'rx' ? 'all' : 'upcoming', ['dashboard', 'appointments', 'telehealth', 'rx'].includes(page) && dialog === null && document === null);
   const unread = useResource<{ unread_count: number }>(enabled ? 'notifications/unread-count' : null);
   const openQuestions = useResource<Question[]>(enabled ? 'doctor/qna/questions?status=OPEN&limit=100&offset=0' : null);
   // Server-authoritative financial mode (`GET /config/booking-policy`); defaults to true
@@ -95,6 +95,7 @@ function Application({ initialPage }: { initialPage: 'dashboard' | 'chat' }) {
     else if (['EARNING_CREDITED', 'PAYOUT_PAID'].includes(notice.notification_type)) go('wallet');
     else if (notice.notification_type === 'CONSULTATION_REMINDER_15M') { const appointment = queue.data.find(a => a.id === notice.related_entity_id); if (appointment) action(appointment.modality === 'CHAT' ? 'chat' : 'call', appointment); else go('appointments'); }
     else if (notice.related_entity_type === 'CHAT') { const appointment = queue.data.find(a => a.id === notice.metadata?.appointment_id || a.conversation_id === notice.related_entity_id); if (appointment) action('chat', appointment); else go('chat'); }
+    else if (notice.notification_type === 'RX_WINDOW_CLOSING') { const appointment = queue.data.find(a => a.id === notice.related_entity_id); if (appointment) action('rx', appointment); else go('rx'); }
     else if (notice.notification_type === 'ARTICLE_STATUS_CHANGED') go('articles');
     else go('appointments');
   }
@@ -115,7 +116,7 @@ function Application({ initialPage }: { initialPage: 'dashboard' | 'chat' }) {
   let view: React.ReactNode;
   if (offline || suspended) view = <div className="am-card"><State error={offline ? 'You are offline. Reconnect to load patient information.' : 'Checking your session…'} retry={() => void restore()}/></div>;
   else if (page === 'chat') view = <Chat profile={profile} appointments={queue.data} selectedAppointment={active?.id} focusAppointment={active ?? undefined} visible={dialog === null && document === null && !navOpen} action={action} gap={gap}/>;
-  else if (page === 'rx') view = <Rx profile={profile} appointments={queue.data.filter(a => ['CONFIRMED', 'WAITING', 'IN_CONSULTATION', 'COMPLETED'].includes(a.status))} appointment={chosen} pages={chosen ? rxByAppointment[chosen.id] ?? [] : []} setPages={next => { if (chosen && renderGeneration === runtimeGeneration()) setRx(previous => ({ ...previous, [chosen.id]: next })); }} select={setActive} action={action} complete={() => setDialog('completion')} back={() => go('telehealth')}/>;
+  else if (page === 'rx') view = <Rx profile={profile} appointments={rxCandidates(queue.data, active)} appointment={active} pages={active ? rxByAppointment[active.id] ?? [] : []} setPages={next => { if (active && renderGeneration === runtimeGeneration()) setRx(previous => ({ ...previous, [active.id]: next })); }} select={setActive} action={action} complete={() => setDialog('completion')} back={() => go('telehealth')} history={() => go('consultation-history')}/>;
   else if (page === 'schedule') view = <Schedule key={revision} appointments={queue.data} action={action} addSlot={() => setDialog('slot')} gap={gap} initialDate={scheduleDate}/>;
   else if (page === 'wallet') view = paymentRequired ? <Wallet statement={() => setDialog('statement')} payout={() => setDialog('payout')} receipt={row => { setReceipt(row); setDialog('receipt'); }}/> : <DeferredFinancialNotice/>;
   else if (page === 'qna') view = <Qna profile={profile} onChanged={() => void openQuestions.refresh()}/>;

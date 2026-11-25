@@ -196,12 +196,16 @@ jobs:
           fi
 
       - name: Summarize findings and the required decision on real-package bootstrap
+        # Inputs reach the shell as environment variables, never as text
+        # pasted into the script (no shell injection through an input).
+        env:
+          PACKAGE_NAME: ${PACKAGE_NAME}
         run: |
           set -euo pipefail
           {
             echo "## GHCR existing-private-package GITHUB_TOKEN canary result"
             echo ""
-            echo "- Package: \`${{ inputs.package_name }}\`"
+            echo "- Package: \`${PACKAGE_NAME}\`"
             echo "- Reported visibility after GITHUB_TOKEN push (API): \`${CANARY2_VISIBILITY:-unknown}\`"
             echo "- Linked repository: \`${CANARY2_REPO_LINK:-none}\`"
             echo "- Anonymous pull after GITHUB_TOKEN push: \`${CANARY2_ANONYMOUS_PULL:-unknown}\`"

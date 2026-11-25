@@ -16,8 +16,10 @@ import '../../core/network/chat_live.dart';
 import '../../core/network/screen_refresh.dart';
 import '../../core/theme/tokens.dart';
 import '../../core/time/kenya_time.dart';
+import '../../core/time/server_clock.dart';
 import '../../core/validation/kenya_phone.dart';
 import '../../core/widgets/doctor_widgets.dart';
+import '../../core/widgets/afya_auth_widgets.dart' show AfyaLogoMark;
 import '../../core/widgets/person_photo.dart';
 import '../auth/auth_cubit.dart';
 import 'profile_photo_avatar.dart';
@@ -266,9 +268,16 @@ class _ConsultationHistoryState extends State<ConsultationHistoryPage> {
 /// offered only inside that window; the server still decides.
 bool rxWindowOpen(AppointmentDto a, [DateTime? now]) {
   if (a.status != 'COMPLETED' || a.rxDecided) return false;
+  final rx = a.rx;
+  if (rx != null) {
+    // The server's decision and deadline, against the server's clock.
+    final closes = rx.closesAt;
+    return rx.allowed &&
+        (closes == null || (now ?? ServerClock.now()).toUtc().isBefore(closes));
+  }
   final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
   if (ended == null) return false;
-  return (now ?? DateTime.now())
+  return (now ?? ServerClock.now())
       .toUtc()
       .isBefore(ended.toUtc().add(const Duration(hours: 24)));
 }
@@ -827,7 +836,7 @@ class _ConsultationActionsState extends State<ConsultationActions> {
           TextButton(
               onPressed: busy ? null : openChat,
               child: const Text('Follow-up messages')),
-        if (a.canStart)
+        if (rxDispatchAllowed(a))
           TextButton(
               onPressed: () => Navigator.push(
                   context,
@@ -1902,10 +1911,13 @@ class _SlotConsultationActionsState extends State<_SlotConsultationActions> {
         Expanded(
             flex: 8,
             child: OutlinedButton.icon(
-                onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => ScannerPage(initialAppointment: a))),
+                // Prescribing opens once the consultation has started.
+                onPressed: rxDispatchAllowed(a)
+                    ? () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => ScannerPage(initialAppointment: a)))
+                    : null,
                 style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF0A5B35),
                     backgroundColor: const Color(0xFFF3FBF7),
@@ -4147,13 +4159,136 @@ Future<void> _clearFilePickerTempFiles() async {
 
 const _maxRxPages = 5;
 
-/// Whether a prescription can still be dispatched for [a]: a live
-/// consultation, or a completed one inside the 24-hour late-Rx window whose
-/// Rx decision is not yet recorded. Once dispatched (or "no Rx needed"),
-/// never again.
+/// Whether a prescription can be dispatched for [a] now (product owner,
+/// 2026-11-24, the same rule the server enforces): a consultation that has
+/// started, or a completed one inside the 24-hour window whose Rx decision
+/// is not yet recorded. Never before the patient is seen; once dispatched
+/// (or "no Rx needed"), never again.
 bool rxDispatchAllowed(AppointmentDto a, [DateTime? now]) =>
-    const ['CONFIRMED', 'WAITING', 'IN_CONSULTATION'].contains(a.status) ||
-    rxWindowOpen(a, now);
+    rxConsultationStarted(a, now) || rxWindowOpen(a, now);
+
+/// The consultation has started, as the server decides it: a video call
+/// both apps joined (or IN_CONSULTATION), or a chat in which both the doctor
+/// and the patient have written. Without the server's decision (older
+/// backend): IN_CONSULTATION, or a chat whose window has opened.
+bool rxConsultationStarted(AppointmentDto a, [DateTime? now]) {
+  final rx = a.rx;
+  if (rx != null) {
+    return a.status != 'COMPLETED' && rx.allowed;
+  }
+  if (a.status == 'IN_CONSULTATION') return true;
+  if (!a.isChat || !const ['CONFIRMED', 'WAITING'].contains(a.status)) {
+    return false;
+  }
+  final opens =
+      a.join?.joinOpenAt ?? a.start?.subtract(const Duration(minutes: 15));
+  return opens != null &&
+      !(now ?? ServerClock.now()).toUtc().isBefore(opens.toUtc());
+}
+
+/// Hours left in a completed consultation's 24-hour prescription window.
+int? rxHoursLeft(AppointmentDto a, [DateTime? now]) {
+  final left = rxTimeLeft(a, now);
+  if (left == null) return null;
+  return left.isNegative ? 0 : (left.inMinutes / 60).ceil();
+}
+
+/// Time left in a completed consultation's 24-hour prescription window, by
+/// the server's deadline and clock.
+Duration? rxTimeLeft(AppointmentDto a, [DateTime? now]) {
+  final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
+  final closes =
+      a.rx?.closesAt ?? ended?.toUtc().add(const Duration(hours: 24));
+  if (closes == null) return null;
+  return closes.difference((now ?? ServerClock.now()).toUtc());
+}
+
+/// A completed consultation with under an hour left in its window.
+bool rxClosingSoon(AppointmentDto a, [DateTime? now]) {
+  if (a.status != 'COMPLETED') return false;
+  final left = rxTimeLeft(a, now);
+  return left != null && !left.isNegative && left < const Duration(hours: 1);
+}
+
+/// A sent prescription is final; the doctor adds a correction note that the
+/// patient sees in Health Records (product owner, 2026-11-24).
+Future<void> addRxCorrection(BuildContext context, AppointmentDto a) async {
+  final note = await showDialog<String>(
+      context: context,
+      builder: (_) => _RxCorrectionDialog(patient: a.patientName));
+  if (note == null || !context.mounted) return;
+  try {
+    await context
+        .read<DoctorCubit>()
+        .repo
+        .addPrescriptionCorrection(a.id, note);
+    if (context.mounted) {
+      showMessage(context, 'Note sent to the patient.');
+    }
+  } catch (e) {
+    if (context.mounted) showError(context, e);
+  }
+}
+
+class _RxCorrectionDialog extends StatefulWidget {
+  const _RxCorrectionDialog({this.patient});
+  final String? patient;
+  @override
+  State<_RxCorrectionDialog> createState() => _RxCorrectionDialogState();
+}
+
+class _RxCorrectionDialogState extends State<_RxCorrectionDialog> {
+  final controller = TextEditingController();
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+          title: const Text('Add a correction note'),
+          content: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(
+                'The prescription for ${widget.patient ?? 'this patient'} cannot be changed. Your note is shown to the patient with it and they are notified.',
+                style: const TextStyle(color: DoctorTokens.textSub)),
+            const SizedBox(height: 12),
+            TextField(
+                controller: controller,
+                autofocus: true,
+                maxLength: 1000,
+                minLines: 3,
+                maxLines: 6,
+                decoration: const InputDecoration(
+                    hintText:
+                        'For example: take the tablets twice a day, not three times.',
+                    border: OutlineInputBorder())),
+          ])),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () {
+                  final text = controller.text.trim();
+                  if (text.length >= 3) Navigator.pop(context, text);
+                },
+                child: const Text('Send note')),
+          ]);
+}
+
+/// Why [a] cannot take a prescription now, in words.
+String rxBlockedReason(AppointmentDto a) {
+  final message = a.rx?.message ?? '';
+  if (message.isNotEmpty) return message;
+  final who = a.patientName ?? 'this consultation';
+  return a.rxDecided
+      ? 'The prescription decision for $who is already recorded and cannot be changed.'
+      : a.status == 'COMPLETED'
+          ? 'The 24-hour prescription window for $who has closed.'
+          : 'A prescription for $who can be sent once the consultation has started.';
+}
 
 class ScannerPage extends StatefulWidget {
   const ScannerPage(
@@ -4167,14 +4302,16 @@ class ScannerPage extends StatefulWidget {
   State<ScannerPage> createState() => _ScannerState();
 }
 
-class _ScannerState extends State<ScannerPage> {
+class _ScannerState extends State<ScannerPage> with WidgetsBindingObserver {
   final List<_RxPage> pages = [];
   final notes = TextEditingController();
   AppointmentDto? appointment;
   bool dispatching = false;
 
-  /// Opened for a consultation whose Rx decision is already final.
+  /// Opened for a consultation that cannot take a prescription now; the
+  /// picker shows [_ineligibleReason] instead.
   bool decidedNotice = false;
+  String _ineligibleReason = '';
 
   /// Consultations dispatched from this screen instance.
   final Set<String> _dispatched = {};
@@ -4184,13 +4321,35 @@ class _ScannerState extends State<ScannerPage> {
     final initial = widget.initialAppointment;
     if (initial != null && !rxDispatchAllowed(initial)) {
       decidedNotice = true;
+      _ineligibleReason = rxBlockedReason(initial);
     } else {
       appointment = initial;
+    }
+    WidgetsBinding.instance.addObserver(this);
+    // The list keeps itself current: deadlines tick, and consultations that
+    // finish or whose window closes come and go without a manual refresh.
+    _tick = Timer.periodic(const Duration(minutes: 1), (_) => _refresh());
+  }
+
+  Timer? _tick;
+
+  void _refresh() {
+    if (!mounted) return;
+    setState(() {});
+    if (appointment == null && !dispatching) {
+      context.read<DoctorCubit>().loadQueue();
     }
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refresh();
+  }
+
+  @override
   void dispose() {
+    _tick?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     // This screen's `pages` list is purely ephemeral in-memory state (never
     // persisted), so once this widget is torn down — whether by navigating
     // away or by the session ending at logout — any not-yet-uploaded page's
@@ -4338,34 +4497,69 @@ class _ScannerState extends State<ScannerPage> {
     if (sealed && mounted) await _finishDispatch(doctorCubit);
   }
 
-  /// Resets the screen after a successful dispatch: the consultation leaves
-  /// the picker (its Rx decision is final) and the form starts empty.
-  Future<void> _finishDispatch(DoctorCubit doctorCubit) async {
-    final patient = appointment?.patientName ?? 'the patient';
+  // ---------------------------------------------------------------------
+  // Smart Rx redesign (2026-11-24, board:
+  // docs/design/doctor-ui/smart-rx-dispatch-flow.png). Two steps on one
+  // screen: pick a consultation, then capture and dispatch. Upload, retry,
+  // completion and file clean-up above are unchanged.
+  // ---------------------------------------------------------------------
+
+  /// The consultation highlighted in the picker before "Continue".
+  String? _candidateId;
+  String _search = '';
+  _RxFilter _filter = _RxFilter.all;
+
+  /// Opened for one consultation: the back arrow leaves the screen instead
+  /// of returning to the picker.
+  bool get _openedForOne => widget.initialAppointment != null && !decidedNotice;
+
+  /// Leaves the capture step for the picker. Unsent pages are discarded (and
+  /// their files removed), the same as choosing another consultation did.
+  void _backToPicker() {
+    if (dispatching || pages.any((p) => p.status == _PageStatus.uploading)) {
+      return;
+    }
+    for (final page in pages.where((p) => p.status != _PageStatus.done)) {
+      unawaited(_cleanupPage(page));
+    }
     setState(() {
-      if (appointment != null) _dispatched.add(appointment!.id);
+      _candidateId = appointment?.id;
+      appointment = null;
+      pages.clear();
+      notes.clear();
+    });
+  }
+
+  /// Shows the receipt and resets the screen after a successful dispatch:
+  /// the consultation leaves the picker (its Rx decision is final).
+  Future<void> _finishDispatch(DoctorCubit doctorCubit) async {
+    final a = appointment!;
+    final receipt = _RxReceipt(
+        patient: a.patientName ?? 'the patient',
+        pages: pages.length,
+        at: DateTime.now(),
+        lateRx: a.status == 'COMPLETED',
+        outcome: a.clinicalOutcome);
+    setState(() {
+      _dispatched.add(a.id);
       pages.clear();
       notes.clear();
       appointment = null;
+      _candidateId = null;
       decidedNotice = false;
     });
     unawaited(doctorCubit.loadAll());
-    await showDialog<void>(
+    final another = await showDialog<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-                icon: const Icon(Icons.check_circle,
-                    size: 56, color: DoctorTokens.primary),
-                title: const Text('Prescription Submitted!',
-                    textAlign: TextAlign.center),
-                content: Text(
-                    'The prescription has been added to $patient’s health record.',
-                    textAlign: TextAlign.center),
-                actions: [
-                  FilledButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Done'))
-                ]));
-    if (mounted && widget.closeOnDispatch) Navigator.pop(context, true);
+        barrierDismissible: false,
+        builder: (_) => _RxSubmittedDialog(
+            receipt: receipt, allowAnother: !widget.closeOnDispatch));
+    if (!mounted) return;
+    if (widget.closeOnDispatch) {
+      Navigator.pop(context, true);
+    } else if (another != true && Navigator.of(context).canPop()) {
+      Navigator.pop(context);
+    }
   }
 
   void remove(_RxPage page) {
@@ -4374,424 +4568,1384 @@ class _ScannerState extends State<ScannerPage> {
     setState(() => pages.remove(page));
   }
 
+  Future<void> _chooseSource() async {
+    final choice = await showModalBottomSheet<String>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheet) => SafeArea(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+              ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined),
+                  title: const Text('Camera'),
+                  subtitle: const Text('One photo'),
+                  onTap: () => Navigator.pop(sheet, 'camera')),
+              ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Gallery'),
+                  subtitle: const Text('Several photos'),
+                  onTap: () => Navigator.pop(sheet, 'gallery')),
+              ListTile(
+                  leading: const Icon(Icons.insert_drive_file_outlined),
+                  title: const Text('Choose File'),
+                  subtitle: const Text('JPG, PNG or PDF'),
+                  onTap: () => Navigator.pop(sheet, 'file')),
+              const SizedBox(height: 8),
+            ])));
+    switch (choice) {
+      case 'camera':
+        await pick(ImageSource.camera);
+      case 'gallery':
+        await pick(ImageSource.gallery);
+      case 'file':
+        await pickFile();
+    }
+  }
+
   @override
   Widget build(BuildContext c) {
     final state = c.watch<DoctorCubit>().state;
-    // Only consultations whose Rx can still be dispatched; one dispatched
-    // in this screen leaves at once, before the queue reload lands.
-    final appointments = state.queue
-        .cast<AppointmentDto>()
-        .where((a) => rxDispatchAllowed(a) && !_dispatched.contains(a.id))
-        .toList();
-    if (appointment != null &&
-        !appointments.any((a) => a.id == appointment!.id)) {
-      appointments.add(appointment!);
+    final queue = state.queue.cast<AppointmentDto>();
+    final offline = c.read<DoctorCubit>().repo.isOffline;
+    final onCapture = appointment != null;
+    return PopScope(
+        // From the capture step, back returns to the picker (unless the
+        // screen was opened for this one consultation).
+        canPop: !onCapture || _openedForOne,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _backToPicker();
+        },
+        child: SafeArea(
+            bottom: false,
+            child: Scaffold(
+                backgroundColor: DoctorTokens.bg,
+                body: Column(children: [
+                  _RxTopBar(actions: _notificationBellActions(c)),
+                  Expanded(
+                      child: onCapture
+                          ? _captureStep(c, state.profile, offline)
+                          : _pickerStep(c, queue)),
+                ]),
+                bottomNavigationBar: SafeArea(
+                    top: false,
+                    child: Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+                        child: onCapture
+                            ? _dispatchButton()
+                            : _continueButton(queue))))));
+  }
+
+  // ------------------------------------------------------------- picker
+
+  List<(AppointmentDto, _RxKind)> _pickerItems(List<AppointmentDto> queue) {
+    final items = <(AppointmentDto, _RxKind)>[];
+    for (final a in queue) {
+      if (_dispatched.contains(a.id) && !a.rxDecided) continue;
+      final kind = _rxKindOf(a);
+      if (kind != null) items.add((a, kind));
     }
-    final uploading =
-        dispatching || pages.any((p) => p.status == _PageStatus.uploading);
-    final profile = state.profile;
+    // Live first (soonest), then late Rx, then locked (most recent first).
+    items.sort((x, y) {
+      final byKind = x.$2.index.compareTo(y.$2.index);
+      if (byKind != 0) return byKind;
+      final tx = x.$1.start ?? DateTime(0), ty = y.$1.start ?? DateTime(0);
+      return x.$2 == _RxKind.awaiting ? tx.compareTo(ty) : ty.compareTo(tx);
+    });
+    return items;
+  }
+
+  Widget _pickerStep(BuildContext c, List<AppointmentDto> queue) {
+    final all = _pickerItems(queue);
+    final query = _search.trim().toLowerCase();
+    final searched = query.isEmpty
+        ? all
+        : all
+            .where((e) =>
+                (e.$1.patientName ?? '').toLowerCase().contains(query) ||
+                (e.$1.number ?? '').toLowerCase().contains(query))
+            .toList();
+    int count(_RxKind k) => searched.where((e) => e.$2 == k).length;
+    final shown = _filter == _RxFilter.all
+        ? searched
+        : searched.where((e) => e.$2 == _filter.kind).toList();
+    return ListView(
+        padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
+        children: [
+          const _RxHero(),
+          const SizedBox(height: 12),
+          const _RxNote(
+              icon: Icons.description_outlined,
+              tone: _RxNoteTone.brand,
+              text:
+                  'Photograph your handwritten prescription pages and dispatch them to the patient after the consultation.'),
+          if (decidedNotice) ...[
+            const SizedBox(height: 10),
+            _RxNote(
+                icon: Icons.lock_outline,
+                tone: _RxNoteTone.neutral,
+                text: _ineligibleReason),
+          ],
+          const SizedBox(height: 18),
+          const Text('Select Consultation',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: DoctorTokens.navy)),
+          const SizedBox(height: 10),
+          TextField(
+              onChanged: (v) => setState(() => _search = v),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                  hintText: 'Search by patient name or appointment #',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  isDense: true,
+                  filled: true,
+                  fillColor: DoctorTokens.surface,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: DoctorTokens.border)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: DoctorTokens.border)))),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                for (final f in _RxFilter.values)
+                  Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _RxFilterChip(
+                          label:
+                              '${f.label} (${f == _RxFilter.all ? searched.length : count(f.kind!)})',
+                          selected: _filter == f,
+                          onTap: () => setState(() => _filter = f))),
+              ])),
+          const SizedBox(height: 12),
+          if (shown.isEmpty)
+            const Padding(
+                padding: EdgeInsets.symmetric(vertical: 28),
+                child: Text('No consultations here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: DoctorTokens.textSub)))
+          else
+            for (final e in shown) ...[
+              _RxConsultationTile(
+                  appointment: e.$1,
+                  kind: e.$2,
+                  selected: _candidateId == e.$1.id,
+                  api: c.read<DoctorCubit>().repo.api,
+                  onTap: e.$2 == _RxKind.locked
+                      ? (e.$1.clinicalOutcome == 'COMPLETED_WITH_RX'
+                          ? () => addRxCorrection(c, e.$1)
+                          : null)
+                      : () => setState(() => _candidateId = e.$1.id)),
+              const SizedBox(height: 10),
+            ],
+          const SizedBox(height: 4),
+          const _RxNote(
+              icon: Icons.info_outline,
+              tone: _RxNoteTone.neutral,
+              text:
+                  'Completed consultations awaiting a prescription are shown for 24 hours. An ongoing consultation is prescribed from the consultation itself. Tap a sent prescription to add a correction note.'),
+          const SizedBox(height: 6),
+          Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                  onPressed: () => Navigator.push(
+                      c,
+                      MaterialPageRoute(
+                          builder: (_) => const ConsultationHistoryPage())),
+                  icon: const Icon(Icons.history, size: 18),
+                  label: const Text('Past prescriptions'))),
+        ]);
+  }
+
+  Widget _continueButton(List<AppointmentDto> queue) {
+    final candidate = _pickerItems(queue)
+        .where((e) => e.$1.id == _candidateId && e.$2 != _RxKind.locked)
+        .map((e) => e.$1)
+        .firstOrNull;
+    return SizedBox(
+        height: 52,
+        child: FilledButton(
+            onPressed: candidate == null
+                ? null
+                : () => setState(() {
+                      appointment = candidate;
+                      decidedNotice = false;
+                    }),
+            style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Text('Continue',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              SizedBox(width: 8),
+              Icon(Icons.arrow_forward, size: 20),
+            ])));
+  }
+
+  // ------------------------------------------------------------- capture
+
+  Widget _captureStep(BuildContext c, ProfileDto? profile, bool offline) {
+    final a = appointment!;
     final doneCount = pages.where((p) => p.status == _PageStatus.done).length;
     final failedCount =
         pages.where((p) => p.status == _PageStatus.failed).length;
-    final allDone = pages.isNotEmpty && doneCount == pages.length;
-    // No AppBar here, so without this the custom DoctorPageHeader below
-    // renders straight under the status bar (confirmed on-device).
-    return SafeArea(
-        bottom: false,
-        child: Scaffold(
-            backgroundColor: DoctorTokens.bg,
-            body: ListView(padding: EdgeInsets.zero, children: [
-              DoctorPageHeader('Smart Rx Scanner & Dispatch',
-                  'Photo Capture Pad · Auto-Syncs Patient & Date',
-                  actions: _notificationBellActions(c)),
-              Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(children: [
-                    CacheStatusBar(
-                        offline: c.read<DoctorCubit>().repo.isOffline,
-                        refreshing: false),
-                    if (decidedNotice)
-                      Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                              color: DoctorTokens.noticeBg,
-                              borderRadius: BorderRadius.circular(14)),
-                          child: Row(children: [
-                            const Icon(Icons.lock_outline,
-                                color: DoctorTokens.primaryDark),
-                            const SizedBox(width: 10),
-                            Expanded(
-                                child: Text(
-                                    'The prescription decision for ${widget.initialAppointment?.patientName ?? 'this consultation'} is already recorded and cannot be changed.',
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        height: 1.4,
-                                        color: DoctorTokens.fieldText)))
-                          ])),
-                    DoctorCard(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          const Text('Select consultation',
-                              style: TextStyle(fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 6),
-                          DropdownButton<String>(
-                              isExpanded: true,
-                              value: appointment?.id,
-                              hint: const Text('Select current consultation'),
-                              items: appointments
-                                  .map((a) => DropdownMenuItem(
-                                      value: a.id,
-                                      child: Text(rxConsultationLabel(a),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis)))
-                                  .toList(),
-                              onChanged: uploading
-                                  ? null
-                                  : (id) => setState(() {
-                                        if (id == appointment?.id) return;
-                                        appointment = appointments
-                                            .firstWhere((a) => a.id == id);
-                                        pages.clear();
-                                        notes.clear();
-                                      })),
-                          if (appointment != null) ...[
-                            const SizedBox(height: 10),
-                            _RxMetaBar(appointment: appointment!),
-                            const SizedBox(height: 10),
-                            InkWell(
-                                onTap: () => Navigator.push(
-                                    c,
-                                    MaterialPageRoute(
-                                        builder: (_) => HistoryPage(
-                                            appointmentId: appointment!.id))),
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 9),
-                                    decoration: BoxDecoration(
-                                        color: DoctorTokens.surfaceSubtle,
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(
-                                            color: DoctorTokens.border)),
-                                    child: const Row(children: [
-                                      Icon(Icons.history,
-                                          size: 16,
-                                          color: DoctorTokens.primaryDark),
-                                      SizedBox(width: 8),
-                                      Text('Patient Case History',
-                                          style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w700,
-                                              color: DoctorTokens.primaryDark))
-                                    ])))
-                          ]
-                        ])),
-                    const SizedBox(height: 12),
-                    DoctorCard(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          const Text('Capture Handwritten Prescription',
-                              style: TextStyle(fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 10),
-                          if (pages.isNotEmpty) ...[
-                            _RxPagesStrip(
-                                pages: pages,
-                                onRemove: remove,
-                                onRetry: _uploadPage),
-                            const SizedBox(height: 8),
-                            Text(
-                                '${pages.length}/$_maxRxPages pages'
-                                '${failedCount > 0 ? ' · $failedCount failed' : doneCount > 0 ? ' · $doneCount dispatched' : ''}',
-                                style: const TextStyle(
-                                    color: DoctorTokens.textSub, fontSize: 11)),
-                            const SizedBox(height: 10)
-                          ],
-                          Row(children: [
-                            Expanded(
-                                child: FilledButton.icon(
-                                    onPressed: dispatching ||
-                                            pages.length >= _maxRxPages
-                                        ? null
-                                        : () => pick(ImageSource.camera),
-                                    icon: const Icon(Icons.camera_alt),
-                                    label: const Text('Camera'))),
-                            const SizedBox(width: 8),
-                            Expanded(
-                                child: OutlinedButton.icon(
-                                    onPressed: dispatching ||
-                                            pages.length >= _maxRxPages
-                                        ? null
-                                        : () => pick(ImageSource.gallery),
-                                    icon: const Icon(Icons.photo_library),
-                                    label: const Text('Gallery')))
-                          ]),
-                          const SizedBox(height: 8),
-                          SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                  onPressed:
-                                      dispatching || pages.length >= _maxRxPages
-                                          ? null
-                                          : pickFile,
-                                  icon: const Icon(Icons.attach_file),
-                                  label:
-                                      const Text('Choose image or PDF file'))),
-                          const SizedBox(height: 14),
-                          const Text('Advice for the patient (optional)',
+    final full = dispatching || pages.length >= _maxRxPages;
+    return ListView(
+        padding: const EdgeInsets.fromLTRB(10, 0, 18, 18),
+        children: [
+          Row(children: [
+            IconButton(
+                tooltip: 'Back',
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                color: DoctorTokens.navy),
+            const Expanded(
+                child: Text('Smart Rx Scanner & Dispatch',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: DoctorTokens.navy))),
+          ]),
+          Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (offline) ...[
+                      const _RxOfflineBanner(),
+                      const SizedBox(height: 10),
+                    ],
+                    // The last hour: pages that reach the server after the
+                    // deadline are refused, so send everything now.
+                    if (rxClosingSoon(a)) ...[
+                      _RxNote(
+                          icon: Icons.timer_outlined,
+                          tone: _RxNoteTone.warning,
+                          text:
+                              'Less than an hour left. Send all pages now: the server refuses pages after ${_rxClock(kenyaTime(a.rx?.closesAt ?? ServerClock.now()))}.'),
+                      const SizedBox(height: 10),
+                    ],
+                    _RxPatientCard(
+                        appointment: a,
+                        api: c.read<DoctorCubit>().repo.api,
+                        onHistory: () => Navigator.push(
+                            c,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    HistoryPage(appointmentId: a.id)))),
+                    const SizedBox(height: 10),
+                    const _RxNote(
+                        icon: Icons.warning_amber_rounded,
+                        tone: _RxNoteTone.warning,
+                        text: 'Changing consultation clears pages and notes.'),
+                    const SizedBox(height: 18),
+                    const Row(children: [
+                      Expanded(
+                          child: Text('Capture Pages (Max 5)',
                               style: TextStyle(
-                                  fontWeight: FontWeight.w700, fontSize: 12)),
-                          const SizedBox(height: 6),
-                          TextField(
-                              controller: notes,
-                              maxLines: 3,
-                              maxLength: 1000,
-                              style: const TextStyle(fontSize: 12.5),
-                              decoration: const InputDecoration(
-                                  hintText:
-                                      'e.g. Take after meals with warm water…',
-                                  isDense: true,
-                                  counterText: '')),
-                          if (profile != null) ...[
-                            const SizedBox(height: 14),
-                            _RxPadFooter(profile: profile)
-                          ],
-                          const SizedBox(height: 14),
-                          SizedBox(
-                              width: double.infinity,
-                              child: FilledButton(
-                                  onPressed: dispatching ? null : dispatch,
-                                  child: dispatching
-                                      ? const SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.white))
-                                      // allDone here means every page is
-                                      // stored but completion did not go
-                                      // through yet (the screen resets on
-                                      // success).
-                                      : Text(allDone
-                                          ? 'Finish dispatch'
-                                          : failedCount > 0
-                                              ? 'Retry failed pages'
-                                              : 'Dispatch Prescription to Patient'))),
-                          if (pages.isNotEmpty &&
-                              c.read<DoctorCubit>().repo.isOffline)
-                            const Padding(
-                                padding: EdgeInsets.only(top: 8),
-                                child: Text(
-                                    'NOT SENT — internet connection required.',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: DoctorTokens.navy))),
+                      Icon(Icons.info_outline,
+                          size: 15, color: DoctorTokens.slate),
+                      SizedBox(width: 4),
+                      Text('Handwritten Rx only',
+                          style: TextStyle(
+                              fontSize: 12, color: DoctorTokens.slate)),
+                    ]),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(
+                          child: _RxSourceTile(
+                              icon: Icons.camera_alt_outlined,
+                              label: 'Camera',
+                              hint: '(one photo)',
+                              onTap: full
+                                  ? null
+                                  : () => pick(ImageSource.camera))),
+                      const SizedBox(width: 8),
+                      Expanded(
+                          child: _RxSourceTile(
+                              icon: Icons.photo_library_outlined,
+                              label: 'Gallery',
+                              hint: '(multiple)',
+                              onTap: full
+                                  ? null
+                                  : () => pick(ImageSource.gallery))),
+                      const SizedBox(width: 8),
+                      Expanded(
+                          child: _RxSourceTile(
+                              icon: Icons.insert_drive_file_outlined,
+                              label: 'Choose File',
+                              hint: '(JPG, PNG, PDF)',
+                              onTap: full ? null : pickFile)),
+                    ]),
+                    const SizedBox(height: 14),
+                    Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          for (var i = 0; i < _maxRxPages; i++) ...[
+                            if (i > 0) const SizedBox(width: 6),
+                            Expanded(
+                                child: i < pages.length
+                                    ? _RxPageSlot(
+                                        page: pages[i],
+                                        index: i,
+                                        onRetry: () => _uploadPage(pages[i]),
+                                        onRemove: () => remove(pages[i]))
+                                    : _RxEmptySlot(
+                                        index: i,
+                                        onTap: full ? null : _chooseSource)),
+                          ]
+                        ]),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(
+                          child: Text.rich(TextSpan(
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: DoctorTokens.fieldText),
+                              children: [
+                            TextSpan(
+                                text: '${pages.length}/$_maxRxPages pages'),
+                            if (failedCount > 0)
+                              TextSpan(
+                                  text: ' · $failedCount failed',
+                                  style: const TextStyle(
+                                      color: DoctorTokens.danger))
+                            else if (doneCount > 0)
+                              TextSpan(text: ' · $doneCount sent'),
+                          ]))),
+                      const Text('(Max 5 pages)',
+                          style: TextStyle(
+                              fontSize: 12, color: DoctorTokens.textSub)),
+                    ]),
+                    const SizedBox(height: 16),
+                    ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: notes,
+                        builder: (_, value, __) => Row(children: [
+                              const Expanded(
+                                  child: Text.rich(TextSpan(children: [
+                                TextSpan(
+                                    text: 'Advice for the Patient ',
                                     style:
-                                        TextStyle(color: DoctorTokens.danger)))
-                        ]))
-                  ]))
-            ])));
+                                        TextStyle(fontWeight: FontWeight.w800)),
+                                TextSpan(
+                                    text: '(Optional)',
+                                    style:
+                                        TextStyle(color: DoctorTokens.slate)),
+                              ]))),
+                              Text('${value.text.characters.length}/1000',
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      color: DoctorTokens.textSub)),
+                            ])),
+                    const SizedBox(height: 8),
+                    TextField(
+                        controller: notes,
+                        enabled: !dispatching,
+                        minLines: 3,
+                        maxLines: 5,
+                        maxLength: 1000,
+                        style: const TextStyle(fontSize: 13.5, height: 1.4),
+                        decoration: InputDecoration(
+                            hintText: 'e.g. Take after meals with warm water…',
+                            counterText: '',
+                            filled: true,
+                            fillColor: DoctorTokens.surface,
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: DoctorTokens.border)),
+                            enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                    color: DoctorTokens.border)))),
+                    if (profile != null) ...[
+                      const SizedBox(height: 12),
+                      _RxPadCard(profile: profile),
+                    ],
+                    const SizedBox(height: 12),
+                    if (failedCount > 0)
+                      const _RxNote(
+                          icon: Icons.info_outline,
+                          tone: _RxNoteTone.info,
+                          text:
+                              'Only failed pages will be resent. Already-sent pages will not be sent again.')
+                    else
+                      const _RxNote(
+                          icon: Icons.lock_outline,
+                          tone: _RxNoteTone.plain,
+                          text:
+                              'Unsent photos are removed from this device when you leave this screen.'),
+                  ])),
+        ]);
+  }
+
+  Widget _dispatchButton() {
+    final failedCount =
+        pages.where((p) => p.status == _PageStatus.failed).length;
+    final allDone =
+        pages.isNotEmpty && pages.every((p) => p.status == _PageStatus.done);
+    // allDone means every page is stored but completion did not go through
+    // yet (the screen resets on success).
+    final (IconData icon, String label) = allDone
+        ? (Icons.task_alt, 'Finish Dispatch')
+        : failedCount > 0
+            ? (Icons.refresh, 'Retry Failed Pages')
+            : (Icons.send_outlined, 'Dispatch Prescription to Patient');
+    return SizedBox(
+        height: 52,
+        child: FilledButton(
+            onPressed: dispatching ? null : dispatch,
+            style: FilledButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
+            child: dispatching
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
+                : Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(icon, size: 20),
+                    const SizedBox(width: 10),
+                    Flexible(
+                        child: Text(label,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 15.5, fontWeight: FontWeight.w800))),
+                  ])));
   }
 }
 
-class _RxMetaBar extends StatelessWidget {
-  const _RxMetaBar({required this.appointment});
-  final AppointmentDto appointment;
+/// Where a completed consultation stands for Smart Rx (product owner,
+/// 2026-11-24: the list shows completed consultations only; an ongoing one is
+/// prescribed from the consultation itself).
+enum _RxKind { awaiting, locked }
+
+/// `awaiting`: completed in the last 24 hours, no decision yet; `locked`:
+/// the decision is recorded (last 48 hours, greyed out); `null`: not shown.
+@visibleForTesting
+String? rxKindName(AppointmentDto a, [DateTime? now]) =>
+    _rxKindOf(a, now)?.name;
+
+_RxKind? _rxKindOf(AppointmentDto a, [DateTime? now]) {
+  final at = now ?? ServerClock.now();
+  if (rxWindowOpen(a, now)) return _RxKind.awaiting;
+  if (a.rxDecided) {
+    final ended = DateTime.tryParse(a.completedAt ?? '') ?? a.end;
+    if (ended != null &&
+        at.toUtc().difference(ended.toUtc()) < const Duration(hours: 48)) {
+      return _RxKind.locked;
+    }
+  }
+  return null;
+}
+
+enum _RxFilter {
+  all('All', null),
+  awaiting('Awaiting Rx', _RxKind.awaiting),
+  locked('Locked', _RxKind.locked);
+
+  const _RxFilter(this.label, this.kind);
+  final String label;
+  final _RxKind? kind;
+}
+
+const _rxPurple = Color(0xFF6D28D9);
+const _rxPurpleLight = Color(0xFFEDE9FE);
+const _rxGreenSoft = Color(0xFFE7F5EE);
+
+String _rxInitials(String? name) {
+  final parts = (name ?? '')
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((p) => p.isNotEmpty && p.toLowerCase() != 'dr.')
+      .toList();
+  if (parts.isEmpty) return '?';
+  return (parts.first[0] + (parts.length > 1 ? parts.last[0] : ''))
+      .toUpperCase();
+}
+
+const _rxMonths = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec'
+];
+
+String _rxClock(DateTime t) {
+  final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
+  return '${h.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')} '
+      '${t.hour < 12 ? 'AM' : 'PM'}';
+}
+
+/// "Today, 10:30 AM", "Yesterday, 04:15 PM" or "8 Nov, 09:00 AM", in Nairobi
+/// time.
+@visibleForTesting
+String rxWhen(DateTime? instant, {DateTime? now}) {
+  if (instant == null) return '';
+  final t = kenyaTime(instant);
+  final n = kenyaTime(now ?? DateTime.now());
+  final day = DateTime(t.year, t.month, t.day);
+  final today = DateTime(n.year, n.month, n.day);
+  final diff = today.difference(day).inDays;
+  final prefix = diff == 0
+      ? 'Today'
+      : diff == 1
+          ? 'Yesterday'
+          : '${t.day} ${_rxMonths[t.month - 1]}';
+  return '$prefix, ${_rxClock(t)}';
+}
+
+String _rxDate(DateTime instant) {
+  final t = kenyaTime(instant);
+  return '${t.day} ${_rxMonths[t.month - 1]} ${t.year}';
+}
+
+class _RxTopBar extends StatelessWidget {
+  const _RxTopBar({required this.actions});
+  final List<Widget> actions;
   @override
   Widget build(BuildContext c) {
-    final today = DateTime.now();
-    final date = '${today.year}-${today.month.toString().padLeft(2, '0')}-'
-        '${today.day.toString().padLeft(2, '0')}';
-    Widget cell(String label, String value) => Expanded(
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style:
-                  const TextStyle(fontSize: 9.5, color: DoctorTokens.textSub)),
-          const SizedBox(height: 2),
-          Text(value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-                  const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700))
-        ]));
-    return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-            color: DoctorTokens.surfaceSubtle,
-            borderRadius: BorderRadius.circular(10)),
+    final profile = c.watch<DoctorCubit>().state.profile;
+    return Padding(
+        padding: const EdgeInsets.fromLTRB(18, 8, 12, 6),
         child: Row(children: [
-          cell('PATIENT', appointment.patientName ?? 'Patient'),
-          cell('DATE', date),
-          cell('TRACKING', appointment.number ?? appointment.id)
+          const AfyaLogoMark(size: 36),
+          const SizedBox(width: 8),
+          const Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                Text('AfyaMkononi',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: DoctorTokens.navy)),
+                Text('Doctor App',
+                    style: TextStyle(fontSize: 12, color: DoctorTokens.slate)),
+              ])),
+          ...actions,
+          const SizedBox(width: 4),
+          InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () => Navigator.push(
+                  c, MaterialPageRoute(builder: (_) => const ProfilePage())),
+              child: DoctorOwnPhoto(
+                  size: 34,
+                  fallback: Container(
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
+                      decoration: const BoxDecoration(
+                          color: DoctorTokens.primary, shape: BoxShape.circle),
+                      child: Text(_rxInitials(profile?.name),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white))))),
         ]));
   }
 }
 
-class _RxPagesStrip extends StatelessWidget {
-  const _RxPagesStrip(
-      {required this.pages, required this.onRemove, required this.onRetry});
-  final List<_RxPage> pages;
-  final ValueChanged<_RxPage> onRemove;
-  final ValueChanged<_RxPage> onRetry;
+class _RxHero extends StatelessWidget {
+  const _RxHero();
   @override
-  Widget build(BuildContext c) => SizedBox(
-      height: 92,
-      child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: pages.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 8),
-          itemBuilder: (_, i) => _RxPageThumb(
-              page: pages[i],
-              index: i,
-              onRemove: () => onRemove(pages[i]),
-              onRetry: () => onRetry(pages[i]))));
+  Widget build(BuildContext c) => Row(children: [
+        Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+                color: DoctorTokens.primary,
+                borderRadius: BorderRadius.circular(16)),
+            child: const Icon(Icons.photo_camera_outlined,
+                color: Colors.white, size: 30)),
+        const SizedBox(width: 14),
+        const Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Smart Rx',
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: DoctorTokens.navy)),
+          Text('Scanner & Dispatch',
+              style: TextStyle(fontSize: 16, color: DoctorTokens.fieldText)),
+        ])),
+      ]);
 }
 
-class _RxPageThumb extends StatelessWidget {
-  const _RxPageThumb(
-      {required this.page,
-      required this.index,
-      required this.onRemove,
-      required this.onRetry});
-  final _RxPage page;
-  final int index;
-  final VoidCallback onRemove, onRetry;
+enum _RxNoteTone { brand, warning, info, neutral, plain }
+
+class _RxNote extends StatelessWidget {
+  const _RxNote({required this.icon, required this.text, required this.tone});
+  final IconData icon;
+  final String text;
+  final _RxNoteTone tone;
   @override
-  Widget build(BuildContext c) => SizedBox(
-      width: 78,
-      child: Stack(clipBehavior: Clip.none, children: [
-        Container(
-            width: 78,
-            height: 78,
-            decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: page.status == _PageStatus.failed
-                        ? DoctorTokens.danger
-                        : DoctorTokens.border,
-                    width: page.status == _PageStatus.failed ? 1.5 : 1)),
-            clipBehavior: Clip.antiAlias,
-            child: page.isPdf
-                ? const ColoredBox(
-                    color: DoctorTokens.surfaceSubtle,
-                    child: Center(
-                        child: Icon(Icons.picture_as_pdf,
-                            color: DoctorTokens.muted)))
-                : Image.file(File(page.file.path),
-                    fit: BoxFit.cover,
-                    // A `done` page's on-disk file is deleted immediately
-                    // after a successful upload (PHI lifecycle cleanup); the
-                    // thumbnail falls back to a status icon rather than
-                    // surfacing a raw file-not-found error.
-                    errorBuilder: (_, __, ___) => ColoredBox(
-                        color: DoctorTokens.surfaceSubtle,
-                        child: Center(
-                            child: Icon(
-                                page.status == _PageStatus.done
-                                    ? Icons.check_circle
-                                    : Icons.image_not_supported,
-                                color: DoctorTokens.muted))))),
-        Positioned(
-            left: 4,
-            bottom: 4,
-            child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: .55),
-                    borderRadius: BorderRadius.circular(4)),
-                child: Text('${index + 1}',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700)))),
-        if (page.status == _PageStatus.uploading)
-          Positioned.fill(
-              child: ColoredBox(
-                  color: const Color(0x66000000),
-                  child: Center(
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                            // Real upload progress from `onSendProgress`
-                            // (bytes sent / total) once known; `null`
-                            // renders Flutter's own indeterminate
-                            // animation for the brief window before the
-                            // first progress event arrives.
-                            value: page.progress)),
-                    if (page.progress != null) ...[
-                      const SizedBox(height: 4),
-                      Text('${(page.progress! * 100).round()}%',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700))
-                    ]
-                  ])))),
-        if (page.status == _PageStatus.done)
-          const Positioned(
-              right: 2,
-              top: 2,
-              child:
-                  Icon(Icons.check_circle, color: Color(0xFF10B981), size: 18)),
-        if (page.status == _PageStatus.failed)
-          Positioned(
-              right: 2,
-              top: 2,
-              child: InkWell(
-                  onTap: onRetry,
-                  child: const Icon(Icons.error, color: Colors.red, size: 18))),
-        if (page.status != _PageStatus.uploading)
-          Positioned(
-              left: -6,
-              top: -6,
-              child: InkWell(
-                  onTap: onRemove,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                      width: 20,
-                      height: 20,
-                      decoration: const BoxDecoration(
-                          color: DoctorTokens.text, shape: BoxShape.circle),
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.close,
-                          size: 13, color: Colors.white))))
+  Widget build(BuildContext c) {
+    final (Color bg, Color fg) = switch (tone) {
+      _RxNoteTone.brand => (_rxGreenSoft, DoctorTokens.primaryDark),
+      _RxNoteTone.warning => (
+          DoctorTokens.warningLight,
+          const Color(0xFFB45309)
+        ),
+      _RxNoteTone.info => (DoctorTokens.infoLight, DoctorTokens.info),
+      _RxNoteTone.neutral => (DoctorTokens.surfaceSubtle, DoctorTokens.slate),
+      _RxNoteTone.plain => (Colors.transparent, DoctorTokens.slate),
+    };
+    return Container(
+        padding: EdgeInsets.symmetric(
+            horizontal: tone == _RxNoteTone.plain ? 4 : 12,
+            vertical: tone == _RxNoteTone.plain ? 2 : 10),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 18, color: fg),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(text,
+                  style: const TextStyle(
+                      fontSize: 12.5,
+                      height: 1.4,
+                      color: DoctorTokens.fieldText))),
+        ]));
+  }
+}
+
+class _RxFilterChip extends StatelessWidget {
+  const _RxFilterChip(
+      {required this.label, required this.selected, required this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext c) => InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(DoctorTokens.chipRadius),
+      child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+              color: selected ? DoctorTokens.primary : DoctorTokens.surface,
+              borderRadius: BorderRadius.circular(DoctorTokens.chipRadius),
+              border: Border.all(
+                  color:
+                      selected ? DoctorTokens.primary : DoctorTokens.border)),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : DoctorTokens.fieldText))));
+}
+
+class _RxChip extends StatelessWidget {
+  const _RxChip(this.label, this.fg, this.bg);
+  final String label;
+  final Color fg, bg;
+  @override
+  Widget build(BuildContext c) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      child: Text(label,
+          style:
+              TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)));
+}
+
+class _RxAvatar extends StatelessWidget {
+  const _RxAvatar(
+      {required this.appointment, required this.api, this.size = 44});
+  final AppointmentDto appointment;
+  final ApiClient api;
+  final double size;
+  @override
+  Widget build(BuildContext c) => PersonPhoto(
+      api: api,
+      path: appointmentCounterpartPhotoPath(appointment.id),
+      size: size,
+      fallback: Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration:
+              const BoxDecoration(color: _rxGreenSoft, shape: BoxShape.circle),
+          child: Text(_rxInitials(appointment.patientName),
+              style: TextStyle(
+                  fontSize: size * .34,
+                  fontWeight: FontWeight.w800,
+                  color: DoctorTokens.primaryDark))));
+}
+
+class _RxConsultationTile extends StatelessWidget {
+  const _RxConsultationTile(
+      {required this.appointment,
+      required this.kind,
+      required this.selected,
+      required this.api,
+      required this.onTap});
+  final AppointmentDto appointment;
+  final _RxKind kind;
+  final bool selected;
+  final ApiClient api;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext c) {
+    final a = appointment;
+    final locked = kind == _RxKind.locked;
+    final hours = rxHoursLeft(a);
+    final List<Widget> chips = switch (kind) {
+      _RxKind.locked => const [],
+      _RxKind.awaiting => [
+          const _RxChip(
+              'Completed', DoctorTokens.slate, DoctorTokens.surfaceSubtle),
+          if (hours != null) ...[
+            const SizedBox(height: 4),
+            _RxChip(hours <= 1 ? '< 1 h left' : '$hours h left', _rxPurple,
+                _rxPurpleLight),
+          ],
+        ],
+    };
+    return Opacity(
+        opacity: locked ? .62 : 1,
+        child: Material(
+            color: locked ? DoctorTokens.surfaceSubtle : DoctorTokens.surface,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: selected
+                                ? DoctorTokens.primary
+                                : DoctorTokens.border,
+                            width: selected ? 1.6 : 1)),
+                    child: Row(children: [
+                      _RxAvatar(appointment: a, api: api),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(a.patientName ?? 'Patient',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: DoctorTokens.navy)),
+                            const SizedBox(height: 3),
+                            Row(children: [
+                              Icon(
+                                  a.isChat
+                                      ? Icons.chat_bubble_outline
+                                      : Icons.videocam_outlined,
+                                  size: 15,
+                                  color: DoctorTokens.slate),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                  child: Text(
+                                      a.isChat
+                                          ? 'Chat Consultation'
+                                          : 'Video Consultation',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 12.5,
+                                          color: DoctorTokens.fieldText))),
+                            ]),
+                            const SizedBox(height: 3),
+                            Row(children: [
+                              const Icon(Icons.schedule,
+                                  size: 14, color: DoctorTokens.slate),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                  child: Text(rxWhen(a.start),
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 12.5,
+                                          color: DoctorTokens.fieldText))),
+                            ]),
+                          ])),
+                      const SizedBox(width: 8),
+                      if (locked)
+                        SizedBox(
+                            width: 112,
+                            child: Row(children: [
+                              const Icon(Icons.lock_outline,
+                                  size: 18, color: DoctorTokens.slate),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                  child: Text(
+                                      a.clinicalOutcome == 'COMPLETED_WITH_RX'
+                                          ? 'Sent. Tap to add a correction note.'
+                                          : 'Already recorded and cannot be changed.',
+                                      style: const TextStyle(
+                                          fontSize: 11.5,
+                                          color: DoctorTokens.slate))),
+                            ]))
+                      else ...[
+                        // Capped so the patient details keep room on narrow
+                        // phones and at large text sizes; chips shrink to fit.
+                        ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 104),
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  for (final chip in chips)
+                                    FittedBox(
+                                        fit: BoxFit.scaleDown, child: chip)
+                                ])),
+                        const SizedBox(width: 10),
+                        Icon(
+                            selected
+                                ? Icons.radio_button_checked
+                                : Icons.radio_button_unchecked,
+                            color: selected
+                                ? DoctorTokens.primary
+                                : DoctorTokens.border,
+                            size: 24),
+                      ],
+                    ])))));
+  }
+}
+
+class _RxOfflineBanner extends StatelessWidget {
+  const _RxOfflineBanner();
+  @override
+  Widget build(BuildContext c) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+          color: DoctorTokens.roseLight,
+          borderRadius: BorderRadius.circular(12)),
+      child: const Row(children: [
+        Icon(Icons.wifi_off, color: DoctorTokens.danger, size: 22),
+        SizedBox(width: 10),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('NOT SENT — internet connection required.',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: DoctorTokens.danger)),
+          SizedBox(height: 2),
+          Text(
+              "You're offline. Connect to the internet and retry failed pages.",
+              style: TextStyle(fontSize: 12, color: DoctorTokens.fieldText)),
+        ])),
       ]));
 }
 
-class _RxPadFooter extends StatelessWidget {
-  const _RxPadFooter({required this.profile});
+class _RxPatientCard extends StatelessWidget {
+  const _RxPatientCard(
+      {required this.appointment, required this.api, required this.onHistory});
+  final AppointmentDto appointment;
+  final ApiClient api;
+  final VoidCallback onHistory;
+  @override
+  Widget build(BuildContext c) {
+    Widget cell(String label, String value, {int flex = 1}) => Expanded(
+        flex: flex,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 10,
+                  letterSpacing: .4,
+                  color: DoctorTokens.textSub)),
+          const SizedBox(height: 2),
+          Text(value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 12.5,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                  color: DoctorTokens.navy)),
+        ]));
+    return Container(
+        decoration: BoxDecoration(
+            color: DoctorTokens.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: DoctorTokens.border)),
+        child: Column(children: [
+          Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(children: [
+                _RxAvatar(appointment: appointment, api: api, size: 40),
+                const SizedBox(width: 10),
+                cell('PATIENT', appointment.patientName ?? 'Patient', flex: 4),
+                const SizedBox(width: 8),
+                cell('DATE', 'Today,\n${_rxDate(DateTime.now())}', flex: 4),
+                const SizedBox(width: 8),
+                cell('TRACKING',
+                    '#${appointment.number ?? (appointment.id.length > 8 ? appointment.id.substring(0, 8) : appointment.id)}',
+                    flex: 5),
+              ])),
+          const Divider(height: 1, color: DoctorTokens.border),
+          InkWell(
+              onTap: onHistory,
+              borderRadius:
+                  const BorderRadius.vertical(bottom: Radius.circular(14)),
+              child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  child: Row(children: [
+                    Icon(Icons.folder_open_outlined,
+                        size: 19, color: DoctorTokens.primaryDark),
+                    SizedBox(width: 10),
+                    Expanded(
+                        child: Text('Patient Case History',
+                            style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: DoctorTokens.primaryDark))),
+                    Icon(Icons.chevron_right, color: DoctorTokens.primaryDark),
+                  ]))),
+        ]));
+  }
+}
+
+class _RxSourceTile extends StatelessWidget {
+  const _RxSourceTile(
+      {required this.icon,
+      required this.label,
+      required this.hint,
+      required this.onTap});
+  final IconData icon;
+  final String label, hint;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext c) => Opacity(
+      opacity: onTap == null ? .5 : 1,
+      child: Material(
+          color: _rxGreenSoft,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(14),
+              child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+                  child: Column(children: [
+                    Icon(icon, color: DoctorTokens.primaryDark, size: 28),
+                    const SizedBox(height: 6),
+                    Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: DoctorTokens.navy)),
+                    Text(hint,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 11, color: DoctorTokens.slate)),
+                  ])))));
+}
+
+class _RxPageSlot extends StatelessWidget {
+  const _RxPageSlot(
+      {required this.page,
+      required this.index,
+      required this.onRetry,
+      required this.onRemove});
+  final _RxPage page;
+  final int index;
+  final VoidCallback onRetry, onRemove;
+  @override
+  Widget build(BuildContext c) {
+    final (Color border, Color label, String text) = switch (page.status) {
+      _PageStatus.done => (
+          DoctorTokens.primary,
+          DoctorTokens.fieldText,
+          'Sent'
+        ),
+      _PageStatus.uploading => (
+          DoctorTokens.info,
+          DoctorTokens.info,
+          'Uploading…'
+        ),
+      _PageStatus.failed => (
+          DoctorTokens.danger,
+          DoctorTokens.danger,
+          'Failed\nTap to retry'
+        ),
+      _PageStatus.pending => (
+          DoctorTokens.border,
+          DoctorTokens.info,
+          'Pending…'
+        ),
+    };
+    final Widget badge = switch (page.status) {
+      _PageStatus.done =>
+        const Icon(Icons.check_circle, color: DoctorTokens.primary, size: 22),
+      _PageStatus.failed =>
+        const Icon(Icons.error, color: DoctorTokens.danger, size: 22),
+      _PageStatus.pending =>
+        const Icon(Icons.schedule, color: DoctorTokens.info, size: 22),
+      _PageStatus.uploading => SizedBox(
+          width: 34,
+          height: 34,
+          child: Stack(alignment: Alignment.center, children: [
+            CircularProgressIndicator(
+                strokeWidth: 3,
+                // Real byte progress once known; indeterminate before.
+                value: page.progress,
+                color: DoctorTokens.info,
+                backgroundColor: Colors.white),
+            if (page.progress != null)
+              Text('${(page.progress! * 100).round()}%',
+                  style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: DoctorTokens.info)),
+          ])),
+    };
+    final failed = page.status == _PageStatus.failed;
+    return GestureDetector(
+        onTap: failed ? onRetry : null,
+        child: Column(children: [
+          AspectRatio(
+              aspectRatio: .86,
+              child: Stack(clipBehavior: Clip.none, children: [
+                Positioned.fill(
+                    child: Container(
+                        decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: border, width: 1.6)),
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(fit: StackFit.expand, children: [
+                          page.isPdf
+                              ? const ColoredBox(
+                                  color: DoctorTokens.surfaceSubtle,
+                                  child: Icon(Icons.picture_as_pdf,
+                                      color: DoctorTokens.muted))
+                              : Image.file(File(page.file.path),
+                                  fit: BoxFit.cover,
+                                  // A sent page's file is deleted right after
+                                  // upload (PHI clean-up); show a plain tile.
+                                  errorBuilder: (_, __, ___) =>
+                                      const ColoredBox(
+                                          color: DoctorTokens.surfaceSubtle)),
+                          if (failed)
+                            ColoredBox(
+                                color:
+                                    DoctorTokens.danger.withValues(alpha: .18)),
+                          Center(child: badge),
+                        ]))),
+                if (page.status == _PageStatus.pending || failed)
+                  Positioned(
+                      right: -6,
+                      top: -6,
+                      child: InkWell(
+                          onTap: onRemove,
+                          customBorder: const CircleBorder(),
+                          child: Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: const BoxDecoration(
+                                  color: DoctorTokens.navy,
+                                  shape: BoxShape.circle),
+                              child: Icon(Icons.close,
+                                  size: 13,
+                                  color: Colors.white,
+                                  semanticLabel: 'Remove page ${index + 1}')))),
+              ])),
+          const SizedBox(height: 5),
+          Text('${index + 1}',
+              style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: DoctorTokens.navy)),
+          Text(text,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 10.5, height: 1.25, color: label)),
+        ]));
+  }
+}
+
+class _RxEmptySlot extends StatelessWidget {
+  const _RxEmptySlot({required this.index, required this.onTap});
+  final int index;
+  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext c) => GestureDetector(
+      onTap: onTap,
+      child: Column(children: [
+        AspectRatio(
+            aspectRatio: .86,
+            child: Container(
+                decoration: BoxDecoration(
+                    color: DoctorTokens.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: DoctorTokens.border, width: 1.4)),
+                child: Center(
+                    child: Icon(Icons.add_circle_outline,
+                        size: 26,
+                        color: onTap == null
+                            ? DoctorTokens.border
+                            : DoctorTokens.slate,
+                        semanticLabel: 'Add page ${index + 1}')))),
+        const SizedBox(height: 5),
+        Text('${index + 1}',
+            style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: DoctorTokens.navy)),
+        const Text('Add page',
+            style: TextStyle(fontSize: 10.5, color: DoctorTokens.slate)),
+      ]));
+}
+
+class _RxPadCard extends StatelessWidget {
+  const _RxPadCard({required this.profile});
   final ProfileDto profile;
   @override
   Widget build(BuildContext c) => Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-          color: DoctorTokens.surfaceSubtle,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: DoctorTokens.border)),
+          color: _rxGreenSoft, borderRadius: BorderRadius.circular(14)),
       child: Row(children: [
-        const Text('℞',
-            style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: DoctorTokens.primaryDark)),
-        const SizedBox(width: 10),
+        // Drawn as text: the app font has no "℞" glyph.
+        const Text.rich(
+            TextSpan(children: [
+              TextSpan(
+                  text: 'R',
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800)),
+              TextSpan(
+                  text: 'x',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+            ]),
+            style: TextStyle(color: DoctorTokens.primaryDark, height: 1)),
+        const SizedBox(width: 14),
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(profile.name,
-              style:
-                  const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
-          Text('KMPDC Reg #${profile.license}',
-              style:
-                  const TextStyle(fontSize: 10.5, color: DoctorTokens.textSub))
-        ]))
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: DoctorTokens.navy)),
+          Text('KMPDC Reg. No. ${profile.license}',
+              style: const TextStyle(
+                  fontSize: 12.5, color: DoctorTokens.fieldText)),
+        ])),
       ]));
+}
+
+/// Test-only: the page strip in each state, for screenshots of the Smart Rx
+/// board (statuses: pending, uploading, done, failed; null = empty slot).
+@visibleForTesting
+Widget rxPageSlotsPreview(List<String?> statuses, {double? progress}) {
+  final slots = <Widget>[];
+  for (var i = 0; i < statuses.length; i++) {
+    final status = statuses[i];
+    if (i > 0) slots.add(const SizedBox(width: 6));
+    if (status == null) {
+      slots.add(Expanded(child: _RxEmptySlot(index: i, onTap: () {})));
+      continue;
+    }
+    final page = _RxPage(XFile('preview-$i.jpg'))
+      ..status = _PageStatus.values.byName(status)
+      ..progress = status == 'uploading' ? progress : null;
+    slots.add(Expanded(
+        child: _RxPageSlot(
+            page: page, index: i, onRetry: () {}, onRemove: () {})));
+  }
+  return Row(crossAxisAlignment: CrossAxisAlignment.start, children: slots);
+}
+
+/// Test-only: the "Prescription Submitted!" summary, for screenshots.
+@visibleForTesting
+Widget rxSubmittedPreview(
+        {required String patient,
+        required int pages,
+        required DateTime at,
+        bool lateRx = false,
+        String? outcome}) =>
+    _RxSubmittedDialog(
+        receipt: _RxReceipt(
+            patient: patient,
+            pages: pages,
+            at: at,
+            lateRx: lateRx,
+            outcome: outcome),
+        allowAnother: true);
+
+class _RxReceipt {
+  const _RxReceipt(
+      {required this.patient,
+      required this.pages,
+      required this.at,
+      required this.lateRx,
+      required this.outcome});
+  final String patient;
+  final int pages;
+  final DateTime at;
+
+  /// A late Rx for an already-completed consultation keeps its outcome.
+  final bool lateRx;
+  final String? outcome;
+}
+
+class _RxSubmittedDialog extends StatelessWidget {
+  const _RxSubmittedDialog({required this.receipt, required this.allowAnother});
+  final _RxReceipt receipt;
+  final bool allowAnother;
+  @override
+  Widget build(BuildContext c) {
+    final status = !receipt.lateRx
+        ? 'Completed with prescription'
+        : switch (receipt.outcome) {
+            'REFERRED' => 'Referred · prescription added',
+            'ESCALATED' => 'Escalated · prescription added',
+            _ => 'Completed · prescription added',
+          };
+    Widget row(IconData icon, String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 19, color: DoctorTokens.slate),
+          const SizedBox(width: 10),
+          SizedBox(
+              width: 96,
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 13.5, color: DoctorTokens.fieldText))),
+          Expanded(
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: DoctorTokens.navy))),
+        ]));
+    final t = kenyaTime(receipt.at);
+    return Dialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                  width: 72,
+                  height: 72,
+                  decoration: const BoxDecoration(
+                      color: _rxGreenSoft, shape: BoxShape.circle),
+                  child: const Icon(Icons.check,
+                      size: 44, color: DoctorTokens.primary)),
+              const SizedBox(height: 14),
+              const Text('Prescription Submitted!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: DoctorTokens.navy)),
+              const SizedBox(height: 4),
+              Text('Added to ${receipt.patient}’s health record.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 14, color: DoctorTokens.fieldText)),
+              const SizedBox(height: 16),
+              Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: DoctorTokens.border)),
+                  child: Column(children: [
+                    row(Icons.person_outline, 'Patient', receipt.patient),
+                    const Divider(height: 1, color: DoctorTokens.border),
+                    row(Icons.layers_outlined, 'Pages Sent',
+                        '${receipt.pages} page${receipt.pages == 1 ? '' : 's'}'),
+                    const Divider(height: 1, color: DoctorTokens.border),
+                    row(Icons.calendar_month_outlined, 'Date & Time',
+                        'Today, ${_rxDate(receipt.at)} at ${_rxClock(t)}'),
+                  ])),
+              const SizedBox(height: 12),
+              Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                      color: _rxGreenSoft,
+                      borderRadius: BorderRadius.circular(14)),
+                  child: Row(children: [
+                    const Icon(Icons.check_circle,
+                        color: DoctorTokens.primary, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          const Text('Consultation status:',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: DoctorTokens.fieldText)),
+                          Text(status,
+                              style: const TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: DoctorTokens.navy)),
+                        ])),
+                  ])),
+              const SizedBox(height: 10),
+              const _RxNote(
+                  icon: Icons.lock_outline,
+                  tone: _RxNoteTone.neutral,
+                  text:
+                      'Once a prescription is sent, the decision is final and cannot be changed.'),
+              const SizedBox(height: 16),
+              SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: FilledButton(
+                      onPressed: () => Navigator.pop(c, false),
+                      style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14))),
+                      child: const Text('Done',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w800)))),
+              if (allowAnother) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: OutlinedButton(
+                        onPressed: () => Navigator.pop(c, true),
+                        style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: DoctorTokens.primary),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14))),
+                        child: const Text('Send Another Prescription',
+                            style: TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w800,
+                                color: DoctorTokens.primaryDark)))),
+              ],
+            ])));
+  }
 }
 
 String _relativeAge(String? iso) {
@@ -5405,13 +6559,8 @@ class _ConsultationState extends State<ConsultationPage> {
                 content:
                     const Text('Choose the outcome recorded by the server.'),
                 actions: [
-                  TextButton(
-                      onPressed: () =>
-                          Navigator.pop(dialogContext, 'ESCALATED'),
-                      child: const Text('Escalate')),
-                  TextButton(
-                      onPressed: () => Navigator.pop(dialogContext, 'REFERRED'),
-                      child: const Text('Refer patient')),
+                  // No referral or escalation (product owner, 2026-11-24):
+                  // every consultation ends with or without a prescription.
                   TextButton(
                       onPressed: () =>
                           Navigator.pop(dialogContext, 'COMPLETED_NO_RX'),
@@ -5507,11 +6656,13 @@ class _ConsultationState extends State<ConsultationPage> {
                       icon: const Icon(Icons.video_call),
                       label: Text(a.joinLockedLabel ?? 'Join video call')),
                   OutlinedButton.icon(
-                      onPressed: () => Navigator.push(
-                          c,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  ScannerPage(initialAppointment: a))),
+                      onPressed: rxDispatchAllowed(a)
+                          ? () => Navigator.push(
+                              c,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      ScannerPage(initialAppointment: a)))
+                          : null,
                       icon: const Icon(Icons.receipt_long),
                       label: const Text('Prescription'))
                 ]),

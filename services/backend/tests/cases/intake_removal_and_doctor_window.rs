@@ -186,6 +186,8 @@ async fn doctor_document_access_ends_20_days_after_consultation(pool: PgPool) {
         .execute(&pool)
         .await
         .unwrap();
+    // A prescription needs a started consultation (2026-11-24).
+    start_consultation(&pool, appointment).await;
     let rx = post(
         &app,
         &format!("/api/v1/consultations/{appointment}/prescription"),
@@ -257,7 +259,8 @@ async fn doctor_document_access_ends_20_days_after_consultation(pool: PgPool) {
         "the client must say access ended, not that there were no files"
     );
 
-    // The patient and Admin keep access.
+    // The patient keeps access; Admin never opens clinical documents, inside
+    // or outside the doctor's window (dd43bd7).
     assert_eq!(
         get(&app, &rx_uri, Some(&patient)).await.status(),
         StatusCode::OK
@@ -270,6 +273,6 @@ async fn doctor_document_access_ends_20_days_after_consultation(pool: PgPool) {
         )
         .await
         .status(),
-        StatusCode::OK
+        StatusCode::FORBIDDEN
     );
 }

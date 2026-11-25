@@ -1,9 +1,10 @@
 // Current Rust DTO fields; no financial or authorization decisions are made here.
 import { joinGate, lockedMessage, type JoinInfo } from './join-window.ts';
+import { serverNow } from './server-clock.ts';
 export type { JoinInfo } from './join-window.ts';
 export type RecordDto = Record<string, unknown>;
 export interface Profile { id: string; user_id: string; full_name: string; license_number: string; license_authority: string; current_hospital: string; primary_specialty: string; is_verified: boolean; professional_verification_status: 'PENDING' | 'VERIFIED' | 'REJECTED'; license_country: string; professional_verification_note?: string | null; qualifications: string[] }
-export interface Appointment { /** Server-derived join eligibility (authoritative policy). */ join?: JoinInfo; queue_actionable?: boolean; id: string; appointment_number: string; patient_id: string; patient_display_name: string; /** Doctor Web redesign: from the RLS-visible patient row, null when not visible. */ patient_age?: number | null; patient_sex?: string | null; modality: string; status: string; doctor_lifecycle: string; start_time: string; end_time: string; history_access_from: string; history_access_until: string | null; history_access_active: boolean; clinical_outcome: string | null; conversation_id?: string | null; chat_expires_at?: string | null; chat_locked?: boolean | null }
+export interface Appointment { /** Server-derived join eligibility (authoritative policy). */ join?: JoinInfo; queue_actionable?: boolean; id: string; appointment_number: string; patient_id: string; patient_display_name: string; /** Doctor Web redesign: from the RLS-visible patient row, null when not visible. */ patient_age?: number | null; patient_sex?: string | null; modality: string; status: string; doctor_lifecycle: string; start_time: string; end_time: string; history_access_from: string; history_access_until: string | null; history_access_active: boolean; clinical_outcome: string | null; completed_at?: string | null; /** The server's prescription decision. */ rx?: RxEligibility | null; conversation_id?: string | null; chat_expires_at?: string | null; chat_locked?: boolean | null }
 export interface Slot { bookable?: boolean; id: string; status: string; start_time: string; end_time: string; appointment_id: string | null; patient_display_name: string | null }
 export interface Conversation { id: string; appointment_id: string; patient_display_name: string; expires_at: string; is_locked: boolean; last_message_at: string | null; modality?: string; appointment_status?: string }
 export interface Message { id: string; sender_id: string; content: string; sent_at: string; attachment_id?: string; attachment?: {id:string;display_name:string;mime_type:string;size_bytes:number}|null }
@@ -32,6 +33,74 @@ export function consultationIntent(a: ActionInput, now=Date.now()): 'chat'|'call
   if (a.modality==='VIDEO' && a.status==='WAITING') return null;
   if (a.modality==='CHAT' && (a.chat_locked || (a.chat_expires_at && Date.parse(a.chat_expires_at)<=now))) return null;
   return a.modality === 'CHAT' ? 'chat' : a.modality === 'VIDEO' ? 'call' : null;
+}
+/** Prescription rule (product owner, 2026-11-24; the server enforces the same
+ * in prescription_service::doctor_rx_allowed). A doctor prescribes only once
+ * the consultation has started — a video call someone has joined
+ * (IN_CONSULTATION) or a chat whose window has opened (chats stay CONFIRMED
+ * until completed) — or within 24 hours after it was completed while no
+ * prescription decision is recorded. Never before; once decided, never again. */
+/** The server's prescription decision (`rx` on the doctor queue,
+ * prescription_service::doctor_rx_decision). The screens display it instead
+ * of re-deriving the rule; the local rule below is only for an older backend. */
+export interface RxEligibility { allowed: boolean; reason: string; message?: string; closes_at?: string | null }
+type RxInput = Pick<Appointment,'modality'|'status'|'start_time'|'end_time'|'clinical_outcome'> & {completed_at?:string|null; join?:JoinInfo; rx?:RxEligibility|null};
+const RX_WINDOW_MS = 24 * 60 * 60 * 1000;
+const decided = (a: RxInput) => a.status === 'COMPLETED' && ['COMPLETED_WITH_RX', 'COMPLETED_NO_RX'].includes(a.clinical_outcome ?? '');
+/** The consultation has started: a video call both apps joined (or
+ * IN_CONSULTATION), or a chat in which both doctor and patient have written. */
+export function rxConsultationStarted(a: RxInput, now = serverNow()): boolean {
+  if (a.rx) return a.status !== 'COMPLETED' && a.rx.allowed;
+  if (a.status === 'IN_CONSULTATION') return true;
+  if (a.modality !== 'CHAT' || !['CONFIRMED', 'WAITING'].includes(a.status)) return false;
+  const opens = Date.parse(a.join?.join_open_at ?? '') || Date.parse(a.start_time) - 15 * 60 * 1000;
+  return Number.isFinite(opens) && now >= opens;
+}
+/** When a completed consultation's 24-hour window closes (server deadline). */
+export function rxClosesAt(a: RxInput): number | null {
+  const server = Date.parse(a.rx?.closes_at ?? '');
+  if (Number.isFinite(server)) return server;
+  const ended = Date.parse(a.completed_at ?? '') || Date.parse(a.end_time);
+  return Number.isFinite(ended) ? ended + RX_WINDOW_MS : null;
+}
+export function rxWindowOpen(a: RxInput, now = serverNow()): boolean {
+  if (a.status !== 'COMPLETED' || decided(a)) return false;
+  if (a.rx && !a.rx.allowed) return false;
+  const closes = rxClosesAt(a);
+  return closes !== null && now < closes;
+}
+export function rxDispatchAllowed(a: RxInput, now = serverNow()): boolean { return rxConsultationStarted(a, now) || rxWindowOpen(a, now); }
+/** Hours left in a completed consultation's 24-hour prescription window. */
+export function rxHoursLeft(a: RxInput, now = serverNow()): number | null {
+  const closes = rxClosesAt(a);
+  if (closes === null) return null;
+  return Math.max(0, Math.ceil((closes - now) / 3600000));
+}
+/** Under an hour left: pages after the deadline are refused. */
+export function rxClosingSoon(a: RxInput, now = serverNow()): boolean {
+  if (a.status !== 'COMPLETED') return false;
+  const closes = rxClosesAt(a);
+  return closes !== null && now < closes && closes - now < 3600000;
+}
+/** The Rx screen's list: completed consultations awaiting a prescription,
+ * fewest hours left first, plus the consultation opened from its room. */
+export function rxCandidates<T extends RxInput & {id:string}>(appointments: T[], opened: T | null, now = serverNow()): T[] {
+  const awaiting = appointments.filter(a => rxWindowOpen(a, now)).sort((x, y) => (rxHoursLeft(x, now) ?? 0) - (rxHoursLeft(y, now) ?? 0));
+  return opened && rxDispatchAllowed(opened, now) && !awaiting.some(a => a.id === opened.id) ? [opened, ...awaiting] : awaiting;
+}
+/** A sent prescription takes correction notes for 7 days (the server decides). */
+export function rxCorrectable(a: RxInput, now = serverNow()): boolean {
+  const ended = Date.parse(a.completed_at ?? '') || Date.parse(a.end_time);
+  return a.status === 'COMPLETED' && a.clinical_outcome === 'COMPLETED_WITH_RX' && Number.isFinite(ended) && now < ended + 7 * RX_WINDOW_MS;
+}
+/** Why [a] cannot take a prescription now (empty when it can). */
+export function rxBlockedReason(a: RxInput & {patient_display_name?:string}, now = serverNow()): string {
+  if (rxDispatchAllowed(a, now)) return '';
+  if (a.rx?.message) return a.rx.message;
+  const who = a.patient_display_name || 'this consultation';
+  if (decided(a)) return `The prescription decision for ${who} is already recorded and cannot be changed.`;
+  if (a.status === 'COMPLETED') return `The 24-hour prescription window for ${who} has closed.`;
+  return `A prescription for ${who} can be sent once the consultation has started.`;
 }
 /** The Start/Join action. A video room is offered only inside the
  * server-authorized join window (opening/closing decided by the backend);

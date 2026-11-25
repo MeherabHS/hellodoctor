@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/network/api_client.dart';
+import 'core/network/app_update_gate.dart';
 import 'core/network/chat_live.dart';
 import 'core/network/screen_refresh.dart';
 import 'core/network/client_error_reporter.dart';
@@ -894,6 +895,8 @@ class _ShellState extends State<DoctorShell> with WidgetsBindingObserver {
       if (!mounted) return;
       context.read<DoctorCubit>().loadAll();
       unawaited(context.read<DoctorCubit>().loadBookingPolicy());
+      unawaited(
+          checkDoctorAppUpdate(context, context.read<DoctorCubit>().repo.api));
       context.read<NotificationCubit>().load();
       // M8-G-13: sequenced, not two independent `unawaited` calls — Android
       // notification channels must exist before FCM can be told to target

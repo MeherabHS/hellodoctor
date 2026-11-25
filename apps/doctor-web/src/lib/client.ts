@@ -1,4 +1,5 @@
 'use client';
+import { observeServerDate } from './server-clock';
 import { createInflightReads } from './inflight.mjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createIncidentReporter, operationContext, IncidentContext } from './client-incidents';
@@ -42,6 +43,7 @@ async function performRequest<T>(path: string, options: RequestInit = {}): Promi
   try {
     const res = await fetch(path, { ...options, credentials: 'same-origin', cache: 'no-store', signal: options.signal ?? controller.signal, headers: { 'Content-Type': 'application/json', 'X-Request-Id':crypto.randomUUID(), 'X-Client-Type':'DOCTOR_WEB', ...options.headers } });
     responseReceived = true;
+    observeServerDate(res.headers.get('Date'));
     if (version !== generation) throw new DOMException('Session changed', 'AbortError');
     const serverScope = res.headers.get('X-Doctor-Scope');
     if (serverScope && scope && serverScope !== scope) {

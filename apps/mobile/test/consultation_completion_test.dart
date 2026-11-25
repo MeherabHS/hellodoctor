@@ -64,8 +64,9 @@ void main() {
     await tester.tap(find.text('Complete consultation'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Escalate'), findsOneWidget);
-    expect(find.text('Refer patient'), findsOneWidget);
+    // No referral or escalation outcomes (product owner, 2026-11-24).
+    expect(find.text('Escalate'), findsNothing);
+    expect(find.text('Refer patient'), findsNothing);
     expect(find.text('Complete without Rx'), findsOneWidget);
     expect(find.text('Complete with Rx'), findsOneWidget);
   });

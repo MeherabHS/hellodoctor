@@ -588,6 +588,18 @@ impl ConsultationService {
         // The same per-consultation lock Rx uploads take, so a page upload
         // and completion serialize: no page can land after COMPLETED.
         appointment_repo::lock_for_document_upload(&mut *tx, appointment_id).await?;
+        // "Completed with prescription" follows the same rule as the pages:
+        // only for a consultation that has started (2026-11-24). An already
+        // completed one replays below as ALREADY_COMPLETED; an appointment
+        // this caller cannot read is left to the SQL function's own refusal.
+        if matches!(outcome, ClinicalOutcome::CompletedWithRx) {
+            if let Some(apt) = appointment_repo::find_by_id(&mut *tx, appointment_id).await? {
+                if apt.status != AppointmentStatus::Completed {
+                    super::PrescriptionService::ensure_doctor_rx_allowed(&mut tx, state, &apt)
+                        .await?;
+                }
+            }
+        }
         Self::complete_in_transaction(&mut tx, ctx, appointment_id, outcome).await?;
         tx.commit().await?;
         Ok(())

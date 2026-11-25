@@ -27,7 +27,12 @@ class PatientDocumentDto {
     this.appointmentNumber,
     this.modality,
     this.consultationStart,
+    this.corrections = const [],
   });
+
+  /// The doctor's correction notes on this prescription (a sent
+  /// prescription cannot change; the doctor adds a note instead).
+  final List<PrescriptionCorrection> corrections;
   final String kind, id, appointmentId;
   final DateTime createdAt;
   final String? mimeType, rxNumber, doctorDisplayName, primarySpecialty;
@@ -57,5 +62,21 @@ class PatientDocumentDto {
         modality: _optionalText(j['modality']),
         consultationStart:
             DateTime.tryParse(_textOf(j['consultation_start']))?.toUtc(),
+        corrections: [
+          if (j['corrections'] is List)
+            for (final c in j['corrections'] as List)
+              if (c is Map && _textOf(c['note']).isNotEmpty)
+                PrescriptionCorrection(
+                    note: _textOf(c['note']),
+                    createdAt:
+                        DateTime.tryParse(_textOf(c['created_at']))?.toLocal()),
+        ],
       );
+}
+
+/// One correction note the doctor added to a sent prescription.
+class PrescriptionCorrection {
+  const PrescriptionCorrection({required this.note, this.createdAt});
+  final String note;
+  final DateTime? createdAt;
 }

@@ -1,6 +1,35 @@
 # HelloDoctor - Current Project Checkpoint
 
-**Checkpoint — 2026-11-22 (resume from here):** The product is feature-complete for its
+**Checkpoint — 2026-11-25 (resume from here):** Running in production on the ARM64 VM for
+**internal use only**: not submitted to Google Play, no pilot users yet. Full status:
+[PROGRESS.md](PROGRESS.md#current-status--2026-11-25).
+
+- **Usage and operations:** payments deferred; production backups off by the owner's decision
+  (nightly dump kit in the repo, not installed); secrets rotated after the 2026-11-22
+  workstation incident and the workstation is clean (2026-11-24). Heavy work (backend suite,
+  image builds, pentest) runs on GitHub only.
+- **Code:** `main` at `1cc550c` (PR #60), CI green; ARM64 images from it published to GHCR,
+  rollout on the VM is the owner's step. PRs #54–#60 merged since 2026-11-22.
+- **Open PR #61** (`feat/doctor-smart-rx-redesign`, 12+ commits): Smart Rx redesign; one
+  server-decided prescription rule (started consultation or 24 hours after, chat needs both
+  sides to have written, video counts both apps' joins); server clock in the apps; 4-hour
+  window reminder; Admin prescription follow-ups; correction notes; refer/escalate removed;
+  minimum Care app build. Security: cross-account sweep over all 226 routes, Semgrep and
+  Trivy in CI, GitHub pentest workflow (attack suite, ZAP, ffuf, sqlmap, MobSF). Fixed: Admin
+  could read consultation chat and open clinical documents; correction notes answered
+  strangers with 200. Migration `20261222000022` (140 total).
+- **In flight:** the backend suite and the first pentest run on PR #61 (label `run-pentest`).
+- **Next:** (1) review the pentest results, merge PR #61, publish images, roll out with the
+  migration; (2) Google Play internal testing (AAB workflow and signing still uncommitted on
+  the workstation), then set `DOCTOR_APP_MIN_BUILD`; (3) pilot.
+- **Decisions in force:** as on 2026-11-22, plus: Smart Rx lists completed consultations
+  only; server time decides; no referral/escalation; prescriptions corrected by note only; no
+  typed/QR prescriptions; Admin never reads consultation chat or opens clinical documents;
+  reminders use the phone clock; backups off for now.
+
+---
+
+**Checkpoint — 2026-11-22 (history):** The product is feature-complete for its
 current scope and running in production on the ARM64 VM. Full status, milestone table and the
 ordered list of what remains: [PROGRESS.md](PROGRESS.md#current-status--2026-11-22).
 

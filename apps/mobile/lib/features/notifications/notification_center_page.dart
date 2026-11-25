@@ -37,7 +37,8 @@ String notificationCategory(String type) {
   if (type == 'NEW_CHAT_MESSAGE') return 'messages';
   if (type.startsWith('BOOKING_') ||
       type.startsWith('CONSULTATION_') ||
-      type == 'PRESCRIPTION_AVAILABLE') {
+      type == 'PRESCRIPTION_AVAILABLE' ||
+      type == 'RX_WINDOW_CLOSING') {
     return 'appointments';
   }
   return 'system';

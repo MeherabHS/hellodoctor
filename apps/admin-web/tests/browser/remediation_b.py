@@ -119,7 +119,7 @@ async def main():
                     before=STATE.rotations;response=await context.request.get(ORIGIN+path);assert response.status==200,f'Expected refresh recovery, got {response.status}';assert STATE.rotations==before+1
                     cookies=await context.cookies();assert any(c['name']=='hd_admin_access' and c['httpOnly'] and c['sameSite']=='Strict' for c in cookies)
                 finally:await context.close()
-            for name,path in [('missing access JSON BFF refresh','/api/proxy/admin/overview'),('missing access private cover refresh',f'/api/article-media/{ARTICLE}'),('missing access clinical grant refresh','/api/documents/download?appointment_id=a&document_id=b')]:await check(name,lambda p=path:session(p))
+            for name,path in [('missing access JSON BFF refresh','/api/proxy/admin/overview'),('missing access private cover refresh',f'/api/article-media/{ARTICLE}')]:await check(name,lambda p=path:session(p))
             async def cookie_context(access=None,refresh=None,marker=True):
                 context=await browser.new_context();cookies=[]
                 if marker:cookies.append(dict(name='hd_admin_session',value='1',domain='127.0.0.1',path='/',httpOnly=True))

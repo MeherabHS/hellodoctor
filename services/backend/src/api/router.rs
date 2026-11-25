@@ -630,6 +630,7 @@ fn protected_routes() -> Router<AppState> {
             "/config/booking-policy",
             get(config_handlers::booking_policy),
         )
+        .route("/config/app-version", get(config_handlers::app_version))
         // Appointments
         .route(
             "/appointments/book",
@@ -687,6 +688,11 @@ fn protected_routes() -> Router<AppState> {
         .route(
             "/consultations/:appointment_id/prescription",
             axum::routing::post(prescription_handlers::upload_doctor_prescription),
+        )
+        .route(
+            "/consultations/:appointment_id/prescription/corrections",
+            axum::routing::post(prescription_handlers::add_prescription_correction)
+                .get(prescription_handlers::list_prescription_corrections),
         )
         .route(
             "/consultations/:appointment_id/complete-no-rx",

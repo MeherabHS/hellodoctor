@@ -323,10 +323,11 @@ async fn authorized_document(
     appointment_id: Uuid,
     document_id: Uuid,
 ) -> Result<DocumentLocation, AppError> {
-    if !matches!(
-        ctx.role,
-        UserRole::Doctor | UserRole::Patient | UserRole::Admin
-    ) {
+    // The consultation's doctor and patient only. Admin may see that a
+    // document exists (Patient record lists date, size and status) but never
+    // its contents: no grant, no download, no preview (product owner,
+    // 2026-11-24; found in the local pentest).
+    if !matches!(ctx.role, UserRole::Doctor | UserRole::Patient) {
         return Err(AppError::Forbidden(
             "This role cannot access clinical documents.".into(),
         ));
@@ -573,4 +574,50 @@ async fn trace_document_access(
     .await?;
     tx.commit().await?;
     Ok(())
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PrescriptionCorrectionRequest {
+    pub note: String,
+}
+
+/// POST /consultations/:appointment_id/prescription/corrections — the
+/// doctor adds a correction note to a dispatched prescription.
+pub async fn add_prescription_correction(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(appointment_id): Path<Uuid>,
+    Json(payload): Json<PrescriptionCorrectionRequest>,
+) -> Result<impl IntoResponse, AppError> {
+    abac::authorize(&ctx, Action::UploadDoctorPrescription)?;
+    let doctor_id = ctx.doctor_profile_id(&state).await?;
+    let data = PrescriptionService::add_prescription_correction(
+        &state,
+        &ctx,
+        appointment_id,
+        doctor_id,
+        payload.note,
+    )
+    .await?;
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(serde_json::json!({"success": true, "data": data})),
+    ))
+}
+
+/// GET /consultations/:appointment_id/prescription/corrections — the notes,
+/// for the consultation's doctor or patient (row-level security decides).
+pub async fn list_prescription_corrections(
+    State(state): State<AppState>,
+    ctx: AuthContext,
+    Path(appointment_id): Path<Uuid>,
+) -> Result<impl IntoResponse, AppError> {
+    if !matches!(ctx.role, UserRole::Doctor | UserRole::Patient) {
+        return Err(AppError::Forbidden(
+            "Only the consultation's doctor or patient can read prescription notes.".into(),
+        ));
+    }
+    let data =
+        PrescriptionService::list_prescription_corrections(&state, &ctx, appointment_id).await?;
+    Ok(Json(serde_json::json!({"success": true, "data": data})))
 }

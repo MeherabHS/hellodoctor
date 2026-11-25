@@ -1,0 +1,17 @@
+# Trivy findings accepted on purpose. Each entry is scoped to the files it
+# covers and says why, who decided and when to review it.
+misconfigurations:
+  - id: DS-0002
+    paths:
+      - "deploy/single-vm/backup/pgbackrest.Dockerfile"
+    statement: >-
+      Starts as root by design: the same image runs PostgreSQL (its entrypoint
+      drops to postgres), chowns the backup volume and runs system cron; every
+      backup job drops to postgres via runuser. Not deployed (backups off).
+      Reviewed 2026-11-24, review again before re-enabling backups.
+  - id: DS-0002
+    paths:
+      - "services/backend/bench/loadgen.Dockerfile"
+    statement: >-
+      Performance test tooling, never deployed; writes evidence into a host
+      bind mount. Reviewed 2026-11-24.

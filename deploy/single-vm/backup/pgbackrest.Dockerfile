@@ -44,4 +44,10 @@ COPY alert-notify.sh /usr/local/bin/alert-notify.sh
 COPY postgres-entrypoint.sh /usr/local/bin/postgres-entrypoint.sh
 RUN chmod 0755 /usr/local/bin/backup-entrypoint.sh /usr/local/bin/backup-runner.sh /usr/local/bin/backup-monitor.sh /usr/local/bin/alert-notify.sh /usr/local/bin/postgres-entrypoint.sh /usr/local/bin/pgbackrest-conf-common.sh /usr/local/bin/fetch-keyvault-secret.sh
 
+# Starts as root on purpose (reviewed 2026-11-24): the same image runs
+# PostgreSQL (whose entrypoint drops to `postgres` itself), the entrypoint
+# chowns the backup volume, and system cron must run as root; every backup
+# job drops to `postgres` with runuser (backup-entrypoint.sh). A USER line
+# here would break all three. Not deployed today (backups are off).
+# nosemgrep: dockerfile.security.missing-user-entrypoint.missing-user-entrypoint
 ENTRYPOINT ["/usr/local/bin/backup-entrypoint.sh"]

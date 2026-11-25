@@ -51,6 +51,7 @@ class NotificationDestination {
       'CONSULTATION_NEEDS_REVIEW',
       'CONSULTATION_RECOVERY_RESOLVED',
       'PRESCRIPTION_AVAILABLE',
+      'PRESCRIPTION_CORRECTED',
     };
     if (notice.relatedEntityType == 'APPOINTMENT' &&
         appointments.contains(notice.type)) {

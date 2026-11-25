@@ -1249,7 +1249,41 @@ pub async fn get_command_telemetry(
         .iter()
         .filter(|row| row["ongoing"] == true)
         .count();
+    // Prescriptions to follow up (no clinical content): windows that closed
+    // with no decision, and video consultations both apps joined that the
+    // provider callback never marked started.
+    let rx_follow_ups: Vec<RxFollowUpRow> =
+        sqlx::query_as("SELECT * FROM fn_admin_rx_follow_ups($1)")
+            .bind(7_i32)
+            .fetch_all(&mut *tx)
+            .await?;
     tx.commit().await?;
+    let rx_follow_ups: Vec<_> = rx_follow_ups
+        .into_iter()
+        .map(
+            |(
+                kind,
+                appointment_id,
+                number,
+                doctor_name,
+                modality,
+                ended_at,
+                closed_at,
+                slot_start,
+            )| {
+                serde_json::json!({
+                    "kind": kind,
+                    "appointment_id": appointment_id,
+                    "appointment_number": number,
+                    "doctor_name": doctor_name,
+                    "modality": modality,
+                    "ended_at": ended_at,
+                    "closed_at": closed_at,
+                    "slot_start": slot_start,
+                })
+            },
+        )
+        .collect();
 
     Ok(Json(ApiResponse {
         success: true,
@@ -1261,9 +1295,23 @@ pub async fn get_command_telemetry(
             "active_streams": active_streams,
             "peer_ongoing_count": peer_ongoing,
             "peer_sessions": peer_sessions,
+            "rx_follow_ups": rx_follow_ups,
         }),
     }))
 }
+
+/// One `fn_admin_rx_follow_ups` row: kind, appointment id and number, doctor,
+/// modality, ended at, window closed at, slot start.
+type RxFollowUpRow = (
+    String,
+    Uuid,
+    String,
+    String,
+    String,
+    Option<chrono::DateTime<chrono::Utc>>,
+    Option<chrono::DateTime<chrono::Utc>>,
+    chrono::DateTime<chrono::Utc>,
+);
 
 /// GET /api/v1/admin/slots
 pub async fn list_admin_slots(

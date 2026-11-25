@@ -4,7 +4,7 @@ import {useEffect,useState} from 'react';
 import {Activity,HeartHandshake,MessageSquare,Users,Video} from 'lucide-react';
 import {ConsultationTimeline} from './ConsultationTimeline';
 import {PeerSessionTimeline} from './PeerSessionTimeline';
-import type {AdminOverview,CommandTelemetry,PeerTrackingRow} from '../../lib/api';
+import type {AdminOverview,CommandTelemetry,PeerTrackingRow,RxFollowUpRow} from '../../lib/api';
 import {Card,Chip,EmptyState,Notice,PageHead,StatTile,Tabs} from '../ui/afya';
 
 /**
@@ -116,6 +116,19 @@ export function CommandCenter({telemetry,overview,needsReviewOnly,setNeedsReview
           <td>{p.ongoing?<Chip tone="success">{tr('ops.statusOngoing')}</Chip>:<Chip tone="neutral">{p.status.charAt(0)+p.status.slice(1).toLowerCase()}</Chip>}</td>
           <td>{new Date(p.tracked_until).getTime()>now?<Chip tone={new Date(p.tracked_until).getTime()-now<24*3600_000?'danger':'warn'}>{tr('ops.traceLeft',{time:timeLeft(p.tracked_until,now)})}</Chip>:<Chip tone="neutral">{tr('ops.traceDeleted',{date:nairobiDate(p.tracked_until)})}</Chip>}</td>
           <td style={{textAlign:'right'}}><button type="button" className="afya-btn-secondary" onClick={()=>setPeerTimeline(p.timeline_url)}>{tr('ui.timeline')}</button></td>
+        </tr>)}</tbody>
+      </table></div>}
+    </Card>}
+    {kind!=='peer'&&<Card title={tr('ops.rxTitle',{count:telemetry?.rx_follow_ups?.length??0})} subtitle={tr('ops.rxSubtitle')}>
+      {!telemetry?.rx_follow_ups?.length?<EmptyState title={tr('ops.rxEmpty')}>{tr('ops.rxEmptyHint')}</EmptyState>:
+      <div className="afya-table-wrap"><table className="admin-table">
+        <thead><tr><th>{tr('ui.session')}</th><th>{tr('ui.doctorPatient')}</th><th>{tr('ui.status')}</th></tr></thead>
+        <tbody>{telemetry.rx_follow_ups.map((r:RxFollowUpRow)=><tr key={`${r.kind}-${r.appointment_id}`}>
+          <td><span style={{fontFamily:'ui-monospace,monospace',fontSize:12}}>{r.appointment_number}</span><div className="afya-stat-note">{r.modality==='CHAT'?tr('ops.rxChat'):tr('ops.rxVideo')}</div></td>
+          <td><div style={{fontWeight:700}}>{r.doctor_name}</div></td>
+          <td>{r.kind==='JOIN_SIGNAL_MISSING'
+            ?<><Chip tone="warn">{tr('ops.rxSignal')}</Chip><div className="afya-stat-note">{tr('ops.rxSignalNote',{date:nairobiDate(r.slot_start)})}</div></>
+            :<><Chip tone="danger">{tr('ops.rxClosed')}</Chip><div className="afya-stat-note">{tr('ops.rxClosedNote',{date:r.closed_at?nairobiDate(r.closed_at):'—'})}</div></>}</td>
         </tr>)}</tbody>
       </table></div>}
     </Card>}

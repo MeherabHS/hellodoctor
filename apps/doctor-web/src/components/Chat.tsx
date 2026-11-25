@@ -4,7 +4,7 @@ import { ClinicalAttachment } from './ClinicalAttachment';
 import { compressRxPhoto } from '../lib/rx-compression';
 import { useEffect, useRef, useState } from 'react';
 import { api, chatReceipts, errorText, post, useResource, runtimeGeneration } from '../lib/client';
-import { Appointment, Conversation, Message, Profile, chatExpired, chatLocked, messageSide, consultationContext, compareMessageInstants } from '../lib/contracts';
+import { Appointment, Conversation, Message, Profile, chatExpired, chatLocked, messageSide, consultationContext, compareMessageInstants, rxDispatchAllowed } from '../lib/contracts';
 import { Avatar, Badge, PageHeader, State, demographics } from './Common';
 import { Icon } from './Icons';
 import { ClinicalAction, date, time } from './Queue';
@@ -205,7 +205,7 @@ export function ChatThread({ chat, profile, appointment, onBack, action, gap, vi
         <button className="am-btn ghost sm" disabled={!appointment} onClick={()=>clinical('history')}><Icon name="history" size={15}/>History</button>
         <button className="am-btn ghost sm" disabled={!appointment} onClick={()=>clinical('documents')}><Icon name="file" size={15}/>Documents</button>
         {chat.modality==='VIDEO'&&!locked&&<button className="am-btn ghost sm" disabled={!appointment} onClick={()=>clinical('call')}><Icon name="video" size={15}/>Consultation room</button>}
-        {!locked&&<button className="am-btn soft sm" disabled={!appointment} onClick={()=>clinical('rx')}><Icon name="rx" size={15}/>Prescription</button>}
+        {!locked&&<button className="am-btn soft sm" disabled={!appointment||!rxDispatchAllowed(appointment)} onClick={()=>clinical('rx')}><Icon name="rx" size={15}/>Prescription</button>}
       </div>}
     </header>
     <div ref={feed} className="am-feed" id="dwChatMsgStream">

@@ -6,7 +6,7 @@ use crate::error::AppError;
 use crate::repository::{appointment_repo, prescription_repo, AppState};
 use crate::services::document_storage_service::DocumentStorageService;
 use crate::services::upload_security_service::UploadSecurityService;
-use chrono::Utc;
+use chrono::{DateTime, Duration, Utc};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -30,6 +30,246 @@ fn patient_intake_status_allowed(status: AppointmentStatus) -> bool {
 }
 
 pub struct PrescriptionService;
+
+/// What the prescription rule needs to know about one consultation. Loaded
+/// by [`PrescriptionService::load_rx_facts`] (upload and completion) and by
+/// the doctor queue's own SQL ([`rx_facts_columns`]), so both read the same
+/// facts.
+#[derive(Debug, Clone)]
+pub(crate) struct RxFacts {
+    pub status: AppointmentStatus,
+    pub modality: Modality,
+    pub slot_start: DateTime<Utc>,
+    /// When the consultation ended: the session's end, else the completion
+    /// time; the same instant the doctor's 24-hour clinical-access window
+    /// (`doctor_history_context_allowed`) counts from.
+    pub ended_at: Option<DateTime<Utc>>,
+    pub clinical_outcome: Option<String>,
+    /// Both the doctor's and the patient's app reported joining the video
+    /// call (`DOCTOR_JOINED` / `PATIENT_JOINED` telemetry; the reporter's side
+    /// is set by the server from the caller's identity, so a doctor cannot
+    /// report the patient's join).
+    pub both_joined: bool,
+    /// Both the doctor and the patient have sent at least one chat message.
+    pub both_messaged: bool,
+}
+
+/// The prescription rule's answer (product owner, 2026-11-24).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RxDecision {
+    /// A prescription can be sent now; `closes_at` is the deadline for a
+    /// completed consultation.
+    Allowed { closes_at: Option<DateTime<Utc>> },
+    /// The consultation has not started yet.
+    NotStarted,
+    /// Completed more than 24 hours ago.
+    WindowClosed,
+    /// A prescription decision is already recorded.
+    Decided,
+    /// Unpaid, cancelled, expired or otherwise not a consultation.
+    Unavailable,
+}
+
+impl RxDecision {
+    pub fn allowed(&self) -> bool {
+        matches!(self, RxDecision::Allowed { .. })
+    }
+    /// Stable code for clients.
+    pub fn code(&self) -> &'static str {
+        match self {
+            RxDecision::Allowed { .. } => "OK",
+            RxDecision::NotStarted => "NOT_STARTED",
+            RxDecision::WindowClosed => "WINDOW_CLOSED",
+            RxDecision::Decided => "DECIDED",
+            RxDecision::Unavailable => "UNAVAILABLE",
+        }
+    }
+    pub fn message(&self) -> &'static str {
+        match self {
+            RxDecision::Allowed { .. } => "",
+            RxDecision::NotStarted => RX_NOT_STARTED,
+            RxDecision::WindowClosed => {
+                "The 24-hour prescription window for this consultation has closed."
+            }
+            RxDecision::Decided => {
+                "The prescription decision for this consultation is already recorded and cannot be changed."
+            }
+            RxDecision::Unavailable => "This consultation cannot take a prescription.",
+        }
+    }
+    pub fn to_json(self) -> serde_json::Value {
+        serde_json::json!({
+            "allowed": self.allowed(),
+            "reason": self.code(),
+            "message": self.message(),
+            "closes_at": match self { RxDecision::Allowed { closes_at } => closes_at, _ => None },
+        })
+    }
+}
+
+/// How long after the end a completed consultation can still take a
+/// prescription.
+pub(crate) const RX_WINDOW_HOURS: i64 = 24;
+
+/// Product owner, 2026-11-24: a doctor sends a prescription only for a
+/// consultation that has started, or one completed in the last 24 hours
+/// without a prescription decision. Never before the patient is seen; once
+/// decided, never again. Server time (Africa/Nairobi deployment) decides.
+///
+/// "Started" means:
+/// * video: someone joined and the signed Agora presence callback moved it to
+///   IN_CONSULTATION, or both apps reported joining the call (covers a lost
+///   provider callback);
+/// * chat: its window has opened (`window_before_mins` before the slot) and
+///   both the doctor and the patient have sent a message, so a patient who
+///   never turned up cannot be prescribed for.
+pub(crate) fn doctor_rx_decision(
+    f: &RxFacts,
+    window_before_mins: i64,
+    now: DateTime<Utc>,
+) -> RxDecision {
+    match f.status {
+        AppointmentStatus::Completed => {
+            if matches!(
+                f.clinical_outcome.as_deref(),
+                Some("COMPLETED_WITH_RX") | Some("COMPLETED_NO_RX")
+            ) {
+                return RxDecision::Decided;
+            }
+            match f.ended_at {
+                Some(ended) if now < ended + Duration::hours(RX_WINDOW_HOURS) => {
+                    RxDecision::Allowed {
+                        closes_at: Some(ended + Duration::hours(RX_WINDOW_HOURS)),
+                    }
+                }
+                _ => RxDecision::WindowClosed,
+            }
+        }
+        AppointmentStatus::InConsultation => RxDecision::Allowed { closes_at: None },
+        AppointmentStatus::Confirmed | AppointmentStatus::Waiting => {
+            let started = match f.modality {
+                Modality::Video => f.both_joined,
+                Modality::Chat => {
+                    now >= f.slot_start - Duration::minutes(window_before_mins) && f.both_messaged
+                }
+            };
+            if started {
+                RxDecision::Allowed { closes_at: None }
+            } else {
+                RxDecision::NotStarted
+            }
+        }
+        _ => RxDecision::Unavailable,
+    }
+}
+
+/// The doctor-side refusal for a consultation that has not started.
+pub(crate) const RX_NOT_STARTED: &str = "A prescription can be sent once the consultation has started: after you and the patient have both joined the call, or both sent a message in the chat.";
+
+/// SQL for the two "started" facts of the appointment whose id is the SQL
+/// expression `appointment` and whose doctor's user id is `doctor_user`.
+/// Shared by [`PrescriptionService::load_rx_facts`] and the doctor queue so
+/// both evaluate the same thing.
+pub(crate) fn rx_facts_columns(appointment: &str, doctor_user: &str) -> String {
+    format!(
+        "(EXISTS(SELECT 1 FROM consultation_sessions rs JOIN consultation_telemetry_events re ON re.session_id=rs.id \
+           WHERE rs.appointment_id={appointment} AND re.event_type='DOCTOR_JOINED' AND re.actor_perspective='DOCTOR') \
+          AND EXISTS(SELECT 1 FROM consultation_sessions rs JOIN consultation_telemetry_events re ON re.session_id=rs.id \
+           WHERE rs.appointment_id={appointment} AND re.event_type='PATIENT_JOINED' AND re.actor_perspective='PATIENT')) AS rx_both_joined, \
+         (EXISTS(SELECT 1 FROM chat_conversations rc JOIN chat_messages rm ON rm.conversation_id=rc.id \
+           WHERE rc.appointment_id={appointment} AND rm.sender_id={doctor_user}) \
+          AND EXISTS(SELECT 1 FROM chat_conversations rc JOIN chat_messages rm ON rm.conversation_id=rc.id \
+           WHERE rc.appointment_id={appointment} AND rm.sender_id<>{doctor_user})) AS rx_both_messaged"
+    )
+}
+
+/// The rule's answer for one doctor-queue row (columns from
+/// `doctor_repo::list_appointments_as_of`), as the `rx` object the apps
+/// display: they show what the server decides instead of re-deriving it.
+pub(crate) fn rx_json_for_queue_row(
+    row: &sqlx::postgres::PgRow,
+    window_before_mins: i64,
+    now: DateTime<Utc>,
+) -> serde_json::Value {
+    use sqlx::Row;
+    let parse = |column: &str| serde_json::Value::String(row.get::<String, _>(column));
+    let (Ok(status), Ok(modality)) = (
+        serde_json::from_value::<AppointmentStatus>(parse("status")),
+        serde_json::from_value::<Modality>(parse("modality")),
+    ) else {
+        return RxDecision::Unavailable.to_json();
+    };
+    let ended_at = row
+        .get::<Option<DateTime<Utc>>, _>("session_ended_at")
+        .or(row.get::<Option<DateTime<Utc>>, _>("completed_at"));
+    let facts = RxFacts {
+        status,
+        modality,
+        slot_start: row.get("start_time"),
+        ended_at,
+        clinical_outcome: row.get("clinical_outcome"),
+        both_joined: row.get("rx_both_joined"),
+        both_messaged: row.get("rx_both_messaged"),
+    };
+    doctor_rx_decision(&facts, window_before_mins, now).to_json()
+}
+
+impl PrescriptionService {
+    /// The facts [`doctor_rx_decision`] needs, read in the caller's own
+    /// (RLS-scoped) transaction.
+    pub(crate) async fn load_rx_facts(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        apt: &Appointment,
+    ) -> Result<RxFacts, AppError> {
+        let sql = format!(
+            "SELECT s.start_time, COALESCE(cs.ended_at, a.completed_at) AS ended_at, {} \
+               FROM appointments a JOIN doctor_schedule_slots s ON s.id=a.slot_id \
+               JOIN doctor_profiles d ON d.id=a.doctor_id \
+               LEFT JOIN consultation_sessions cs ON cs.appointment_id=a.id \
+              WHERE a.id=$1",
+            rx_facts_columns("a.id", "d.user_id")
+        );
+        let (slot_start, ended_at, both_joined, both_messaged): (
+            DateTime<Utc>,
+            Option<DateTime<Utc>>,
+            bool,
+            bool,
+        ) = sqlx::query_as(&sql)
+            .bind(apt.id)
+            .fetch_one(&mut **tx)
+            .await?;
+        Ok(RxFacts {
+            status: apt.status,
+            modality: apt.modality,
+            slot_start,
+            ended_at,
+            clinical_outcome: apt.clinical_outcome.clone(),
+            both_joined,
+            both_messaged,
+        })
+    }
+
+    /// Refuses a doctor prescription (page upload or completion with Rx)
+    /// unless [`doctor_rx_decision`] allows it. Called under the
+    /// per-consultation advisory lock with a fresh read.
+    pub(crate) async fn ensure_doctor_rx_allowed(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        state: &AppState,
+        apt: &Appointment,
+    ) -> Result<(), AppError> {
+        let facts = Self::load_rx_facts(tx, apt).await?;
+        let decision = doctor_rx_decision(
+            &facts,
+            state.config.agora_token_window_before_mins,
+            Utc::now(),
+        );
+        if decision.allowed() {
+            Ok(())
+        } else {
+            Err(AppError::Conflict(decision.message().into()))
+        }
+    }
+}
 
 impl PrescriptionService {
     /// Patient multi-prescription upload intake (max 20 photos per appointment)
@@ -380,6 +620,7 @@ impl PrescriptionService {
                 "The prescription for this consultation has already been dispatched.".into(),
             ));
         }
+        Self::ensure_doctor_rx_allowed(&mut tx, state, &locked).await?;
         let (count, no_rx): (i64, bool) = sqlx::query_as("SELECT COUNT(*),COALESCE(BOOL_OR(is_no_rx_required),FALSE) FROM prescriptions WHERE appointment_id=$1")
             .bind(appointment_id).fetch_one(&mut *tx).await?;
         if no_rx {
@@ -553,5 +794,226 @@ impl PrescriptionService {
         .await?;
         tx.commit().await?;
         Ok(prescription)
+    }
+}
+
+/// A dispatched prescription is final (product owner, 2026-11-13); a doctor
+/// corrects it with a written note the patient sees (2026-11-24). Notes are
+/// append-only, at most this many per consultation, and only within this
+/// many days of the consultation's end.
+pub(crate) const RX_CORRECTIONS_MAX: i64 = 5;
+pub(crate) const RX_CORRECTION_DAYS: i64 = 7;
+
+impl PrescriptionService {
+    /// Adds a correction note to a dispatched prescription and notifies the
+    /// patient, in one transaction.
+    pub async fn add_prescription_correction(
+        state: &AppState,
+        ctx: &AuthContext,
+        appointment_id: Uuid,
+        doctor_id: DoctorProfileId,
+        note: String,
+    ) -> Result<serde_json::Value, AppError> {
+        let note = note.trim().to_string();
+        if !(3..=1000).contains(&note.chars().count()) {
+            return Err(AppError::UnprocessableEntity(
+                "A correction note must be 3 to 1000 characters.".into(),
+            ));
+        }
+        let mut tx = state.begin_authed(ctx).await?;
+        appointment_repo::lock_for_document_upload(&mut *tx, appointment_id).await?;
+        let apt = appointment_repo::find_by_id(&mut *tx, appointment_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+        if apt.doctor_id != doctor_id {
+            return Err(AppError::Forbidden(
+                "Caller is not the assigned physician for this appointment.".into(),
+            ));
+        }
+        if apt.status != AppointmentStatus::Completed
+            || apt.clinical_outcome.as_deref() != Some("COMPLETED_WITH_RX")
+        {
+            return Err(AppError::Conflict(
+                "A correction note can be added only after the prescription has been sent.".into(),
+            ));
+        }
+        let ended = Self::load_rx_facts(&mut tx, &apt)
+            .await?
+            .ended_at
+            .unwrap_or_else(Utc::now);
+        if Utc::now() >= ended + Duration::days(RX_CORRECTION_DAYS) {
+            return Err(AppError::Conflict(format!(
+                "Correction notes can be added for {RX_CORRECTION_DAYS} days after the consultation."
+            )));
+        }
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM prescription_corrections WHERE appointment_id=$1",
+        )
+        .bind(appointment_id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if count >= RX_CORRECTIONS_MAX {
+            return Err(AppError::Conflict(format!(
+                "At most {RX_CORRECTIONS_MAX} correction notes per prescription."
+            )));
+        }
+        let (id, created_at): (Uuid, DateTime<Utc>) = sqlx::query_as(
+            "INSERT INTO prescription_corrections(appointment_id, doctor_id, note) VALUES ($1,$2,$3) RETURNING id, created_at",
+        )
+        .bind(appointment_id)
+        .bind(doctor_id)
+        .bind(&note)
+        .fetch_one(&mut *tx)
+        .await?;
+        crate::services::NotificationService::notify_prescription_corrected(
+            &mut tx,
+            appointment_id,
+            id,
+        )
+        .await?;
+        tx.commit().await?;
+        Ok(serde_json::json!({"id": id, "note": note, "created_at": created_at}))
+    }
+
+    /// The correction notes on one consultation's prescription, oldest
+    /// first. Row-level security limits them to its doctor and patient.
+    pub async fn list_prescription_corrections(
+        state: &AppState,
+        ctx: &AuthContext,
+        appointment_id: Uuid,
+    ) -> Result<Vec<serde_json::Value>, AppError> {
+        let mut tx = state.begin_authed(ctx).await?;
+        // Someone who cannot see the consultation gets 404, like every other
+        // consultation route (found by the pentest: an empty 200 before).
+        appointment_repo::find_by_id(&mut *tx, appointment_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Appointment not found.".into()))?;
+        let rows: Vec<(Uuid, String, DateTime<Utc>)> = sqlx::query_as(
+            "SELECT id, note, created_at FROM prescription_corrections WHERE appointment_id=$1 ORDER BY created_at, id",
+        )
+        .bind(appointment_id)
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(rows
+            .into_iter()
+            .map(|(id, note, created_at)| serde_json::json!({"id": id, "note": note, "created_at": created_at}))
+            .collect())
+    }
+}
+
+#[cfg(test)]
+mod doctor_rx_rule_tests {
+    use super::*;
+
+    fn at(h: f64) -> DateTime<Utc> {
+        DateTime::parse_from_rfc3339("2026-11-24T10:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc)
+            + Duration::minutes((h * 60.0) as i64)
+    }
+
+    fn facts(status: AppointmentStatus, modality: Modality) -> RxFacts {
+        RxFacts {
+            status,
+            modality,
+            slot_start: at(-1.0),
+            ended_at: None,
+            clinical_outcome: None,
+            both_joined: false,
+            both_messaged: false,
+        }
+    }
+
+    #[test]
+    fn video_starts_when_someone_joined() {
+        let now = at(0.0);
+        let d = |f: &RxFacts| doctor_rx_decision(f, 15, now);
+        assert!(d(&facts(AppointmentStatus::InConsultation, Modality::Video)).allowed());
+        assert_eq!(
+            d(&facts(AppointmentStatus::Confirmed, Modality::Video)),
+            RxDecision::NotStarted
+        );
+        assert_eq!(
+            d(&facts(AppointmentStatus::Waiting, Modality::Video)),
+            RxDecision::NotStarted
+        );
+        // The provider callback was lost, but both apps reported joining.
+        let joined = RxFacts {
+            both_joined: true,
+            ..facts(AppointmentStatus::Confirmed, Modality::Video)
+        };
+        assert!(d(&joined).allowed());
+    }
+
+    #[test]
+    fn chat_starts_when_both_have_written_inside_the_window() {
+        let now = at(0.0);
+        let d = |f: &RxFacts| doctor_rx_decision(f, 15, now);
+        let open = facts(AppointmentStatus::Confirmed, Modality::Chat);
+        // Window open, but the patient never wrote: a no-show.
+        assert_eq!(d(&open), RxDecision::NotStarted);
+        assert!(d(&RxFacts {
+            both_messaged: true,
+            ..open.clone()
+        })
+        .allowed());
+        // A chat booked for tomorrow does not count before its window.
+        let tomorrow = RxFacts {
+            slot_start: at(24.0),
+            both_messaged: true,
+            ..open.clone()
+        };
+        assert_eq!(d(&tomorrow), RxDecision::NotStarted);
+        // 10 minutes before the slot is inside the 15-minute window.
+        let soon = RxFacts {
+            slot_start: at(10.0 / 60.0),
+            both_messaged: true,
+            ..open
+        };
+        assert!(d(&soon).allowed());
+    }
+
+    #[test]
+    fn completed_has_24_hours_and_one_decision() {
+        let now = at(0.0);
+        let d = |f: &RxFacts| doctor_rx_decision(f, 15, now);
+        let done = |ended: f64, outcome: Option<&str>| RxFacts {
+            ended_at: Some(at(ended)),
+            clinical_outcome: outcome.map(str::to_string),
+            ..facts(AppointmentStatus::Completed, Modality::Video)
+        };
+        assert_eq!(
+            d(&done(-2.0, None)),
+            RxDecision::Allowed {
+                closes_at: Some(at(22.0))
+            }
+        );
+        assert_eq!(d(&done(-25.0, None)), RxDecision::WindowClosed);
+        assert_eq!(
+            d(&done(-1.0, Some("COMPLETED_WITH_RX"))),
+            RxDecision::Decided
+        );
+        assert_eq!(d(&done(-1.0, Some("COMPLETED_NO_RX"))), RxDecision::Decided);
+        assert_eq!(
+            d(&facts(AppointmentStatus::Completed, Modality::Chat)),
+            RxDecision::WindowClosed
+        );
+    }
+
+    #[test]
+    fn never_for_unpaid_cancelled_or_expired() {
+        for status in [
+            AppointmentStatus::PendingPayment,
+            AppointmentStatus::Cancelled,
+            AppointmentStatus::Expired,
+        ] {
+            let f = RxFacts {
+                both_messaged: true,
+                both_joined: true,
+                ..facts(status, Modality::Chat)
+            };
+            assert_eq!(doctor_rx_decision(&f, 15, at(0.0)), RxDecision::Unavailable);
+        }
     }
 }

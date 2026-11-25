@@ -125,6 +125,11 @@ pub struct AppConfig {
     /// docs/AUTH_SECURITY.md §10.2 rather than a hardcoded window, since the
     /// right values are a product decision, not an architectural constant.
     pub agora_token_window_before_mins: i64,
+    /// Oldest Care (doctor) app build allowed to keep working
+    /// (`DOCTOR_APP_MIN_BUILD`, default 0 = no minimum). Raised after a
+    /// release that changes a rule the old app gets wrong; older apps then
+    /// ask the doctor to update (`GET /config/app-version`).
+    pub doctor_app_min_build: i64,
     pub agora_token_window_after_mins: i64,
     /// Emergency backstop for a `CONFIRMED` live-consultation reservation
     /// (`consultation_live_reservations`, M8-G-30) — not a maximum
@@ -341,6 +346,7 @@ impl std::fmt::Debug for AppConfig {
                 "agora_token_window_before_mins",
                 &self.agora_token_window_before_mins,
             )
+            .field("doctor_app_min_build", &self.doctor_app_min_build)
             .field(
                 "agora_token_window_after_mins",
                 &self.agora_token_window_after_mins,
@@ -612,6 +618,13 @@ impl AppConfig {
             totp_encryption_key_b64: require("TOTP_ENCRYPTION_KEY_B64"),
             agora_app_id: require("AGORA_APP_ID"),
             agora_app_certificate: require("AGORA_APP_CERTIFICATE"),
+            doctor_app_min_build: env::var("DOCTOR_APP_MIN_BUILD")
+                .map(|p| {
+                    p.parse().unwrap_or_else(|_| {
+                        panic!("FATAL: DOCTOR_APP_MIN_BUILD must be a valid integer.")
+                    })
+                })
+                .unwrap_or(0),
             agora_token_window_before_mins: env::var("AGORA_TOKEN_WINDOW_BEFORE_MINS")
                 .map(|p| {
                     p.parse().unwrap_or_else(|_| {
@@ -1499,6 +1512,7 @@ pub(crate) mod remediation_e3_tests {
             agora_app_id: "agora-app-id-visible".into(),
             agora_app_certificate: "SYNTH_AGORA_CERT_AAAAAA".into(),
             agora_token_window_before_mins: 15,
+            doctor_app_min_build: 0,
             agora_token_window_after_mins: 60,
             consultation_live_reservation_max_secs: 21_600,
             webhook_hmac_secret: "SYNTH_WEBHOOK_HMAC_BBBBBB".into(),

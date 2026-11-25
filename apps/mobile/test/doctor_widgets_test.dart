@@ -218,10 +218,33 @@ void main() {
           reason: 'width=$width');
       expect(find.text('Follow-up messages'), findsOneWidget,
           reason: 'width=$width');
-      expect(find.text('Write prescription'), findsOneWidget,
+      // Not started yet: no prescription (product owner, 2026-11-24).
+      expect(find.text('Write prescription'), findsNothing,
           reason: 'width=$width');
       expect(find.text('Start chat consultation'), findsNothing,
           reason: 'width=$width');
+
+      // The same consultation once someone has joined the call: the
+      // prescription action appears and the toolbar still fits.
+      final started = AppointmentDto.fromJson({
+        'id': 'a',
+        'patient_id': 'p',
+        'patient_display_name': 'Mohammad Abdur Rahman Chowdhury',
+        'status': 'IN_CONSULTATION',
+        'queue_actionable': true,
+        'modality': 'VIDEO',
+        'conversation_id': 'shared-conversation',
+        'doctor_lifecycle': 'IN_CONSULTATION',
+        'chief_complaint':
+            'Severe abdominal pain with recurring fever since yesterday',
+      });
+      await tester.pumpWidget(harness(
+          Scaffold(body: ConsultationActions(appointment: started)),
+          DoctorState(queue: [started])));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: 'started, width=$width');
+      expect(find.text('Write prescription'), findsOneWidget,
+          reason: 'started, width=$width');
     }
     await tester.binding.setSurfaceSize(null);
   });

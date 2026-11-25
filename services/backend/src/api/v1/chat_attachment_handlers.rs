@@ -77,7 +77,7 @@ async fn require_participant(state: &AppState, ctx: &AuthContext) -> Result<(), 
         }
         UserRole::Patient => Ok(()),
         _ => Err(AppError::Forbidden(
-            "Only consultation participants may attach images.".into(),
+            "Only the consultation's doctor and patient can use its chat images.".into(),
         )),
     }
 }
@@ -354,7 +354,9 @@ pub async fn view(
     ctx: AuthContext,
     Path((conversation_id, message_id)): Path<(Uuid, Uuid)>,
 ) -> Result<Response, AppError> {
-    abac::authorize(&ctx, Action::AnyAuthenticated)?;
+    // Clinical images: the consultation's doctor and patient only, never
+    // Admin (row-level security alone would let the ADMIN role through).
+    require_participant(&state, &ctx).await?;
     let mut tx = state.begin_authed(&ctx).await?;
     let conv = chat_repo::find_conversation(&mut *tx, conversation_id)
         .await?

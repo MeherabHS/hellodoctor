@@ -1,3 +1,4 @@
+import '../time/server_clock.dart';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -329,6 +330,7 @@ class ApiClient {
           handler.next(options);
         },
         onResponse: (response, handler) {
+          ServerClock.observe(response.headers.value('date'));
           if (_proofSigner.enabled &&
               _isSessionEstablishment(response.requestOptions.path)) {
             final body = response.data;
