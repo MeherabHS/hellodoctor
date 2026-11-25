@@ -137,6 +137,22 @@ jobs:
           GLOBAL_IP_RATE_LIMIT_PER_MIN=100000
           DB_POOL_MAX_CONNECTIONS_PER_ROLE=10
           EOF
+          # Secrets the backend refuses to start without (config.rs require()),
+          # generated fresh for this run and discarded with the runner.
+          openssl genpkey -algorithm ed25519 -outform DER -out /tmp/hellodoctor-arm64/jwt.der
+          openssl pkey -in /tmp/hellodoctor-arm64/jwt.der -inform DER -pubout -outform DER -out /tmp/hellodoctor-arm64/jwt.pub.der
+          {
+            echo "JWT_ED25519_PRIVATE_KEY_B64=$(base64 -w0 /tmp/hellodoctor-arm64/jwt.der)"
+            echo "JWT_ED25519_PUBLIC_KEY_B64=$(base64 -w0 /tmp/hellodoctor-arm64/jwt.pub.der)"
+            echo "TOTP_ENCRYPTION_KEY_B64=$(openssl rand -base64 32)"
+            echo "AGORA_APP_ID=$(openssl rand -hex 16)"
+            echo "AGORA_APP_CERTIFICATE=$(openssl rand -hex 16)"
+            echo "WEBHOOK_HMAC_SECRET=$(openssl rand -hex 32)"
+            for role in API_ROLE AUTH_WORKER PAYMENT_WORKER SYSTEM_WORKER FINANCE_WORKER; do
+              echo "DB_${role}_PASSWORD=$(openssl rand -hex 16)"
+            done
+          } >> /tmp/hellodoctor-arm64/backend.env
+          rm -f /tmp/hellodoctor-arm64/jwt.der /tmp/hellodoctor-arm64/jwt.pub.der
       - name: Render and assert the fully merged Compose configuration
         shell: bash
         # Review fix applied: this used to be `config --quiet` (syntax-only).
@@ -168,6 +184,9 @@ jobs:
           PYEOF
       - name: Start six services with synthetic volumes
         run: $DC up -d
+      - name: Service logs on startup failure
+        if: failure()
+        run: $DC logs --no-color --tail 200 || true
       - name: Wait for service health
         shell: bash
         run: |

@@ -56,6 +56,26 @@ jobs:
       PGBACKREST_STANZA: hellodoctor
       # Synthetic, generated fresh per run, never reused, never a real secret.
       PGBACKREST_REPO1_CIPHER_PASS: ${{ github.run_id }}-${{ github.run_attempt }}-synthetic-ci-only-passphrase
+      # compose.yml interpolates every service, so values the recovery job never
+      # starts (backend, web apps, proxy) still need throwaway placeholders.
+      # Volume names share the project prefix so the leftover check covers them.
+      POSTGRES_VOLUME: hellodoctor-arm64-ci-recovery-pgdata
+      REDIS_VOLUME: hellodoctor-arm64-ci-recovery-redisdata
+      CADDY_DATA_VOLUME: hellodoctor-arm64-ci-recovery-caddydata
+      CADDY_CONFIG_VOLUME: hellodoctor-arm64-ci-recovery-caddyconfig
+      BACKEND_RUNTIME_IMAGE: unused-in-recovery/backend
+      ADMIN_WEB_IMAGE: unused-in-recovery/admin-web
+      DOCTOR_WEB_IMAGE: unused-in-recovery/doctor-web
+      BACKEND_ENV_FILE: /tmp/hellodoctor-arm64-recovery/backend.env
+      ERASURE_JOURNAL_DIR: /tmp/hellodoctor-arm64-recovery/erasure
+      API_HOST: api.localhost
+      ADMIN_HOST: admin.localhost
+      DOCTOR_HOST: doctor.localhost
+      WEB_PROXY_SECRET: arm64-recovery-proxy-secret
+      TURNSTILE_SITE_KEY: arm64-recovery-site
+      TURNSTILE_SECRET_KEY: arm64-recovery-secret
+      WEB_AUTH_ASSERTION_SECRET: arm64-recovery-assertion-secret-0123456789012345678901
+      ACME_EMAIL: test@example.invalid
       DC: >-
         docker compose -p hellodoctor-arm64-ci-recovery
         -f deploy/single-vm/compose.yml
@@ -64,6 +84,10 @@ jobs:
         -f deploy/single-vm/compose.arm64-ci-recovery.yml
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Create the placeholder files compose expects
+        run: |
+          mkdir -p /tmp/hellodoctor-arm64-recovery/erasure
+          : > /tmp/hellodoctor-arm64-recovery/backend.env
       - name: Verify native runner
         run: |
           set -euo pipefail
