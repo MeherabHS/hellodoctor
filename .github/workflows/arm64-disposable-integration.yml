@@ -299,7 +299,10 @@ jobs:
           sleep 1
           echo "BOOKING_WINDOW_STARTED=$(date -u +%FT%TZ)" >> "$GITHUB_ENV"
           CAPACITY_ISOLATED_ACTION=booking_payment cargo run --release --example capacity_test
-          CAPACITY_ISOLATED_ACTION=chat cargo run --release --example capacity_test
+          # Fresh patients for chat: the booking run's patients already hold
+          # the earliest slot time, so the chat run's own booking would be
+          # (correctly) rejected by appt_patient_no_overlap.
+          CAPACITY_PATIENT_OFFSET=100 CAPACITY_ISOLATED_ACTION=chat cargo run --release --example capacity_test
       - name: Assert booking and chat rows were actually created
         shell: bash
         run: |
