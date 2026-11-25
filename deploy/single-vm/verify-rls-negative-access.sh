@@ -130,7 +130,7 @@ CLEANUP_IDS=("$patient_a" "$patient_b")
 visible_rows="$(psql_q -c "
   BEGIN;
   SET LOCAL ROLE hellodoctor_api;
-  SET LOCAL app.current_role = 'PATIENT';
+  SET LOCAL app."current_role" = 'PATIENT';  -- current_role is a reserved word: must be quoted
   SET LOCAL app.current_user_id = '${patient_a}';
   SELECT count(*) FROM patient_profiles WHERE user_id = '${patient_b}';
 ")"
@@ -140,7 +140,7 @@ echo "PASS: cross-patient row is invisible under hellodoctor_api + patient_profi
 own_row="$(psql_q -c "
   BEGIN;
   SET LOCAL ROLE hellodoctor_api;
-  SET LOCAL app.current_role = 'PATIENT';
+  SET LOCAL app."current_role" = 'PATIENT';  -- current_role is a reserved word: must be quoted
   SET LOCAL app.current_user_id = '${patient_a}';
   SELECT count(*) FROM patient_profiles WHERE user_id = '${patient_a}';
 ")"
