@@ -735,11 +735,20 @@ async fn main() {
             "registered_patients={} active_sessions_target={active_sessions} ramp_secs={ramp_secs} think_time_secs=[{think_min_secs},{think_max_secs}]\n",
             patient_count
         );
+        // Opt-in (default 0 = unchanged): shift which seeded patients the
+        // sessions use, so a second isolated run in the same hour does not
+        // reuse patients whose first booking already holds the earliest slot
+        // time (appt_patient_no_overlap) or whose 10/hour booking quota the
+        // previous run consumed.
+        let patient_offset: usize = env::var("CAPACITY_PATIENT_OFFSET")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
         let mut handles = Vec::new();
         for session_idx in 0..active_sessions {
             let f = fixtures.clone();
             let tx = tx.clone();
-            let patient_idx = session_idx % patient_count.max(1);
+            let patient_idx = (session_idx + patient_offset) % patient_count.max(1);
             // Milestone 8.0 session-ramp remediation: spread each session's
             // first start uniformly across [0, ramp_secs] instead of every
             // session starting at the same instant. ramp_secs=0 (the

@@ -138,6 +138,7 @@ jobs:
           RECOVERY_MODE=false
           GLOBAL_IP_RATE_LIMIT_PER_MIN=100000
           DB_POOL_MAX_CONNECTIONS_PER_ROLE=10
+          FINANCIAL_MODULE_MODE=deferred
           EOF
           # Secrets the backend refuses to start without (config.rs require()),
           # generated fresh for this run and discarded with the runner.
@@ -177,6 +178,9 @@ jobs:
               'DEV_SIMULATION_ENABLED': 'true',
               'SEED_DEV_DATA': 'true',
               'STORAGE_PROVIDER': 'disabled',
+              # Matches production (no gateway yet). The backend defaults to
+              # `enabled`, which rejects the gateway-less synthetic bookings.
+              'FINANCIAL_MODULE_MODE': 'deferred',
           }
           bad = {k: (be.get(k), v) for k, v in expected.items() if str(be.get(k)) != v}
           if bad:
@@ -280,9 +284,25 @@ jobs:
         # this command's exit code.
         run: |
           set -euo pipefail
+          # The harness signs its synthetic logins with the same disposable
+          # Ed25519 key the backend was started with (rendered into
+          # backend.env by "Prepare synthetic backend environment").
+          JWT_ED25519_PRIVATE_KEY_B64="$(grep '^JWT_ED25519_PRIVATE_KEY_B64=' "$BACKEND_ENV_FILE" | cut -d= -f2-)"
+          test -n "$JWT_ED25519_PRIVATE_KEY_B64" || { echo "::error::JWT_ED25519_PRIVATE_KEY_B64 missing from $BACKEND_ENV_FILE"; exit 1; }
+          export JWT_ED25519_PRIVATE_KEY_B64
+          # The harness only uses seeded synthetic users (+25471 doctors,
+          # +25472 patients) and their future open slots; the disposable DB
+          # starts empty. Seed BEFORE recording the window start so the
+          # seed's historical appointments/messages are not counted below.
+          PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -q -v ON_ERROR_STOP=1 \
+            -f scripts/seed_capacity_dataset.sql
+          sleep 1
           echo "BOOKING_WINDOW_STARTED=$(date -u +%FT%TZ)" >> "$GITHUB_ENV"
           CAPACITY_ISOLATED_ACTION=booking_payment cargo run --release --example capacity_test
-          CAPACITY_ISOLATED_ACTION=chat cargo run --release --example capacity_test
+          # Fresh patients for chat: the booking run's patients already hold
+          # the earliest slot time, so the chat run's own booking would be
+          # (correctly) rejected by appt_patient_no_overlap.
+          CAPACITY_PATIENT_OFFSET=100 CAPACITY_ISOLATED_ACTION=chat cargo run --release --example capacity_test
       - name: Assert booking and chat rows were actually created
         shell: bash
         run: |
@@ -290,7 +310,7 @@ jobs:
           appt_count="$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -t -A -v ON_ERROR_STOP=1 \
             -c "SELECT count(*) FROM appointments WHERE created_at >= '${BOOKING_WINDOW_STARTED}'::timestamptz;")"
           chat_count="$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -p 55432 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -t -A -v ON_ERROR_STOP=1 \
-            -c "SELECT count(*) FROM chat_messages WHERE created_at >= '${BOOKING_WINDOW_STARTED}'::timestamptz;")"
+            -c "SELECT count(*) FROM chat_messages WHERE sent_at >= '${BOOKING_WINDOW_STARTED}'::timestamptz;")"
           test "$appt_count" -gt 0 || { echo "::error::no appointments created by the synthetic booking run (count=$appt_count)"; exit 1; }
           test "$chat_count" -gt 0 || { echo "::error::no chat messages created by the synthetic chat run (count=$chat_count)"; exit 1; }
           echo "PASS: synthetic run deterministically created $appt_count appointment(s) and $chat_count chat message(s)"
