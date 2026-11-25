@@ -332,9 +332,36 @@ jobs:
             fi
             echo "PASS: $svc is read-only rootfs, no-new-privileges, CapDrop ALL, and rejects a rootfs write"
           done
-          net="$(docker network inspect "${PROJECT}_data" --format '{{json .Internal}}')"
-          test "$net" = "true" || { echo "::error::data network is not internal"; exit 1; }
-          echo "PASS: data network is internal:true"
+          # compose.local-verification.yml deliberately sets the data network
+          # internal:false in THIS stack so the runner can reach postgres/redis
+          # on loopback (Docker publishes no ports for internal networks), so
+          # the runtime flag here can never be true. Assert the production
+          # base file instead, plus loopback-only publishing in this stack.
+          docker compose -p prod-render-check -f deploy/single-vm/compose.yml config --format json > /tmp/hellodoctor-arm64/prod-compose.json
+          python3 - <<'PYEOF'
+          import json, sys
+          d = json.load(open('/tmp/hellodoctor-arm64/prod-compose.json'))
+          errs = []
+          if d['networks']['data'].get('internal') is not True:
+              errs.append("production compose.yml: data network is not internal:true")
+          for svc in ('postgres', 'redis'):
+              s = d['services'][svc]
+              if s.get('ports'):
+                  errs.append(f"production compose.yml: {svc} publishes ports {s['ports']}")
+              if set(s.get('networks', {})) != {'data'}:
+                  errs.append(f"production compose.yml: {svc} is on networks {sorted(s.get('networks', {}))}, expected only data")
+          if errs:
+              for e in errs: print(f"::error::{e}")
+              sys.exit(1)
+          print("PASS: production compose.yml renders data as internal:true, with postgres/redis on data only and no published ports")
+          PYEOF
+          for svc in postgres redis; do
+            bindings="$(docker inspect -f '{{json .NetworkSettings.Ports}}' "$($DC ps -q "$svc")")"
+            echo "$bindings" | python3 -c 'import json,sys; b=[h for v in (json.load(sys.stdin) or {}).values() if v for h in v]; sys.exit(0 if b and all(h["HostIp"]=="127.0.0.1" for h in b) else 1)' \
+              || { echo "::error::$svc host port binding is not loopback-only in the CI stack: $bindings"; exit 1; }
+          done
+          echo "PASS: CI-only postgres/redis host ports bind to 127.0.0.1 only"
+          echo "NOT TESTED: runtime internal:true on the data network - this stack overrides it to false for runner access; production compose.yml is asserted above instead"
       - name: Exercise the full Admin login, OTP, protected BFF request and refresh sequence
         shell: bash
         # Review fix applied: the previous draft only checked for *a*
