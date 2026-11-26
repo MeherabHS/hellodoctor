@@ -158,6 +158,10 @@ services:
       - "${PROXY_BIND_ADDRESS:-0.0.0.0}:${PROXY_HTTPS_PORT:-443}:443"
     volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddydata:/data", "caddyconfig:/config"]
     read_only: true
+    # Internet-facing: drop every capability like the other services, keeping
+    # only the one Caddy needs to listen on :80/:443 inside the container.
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
     tmpfs: ["/tmp:size=16m,mode=1777"]
     networks:
       app: {ipv4_address: 172.30.84.10}
